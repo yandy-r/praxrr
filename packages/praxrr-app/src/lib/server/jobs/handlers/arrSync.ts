@@ -1,22 +1,47 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobHandlerResult, JobQueueRecord, JobRunStatus, JobType } from '../queueTypes.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import { type ArrInstance, arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrSyncQueries, type ReviewedSyncClaim } from '$db/queries/arrSync.ts';
+import {
+  type ArrInstanceReviewClient,
+  getArrInstanceClient,
+  getArrInstanceReviewClient,
+} from '$arr/arrInstanceClients.ts';
 import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
+import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrType } from '$arr/types.ts';
 import { calculateNextRun } from '$lib/server/sync/utils.ts';
-import type { SectionType } from '$lib/server/sync/types.ts';
+import type { BaseSyncer, SectionType } from '$lib/server/sync/types.ts';
 import { getSection } from '$lib/server/sync/registry.ts';
 import {
-  SYNC_SECTION_ORDER,
   getUnsupportedSyncSectionReason,
   resolveSyncSectionAvailability,
+  SYNC_SECTION_ORDER,
   type SyncArrType,
 } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 import { snapshotService } from '$pcd/snapshots/service.ts';
-import { capturePreSyncChanges, deriveSyncHistoryStatus, recordSyncHistory } from '$sync/syncHistory/record.ts';
+import {
+  capturePreSyncChanges,
+  deriveSyncHistoryStatus,
+  flattenSyncPreviewChanges,
+  recordSyncHistory,
+} from '$sync/syncHistory/record.ts';
+import {
+  buildSyncPreviewReviewBinding,
+  buildSyncPreviewTargetHash,
+  compareReviewedEvidence,
+  syncPreviewReviewTarget,
+} from '$sync/preview/reviewBinding.ts';
+import { generatePreview, type GeneratePreviewWithReviewContextResult } from '$sync/preview/orchestrator.ts';
+import type {
+  ReviewedEvidenceComparison,
+  SyncPreviewEvidenceClass,
+  SyncPreviewPreparedExecutionContext,
+  SyncPreviewReviewBinding,
+  SyncPreviewReviewInvalidationReason,
+  SyncPreviewReviewTargetInput,
+} from '$sync/preview/types.ts';
 import type {
   SyncEntityChange,
   SyncOperationStatus,
@@ -35,6 +60,63 @@ export type SyncJobResult = JobHandlerResult & {
   outcomes: SyncEntityOutcome[];
   syncHistoryId: number | null;
 };
+
+export interface ExecuteReviewedSyncJobInput {
+  readonly binding: SyncPreviewReviewBinding;
+  readonly sections: readonly SyncPreviewSection[];
+  readonly previewId: string;
+  readonly expiresAt: string;
+  readonly source?: 'manual' | 'system' | 'schedule';
+  /** Test-only/adversarial seam after every section matches and before the first side effect. */
+  readonly beforeWrite?: () => void | Promise<void>;
+  readonly dependencies?: Partial<ReviewedSyncExecutionDependencies>;
+}
+
+export type ReviewedSyncJobResult =
+  | { readonly kind: 'executed'; readonly result: SyncJobResult }
+  | {
+      readonly kind: 'claim_conflict';
+      readonly outcomes: readonly [];
+      readonly syncHistoryId: null;
+    }
+  | {
+      readonly kind: 'expired';
+      readonly outcomes: readonly [];
+      readonly syncHistoryId: null;
+    }
+  | {
+      readonly kind: 'invalidated';
+      readonly reason: SyncPreviewReviewInvalidationReason;
+      readonly changedEvidence: readonly SyncPreviewEvidenceClass[];
+      readonly changedSections: readonly SyncPreviewSection[];
+      readonly outcomes: readonly [];
+      readonly syncHistoryId: null;
+    };
+
+interface ReviewedExecutionSyncer extends BaseSyncer {
+  setPreparedExecutionContext(context: SyncPreviewPreparedExecutionContext): void;
+  clearPreparedExecutionContext(): void;
+}
+
+export interface ReviewedSyncExecutionDependencies {
+  readonly now: () => number;
+  readonly getInstance: (instanceId: number) => ArrInstance | null;
+  readonly getReviewClient: (instance: ArrInstance) => Promise<ArrInstanceReviewClient>;
+  readonly detectVersion: typeof detectAndRecordArrVersion;
+  readonly claimSections: (instanceId: number, sections: readonly SectionType[]) => ReviewedSyncClaim | null;
+  readonly releaseSections: (claim: ReviewedSyncClaim) => boolean;
+  readonly completeSections: (claim: ReviewedSyncClaim) => boolean;
+  readonly failSections: (claim: ReviewedSyncClaim, error: string) => boolean;
+  readonly materializeReview: (
+    instance: ArrInstance,
+    sections: readonly SectionType[],
+    sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>,
+    client: BaseArrClient
+  ) => Promise<GeneratePreviewWithReviewContextResult>;
+  readonly createSnapshot: typeof snapshotService.createAutoSnapshot;
+  readonly recordHistory: typeof recordSyncHistory;
+  readonly getSectionHandler: typeof getSection;
+}
 
 // Register sync handlers
 import '$lib/server/sync/qualityProfiles/handler.ts';
@@ -304,19 +386,425 @@ export const __testOnly = {
   collectSnapshotDatabaseIds,
 };
 
+const DEFAULT_REVIEWED_SYNC_DEPENDENCIES: ReviewedSyncExecutionDependencies = {
+  now: Date.now,
+  getInstance: (instanceId) => arrInstancesQueries.getById(instanceId) ?? null,
+  getReviewClient: async (instance) => await getArrInstanceReviewClient(instance.type as ArrType, instance),
+  detectVersion: detectAndRecordArrVersion,
+  claimSections: (instanceId, sections) => arrSyncQueries.claimReviewedSyncSections(instanceId, sections),
+  releaseSections: (claim) => arrSyncQueries.releaseReviewedSyncSections(claim),
+  completeSections: (claim) => arrSyncQueries.completeReviewedSyncSections(claim),
+  failSections: (claim, error) => arrSyncQueries.failReviewedSyncSections(claim, error),
+  materializeReview: (instance, sections, sectionConfigs, client) =>
+    generatePreview(
+      {
+        instance,
+        sections: [...sections],
+        sectionConfigs: { ...sectionConfigs },
+      },
+      { captureReviewContext: true, client }
+    ),
+  createSnapshot: (input) => snapshotService.createAutoSnapshot(input),
+  recordHistory: recordSyncHistory,
+  getSectionHandler: getSection,
+};
+
+function invalidatedReviewedSync(
+  reason: SyncPreviewReviewInvalidationReason,
+  changedSections: readonly SyncPreviewSection[],
+  changedEvidence: readonly SyncPreviewEvidenceClass[] = []
+): ReviewedSyncJobResult {
+  return {
+    kind: 'invalidated',
+    reason,
+    changedEvidence: Object.freeze([...changedEvidence]),
+    changedSections: Object.freeze([...changedSections]),
+    outcomes: [],
+    syncHistoryId: null,
+  };
+}
+
+function isReviewedSectionSubsequence(
+  sections: readonly SyncPreviewSection[],
+  reviewedSections: readonly SyncPreviewSection[]
+): boolean {
+  let previousIndex = -1;
+  for (const section of sections) {
+    const index = reviewedSections.indexOf(section);
+    if (index <= previousIndex) return false;
+    previousIndex = index;
+  }
+  return true;
+}
+
+function validateReviewedScope(
+  binding: SyncPreviewReviewBinding,
+  sections: readonly SyncPreviewSection[],
+  instance: ArrInstance | null
+): ReviewedSyncJobResult | null {
+  if (
+    !instance ||
+    !instance.enabled ||
+    instance.id !== binding.instanceId ||
+    instance.type !== binding.arrType ||
+    sections.length === 0 ||
+    new Set(sections).size !== sections.length ||
+    !isReviewedSectionSubsequence(sections, binding.sections) ||
+    sections.some(
+      (section) =>
+        !SYNC_SECTION_ORDER.includes(section) ||
+        !binding.sections.includes(section) ||
+        !binding.evidence[section] ||
+        getUnsupportedSyncSectionReason(binding.arrType, section) !== null
+    )
+  ) {
+    return invalidatedReviewedSync('scope_drift', sections);
+  }
+
+  return null;
+}
+
+function collectReviewedSnapshotDatabaseIds(
+  contexts: Readonly<Partial<Record<SyncPreviewSection, SyncPreviewPreparedExecutionContext>>>,
+  sections: readonly SyncPreviewSection[]
+): number[] {
+  const ids = new Set<number>();
+  const add = (value: unknown): void => addPositiveDatabaseId(ids, value);
+
+  for (const section of sections) {
+    const config = contexts[section]?.config;
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      continue;
+    }
+    const value = config as Record<string, unknown>;
+    if (section === 'qualityProfiles' && Array.isArray(value.selections)) {
+      for (const selection of value.selections) {
+        if (selection && typeof selection === 'object') {
+          add((selection as Record<string, unknown>).databaseId);
+        }
+      }
+    } else if (section === 'delayProfiles' || section === 'metadataProfiles') {
+      add(value.databaseId);
+    } else if (section === 'mediaManagement') {
+      add(value.namingDatabaseId);
+      add(value.qualityDefinitionsDatabaseId);
+      add(value.mediaSettingsDatabaseId);
+    }
+  }
+
+  return [...ids];
+}
+
+/**
+ * Revalidate and execute an exact reviewed preview subset.
+ *
+ * Every selected section is claimed and re-materialized before snapshots, history capture,
+ * confirmed outcomes, or Arr writes. The prepared contexts narrow the remaining external Arr
+ * race, but Arr does not expose a common conditional-write contract across all supported apps.
+ */
+export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput): Promise<ReviewedSyncJobResult> {
+  const deps: ReviewedSyncExecutionDependencies = {
+    ...DEFAULT_REVIEWED_SYNC_DEPENDENCIES,
+    ...input.dependencies,
+  };
+  const sections = Object.freeze([...input.sections]);
+  const initialInstance = deps.getInstance(input.binding.instanceId);
+  const initialScopeFailure = validateReviewedScope(input.binding, sections, initialInstance);
+  if (initialScopeFailure) return initialScopeFailure;
+
+  let claim: ReviewedSyncClaim | null;
+  try {
+    claim = deps.claimSections(input.binding.instanceId, sections);
+  } catch {
+    return invalidatedReviewedSync('unverifiable_review', sections);
+  }
+  if (!claim) {
+    return { kind: 'claim_conflict', outcomes: [], syncHistoryId: null };
+  }
+
+  const expiresAtMs = Date.parse(input.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) {
+    deps.releaseSections(claim);
+    return invalidatedReviewedSync('unverifiable_review', sections);
+  }
+  if (deps.now() >= expiresAtMs) {
+    deps.releaseSections(claim);
+    return { kind: 'expired', outcomes: [], syncHistoryId: null };
+  }
+
+  const instance = deps.getInstance(input.binding.instanceId);
+  const claimedScopeFailure = validateReviewedScope(input.binding, sections, instance);
+  if (claimedScopeFailure || !instance) {
+    deps.releaseSections(claim);
+    return claimedScopeFailure ?? invalidatedReviewedSync('scope_drift', sections);
+  }
+
+  let client: BaseArrClient | null = null;
+  let target: SyncPreviewReviewTargetInput;
+  let materialized: GeneratePreviewWithReviewContextResult;
+  try {
+    const reviewClient = await deps.getReviewClient(instance);
+    client = reviewClient.client;
+    target = syncPreviewReviewTarget(instance, reviewClient.credentialIdentity);
+    const currentTargetHash = await buildSyncPreviewTargetHash({
+      instanceId: instance.id,
+      arrType: input.binding.arrType,
+      target,
+    });
+    if (currentTargetHash !== input.binding.targetHash) {
+      deps.releaseSections(claim);
+      client.close();
+      return invalidatedReviewedSync('scope_drift', sections);
+    }
+    const detected = await deps.detectVersion(instance.id, instance.type, client);
+    const detectedVersion = detected?.detectedVersion ?? instance.detected_version;
+    const unavailable = sections.filter(
+      (section) =>
+        resolveSyncSectionAvailability(input.binding.arrType, section, detectedVersion).status === 'unavailable'
+    );
+    if (unavailable.length > 0) {
+      deps.releaseSections(claim);
+      client.close();
+      return invalidatedReviewedSync('scope_drift', unavailable);
+    }
+
+    materialized = await deps.materializeReview(instance, sections, input.binding.sectionConfigs, client);
+  } catch {
+    deps.releaseSections(claim);
+    client?.close();
+    return invalidatedReviewedSync('unverifiable_review', sections);
+  }
+
+  let comparison: ReviewedEvidenceComparison;
+  try {
+    const actualBinding = await buildSyncPreviewReviewBinding({
+      instanceId: instance.id,
+      arrType: input.binding.arrType,
+      target,
+      sections,
+      sectionConfigs: materialized.reviewContext.sectionConfigs,
+      evidence: materialized.reviewContext.evidence,
+    });
+    comparison = compareReviewedEvidence(input.binding, actualBinding, sections);
+  } catch {
+    comparison = {
+      kind: 'invalidated',
+      reason: 'unverifiable_review',
+      changedEvidence: [],
+      changedSections: sections,
+    };
+  }
+
+  if (comparison.kind === 'invalidated') {
+    deps.releaseSections(claim);
+    client.close();
+    return {
+      kind: 'invalidated',
+      reason: comparison.reason,
+      changedEvidence: comparison.changedEvidence,
+      changedSections: comparison.changedSections,
+      outcomes: [],
+      syncHistoryId: null,
+    };
+  }
+
+  const preparedContexts = materialized.reviewContext.preparedExecutionContexts;
+  if (
+    sections.some((section) => {
+      const context = preparedContexts[section];
+      return !context || context.section !== section;
+    })
+  ) {
+    deps.releaseSections(claim);
+    client.close();
+    return invalidatedReviewedSync('unverifiable_review', sections);
+  }
+
+  const sectionResults: SyncSectionResult[] = [];
+  const allOutcomes: SyncEntityOutcome[] = [];
+  const results: string[] = [];
+  let itemsSynced = 0;
+  let failures = 0;
+  let ranSections = 0;
+  let sideEffectsStarted = false;
+
+  try {
+    await input.beforeWrite?.();
+
+    // Materialization and its prepared-context validation may take long enough for the review
+    // receipt to expire. Re-check the authoritative deadline at the final pre-side-effect
+    // boundary so an expired review cannot create snapshots/history/outcomes or reach Arr writes.
+    if (deps.now() >= expiresAtMs) {
+      deps.releaseSections(claim);
+      return { kind: 'expired', outcomes: [], syncHistoryId: null };
+    }
+
+    const startedAt = new Date(deps.now()).toISOString();
+    for (const databaseId of collectReviewedSnapshotDatabaseIds(preparedContexts, sections)) {
+      sideEffectsStarted = true;
+      await deps.createSnapshot({
+        databaseId,
+        trigger: 'sync',
+        targetInstanceIds: [instance.id],
+      });
+    }
+
+    // The reviewed materialization is the authoritative, config-bound pre-write diff. Reusing it
+    // keeps history aligned with the evidence that was revalidated and avoids a second PCD/Arr
+    // preview pass (and its additional network reads) at the execution boundary.
+    const changes = flattenSyncPreviewChanges(materialized.preview);
+    for (const section of sections) {
+      const handler = deps.getSectionHandler(section);
+      const context = preparedContexts[section]!;
+      const syncer = handler.createSyncer(client, instance) as ReviewedExecutionSyncer;
+      ranSections += 1;
+      try {
+        syncer.setPreparedExecutionContext(context);
+        sideEffectsStarted = true;
+        const result = await syncer.sync();
+        allOutcomes.push(...result.outcomes);
+        itemsSynced += result.itemsSynced;
+        if (result.success) {
+          const failedEntities = result.outcomes.filter((outcome) => outcome.status === 'failed').length;
+          results.push(
+            failedEntities > 0
+              ? `${section}: ${result.itemsSynced} item(s), ${failedEntities} entity failure(s)`
+              : `${section}: ${result.itemsSynced} item(s)`
+          );
+          sectionResults.push({
+            section,
+            status: 'success',
+            itemsSynced: result.itemsSynced,
+            error: null,
+            failedProfiles: result.failedProfiles,
+          });
+        } else {
+          failures += 1;
+          results.push(`${section}: failed`);
+          sectionResults.push({
+            section,
+            status: 'failed',
+            itemsSynced: result.itemsSynced,
+            error: result.error ?? 'Unknown error',
+            failedProfiles: result.failedProfiles,
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        failures += 1;
+        results.push(`${section}: failed`);
+        sectionResults.push({
+          section,
+          status: 'failed',
+          itemsSynced: 0,
+          error: message,
+        });
+      } finally {
+        syncer.clearPreparedExecutionContext();
+        syncer.clearPreviewConfig();
+      }
+    }
+
+    const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults, allOutcomes);
+    const finishedAt = new Date(deps.now()).toISOString();
+    sideEffectsStarted = true;
+    const syncHistoryId = deps.recordHistory({
+      arrInstanceId: instance.id,
+      instanceName: instance.name,
+      arrType: input.binding.arrType,
+      jobId: null,
+      trigger: input.source ?? 'manual',
+      triggerEvent: null,
+      sectionsAttempted: [...sections],
+      status: historyStatus,
+      sectionsRun: ranSections,
+      itemsSynced,
+      failureCount: failures,
+      sectionResults,
+      changes,
+      entityOutcomes: allOutcomes,
+      previewId: input.previewId,
+      error: failures > 0 ? results.join(', ') : null,
+      startedAt,
+      finishedAt,
+      durationMs: Date.parse(finishedAt) - Date.parse(startedAt),
+    });
+    const hasFailedOutcome = allOutcomes.some((outcome) => outcome.status === 'failed');
+    const failed = failures > 0 || hasFailedOutcome;
+    if (failed) {
+      deps.failSections(claim, results.join(', ') || 'Reviewed sync failed');
+    } else {
+      deps.completeSections(claim);
+    }
+
+    const output = results.join(', ');
+    if (failed) {
+      return {
+        kind: 'executed',
+        result: {
+          status: 'failure',
+          failureCode: 'upstream',
+          output,
+          outcomes: allOutcomes,
+          syncHistoryId,
+        },
+      };
+    }
+
+    return {
+      kind: 'executed',
+      result: {
+        status: ranSections === 0 ? 'skipped' : 'success',
+        output,
+        outcomes: allOutcomes,
+        syncHistoryId,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Reviewed sync execution failed';
+    if (sideEffectsStarted) {
+      deps.failSections(claim, 'Reviewed sync execution failed');
+    } else {
+      deps.releaseSections(claim);
+    }
+    return {
+      kind: 'executed',
+      result: {
+        status: 'failure',
+        failureCode: 'upstream',
+        output: message,
+        outcomes: allOutcomes,
+        syncHistoryId: null,
+      },
+    };
+  } finally {
+    client.close();
+  }
+}
+
 const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
   const startedAt = new Date().toISOString();
   const previewId = typeof job.payload.previewId === 'string' ? job.payload.previewId : null;
   const instanceId = Number(job.payload.instanceId);
   if (!Number.isFinite(instanceId)) {
     // No instance context — nothing attempted, no audit row.
-    return { status: 'failure', failureCode: 'invalidPayload', outcomes: [], syncHistoryId: null };
+    return {
+      status: 'failure',
+      failureCode: 'invalidPayload',
+      outcomes: [],
+      syncHistoryId: null,
+    };
   }
 
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance || !instance.enabled) {
     // Disabled/missing instance — nothing attempted (semantically cancelled), no audit row.
-    return { status: 'cancelled', decision: 'Arr instance disabled', outcomes: [], syncHistoryId: null };
+    return {
+      status: 'cancelled',
+      decision: 'Arr instance disabled',
+      outcomes: [],
+      syncHistoryId: null,
+    };
   }
 
   const syncArrType = toSyncArrType(instance.type);
@@ -325,9 +813,19 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
     // misconfiguration is not audited beyond the failure return.
     await logger.error('Arr sync unsupported instance type', {
       source: 'ArrSyncJob',
-      meta: { jobId: job.id, instanceId, instanceName: instance.name, instanceType: instance.type },
+      meta: {
+        jobId: job.id,
+        instanceId,
+        instanceName: instance.name,
+        instanceType: instance.type,
+      },
     });
-    return { status: 'failure', failureCode: 'unsupported', outcomes: [], syncHistoryId: null };
+    return {
+      status: 'failure',
+      failureCode: 'unsupported',
+      outcomes: [],
+      syncHistoryId: null,
+    };
   }
 
   // Audit-trail recorder (never throws; self-gates on sync_history_settings.enabled). Returns the
@@ -373,8 +871,15 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
   const sectionsToRun = resolveSections(job.jobType, job.payload);
 
   if (sectionsToRun.length === 0) {
-    const syncHistoryId = recordHistory('skipped', { error: 'No sync sections specified' });
-    return { status: 'skipped', decision: 'No sync sections specified', outcomes: [], syncHistoryId };
+    const syncHistoryId = recordHistory('skipped', {
+      error: 'No sync sections specified',
+    });
+    return {
+      status: 'skipped',
+      decision: 'No sync sections specified',
+      outcomes: [],
+      syncHistoryId,
+    };
   }
 
   let client: Awaited<ReturnType<typeof getArrInstanceClient>>;
@@ -407,7 +912,9 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         });
       }
 
-      const credentialError = `Arr credentials are not readable. ${getArrClientFailureMessage(message)} The instance has been disabled.`;
+      const credentialError = `Arr credentials are not readable. ${getArrClientFailureMessage(
+        message
+      )} The instance has been disabled.`;
       const syncHistoryId = recordHistory('failed', {
         error: credentialError,
         sectionsAttempted: sectionsToRun,
@@ -426,14 +933,24 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
     // typed transport code.
     await logger.error('Arr sync could not create client', {
       source: 'ArrSyncJob',
-      meta: { jobId: job.id, instanceId, instanceName: instance.name, error: message },
+      meta: {
+        jobId: job.id,
+        instanceId,
+        instanceName: instance.name,
+        error: message,
+      },
     });
     const syncHistoryId = recordHistory('failed', {
       error: message,
       sectionsAttempted: sectionsToRun,
       failureCount: sectionsToRun.length,
     });
-    return { status: 'failure', failureCode: 'upstream', outcomes: [], syncHistoryId };
+    return {
+      status: 'failure',
+      failureCode: 'upstream',
+      outcomes: [],
+      syncHistoryId,
+    };
   }
 
   // Refresh the detected application version on every run, reusing this run's
@@ -471,7 +988,12 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
 
     if (unsupportedReason) {
       results.push(`${section}: skipped (${unsupportedReason})`);
-      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: unsupportedReason });
+      sectionResults.push({
+        section,
+        status: 'skipped',
+        itemsSynced: 0,
+        error: unsupportedReason,
+      });
       await logger.debug('Skipping unsupported sync section', {
         source: 'ArrSyncJob',
         meta: {
@@ -516,13 +1038,23 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
 
     if (job.source === 'schedule' && config.trigger !== 'schedule') {
       results.push(`${section}: skipped`);
-      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: null });
+      sectionResults.push({
+        section,
+        status: 'skipped',
+        itemsSynced: 0,
+        error: null,
+      });
       continue;
     }
 
     if (!handler.hasConfig(instanceId)) {
       results.push(`${section}: skipped`);
-      sectionResults.push({ section, status: 'skipped', itemsSynced: 0, error: null });
+      sectionResults.push({
+        section,
+        status: 'skipped',
+        itemsSynced: 0,
+        error: null,
+      });
       continue;
     }
 
@@ -575,10 +1107,21 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
       handler.failSync(instanceId, message);
       results.push(`${section}: failed`);
       failures++;
-      sectionResults.push({ section, status: 'failed', itemsSynced: 0, error: message });
+      sectionResults.push({
+        section,
+        status: 'failed',
+        itemsSynced: 0,
+        error: message,
+      });
       await logger.error('Arr sync failed', {
         source: 'ArrSyncJob',
-        meta: { jobId: job.id, instanceId, instanceName: instance.name, section, error: message },
+        meta: {
+          jobId: job.id,
+          instanceId,
+          instanceName: instance.name,
+          section,
+          error: message,
+        },
       });
     } finally {
       if (config.trigger === 'schedule') {
@@ -618,7 +1161,13 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         syncHistoryId,
       };
     }
-    return { status, output, rescheduleAt: terminalRescheduleAt, outcomes: allOutcomes, syncHistoryId };
+    return {
+      status,
+      output,
+      rescheduleAt: terminalRescheduleAt,
+      outcomes: allOutcomes,
+      syncHistoryId,
+    };
   };
 
   if (job.source === 'schedule' && job.jobType === 'arr.sync') {

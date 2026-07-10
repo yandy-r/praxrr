@@ -2,33 +2,33 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
 import { logger } from '$logger/logger.ts';
-import { getSectionsInProgress, executeSyncJob } from '$lib/server/jobs/handlers/arrSync.ts';
+import { getSectionsInProgress, executeReviewedSyncJob } from '$lib/server/jobs/handlers/arrSync.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 import { PREVIEW_REQUEST_BODY_LIMIT_BYTES } from '$lib/server/sync/preview/limits.ts';
 import {
   previewStore,
   PREVIEW_STATUS_READY,
   PREVIEW_STATUS_APPLIED,
-  PREVIEW_STATUS_APPLYING,
   PREVIEW_STATUS_FAILED,
   evaluatePreviewStaleness,
 } from '$lib/server/sync/preview/store.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$lib/server/sync/preview/failureReason.ts';
-import type { SyncPreviewResult } from '$lib/server/sync/preview/types.ts';
+import type { SyncPreviewResult, SyncPreviewReviewInvalidationReason } from '$lib/server/sync/preview/types.ts';
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
 type SyncPreviewApplyErrorResponse = components['schemas']['SyncPreviewApplyErrorResponse'];
+type SyncPreviewApplyInvalidatedResponse = components['schemas']['SyncPreviewApplyInvalidatedResponse'];
 
 export interface SyncPreviewApplyDependencies {
   readonly getSectionsInProgress: typeof getSectionsInProgress;
-  readonly executeSyncJob: typeof executeSyncJob;
+  readonly executeReviewedSyncJob: typeof executeReviewedSyncJob;
   readonly now: () => number;
 }
 
 const DEFAULT_DEPENDENCIES: SyncPreviewApplyDependencies = {
   getSectionsInProgress,
-  executeSyncJob,
+  executeReviewedSyncJob,
   now: Date.now,
 };
 
@@ -88,6 +88,37 @@ function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
   }
 
   return snapshot.sections.filter((section) => successful.has(section));
+}
+
+function invalidationMessage(reason: SyncPreviewReviewInvalidationReason): string {
+  switch (reason) {
+    case 'pcd_drift':
+      return 'Desired PCD data or reviewed configuration changed. Nothing was applied. Generate and review a new preview.';
+    case 'arr_drift':
+      return 'Live Arr configuration changed. Nothing was applied. Generate and review a new preview.';
+    case 'pcd_and_arr_drift':
+      return 'Desired PCD data and live Arr configuration changed. Nothing was applied. Generate and review a new preview.';
+    case 'scope_drift':
+      return 'The reviewed target or section scope changed. Nothing was applied. Generate and review a new preview.';
+    case 'unverifiable_review':
+      return 'The reviewed preview could not be verified safely. Nothing was applied. Generate and review a new preview.';
+  }
+}
+
+function invalidatedResponse(
+  reason: SyncPreviewReviewInvalidationReason,
+  changedEvidence: readonly ('pcd' | 'arr')[],
+  changedSections: readonly SectionType[],
+  staleWarning: string | null
+): SyncPreviewApplyInvalidatedResponse {
+  return {
+    error: invalidationMessage(reason),
+    code: reason,
+    changedEvidence: [...changedEvidence],
+    changedSections: [...changedSections],
+    regenerateRequired: true,
+    staleWarning,
+  };
 }
 
 /**
@@ -188,12 +219,13 @@ export async function _handleSyncPreviewApplyRequest(
   }
 
   const nowMs = dependencies.now();
-  previewStore.cleanup(nowMs);
   const staleness = evaluatePreviewStaleness(snapshot, nowMs);
   if (staleness.shouldBlock) {
+    const failure = buildPreviewFailure('stale', snapshot.arrType);
+    previewStore.updateResult(previewId, { status: PREVIEW_STATUS_FAILED, failure }, nowMs);
     return json(
       {
-        failure: buildPreviewFailure('stale', snapshot.arrType),
+        failure,
         staleWarning: staleWarningMessage(staleness.ageMs),
       } satisfies SyncPreviewApplyErrorResponse,
       { status: 422 }
@@ -209,31 +241,83 @@ export async function _handleSyncPreviewApplyRequest(
     );
   }
 
-  const applyingSnapshot = previewStore.transition(previewId, PREVIEW_STATUS_APPLYING, nowMs);
-  if (!applyingSnapshot) {
-    return json(
-      {
-        error: `Cannot transition preview from ${snapshot.status} to ${PREVIEW_STATUS_APPLYING}`,
-      } satisfies ErrorResponse,
-      { status: 409 }
-    );
+  const claim = previewStore.claimReadyForApply(previewId, sectionsToApply, nowMs);
+  if (!claim.ok) {
+    if (claim.reason === 'not_found') {
+      return json({ error: 'Preview not found' } satisfies ErrorResponse, { status: 404 });
+    }
+    if (claim.reason === 'invalid_state') {
+      return json({ error: `Invalid preview state: ${claim.status}` } satisfies ErrorResponse, { status: 409 });
+    }
+    if (claim.reason === 'expired') {
+      const failure = buildPreviewFailure('stale', snapshot.arrType);
+      return json(
+        {
+          failure,
+          staleWarning: staleWarningMessage(staleness.ageMs),
+        } satisfies SyncPreviewApplyErrorResponse,
+        { status: 422 }
+      );
+    }
+
+    previewStore.transition(previewId, PREVIEW_STATUS_FAILED, nowMs);
+    return json(invalidatedResponse(claim.reason, [], sectionsToApply, null), { status: 422 });
   }
 
+  const staleWarning = staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null;
   try {
-    // Pass the reviewed preview id so the run correlates back to it in Sync History (issue #232).
-    const result = await dependencies.executeSyncJob(snapshot.instanceId, sectionsToApply, 'manual', snapshot.id);
+    const reviewedResult = await dependencies.executeReviewedSyncJob({
+      binding: claim.binding,
+      sections: claim.sections,
+      previewId: claim.snapshot.id,
+      expiresAt: claim.snapshot.expiresAt,
+      source: 'manual',
+    });
+
+    if (reviewedResult.kind === 'claim_conflict') {
+      previewStore.releaseApplyClaim(claim.receipt, dependencies.now());
+      return json(
+        { error: 'Cannot apply while sync is running for one or more reviewed sections.' } satisfies ErrorResponse,
+        { status: 409 }
+      );
+    }
+
+    if (reviewedResult.kind === 'expired') {
+      const failure = buildPreviewFailure('stale', snapshot.arrType);
+      previewStore.completeApplyClaim(claim.receipt, { status: PREVIEW_STATUS_FAILED, failure }, dependencies.now());
+      return json(
+        {
+          failure,
+          staleWarning,
+        } satisfies SyncPreviewApplyErrorResponse,
+        { status: 422 }
+      );
+    }
+
+    if (reviewedResult.kind === 'invalidated') {
+      const payload = invalidatedResponse(
+        reviewedResult.reason,
+        reviewedResult.changedEvidence,
+        reviewedResult.changedSections,
+        staleWarning
+      );
+      previewStore.completeApplyClaim(claim.receipt, { status: PREVIEW_STATUS_FAILED }, dependencies.now());
+      return json(payload, { status: 422 });
+    }
+
+    const result = reviewedResult.result;
     const output = result.output ?? '';
     const success = result.status === 'success' || result.status === 'skipped';
 
     if (success) {
-      previewStore.transition(previewId, PREVIEW_STATUS_APPLIED, dependencies.now());
+      previewStore.completeApplyClaim(claim.receipt, { status: PREVIEW_STATUS_APPLIED }, dependencies.now());
       return json({
         success: true,
         results: {
           status: result.status,
           output,
         },
-        staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
+        staleWarning,
         outcomes: result.outcomes,
         syncHistoryId: result.syncHistoryId,
       } satisfies SyncPreviewApplyResponse);
@@ -243,10 +327,7 @@ export async function _handleSyncPreviewApplyRequest(
     // never reclassified by substring nor transported. Surface a typed `executionFailed` reason;
     // the granular, already-sanitized per-entity `outcomes[].reason` (#232) carry the detail.
     const failure = buildPreviewFailure('executionFailed', snapshot.arrType);
-    previewStore.updateResult(previewId, {
-      status: PREVIEW_STATUS_FAILED,
-      failure,
-    });
+    previewStore.completeApplyClaim(claim.receipt, { status: PREVIEW_STATUS_FAILED, failure }, dependencies.now());
     await logger.error('Sync preview apply run reported failure', {
       source: 'SyncPreviewApply',
       meta: {
@@ -267,7 +348,7 @@ export async function _handleSyncPreviewApplyRequest(
           output,
           failure,
         },
-        staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
+        staleWarning,
         outcomes: result.outcomes,
         syncHistoryId: result.syncHistoryId,
       } satisfies SyncPreviewApplyResponse,
@@ -277,10 +358,7 @@ export async function _handleSyncPreviewApplyRequest(
     // Classify by error TYPE only; the raw message stays out of the response and the stored
     // snapshot, and is recorded solely on the sanitized logger boundary below.
     const failure = classifyPreviewFailure(error, snapshot.arrType);
-    previewStore.updateResult(previewId, {
-      status: PREVIEW_STATUS_FAILED,
-      failure,
-    });
+    previewStore.completeApplyClaim(claim.receipt, { status: PREVIEW_STATUS_FAILED, failure }, dependencies.now());
     await logger.error('Sync preview apply raised an unexpected error', {
       source: 'SyncPreviewApply',
       meta: {
@@ -294,7 +372,7 @@ export async function _handleSyncPreviewApplyRequest(
     return json(
       {
         failure,
-        staleWarning: staleness.shouldWarn ? staleWarningMessage(staleness.ageMs) : null,
+        staleWarning,
       } satisfies SyncPreviewApplyErrorResponse,
       { status: 500 }
     );

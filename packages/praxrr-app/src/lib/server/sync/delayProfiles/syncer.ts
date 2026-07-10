@@ -17,54 +17,59 @@ import type { ArrDelayProfile } from '$arr/types.ts';
 import { LidarrClient } from '$arr/clients/lidarr.ts';
 import { RadarrClient } from '$arr/clients/radarr.ts';
 import { SonarrClient } from '$arr/clients/sonarr.ts';
-import type { DelayProfilesPreview } from '../preview/types.ts';
+import type { DelayProfilesPreview, SyncPreviewPreparedExecutionContext } from '../preview/types.ts';
 import { logger } from '$logger/logger.ts';
 import { diffSingletonEntity } from '../preview/sectionDiffs.ts';
+import { parseNamedProfilePreviewConfig } from '../preview/sectionConfigs.ts';
 import { getUnsupportedSyncSectionReason, isSyncSectionSupported, type SyncArrType } from '../mappings.ts';
 
-interface DelayProfilesPreviewConfig {
-  databaseId: number | null;
-  profileName: string | null;
-}
-
-function parseDelayProfilesPreviewConfig(rawConfig: unknown): DelayProfilesPreviewConfig | null {
-  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
-    return null;
-  }
-
-  const value = rawConfig as Record<string, unknown>;
-  if (!('databaseId' in value) || !('profileName' in value)) {
-    return null;
-  }
-
-  const rawDatabaseId = value.databaseId;
-  const rawProfileName = value.profileName;
-  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
-  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
-
-  if (databaseId === null && profileName === null) {
-    return {
-      databaseId: null,
-      profileName: null,
+type DelayProfileTargetResolution =
+  | {
+      arrType: 'radarr' | 'sonarr';
+      strategy: 'fixed-default-id';
+      requestedId: 1;
+      selectedId: number;
+    }
+  | {
+      arrType: 'lidarr';
+      strategy: 'untagged-lowest-order';
+      selectedId: number;
+      candidates: Array<{
+        id: number;
+        order: number;
+        tags: number[];
+      }>;
+    }
+  | {
+      arrType: 'lidarr';
+      strategy: 'fixed-default-id-fallback';
+      requestedId: 1;
+      selectedId: number;
+      candidates: [];
     };
-  }
 
-  if (databaseId === null || profileName === null) {
-    return null;
-  }
-
-  return {
-    databaseId,
-    profileName,
-  };
+interface ResolvedDelayProfileTarget {
+  profile: ArrDelayProfile;
+  resolution: DelayProfileTargetResolution;
 }
 
-function parsePositiveInt(rawValue: unknown): number | null {
-  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
-    return null;
-  }
-
-  return rawValue;
+interface DelayProfilePreparedExecutionContext extends SyncPreviewPreparedExecutionContext {
+  readonly section: 'delayProfiles';
+  readonly config: {
+    readonly databaseId: number;
+    readonly profileName: string;
+  };
+  readonly desired: ArrDelayProfile;
+  readonly materialPlan: {
+    readonly arrType: SyncArrType;
+    readonly profileName: string;
+    readonly targetProfileId: number;
+    readonly targetResolution: DelayProfileTargetResolution;
+  };
+  readonly currentGuards: {
+    readonly targetProfile: ArrDelayProfile;
+    readonly targetResolution: DelayProfileTargetResolution;
+  };
 }
 
 export class DelayProfileSyncer extends BaseSyncer {
@@ -111,6 +116,12 @@ export class DelayProfileSyncer extends BaseSyncer {
         );
       }
 
+      this.recordPreviewEvidence('delayProfiles', 'arr', 'materialCapabilities', {
+        arrType: instanceType,
+        delayProfilesSupported: true,
+        targetResolution: instanceType === 'lidarr' ? 'untagged-lowest-order' : 'fixed-default-id',
+      });
+
       const syncConfig = this.getDelayProfilesSyncConfig();
       if (!syncConfig.databaseId || !syncConfig.profileName) {
         await logger.warn('Missing delay profile configuration for preview', {
@@ -129,6 +140,12 @@ export class DelayProfileSyncer extends BaseSyncer {
           })
         );
       }
+
+      const effectiveConfig = {
+        databaseId: syncConfig.databaseId,
+        profileName: syncConfig.profileName,
+      };
+      this.recordPreviewEvidence('delayProfiles', 'pcd', 'selectedConfig', effectiveConfig);
 
       const cache = getCache(syncConfig.databaseId);
       if (!cache) {
@@ -150,7 +167,10 @@ export class DelayProfileSyncer extends BaseSyncer {
       if (!profile) {
         await logger.warn(`Profile "${syncConfig.profileName}" not found`, {
           source: 'Preview:DelayProfile',
-          meta: { instanceId: this.instanceId, profileName: syncConfig.profileName },
+          meta: {
+            instanceId: this.instanceId,
+            profileName: syncConfig.profileName,
+          },
         });
         throw new Error(
           JSON.stringify({
@@ -162,8 +182,10 @@ export class DelayProfileSyncer extends BaseSyncer {
         );
       }
 
-      const targetProfile = await this.resolveTargetDelayProfileForPreview();
-      if (!targetProfile) {
+      this.recordPreviewEvidence('delayProfiles', 'pcd', 'selectedProfile', profile);
+
+      const target = await this.resolveTargetDelayProfileForPreview(instanceType);
+      if (!target) {
         await logger.error('Failed to locate delay profile target for preview', {
           source: 'Preview:DelayProfile',
           meta: { instanceId: this.instanceId },
@@ -178,19 +200,45 @@ export class DelayProfileSyncer extends BaseSyncer {
       }
 
       const transformed = this.transform(profile);
+      this.recordPreviewEvidence('delayProfiles', 'pcd', 'transformedDesiredProfile', transformed);
+
       const payload = {
-        ...targetProfile,
+        ...target.profile,
         ...transformed,
-        id: targetProfile.id,
-        order: targetProfile.order,
-        tags: Array.isArray(targetProfile.tags) ? targetProfile.tags : [],
+        id: target.profile.id,
+        order: target.profile.order,
+        tags: Array.isArray(target.profile.tags) ? target.profile.tags : [],
       };
+
+      this.recordPreviewEvidence('delayProfiles', 'arr', 'targetResolution', target.resolution);
+      this.recordPreviewEvidence('delayProfiles', 'arr', 'liveTargetProfile', target.profile);
+      this.recordPreviewEvidence('delayProfiles', 'arr', 'remoteIdentity', {
+        id: target.profile.id,
+        order: target.profile.order,
+        tags: Array.isArray(target.profile.tags) ? target.profile.tags : [],
+      });
+
+      this.preparePreviewExecution({
+        section: 'delayProfiles',
+        config: effectiveConfig,
+        desired: payload,
+        materialPlan: {
+          arrType: instanceType,
+          profileName: profile.name,
+          targetProfileId: target.profile.id,
+          targetResolution: target.resolution,
+        },
+        currentGuards: {
+          targetProfile: target.profile,
+          targetResolution: target.resolution,
+        },
+      } satisfies DelayProfilePreparedExecutionContext);
 
       const profileChange = diffSingletonEntity({
         entityType: 'delayProfile',
         name: profile.name,
         desiredEntity: payload as ArrDelayProfile & Record<string, unknown>,
-        currentEntity: targetProfile as ArrDelayProfile & Record<string, unknown>,
+        currentEntity: target.profile as ArrDelayProfile & Record<string, unknown>,
       });
 
       await logger.info(`Generated delay profile preview for "${this.instanceName}"`, {
@@ -219,22 +267,66 @@ export class DelayProfileSyncer extends BaseSyncer {
     }
   }
 
-  private async resolveTargetDelayProfileForPreview(): Promise<ArrDelayProfile | null> {
-    if (this.client instanceof LidarrClient) {
-      const target = await this.resolveTargetDelayProfile();
-      if (target) {
-        return target;
+  private async resolveTargetDelayProfileForPreview(arrType: SyncArrType): Promise<ResolvedDelayProfileTarget | null> {
+    if (arrType === 'lidarr') {
+      if (!(this.client instanceof LidarrClient)) {
+        return null;
       }
 
-      return this.client.getDelayProfile(1);
+      const profiles = await this.client.getDelayProfiles();
+      const candidates = this.toDeterministicLidarrCandidates(profiles);
+      const profile = this.selectLidarrTargetProfile(profiles);
+      if (profile) {
+        return {
+          profile,
+          resolution: {
+            arrType: 'lidarr',
+            strategy: 'untagged-lowest-order',
+            selectedId: profile.id,
+            candidates,
+          },
+        };
+      }
+
+      const fallback = await this.client.getDelayProfile(1);
+      return {
+        profile: fallback,
+        resolution: {
+          arrType: 'lidarr',
+          strategy: 'fixed-default-id-fallback',
+          requestedId: 1,
+          selectedId: fallback.id,
+          candidates: [],
+        },
+      };
     }
 
-    return this.client.getDelayProfile(1);
+    const expectedClient = arrType === 'sonarr' ? SonarrClient : RadarrClient;
+    if (!(this.client instanceof expectedClient)) {
+      return null;
+    }
+
+    const profile = await this.client.getDelayProfile(1);
+    return {
+      profile,
+      resolution: {
+        arrType,
+        strategy: 'fixed-default-id',
+        requestedId: 1,
+        selectedId: profile.id,
+      },
+    };
   }
 
-  private getDelayProfilesSyncConfig(): { databaseId: number | null; profileName: string | null } {
-    const previewConfig = parseDelayProfilesPreviewConfig(this.getPreviewConfig());
-    if (previewConfig) {
+  private getDelayProfilesSyncConfig(): {
+    databaseId: number | null;
+    profileName: string | null;
+  } {
+    if (this.hasPreviewConfig()) {
+      const previewConfig = parseNamedProfilePreviewConfig(this.getPreviewConfig());
+      if (!previewConfig) {
+        throw new Error('Invalid reviewed delay profile configuration');
+      }
       return previewConfig;
     }
 
@@ -253,7 +345,17 @@ export class DelayProfileSyncer extends BaseSyncer {
    * Override sync to handle single profile update to id=1
    */
   override async sync(): Promise<SyncResult> {
-    const syncConfig = arrSyncQueries.getDelayProfilesSync(this.instanceId);
+    try {
+      return await this.syncOnce();
+    } finally {
+      this.clearPreparedExecutionContext();
+      this.clearPreviewConfig();
+    }
+  }
+
+  private async syncOnce(): Promise<SyncResult> {
+    const prepared = this.getPreparedDelayProfileExecution();
+    const syncConfig = prepared?.config ?? this.getDelayProfilesSyncConfig();
     const arrType = this.getSyncArrType();
 
     if (!syncConfig.databaseId || !syncConfig.profileName) {
@@ -275,7 +377,11 @@ export class DelayProfileSyncer extends BaseSyncer {
     }
 
     const profileName = syncConfig.profileName;
-    const outcome = (status: SyncEntityOutcome['status'], remoteId: string | null, reason: string | null): SyncEntityOutcome => ({
+    const outcome = (
+      status: SyncEntityOutcome['status'],
+      remoteId: string | null,
+      reason: string | null
+    ): SyncEntityOutcome => ({
       section: 'delayProfiles',
       arrType,
       entityType: 'delayProfile',
@@ -285,6 +391,21 @@ export class DelayProfileSyncer extends BaseSyncer {
       remoteId,
       reason,
     });
+
+    if (prepared) {
+      if (prepared.materialPlan.arrType !== arrType) {
+        return {
+          success: false,
+          itemsSynced: 0,
+          error: 'Reviewed delay profile target type does not match the active arr client',
+          outcomes: [],
+        };
+      }
+
+      const targetProfileId = prepared.currentGuards.targetProfile.id;
+      const payload = structuredClone(prepared.desired);
+      return await this.writeDelayProfile(prepared.materialPlan.profileName, targetProfileId, payload, outcome);
+    }
 
     const cache = getCache(syncConfig.databaseId);
     if (!cache) {
@@ -320,7 +441,11 @@ export class DelayProfileSyncer extends BaseSyncer {
     const transformed = this.transform(profile);
     await logger.debug(`Syncing "${profile.name}" delay profile`, {
       source: 'Sync:DelayProfile',
-      meta: { instanceId: this.instanceId, profileName: profile.name, targetProfileId: profileId },
+      meta: {
+        instanceId: this.instanceId,
+        profileName: profile.name,
+        targetProfileId: profileId,
+      },
     });
 
     const existingProfile = this.client instanceof LidarrClient ? targetProfile : null;
@@ -335,13 +460,26 @@ export class DelayProfileSyncer extends BaseSyncer {
         }
       : transformed;
 
+    return await this.writeDelayProfile(profile.name, profileId, payload, outcome);
+  }
+
+  private async writeDelayProfile(
+    profileName: string,
+    profileId: number,
+    payload: ArrDelayProfile,
+    outcome: (status: SyncEntityOutcome['status'], remoteId: string | null, reason: string | null) => SyncEntityOutcome
+  ): Promise<SyncResult> {
     try {
       await this.client.updateDelayProfile(profileId, payload);
     } catch (error) {
       const { reason, protectedDetails } = sanitizeArrWriteError(error);
-      await logger.error(`Failed to sync delay profile "${profile.name}" to "${this.instanceName}"`, {
+      await logger.error(`Failed to sync delay profile "${profileName}" to "${this.instanceName}"`, {
         source: 'Sync:DelayProfile',
-        meta: { instanceId: this.instanceId, targetProfileId: profileId, ...protectedDetails },
+        meta: {
+          instanceId: this.instanceId,
+          targetProfileId: profileId,
+          ...protectedDetails,
+        },
       });
       return {
         success: false,
@@ -351,12 +489,16 @@ export class DelayProfileSyncer extends BaseSyncer {
       };
     }
 
-    await logger.info(`Synced delay profile "${profile.name}" to "${this.instanceName}"`, {
+    await logger.info(`Synced delay profile "${profileName}" to "${this.instanceName}"`, {
       source: 'Sync:DelayProfile',
       meta: { instanceId: this.instanceId, remoteId: profileId },
     });
 
-    return { success: true, itemsSynced: 1, outcomes: [outcome('success', String(profileId), null)] };
+    return {
+      success: true,
+      itemsSynced: 1,
+      outcomes: [outcome('success', String(profileId), null)],
+    };
   }
 
   /**
@@ -369,7 +511,10 @@ export class DelayProfileSyncer extends BaseSyncer {
       return null;
     }
 
-    const profiles = await this.client.getDelayProfiles();
+    return this.selectLidarrTargetProfile(await this.client.getDelayProfiles());
+  }
+
+  private selectLidarrTargetProfile(profiles: ArrDelayProfile[]): ArrDelayProfile | null {
     if (profiles.length === 0) {
       return null;
     }
@@ -377,9 +522,38 @@ export class DelayProfileSyncer extends BaseSyncer {
     const untaggedProfiles = profiles.filter((profile) => !Array.isArray(profile.tags) || profile.tags.length === 0);
     const candidates = untaggedProfiles.length > 0 ? untaggedProfiles : profiles;
 
-    const defaultProfile = candidates.reduce((winner, current) => (current.order < winner.order ? current : winner));
+    return candidates.reduce((winner, current) => (current.order < winner.order ? current : winner));
+  }
 
-    return defaultProfile;
+  private toDeterministicLidarrCandidates(
+    profiles: ArrDelayProfile[]
+  ): Array<{ id: number; order: number; tags: number[] }> {
+    return profiles
+      .map((profile) => ({
+        id: profile.id,
+        order: profile.order,
+        tags: Array.isArray(profile.tags) ? [...profile.tags].sort((left, right) => left - right) : [],
+      }))
+      .sort((left, right) => left.id - right.id);
+  }
+
+  private getPreparedDelayProfileExecution(): Readonly<DelayProfilePreparedExecutionContext> | null {
+    const context = this.getPreparedExecutionContext<DelayProfilePreparedExecutionContext>();
+    if (!context) {
+      return null;
+    }
+
+    if (
+      context.section !== 'delayProfiles' ||
+      context.config.databaseId <= 0 ||
+      context.config.profileName.length === 0 ||
+      context.desired.id !== context.currentGuards.targetProfile.id ||
+      context.materialPlan.targetProfileId !== context.currentGuards.targetProfile.id
+    ) {
+      throw new TypeError('Invalid reviewed delay profile execution context');
+    }
+
+    return context;
   }
 
   private transform(profile: DelayProfilesRow): ArrDelayProfile {

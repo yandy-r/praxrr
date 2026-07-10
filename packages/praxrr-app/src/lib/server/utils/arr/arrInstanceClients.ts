@@ -1,11 +1,22 @@
 import { decryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import type { ArrClientOptions } from './base.ts';
 import { createArrClient } from './factory.ts';
 import type { BaseArrClient } from './base.ts';
 import type { ArrType } from './types.ts';
 import { assertSafeArrUrl } from './urlSafety.ts';
+
+export interface ArrInstanceCredentialIdentity {
+  readonly fingerprint: string;
+  readonly keyVersion: string;
+  readonly revision: string;
+}
+
+export interface ArrInstanceReviewClient {
+  readonly client: BaseArrClient;
+  readonly credentialIdentity: ArrInstanceCredentialIdentity;
+}
 
 export interface ArrInstanceClientCacheEntry {
   keyVersion: string;
@@ -53,6 +64,64 @@ export function createArrInstanceClientCache(): ArrInstanceClientCache {
   return new Map();
 }
 
+function getCredentialSnapshot(instanceId: number) {
+  try {
+    return arrInstanceCredentialsQueries.getByInstanceId(instanceId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('Database not initialized') ||
+        error.message.includes('no such table: arr_instance_credentials'))
+    ) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Acquire one client and its non-secret identity from the same authoritative credential snapshot.
+ *
+ * Reviewed preview callers must keep this pair together: a second credential query between target
+ * hashing and client construction would re-open a rotation TOCTOU window.
+ */
+export async function getArrInstanceReviewClient(
+  type: ArrType,
+  instance: Pick<ArrInstance, 'id' | 'url' | 'api_key' | 'api_key_fingerprint' | 'updated_at'>,
+  options?: ArrClientOptions
+): Promise<ArrInstanceReviewClient> {
+  assertSafeArrUrl(instance.url);
+  const credential = getCredentialSnapshot(instance.id);
+
+  if (!credential) {
+    if (!instance.api_key || !instance.api_key_fingerprint) {
+      throw new Error(`No Arr credentials found for instance ${instance.id}`);
+    }
+    return Object.freeze({
+      client: createArrClient(type, instance.url, instance.api_key, options),
+      credentialIdentity: Object.freeze({
+        fingerprint: instance.api_key_fingerprint,
+        keyVersion: 'legacy',
+        revision: instance.updated_at,
+      }),
+    });
+  }
+
+  const apiKey = await decryptArrInstanceApiKey({
+    keyVersion: credential.key_version,
+    nonce: credential.nonce,
+    ciphertext: credential.ciphertext,
+  });
+  return Object.freeze({
+    client: createArrClient(type, instance.url, apiKey, options),
+    credentialIdentity: Object.freeze({
+      fingerprint: credential.fingerprint,
+      keyVersion: credential.key_version,
+      revision: credential.updated_at,
+    }),
+  });
+}
+
 export async function getArrInstanceClient(
   type: ArrType,
   instanceId: number,
@@ -62,20 +131,7 @@ export async function getArrInstanceClient(
 ): Promise<BaseArrClient> {
   assertSafeArrUrl(url);
 
-  let credentials;
-  try {
-    credentials = arrInstanceCredentialsQueries.getByInstanceId(instanceId);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.includes('Database not initialized') ||
-        error.message.includes('no such table: arr_instance_credentials'))
-    ) {
-      credentials = undefined;
-    } else {
-      throw error;
-    }
-  }
+  const credentials = getCredentialSnapshot(instanceId);
   if (!credentials) {
     let instance;
     try {

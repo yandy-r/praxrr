@@ -1,18 +1,27 @@
 import { assert, assertEquals, assertExists } from '@std/assert';
+import type { BaseArrClient } from '$arr/base.ts';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import type { ReviewedSyncClaim } from '$db/queries/arrSync.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
 import { HttpError } from '$http/types.ts';
+import { executeReviewedSyncJob, type ReviewedSyncExecutionDependencies } from '$jobs/handlers/arrSync.ts';
 import { sanitizeArrWriteError } from '$sync/sanitizeArrWriteError.ts';
 import { deriveSyncHistoryStatus } from '$sync/syncHistory/record.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import { syncCustomFormats } from '$sync/customFormats/syncer.ts';
 import type { PcdCustomFormat } from '$sync/customFormats/transformer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
+import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
-import type { SyncHistoryInput, SyncPreviewArrType, SyncSectionResult } from '$sync/syncHistory/types.ts';
+import type {
+  SyncEntityChange,
+  SyncHistoryInput,
+  SyncPreviewArrType,
+  SyncSectionResult,
+} from '$sync/syncHistory/types.ts';
 
 // =============================================================================
 // sanitizeArrWriteError — user-facing reason is NEVER the raw Arr body (D9)
@@ -29,7 +38,10 @@ Deno.test('sanitizeArrWriteError classifies HTTP status without leaking the raw 
   assertEquals(server.protectedDetails.status, 500);
   assertEquals(server.protectedDetails.error, rawBody);
 
-  assertEquals(sanitizeArrWriteError(new HttpError('x', 400)).reason, 'The Arr instance rejected the request (HTTP 400).');
+  assertEquals(
+    sanitizeArrWriteError(new HttpError('x', 400)).reason,
+    'The Arr instance rejected the request (HTTP 400).'
+  );
   assertEquals(sanitizeArrWriteError(new HttpError('x', 408)).reason, 'The Arr instance timed out.');
   assertEquals(sanitizeArrWriteError(new HttpError('x', 0)).reason, 'Could not reach the Arr instance.');
   // Non-HTTP errors get a stable generic reason (never the message text).
@@ -41,7 +53,12 @@ Deno.test('sanitizeArrWriteError classifies HTTP status without leaking the raw 
 // deriveSyncHistoryStatus — outcome-aware, never collapses to success (Gap 1)
 // =============================================================================
 
-const sectionSuccess: SyncSectionResult = { section: 'qualityProfiles', status: 'success', itemsSynced: 3, error: null };
+const sectionSuccess: SyncSectionResult = {
+  section: 'qualityProfiles',
+  status: 'success',
+  itemsSynced: 3,
+  error: null,
+};
 const sectionFailed: SyncSectionResult = { section: 'delayProfiles', status: 'failed', itemsSynced: 0, error: 'boom' };
 
 function outcome(status: SyncEntityOutcome['status']): SyncEntityOutcome {
@@ -53,7 +70,7 @@ function outcome(status: SyncEntityOutcome['status']): SyncEntityOutcome {
     action: 'create',
     status,
     remoteId: null,
-    reason: status === 'success' ? null : 'The Arr instance rejected the request (HTTP 400).'
+    reason: status === 'success' ? null : 'The Arr instance rejected the request (HTTP 400).',
   };
 }
 
@@ -90,7 +107,7 @@ function createProfile(name: string): PcdQualityProfile {
     upgradeScoreIncrement: 1,
     qualities: [],
     language: null,
-    customFormats: []
+    customFormats: [],
   };
 }
 
@@ -102,10 +119,10 @@ function createBatch(databaseId: number, suffix: string, profileNames: string[])
     suffix,
     profiles: profileNames.map((profileName) => ({
       pcdProfile: createProfile(profileName),
-      referencedFormatNames: []
+      referencedFormatNames: [],
     })),
     customFormats: new Map<string, never>(),
-    pcdFormatIdMap: new Map<string, number>()
+    pcdFormatIdMap: new Map<string, number>(),
   };
 }
 
@@ -129,7 +146,7 @@ Deno.test('quality profile sync emits one terminal outcome per profile sourced f
         throw new HttpError('SECRET arr body: rejected value', 400);
       }
       return Promise.resolve({ id: createCalls * 10, name: 'ok', cutoff: 0, qualityProfile: {} });
-    }
+    },
   };
 
   const syncer = new QualityProfileSyncer(client as never, 10, 'Test', 'radarr');
@@ -163,7 +180,29 @@ Deno.test('quality profile sync emits one terminal outcome per profile sourced f
 
   // Back-compat aggregate still reflects the failure.
   assertEquals(result.success, false);
+  assertEquals(result.itemsSynced, 2);
   assertEquals(result.failedProfiles, ['second']);
+});
+
+Deno.test('syncCustomFormats treats a missing create response id as a failed outcome', async () => {
+  const client = {
+    getCustomFormats: () => Promise.resolve([]),
+    updateCustomFormat: () => Promise.resolve({}),
+    createCustomFormat: () => Promise.resolve({}),
+  };
+  const { outcomes, pcdFormatIdMap } = await syncCustomFormats(
+    client as never,
+    10,
+    'radarr',
+    new Map([['cf-missing-id', pcdFormat('cf-missing-id')]]),
+    '-x'
+  );
+
+  assertEquals(outcomes.length, 1);
+  assertEquals(outcomes[0].status, 'failed');
+  assertEquals(outcomes[0].action, 'create');
+  assertEquals(outcomes[0].remoteId, null);
+  assertEquals(pcdFormatIdMap.has('cf-missing-id'), false);
 });
 
 // =============================================================================
@@ -184,12 +223,12 @@ Deno.test('syncCustomFormats surfaces a failed outcome for a thrown write with a
         throw new HttpError('SECRET arr body: apiKey leaked', 400);
       }
       return Promise.resolve({ id: 7 });
-    }
+    },
   };
 
   const pcdFormats = new Map<string, PcdCustomFormat>([
     ['cf-ok', pcdFormat('cf-ok')],
-    ['cf-fail', pcdFormat('cf-fail')]
+    ['cf-fail', pcdFormat('cf-fail')],
   ]);
 
   const { outcomes, pcdFormatIdMap } = await syncCustomFormats(client as never, 10, 'radarr', pcdFormats, '-x');
@@ -214,7 +253,7 @@ Deno.test('syncCustomFormats emits a skipped outcome for a Lidarr format with no
   const client = {
     getCustomFormats: () => Promise.resolve([]),
     updateCustomFormat: () => Promise.resolve({}),
-    createCustomFormat: () => Promise.resolve({ id: 1 })
+    createCustomFormat: () => Promise.resolve({ id: 1 }),
   };
 
   // A `source` condition is not in LIDARR_SUPPORTED_CONDITION_TYPES, so it is dropped; with the
@@ -223,9 +262,9 @@ Deno.test('syncCustomFormats emits a skipped outcome for a Lidarr format with no
     [
       'lidarr-cf',
       pcdFormat('lidarr-cf', [
-        { name: 'src', type: 'source', arrType: 'all', negate: false, required: false, sources: ['bluray'] }
-      ])
-    ]
+        { name: 'src', type: 'source', arrType: 'all', negate: false, required: false, sources: ['bluray'] },
+      ]),
+    ],
   ]);
 
   const { outcomes } = await syncCustomFormats(client as never, 11, 'lidarr', pcdFormats, '-x');
@@ -235,6 +274,118 @@ Deno.test('syncCustomFormats emits a skipped outcome for a Lidarr format with no
   assertEquals(outcomes[0].name, 'lidarr-cf');
   assertEquals(outcomes[0].arrType, 'lidarr');
   assert((outcomes[0].reason ?? '').length > 0, 'a skipped outcome must carry a reason');
+});
+
+// =============================================================================
+// Reviewed-plan rejection — evidence is authorization, never a confirmed outcome
+// =============================================================================
+
+Deno.test('review evidence invalidation creates no confirmed outcome or Sync History row', async () => {
+  const nowMs = Date.parse('2026-07-10T12:00:00.000Z');
+  const reviewedEvidence = {
+    section: 'qualityProfiles' as const,
+    pcd: { revision: 1, desired: 'Reviewed HD' },
+    arr: { revision: 1, remoteId: 7 },
+    plan: { action: 'update', fields: ['cutoff'] },
+  };
+  const binding = await buildSyncPreviewReviewBinding({
+    instanceId: 234,
+    arrType: 'radarr',
+    target: {
+      url: 'http://127.0.0.1:7878',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'legacy',
+      credentialRevision: '2026-07-10T10:00:00.000Z',
+    },
+    sections: ['qualityProfiles'],
+    sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
+    evidence: [reviewedEvidence],
+  });
+  const instance: ArrInstance = {
+    id: 234,
+    name: 'Reviewed Radarr',
+    type: 'radarr',
+    url: 'http://127.0.0.1:7878',
+    external_url: null,
+    api_key_fingerprint: 'credential-v1',
+    api_key: 'test-key',
+    tags: null,
+    enabled: 1,
+    source: 'ui',
+    detected_version: '5.14.0.9383',
+    detected_at: '2026-07-10T11:00:00.000Z',
+    created_at: '2026-07-10T10:00:00.000Z',
+    updated_at: '2026-07-10T10:00:00.000Z',
+  };
+  const claim = Object.freeze({
+    instanceId: instance.id,
+    sections: Object.freeze(['qualityProfiles'] as const),
+  }) as ReviewedSyncClaim;
+  const calls = { snapshots: 0, history: 0, handlers: 0, releasedClaim: 0, failedClaim: 0 };
+  const client = { close: () => undefined } as unknown as BaseArrClient;
+  const dependencies = {
+    now: () => nowMs,
+    getInstance: () => instance,
+    getReviewClient: () =>
+      Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: 'credential-v1',
+          keyVersion: 'legacy',
+          revision: instance.updated_at,
+        },
+      }),
+    detectVersion: () => Promise.resolve(null),
+    claimSections: () => claim,
+    releaseSections: () => {
+      calls.releasedClaim += 1;
+      return true;
+    },
+    completeSections: () => true,
+    failSections: () => {
+      calls.failedClaim += 1;
+      return true;
+    },
+    materializeReview: () =>
+      Promise.resolve({
+        preview: { sections: ['qualityProfiles'] },
+        reviewContext: {
+          sectionConfigs: binding.sectionConfigs,
+          evidence: [{ ...reviewedEvidence, pcd: { revision: 2, desired: 'Unreviewed UHD' } }],
+          preparedExecutionContexts: {},
+        },
+      }),
+    createSnapshot: () => {
+      calls.snapshots += 1;
+      return Promise.resolve(null);
+    },
+    recordHistory: () => {
+      calls.history += 1;
+      return 1;
+    },
+    getSectionHandler: () => {
+      calls.handlers += 1;
+      throw new Error('review invalidation must not reach a writer');
+    },
+  } as unknown as ReviewedSyncExecutionDependencies;
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections: ['qualityProfiles'],
+    previewId: 'preview-invalidated-before-write',
+    expiresAt: new Date(nowMs + 60_000).toISOString(),
+    dependencies,
+  });
+
+  assertEquals(result, {
+    kind: 'invalidated',
+    reason: 'pcd_drift',
+    changedEvidence: ['pcd'],
+    changedSections: ['qualityProfiles'],
+    outcomes: [],
+    syncHistoryId: null,
+  });
+  assertEquals(calls, { snapshots: 0, history: 0, handlers: 0, releasedClaim: 1, failedClaim: 0 });
 });
 
 // =============================================================================
@@ -261,7 +412,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         config.setBasePath(originalBasePath);
         await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
       }
-    }
+    },
   });
 }
 
@@ -271,11 +422,15 @@ function seedInstance(type: SyncPreviewArrType): number {
     name: `${type}-${crypto.randomUUID()}`,
     type,
     url: `http://localhost:${port}`,
-    apiKey: 'test-api-key'
+    apiKey: 'test-api-key',
   });
 }
 
-function baseInput(instanceId: number, arrType: SyncPreviewArrType, overrides: Partial<SyncHistoryInput>): SyncHistoryInput {
+function baseInput(
+  instanceId: number,
+  arrType: SyncPreviewArrType,
+  overrides: Partial<SyncHistoryInput>
+): SyncHistoryInput {
   return {
     arrInstanceId: instanceId,
     instanceName: `${arrType}-instance`,
@@ -296,7 +451,7 @@ function baseInput(instanceId: number, arrType: SyncPreviewArrType, overrides: P
     startedAt: '2026-07-10T10:00:00.000Z',
     finishedAt: '2026-07-10T10:00:01.000Z',
     durationMs: 1000,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -304,21 +459,111 @@ function baseInput(instanceId: number, arrType: SyncPreviewArrType, overrides: P
 // Lidarr-only; every arr supports qualityProfiles/delayProfiles/mediaManagement.
 const OUTCOME_MATRIX: Record<SyncPreviewArrType, SyncEntityOutcome[]> = {
   radarr: [
-    { section: 'qualityProfiles', arrType: 'radarr', entityType: 'customFormat', name: 'HDR10', action: 'create', status: 'success', remoteId: '5', reason: null },
-    { section: 'qualityProfiles', arrType: 'radarr', entityType: 'qualityProfile', name: 'HD', action: 'update', status: 'success', remoteId: '1', reason: null },
-    { section: 'delayProfiles', arrType: 'radarr', entityType: 'delayProfile', name: 'Default', action: 'update', status: 'success', remoteId: '1', reason: null },
-    { section: 'mediaManagement', arrType: 'radarr', entityType: 'qualityDefinitions', name: 'sizes', action: 'update', status: 'skipped', remoteId: null, reason: 'No quality definitions matched between the source config and this instance.' }
+    {
+      section: 'qualityProfiles',
+      arrType: 'radarr',
+      entityType: 'customFormat',
+      name: 'HDR10',
+      action: 'create',
+      status: 'success',
+      remoteId: '5',
+      reason: null,
+    },
+    {
+      section: 'qualityProfiles',
+      arrType: 'radarr',
+      entityType: 'qualityProfile',
+      name: 'HD',
+      action: 'update',
+      status: 'success',
+      remoteId: '1',
+      reason: null,
+    },
+    {
+      section: 'delayProfiles',
+      arrType: 'radarr',
+      entityType: 'delayProfile',
+      name: 'Default',
+      action: 'update',
+      status: 'success',
+      remoteId: '1',
+      reason: null,
+    },
+    {
+      section: 'mediaManagement',
+      arrType: 'radarr',
+      entityType: 'qualityDefinitions',
+      name: 'sizes',
+      action: 'update',
+      status: 'skipped',
+      remoteId: null,
+      reason: 'No quality definitions matched between the source config and this instance.',
+    },
   ],
   sonarr: [
-    { section: 'qualityProfiles', arrType: 'sonarr', entityType: 'qualityProfile', name: 'WEB-1080p', action: 'create', status: 'success', remoteId: '2', reason: null },
-    { section: 'delayProfiles', arrType: 'sonarr', entityType: 'delayProfile', name: 'Default', action: 'update', status: 'failed', remoteId: '1', reason: 'The Arr instance returned an error (HTTP 500).' },
-    { section: 'mediaManagement', arrType: 'sonarr', entityType: 'naming', name: 'Standard', action: 'update', status: 'success', remoteId: '1', reason: null }
+    {
+      section: 'qualityProfiles',
+      arrType: 'sonarr',
+      entityType: 'qualityProfile',
+      name: 'WEB-1080p',
+      action: 'create',
+      status: 'success',
+      remoteId: '2',
+      reason: null,
+    },
+    {
+      section: 'delayProfiles',
+      arrType: 'sonarr',
+      entityType: 'delayProfile',
+      name: 'Default',
+      action: 'update',
+      status: 'failed',
+      remoteId: '1',
+      reason: 'The Arr instance returned an error (HTTP 500).',
+    },
+    {
+      section: 'mediaManagement',
+      arrType: 'sonarr',
+      entityType: 'naming',
+      name: 'Standard',
+      action: 'update',
+      status: 'success',
+      remoteId: '1',
+      reason: null,
+    },
   ],
   lidarr: [
-    { section: 'qualityProfiles', arrType: 'lidarr', entityType: 'customFormat', name: 'Lossless', action: 'create', status: 'skipped', remoteId: null, reason: 'No custom format conditions are supported on Lidarr.' },
-    { section: 'metadataProfiles', arrType: 'lidarr', entityType: 'metadataProfile', name: 'Standard', action: 'update', status: 'success', remoteId: '3', reason: null },
-    { section: 'mediaManagement', arrType: 'lidarr', entityType: 'mediaSettings', name: 'settings', action: 'update', status: 'skipped', remoteId: null, reason: 'Field is not represented by the Lidarr API config payload and is skipped during sync' }
-  ]
+    {
+      section: 'qualityProfiles',
+      arrType: 'lidarr',
+      entityType: 'customFormat',
+      name: 'Lossless',
+      action: 'create',
+      status: 'skipped',
+      remoteId: null,
+      reason: 'No custom format conditions are supported on Lidarr.',
+    },
+    {
+      section: 'metadataProfiles',
+      arrType: 'lidarr',
+      entityType: 'metadataProfile',
+      name: 'Standard',
+      action: 'update',
+      status: 'success',
+      remoteId: '3',
+      reason: null,
+    },
+    {
+      section: 'mediaManagement',
+      arrType: 'lidarr',
+      entityType: 'mediaSettings',
+      name: 'settings',
+      action: 'update',
+      status: 'skipped',
+      remoteId: null,
+      reason: 'Field is not represented by the Lidarr API config payload and is skipped during sync',
+    },
+  ],
 };
 
 migratedTest('entity outcomes round-trip through insert/getById for every supported arr_type', () => {
@@ -331,7 +576,7 @@ migratedTest('entity outcomes round-trip through insert/getById for every suppor
       baseInput(instanceId, arrType, {
         entityOutcomes: outcomes,
         previewId,
-        status: outcomes.some((o) => o.status === 'failed') ? 'partial' : 'success'
+        status: outcomes.some((o) => o.status === 'failed') ? 'partial' : 'success',
       })
     );
 
@@ -357,4 +602,43 @@ migratedTest('summary rows carry the outcome count and preview correlation witho
   assertEquals(summaries.length, 1);
   assertEquals(summaries[0].entityOutcomeCount, outcomes.length);
   assertEquals(summaries[0].previewId, previewId);
+});
+
+migratedTest('planned review changes and confirmed write outcomes remain separate persisted evidence', () => {
+  const instanceId = seedInstance('radarr');
+  const plannedChange: SyncEntityChange = {
+    section: 'qualityProfiles',
+    category: 'qualityProfiles',
+    entityType: 'qualityProfile',
+    name: 'Reviewed HD',
+    action: 'update',
+    remoteId: 7,
+    fields: [{ field: 'cutoff', type: 'changed', current: 10, desired: 20 }],
+  };
+  const confirmedOutcome: SyncEntityOutcome = {
+    section: 'qualityProfiles',
+    arrType: 'radarr',
+    entityType: 'qualityProfile',
+    name: 'Reviewed HD',
+    action: 'update',
+    status: 'failed',
+    remoteId: '7',
+    reason: 'The Arr instance rejected the request (HTTP 400).',
+  };
+
+  const id = syncHistoryQueries.insert(
+    baseInput(instanceId, 'radarr', {
+      status: 'failed',
+      changes: [plannedChange],
+      entityOutcomes: [confirmedOutcome],
+      previewId: 'preview-planned-versus-confirmed',
+    })
+  );
+  const detail = syncHistoryQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.changes, [plannedChange]);
+  assertEquals(detail.entityOutcomes, [confirmedOutcome]);
+  assertEquals(detail.changes[0].action, detail.entityOutcomes[0].action);
+  assertEquals('status' in detail.changes[0], false);
+  assertEquals('fields' in detail.entityOutcomes[0], false);
 });

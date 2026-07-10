@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { onMount } from 'svelte';
-  import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-svelte';
+  import { onMount, tick } from 'svelte';
+  import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import Modal from '$ui/modal/Modal.svelte';
@@ -15,10 +15,20 @@
   import type { SectionType, SyncEntityOutcome } from '$sync/types.ts';
   import SyncOutcomeList from '$ui/sync-history/SyncOutcomeList.svelte';
   import type { components } from '$api/v1.d.ts';
+  import { getRememberedSyncPreviewRequest, rememberSyncPreviewRequest } from './SyncPreviewTrigger.svelte';
 
   type SyncPreviewTriggerStatus = 'idle' | 'generating' | 'error' | 'ready';
   type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
   type SyncPreviewApplyErrorResponse = components['schemas']['SyncPreviewApplyErrorResponse'];
+  type SyncPreviewApplyInvalidatedResponse = components['schemas']['SyncPreviewApplyInvalidatedResponse'];
+  type SyncPreviewApplyInvalidationCode = components['schemas']['SyncPreviewApplyInvalidationCode'];
+
+  type ReviewInvalidation = {
+    code: SyncPreviewApplyInvalidationCode;
+    title: string;
+    message: string;
+    changedSections: readonly SyncPreviewSection[];
+  };
 
   type SyncPreviewRouteState = {
     previewId: string | null;
@@ -86,7 +96,12 @@
   let showApplyModal = false;
   let deleteConfirmText = '';
   let applying = false;
+  let regenerating = false;
+  let regenerationError = '';
   let applyError = '';
+  let reviewInvalidation: ReviewInvalidation | null = null;
+  let invalidationAlert: HTMLDivElement | null = null;
+  let previewHeading: HTMLHeadingElement | null = null;
   let confirmationMatches = false;
   let showExplanationDetails = false;
   let narrationLevel: NarrationLevel = 'summary';
@@ -97,6 +112,9 @@
   let applyRecoveryAction = '';
   let applyOutcomes: SyncEntityOutcome[] = [];
   let applySyncHistoryId: number | null = null;
+  let reviewedSections: SyncPreviewSection[] = [];
+  let selectedSectionText = '';
+  let observedRoutePreviewId: string | null = null;
 
   const sectionLabels: Record<SyncPreviewSection, string> = {
     qualityProfiles: 'Quality Profiles',
@@ -104,6 +122,26 @@
     mediaManagement: 'Media Management',
     metadataProfiles: 'Metadata Profiles',
   };
+
+  const arrLabels: Record<SyncPreviewResult['arrType'], string> = {
+    radarr: 'Radarr',
+    sonarr: 'Sonarr',
+    lidarr: 'Lidarr',
+  };
+
+  const invalidationCodes = new Set<SyncPreviewApplyInvalidationCode>([
+    'pcd_drift',
+    'arr_drift',
+    'pcd_and_arr_drift',
+    'scope_drift',
+    'unverifiable_review',
+  ]);
+  const previewSections = new Set<SyncPreviewSection>([
+    'qualityProfiles',
+    'delayProfiles',
+    'mediaManagement',
+    'metadataProfiles',
+  ]);
 
   onMount(() => {
     const timer = setInterval(() => {
@@ -290,6 +328,98 @@
     showExplanationDetails = !showExplanationDetails;
   }
 
+  function resolveReviewedSections(snapshot: SyncPreviewResult): SyncPreviewSection[] {
+    if (snapshot.sectionOutcomes.length === 0) {
+      return snapshot.failure ? [] : [...snapshot.sections];
+    }
+
+    const successful = new Set(
+      snapshot.sectionOutcomes
+        .filter((outcome) => outcome.failure === null && !outcome.skipped)
+        .map((outcome) => outcome.section)
+    );
+    return snapshot.sections.filter((section) => successful.has(section));
+  }
+
+  function isInvalidatedResponse(payload: unknown): payload is SyncPreviewApplyInvalidatedResponse {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+    const candidate = payload as Record<string, unknown>;
+    return (
+      typeof candidate.code === 'string' &&
+      invalidationCodes.has(candidate.code as SyncPreviewApplyInvalidationCode) &&
+      candidate.regenerateRequired === true &&
+      Array.isArray(candidate.changedSections) &&
+      candidate.changedSections.every(
+        (section) => typeof section === 'string' && previewSections.has(section as SyncPreviewSection)
+      ) &&
+      Array.isArray(candidate.changedEvidence)
+    );
+  }
+
+  function recoveryFor(
+    code: SyncPreviewApplyInvalidationCode,
+    arrLabel: string,
+    changedSections: readonly SyncPreviewSection[]
+  ): ReviewInvalidation {
+    switch (code) {
+      case 'pcd_drift':
+        return {
+          code,
+          title: 'Review invalidated: PCD changed',
+          message:
+            'Desired PCD data changed after this preview was generated. Nothing was applied. Generate a new preview and review the updated desired changes before applying.',
+          changedSections,
+        };
+      case 'arr_drift':
+        return {
+          code,
+          title: `Review invalidated: live ${arrLabel} data changed`,
+          message: `Live ${arrLabel} data changed after this preview was generated. Nothing was applied. Generate a new preview and review the updated current state before applying.`,
+          changedSections,
+        };
+      case 'pcd_and_arr_drift':
+        return {
+          code,
+          title: `Review invalidated: PCD and live ${arrLabel} data changed`,
+          message: `Both desired PCD data and live ${arrLabel} data changed after this preview was generated. Nothing was applied. Generate a new preview and review all updated changes before applying.`,
+          changedSections,
+        };
+      case 'scope_drift':
+        return {
+          code,
+          title: 'Review invalidated: target or scope changed',
+          message:
+            'Praxrr could not verify this preview for the same instance, Arr type, and reviewed sections. Nothing was applied. Generate a new preview from the intended instance and review it before applying.',
+          changedSections,
+        };
+      case 'unverifiable_review':
+        return {
+          code,
+          title: 'Could not verify the reviewed preview',
+          message: `Praxrr could not safely compare the reviewed preview with current PCD and live ${arrLabel} data. Nothing was applied. Generate a new preview and review it before applying. If preview generation also fails, check PCD and ${arrLabel} connectivity.`,
+          changedSections,
+        };
+      default: {
+        const exhaustive: never = code;
+        return exhaustive;
+      }
+    }
+  }
+
+  function isPreviewResult(payload: unknown): payload is SyncPreviewResult {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+    const candidate = payload as Partial<SyncPreviewResult>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.instanceId === 'number' &&
+      typeof candidate.instanceName === 'string' &&
+      typeof candidate.arrType === 'string' &&
+      Array.isArray(candidate.sections) &&
+      Array.isArray(candidate.sectionOutcomes) &&
+      !!candidate.summary
+    );
+  }
+
   async function loadPreview(previewId: string) {
     activePreviewId = previewId;
     loading = true;
@@ -310,6 +440,8 @@
       }
 
       preview = payload;
+      reviewInvalidation = null;
+      regenerationError = '';
     } catch {
       if (activePreviewId !== previewId) return;
       loadError = 'Failed to fetch preview details.';
@@ -322,10 +454,10 @@
   }
 
   async function handleApply() {
-    if (!preview) return;
+    if (!preview || applying || reviewInvalidation) return;
 
     const hasDeletes = preview.summary.totalDeletes > 0;
-    if (hasDeletes && deleteConfirmText.trim() !== instanceName) return;
+    if (hasDeletes && deleteConfirmText !== preview.instanceName) return;
 
     showApplyModal = false;
     applying = true;
@@ -339,35 +471,55 @@
       const response = await fetch(`/api/v1/sync/preview/${preview.id}/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ sections: reviewedSections }),
       });
-      const payload = (await response.json().catch(() => null)) as
-        SyncPreviewApplyResponse | SyncPreviewApplyErrorResponse | null;
+      const payload = (await response.json().catch(() => null)) as unknown;
 
-      // Capture confirmed outcomes even on a partial/failed apply — they must never be dropped.
-      if (payload && 'outcomes' in payload) {
-        applyOutcomes = payload.outcomes;
-        applySyncHistoryId = payload.syncHistoryId;
+      if (response.status === 422 && isInvalidatedResponse(payload)) {
+        const safeRecovery = recoveryFor(payload.code, arrLabels[preview.arrType], payload.changedSections);
+        reviewInvalidation = safeRecovery;
+        applyError = safeRecovery.message;
+        alertStore.add('error', safeRecovery.message);
+        await tick();
+        invalidationAlert?.focus();
+        return;
       }
 
-      if (!response.ok || !payload || !('success' in payload) || payload.success === false) {
-        // Both apply failure shapes now carry a typed, safe `failure` reason — never raw text.
+      // Capture confirmed outcomes even on a partial/failed apply — they must never be dropped.
+      if (payload && typeof payload === 'object' && 'outcomes' in payload) {
+        const applyPayload = payload as SyncPreviewApplyResponse;
+        applyOutcomes = applyPayload.outcomes;
+        applySyncHistoryId = applyPayload.syncHistoryId;
+      }
+
+      if (
+        !response.ok ||
+        !payload ||
+        typeof payload !== 'object' ||
+        !('success' in payload) ||
+        payload.success === false
+      ) {
+        const errorPayload = payload as
+          SyncPreviewApplyErrorResponse | (SyncPreviewApplyResponse & { success: false }) | null;
+        // Both apply failure shapes carry a typed, safe reason; never surface raw error text.
         const reason =
-          payload && 'failure' in payload && payload.failure
-            ? payload.failure
-            : payload && 'results' in payload && payload.results.failure
-              ? payload.results.failure
+          errorPayload && 'failure' in errorPayload && errorPayload.failure
+            ? errorPayload.failure
+            : errorPayload && 'results' in errorPayload
+              ? errorPayload.results.failure
               : null;
         applyRecoveryAction = reason?.recoveryAction ?? '';
         throw new Error(reason?.message ?? 'Failed to apply preview.');
       }
 
-      if ('staleWarning' in payload && payload.staleWarning) {
-        alertStore.add('warning', payload.staleWarning);
+      const applyPayload = payload as SyncPreviewApplyResponse;
+
+      if (applyPayload.staleWarning) {
+        alertStore.add('warning', applyPayload.staleWarning);
       }
 
       applyResultText =
-        payload.results.status === 'skipped'
+        applyPayload.results.status === 'skipped'
           ? 'The apply job was skipped.'
           : `The apply job completed. ${applyOutcomes.length} confirmed entity outcome(s) recorded.`;
 
@@ -382,6 +534,59 @@
       alertStore.add('error', message);
     } finally {
       applying = false;
+    }
+  }
+
+  async function handleRegenerate() {
+    if (!preview || applying || regenerating) return;
+
+    regenerating = true;
+    regenerationError = '';
+    const requestBody =
+      getRememberedSyncPreviewRequest(preview.id) ??
+      JSON.stringify({ instanceId: preview.instanceId, sections: [...preview.sections] });
+
+    try {
+      const response = await fetch('/api/v1/sync/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      });
+      const payload = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok || !isPreviewResult(payload)) {
+        const failure =
+          payload &&
+          typeof payload === 'object' &&
+          'failure' in payload &&
+          payload.failure &&
+          typeof payload.failure === 'object'
+            ? (payload.failure as Record<string, unknown>)
+            : null;
+        const message =
+          failure && typeof failure.message === 'string'
+            ? failure.message
+            : payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+              ? payload.error
+              : 'Failed to generate a new preview.';
+        throw new Error(message);
+      }
+
+      rememberSyncPreviewRequest(payload.id, requestBody);
+      activePreviewId = payload.id;
+      preview = payload;
+      reviewInvalidation = null;
+      applyError = '';
+      applyResultText = '';
+      deleteConfirmText = '';
+      alertStore.add('success', 'New preview ready. Review the changes before applying.');
+      await tick();
+      previewHeading?.focus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate a new preview.';
+      regenerationError = message;
+      alertStore.add('error', message);
+    } finally {
+      regenerating = false;
     }
   }
 
@@ -414,15 +619,26 @@
     return focusedGroups.length > 0 ? focusedGroups : groups;
   })();
   $: staleness = preview ? evaluateStaleness(preview.createdAt, stalenessNow) : null;
-  $: confirmationMatches = deleteConfirmText.trim() === instanceName.trim();
-  $: hasApplyPermission = !!preview && preview.status === 'ready' && !applying && !staleness?.shouldBlock;
+  $: confirmationMatches = !!preview && deleteConfirmText === preview.instanceName;
+  $: reviewedSections = preview ? resolveReviewedSections(preview) : [];
+  $: selectedSectionText = reviewedSections.map((section) => sectionLabels[section]).join(', ');
+  $: hasApplyPermission =
+    !!preview &&
+    preview.status === 'ready' &&
+    reviewedSections.length > 0 &&
+    !applying &&
+    !regenerating &&
+    !reviewInvalidation &&
+    !staleness?.shouldBlock;
   $: hasDeletes = summary.totalDeletes > 0;
 
   $: if (previewState.status === 'ready' && previewState.previewId) {
-    if (previewState.previewId !== activePreviewId) {
+    if (previewState.previewId !== observedRoutePreviewId) {
+      observedRoutePreviewId = previewState.previewId;
       void loadPreview(previewState.previewId);
     }
   } else {
+    observedRoutePreviewId = null;
     activePreviewId = null;
     preview = null;
     loadError = previewState.error ?? '';
@@ -432,11 +648,20 @@
   }
 </script>
 
-<div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+<div
+  class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+  aria-busy={applying || regenerating}
+>
   <div class="border-b border-neutral-200 px-4 py-4 dark:border-neutral-800">
     <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-neutral-900 dark:text-neutral-50">Sync Preview</h2>
+        <h2
+          bind:this={previewHeading}
+          tabindex="-1"
+          class="text-xl font-semibold text-neutral-900 outline-none dark:text-neutral-50"
+        >
+          Sync Preview
+        </h2>
         <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Review planned sync changes before applying.</p>
       </div>
       <div class="text-xs text-neutral-600 dark:text-neutral-400">
@@ -486,14 +711,68 @@
             </div>
             <div>
               <span class="text-neutral-500 dark:text-neutral-400">Arr:</span>
-              <span class="ml-1 text-neutral-900 dark:text-neutral-100">{preview.arrType}</span>
+              <span class="ml-1 text-neutral-900 dark:text-neutral-100">{arrLabels[preview.arrType]}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-neutral-500 dark:text-neutral-400">Reviewed sections:</span>
+              {#each reviewedSections as section}
+                <Badge variant="neutral">{sectionLabels[section]}</Badge>
+              {/each}
             </div>
           </div>
 
-          <div class="font-mono text-xs text-neutral-500 dark:text-neutral-400" aria-live="polite">
+          <div class="font-mono text-xs text-neutral-500 dark:text-neutral-400">
             {stalenessText ? `Preview is ${stalenessText}.` : 'No staleness info yet.'}
           </div>
         </div>
+
+        {#if applying}
+          <div
+            class="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-200"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <Loader2 size={16} class="animate-spin" />
+            <span>Validating reviewed preview…</span>
+          </div>
+        {/if}
+
+        {#if reviewInvalidation}
+          <div
+            bind:this={invalidationAlert}
+            tabindex="-1"
+            role="alert"
+            aria-atomic="true"
+            class="space-y-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200 dark:focus:ring-offset-neutral-900"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="font-semibold">{reviewInvalidation.title}</p>
+              <Badge variant="warning">Read-only</Badge>
+            </div>
+            <p>{reviewInvalidation.message}</p>
+            {#if reviewInvalidation.changedSections.length > 0}
+              <p>
+                Affected reviewed sections:
+                {reviewInvalidation.changedSections.map((section) => sectionLabels[section]).join(', ')}.
+              </p>
+            {/if}
+            <p class="font-medium">
+              Target: {preview.instanceName} · {arrLabels[preview.arrType]} · {selectedSectionText}
+            </p>
+            {#if regenerationError}
+              <p class="font-medium">{regenerationError}</p>
+            {/if}
+            <Button
+              variant="primary"
+              text={regenerating ? 'Generating a new preview…' : 'Generate a new preview'}
+              disabled={regenerating || applying}
+              icon={regenerating ? Loader2 : RefreshCw}
+              iconColor={regenerating ? 'text-white animate-spin' : 'text-white'}
+              onclick={handleRegenerate}
+            />
+          </div>
+        {/if}
 
         {#if staleness && staleness.shouldWarn && !staleness.shouldBlock}
           <div
@@ -674,7 +953,7 @@
               icon={applying ? Loader2 : CheckCircle2}
               iconColor={applying ? 'text-white animate-spin' : 'text-white'}
               on:click={openApply}
-              text={applying ? 'Applying...' : 'Apply Preview'}
+              text={applying ? 'Validating reviewed preview…' : 'Apply Preview'}
             />
           </div>
         </div>
@@ -688,7 +967,7 @@
   header={hasDeletes ? 'Confirm Destructive Preview Apply' : 'Confirm Preview Apply'}
   confirmText={hasDeletes ? 'Apply Deletions' : 'Apply Changes'}
   confirmDanger={hasDeletes}
-  confirmDisabled={hasDeletes && !confirmationMatches}
+  confirmDisabled={applying || !!reviewInvalidation || (hasDeletes && !confirmationMatches)}
   loading={applying}
   on:confirm={handleApply}
   on:cancel={closeApplyModal}
@@ -698,6 +977,16 @@
     <p class="text-sm text-neutral-600 dark:text-neutral-400">
       You are about to apply the planned changes to <strong>{preview?.instanceName ?? instanceName}</strong>.
     </p>
+
+    {#if preview}
+      <div class="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
+        <p><strong>Target:</strong> {preview.instanceName} · {arrLabels[preview.arrType]}</p>
+        <p><strong>Reviewed sections:</strong> {selectedSectionText}</p>
+      </div>
+      <p class="text-sm text-neutral-600 dark:text-neutral-400">
+        Praxrr will first verify that the reviewed PCD and live {arrLabels[preview.arrType]} evidence still match.
+      </p>
+    {/if}
 
     <p class="text-sm font-medium text-neutral-800 dark:text-neutral-200">
       Planned changes: {formatSummary(summary)}
@@ -715,7 +1004,7 @@
       <div class="space-y-2">
         <p class="text-sm text-red-700 dark:text-red-200">
           Destructive deletes are included. To continue, type the instance name exactly:
-          <strong class="ml-1">{instanceName || (preview?.instanceName ?? 'instance')}</strong>
+          <strong class="ml-1">{preview?.instanceName ?? (instanceName || 'instance')}</strong>
         </p>
         <FormInput
           label="Type instance name to confirm"

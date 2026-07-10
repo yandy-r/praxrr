@@ -23,7 +23,7 @@ import { getCache } from '$pcd/database/registry.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { ArrType } from '$arr/types.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
-import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
+import type { GeneratePreviewInput, GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import { registerPreviewCreateAttempt } from '$sync/preview/limits.ts';
 import { SYNC_SECTION_ORDER, resolveSyncSectionAvailability, type SyncArrType } from '$sync/mappings.ts';
 import type { SectionType } from '$sync/types.ts';
@@ -42,7 +42,7 @@ export const DEFAULT_DRIFT_BUDGET_MS = 20_000;
 
 export interface DriftCheckDeps {
   /** Runs the live-vs-desired section diff for an instance. */
-  readonly generatePreview: typeof generatePreview;
+  readonly generatePreview: (input: GeneratePreviewInput) => Promise<GeneratePreviewResult>;
   /** Cheap reachability probe (short timeout, no retries); never throws. */
   readonly heartbeat: (instance: ArrInstance) => Promise<HeartbeatResult>;
   /** True iff every PCD database this instance syncs from has a built cache. */
