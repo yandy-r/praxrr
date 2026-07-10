@@ -202,6 +202,7 @@ EntityConfigDiff:
       enum:
         - radarr
         - sonarr
+        - lidarr
     changes:
       type: array
       items:

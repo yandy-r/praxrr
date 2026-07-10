@@ -26,7 +26,7 @@ function toWireChanges(changes: FieldChange[]): EntityConfigDiff['changes'] {
 export async function buildQualityProfileConfigDiff(
   currentCache: PCDCache,
   sandboxCache: PCDCache,
-  arrType: 'radarr' | 'sonarr',
+  arrType: 'radarr' | 'sonarr' | 'lidarr',
   profileNames: string[]
 ): Promise<EntityConfigDiff[]> {
   const result: EntityConfigDiff[] = [];

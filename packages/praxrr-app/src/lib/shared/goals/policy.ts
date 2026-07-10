@@ -11,7 +11,14 @@
  * All arithmetic is integer (`Math.round`); the displayed axis contributions sum exactly to the score.
  */
 
-import type { GoalAxisContribution, GoalCategory, GoalCeilingRelation, GoalThresholds, GoalWeights } from './types.ts';
+import type {
+  GoalArrType,
+  GoalAxisContribution,
+  GoalCategory,
+  GoalCeilingRelation,
+  GoalThresholds,
+  GoalWeights,
+} from './types.ts';
 import type { ResolutionLevel } from './classifier.ts';
 
 /** The weight axes that participate in category scoring (excludes the one-directional strictness axis). */
@@ -55,7 +62,27 @@ export const CATEGORY_POLICY: Readonly<Record<Exclude<GoalCategory, 'unwanted' |
   release_group_tier_3: { base: 50, qualityVsSize: 25, compatibility: 0, hdrPreference: 0 },
   streaming_service: { base: 100, qualityVsSize: 0, compatibility: 100, hdrPreference: 0 },
   movie_version: { base: 150, qualityVsSize: 100, compatibility: 0, hdrPreference: 0 },
-  repack_proper: { base: 5, qualityVsSize: 0, compatibility: 0, hdrPreference: 0 }
+  repack_proper: { base: 5, qualityVsSize: 0, compatibility: 0, hdrPreference: 0 },
+};
+
+/**
+ * Explicit AUDIO-domain policy for Lidarr (#222). Deliberately separate from the video-tuned
+ * `CATEGORY_POLICY` — Lidarr goals must NEVER borrow video magnitudes (cross-Arr guardrail). Only the
+ * categories that survive `LIDARR_EXCLUDED_CATEGORIES` need a row; a Lidarr score for any other
+ * category is a bug and fails fast in `scoreCategory` rather than silently using a video row.
+ *
+ * Audio-as-primary rationale (engine-internal scale; golden fixtures pin the exact emitted scores):
+ * lossless is rewarded most and penalized on compatibility (larger, less-universal files); baseline is
+ * rewarded on compatibility (universally playable) but penalized on quality-vs-size; `hdrPreference`
+ * sensitivity is `0` everywhere so the inert video slider contributes exactly 0.
+ */
+export const LIDARR_AUDIO_POLICY: Readonly<
+  Partial<Record<Exclude<GoalCategory, 'unwanted' | 'resolution'>, PolicyRow>>
+> = {
+  audio_lossless: { base: 500, qualityVsSize: 300, compatibility: -150, hdrPreference: 0 },
+  audio_advanced: { base: 250, qualityVsSize: 100, compatibility: 50, hdrPreference: 0 },
+  audio_baseline: { base: 100, qualityVsSize: -50, compatibility: 150, hdrPreference: 0 },
+  repack_proper: { base: 50, qualityVsSize: 0, compatibility: 0, hdrPreference: 0 },
 };
 
 const WEIGHT_AXES: readonly PolicyAxis[] = ['qualityVsSize', 'compatibility', 'hdrPreference'];
@@ -98,9 +125,17 @@ export interface CategoryScore {
  */
 export function scoreCategory(
   category: Exclude<GoalCategory, 'unwanted' | 'resolution'>,
-  weights: GoalWeights
+  weights: GoalWeights,
+  arrType: GoalArrType
 ): CategoryScore {
-  const row = CATEGORY_POLICY[category];
+  // Strict per-arr_type dispatch, no sibling fallback: Lidarr resolves the audio policy and throws if a
+  // category has no audio row rather than borrowing a video magnitude.
+  const row = arrType === 'lidarr' ? LIDARR_AUDIO_POLICY[category] : CATEGORY_POLICY[category];
+  if (!row) {
+    throw new Error(
+      `No Lidarr audio policy row for category "${category}"; Lidarr goals must not use the video policy.`
+    );
+  }
   const axisContributions: GoalAxisContribution[] = [];
   let total = row.base;
 

@@ -17,10 +17,10 @@ import type {
   GoalScoreDelta,
   GoalThresholdDelta,
   GoalThresholds,
-  GoalUncategorizedCf
+  GoalUncategorizedCf,
 } from './types.ts';
 import { GOALS_ENGINE_VERSION } from './types.ts';
-import { classifyCustomFormat, detectResolutionLevel } from './classifier.ts';
+import { EXCLUDED_RULE_ID, classifyCustomFormat, detectResolutionLevel } from './classifier.ts';
 import { CEILING_ABOVE_PENALTY, UNWANTED_SCORE, ceilingGate, computeThresholds, scoreCategory } from './policy.ts';
 
 function byName(a: { customFormatName: string }, b: { customFormatName: string }): number {
@@ -28,14 +28,20 @@ function byName(a: { customFormatName: string }, b: { customFormatName: string }
 }
 
 /** Score one classified custom format, resolving the ceiling-gate interaction. */
-function decide(input: ComputeGoalPlanInput, name: string, category: GoalCfDecision['category'], ruleId: string, level: ReturnType<typeof detectResolutionLevel>): GoalCfDecision {
+function decide(
+  input: ComputeGoalPlanInput,
+  name: string,
+  category: GoalCfDecision['category'],
+  ruleId: string,
+  level: ReturnType<typeof detectResolutionLevel>
+): GoalCfDecision {
   const { arrType, weights } = input;
   const base = (score: number, reason: Omit<GoalReason, 'code' | 'category' | 'ruleId'>): GoalCfDecision => ({
     customFormatName: name,
     arrType,
     category,
     score,
-    reason: { code: `category.${category}`, category, ruleId, ...reason }
+    reason: { code: `category.${category}`, category, ruleId, ...reason },
   });
 
   if (category === 'unwanted') {
@@ -51,7 +57,7 @@ function decide(input: ComputeGoalPlanInput, name: string, category: GoalCfDecis
     return base(gate.score, { base: gate.score, axisContributions: [], ceiling: gate.relation });
   }
 
-  const scored = scoreCategory(category, weights);
+  const scored = scoreCategory(category, weights, arrType);
 
   if (level !== undefined) {
     const gate = ceilingGate(level, weights);
@@ -59,7 +65,11 @@ function decide(input: ComputeGoalPlanInput, name: string, category: GoalCfDecis
     if (gate.relation === 'above') {
       return base(CEILING_ABOVE_PENALTY, { base: CEILING_ABOVE_PENALTY, axisContributions: [], ceiling: 'above' });
     }
-    return base(scored.score, { base: scored.base, axisContributions: scored.axisContributions, ceiling: gate.relation });
+    return base(scored.score, {
+      base: scored.base,
+      axisContributions: scored.axisContributions,
+      ceiling: gate.relation,
+    });
   }
 
   return base(scored.score, { base: scored.base, axisContributions: scored.axisContributions, ceiling: null });
@@ -75,7 +85,10 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
   for (const facts of input.customFormats) {
     const { category, ruleId } = classifyCustomFormat(facts, input.arrType);
     if (category === null) {
-      uncategorized.push({ name: facts.name, suggestedCategory: null, reason: 'no-matching-rule' });
+      // A CF dropped by the Lidarr video-only exclusion filter carries a distinct, user-facing reason
+      // (AC4) so the UI can explain the skip rather than showing it as a coverage gap.
+      const reason = ruleId === EXCLUDED_RULE_ID ? 'excluded.video-only-on-lidarr' : 'no-matching-rule';
+      uncategorized.push({ name: facts.name, suggestedCategory: null, reason });
       continue;
     }
     decisions.push(decide(input, facts.name, category, ruleId, detectResolutionLevel(facts)));
@@ -94,8 +107,8 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
     customFormatScores: decisions.map((decision) => ({
       customFormatName: decision.customFormatName,
       arrType: decision.arrType,
-      score: decision.score
-    }))
+      score: decision.score,
+    })),
   };
 
   return {
@@ -107,9 +120,9 @@ export function computeGoalPlan(input: ComputeGoalPlanInput): GoalPlan {
     coverage: {
       total: input.customFormats.length,
       scored: decisions.length,
-      uncategorized: uncategorized.length
+      uncategorized: uncategorized.length,
     },
-    scoringInput
+    scoringInput,
   };
 }
 

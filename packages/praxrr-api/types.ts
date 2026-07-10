@@ -1924,7 +1924,7 @@ export interface components {
       entityType: 'quality_profile';
       name: string;
       /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
       changes: components['schemas']['FieldChange'][];
     };
     CascadeWarning: {
@@ -2786,7 +2786,14 @@ export interface components {
     };
     GoalPreset: {
       /** @enum {string} */
-      id: 'best-quality' | 'smallest-size' | 'balanced' | '4k-hdr-priority';
+      id:
+        | 'best-quality'
+        | 'smallest-size'
+        | 'balanced'
+        | '4k-hdr-priority'
+        | 'audio-lossless-priority'
+        | 'audio-balanced'
+        | 'audio-space-saver';
       label: string;
       description: string;
       weights: components['schemas']['GoalWeights'];
@@ -2806,7 +2813,7 @@ export interface components {
     GoalCfDecision: {
       customFormatName: string;
       /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
       category: components['schemas']['GoalCategory'];
       score: number;
       reason: components['schemas']['GoalReason'];
@@ -2830,7 +2837,7 @@ export interface components {
     GoalPlan: {
       engineVersion: string;
       /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
       decisions: components['schemas']['GoalCfDecision'][];
       uncategorized: components['schemas']['GoalUncategorizedCf'][];
       thresholds: components['schemas']['GoalThresholds'];
@@ -2852,7 +2859,7 @@ export interface components {
     GoalPreviewRequest: {
       databaseId: number;
       /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
       /** @description Raw PCD quality-profile name (pcd:-stripped) */
       profileName: string;
       preset: string;
@@ -2868,7 +2875,7 @@ export interface components {
     GoalApplyRequest: {
       databaseId: number;
       /** @enum {string} */
-      arrType: 'radarr' | 'sonarr';
+      arrType: 'radarr' | 'sonarr' | 'lidarr';
       profileName: string;
       preset: string;
       weights: components['schemas']['GoalWeights'];

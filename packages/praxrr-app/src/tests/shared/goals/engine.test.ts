@@ -1,7 +1,8 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 
 import { computeGoalPlan, diffGoalPlans } from '$shared/goals/engine.ts';
 import { resolvePreset } from '$shared/goals/presets.ts';
+import { scoreCategory } from '$shared/goals/policy.ts';
 import { GOALS_ENGINE_VERSION } from '$shared/goals/types.ts';
 import type { CfFacts, GoalPresetId, GoalWeights } from '$shared/goals/types.ts';
 
@@ -20,7 +21,7 @@ const FIXTURE: CfFacts[] = [
   cf('IMAX', ['Edition']),
   cf('AMZN', ['Streaming Service', 'WEB-DL']),
   cf('Banned Groups', ['Banned', 'Release Group']),
-  cf('x265 (Bluray)', ['Codec'])
+  cf('x265 (Bluray)', ['Codec']),
 ];
 
 function planFor(preset: GoalPresetId, weights?: Partial<GoalWeights>) {
@@ -29,7 +30,7 @@ function planFor(preset: GoalPresetId, weights?: Partial<GoalWeights>) {
     arrType: 'radarr',
     weights: { ...p.weights, ...weights },
     presetBaseUpgrade: p.baseUpgrade,
-    customFormats: FIXTURE
+    customFormats: FIXTURE,
   });
 }
 
@@ -48,7 +49,7 @@ Deno.test('engine: Best Quality golden score map (bedrock — pins the policy)',
     '1080p Bluray': 50, // resolution level 2 < ceiling 3 -> below +50
     IMAX: 250, // 150 + quality(+100)
     AMZN: 60, // 100 + compat(100*-0.4=-40)
-    'Banned Groups': -10000 // fixed unwanted sentinel
+    'Banned Groups': -10000, // fixed unwanted sentinel
   };
   for (const [name, score] of Object.entries(expected)) {
     assertEquals(scoreOf(plan, name), score, `${name} score`);
@@ -79,7 +80,10 @@ Deno.test('engine: additive contributions sum exactly to the score', () => {
 Deno.test('engine: coverage and uncategorized handling', () => {
   const plan = planFor('best-quality');
   assertEquals(plan.coverage, { total: 10, scored: 9, uncategorized: 1 });
-  assertEquals(plan.uncategorized.map((u) => u.name), ['x265 (Bluray)']);
+  assertEquals(
+    plan.uncategorized.map((u) => u.name),
+    ['x265 (Bluray)']
+  );
   // Uncategorized CFs are never emitted into the scoring input (existing scores left untouched).
   assert(!plan.scoringInput.customFormatScores.some((s) => s.customFormatName === 'x265 (Bluray)'));
   // Every emitted score carries a concrete arrType, never 'all'.
@@ -110,10 +114,79 @@ Deno.test('engine: deterministic and order-invariant', () => {
     arrType: 'radarr',
     weights: resolvePreset('balanced')!.weights,
     presetBaseUpgrade: resolvePreset('balanced')!.baseUpgrade,
-    customFormats: [...FIXTURE].reverse()
+    customFormats: [...FIXTURE].reverse(),
   });
   assertEquals(shuffled.decisions, a.decisions);
   assertEquals(shuffled.scoringInput, a.scoringInput);
+});
+
+// --- Lidarr audio domain (#222) ------------------------------------------------------------------
+
+/** The 3 real Lidarr CFs + a video-only CF (excluded) + a codec CF (unmatched). */
+const LIDARR_FIXTURE: CfFacts[] = [
+  cf('Lidarr - FLAC (Praxrr)', ['Audio']),
+  cf('Lidarr - AAC (Praxrr)', ['Audio']),
+  cf('Lidarr - Opus (Praxrr)', ['Audio']),
+  cf('Dolby Vision', ['Colour Grade', 'HDR']),
+  cf('x265 (Bluray)', ['Codec']),
+];
+
+// qualityVsSize=100 (signed +1), compatibility=0 (signed -1), hdrPreference=50 (signed 0, inert).
+const LIDARR_WEIGHTS: GoalWeights = {
+  qualityVsSize: 100,
+  compatibility: 0,
+  hdrPreference: 50,
+  unwantedStrictness: 100,
+  resolutionCeiling: '1080p',
+};
+
+function lidarrPlan() {
+  return computeGoalPlan({
+    arrType: 'lidarr',
+    weights: LIDARR_WEIGHTS,
+    presetBaseUpgrade: 500,
+    customFormats: LIDARR_FIXTURE,
+  });
+}
+
+Deno.test('engine: lidarr audio golden score map (pins LIDARR_AUDIO_POLICY)', () => {
+  const plan = lidarrPlan();
+  assertEquals(scoreOf(plan, 'Lidarr - FLAC (Praxrr)'), 950); // lossless 500 + quality +300 + compat +150
+  assertEquals(scoreOf(plan, 'Lidarr - AAC (Praxrr)'), 300); // advanced 250 + quality +100 + compat -50
+  assertEquals(scoreOf(plan, 'Lidarr - Opus (Praxrr)'), 300);
+  // hdrPreference is inert for audio (sensitivity 0) — it contributes no axis term.
+  const flac = plan.decisions.find((d) => d.customFormatName === 'Lidarr - FLAC (Praxrr)')!;
+  assert(!flac.reason.axisContributions.some((c) => c.axis === 'hdrPreference'));
+  // Every emitted score is stamped lidarr, never 'all'.
+  assert(plan.scoringInput.customFormatScores.every((s) => s.arrType === 'lidarr'));
+  // u=1 -> minimumScore 0; upgradeUntil = 500 + signedWeight(100)*1000 = 1500.
+  assertEquals(plan.thresholds, { minimumScore: 0, upgradeUntilScore: 1500, upgradeScoreIncrement: 1 });
+});
+
+Deno.test('engine: lidarr excludes video-only CFs with the distinct reason (AC4)', () => {
+  const plan = lidarrPlan();
+  assertEquals(plan.coverage, { total: 5, scored: 3, uncategorized: 2 });
+  assertEquals(plan.uncategorized.find((u) => u.name === 'Dolby Vision')?.reason, 'excluded.video-only-on-lidarr');
+  assertEquals(plan.uncategorized.find((u) => u.name === 'x265 (Bluray)')?.reason, 'no-matching-rule');
+});
+
+Deno.test('engine: scoreCategory fails fast for a lidarr category with no audio-policy row (no video fallback)', () => {
+  // hdr_baseline survives scoring only for radarr/sonarr; a lidarr score for it must throw, never
+  // silently borrow the video magnitude.
+  assertThrows(() => scoreCategory('hdr_baseline', LIDARR_WEIGHTS, 'lidarr'));
+  assertEquals(scoreCategory('hdr_baseline', LIDARR_WEIGHTS, 'radarr').base, 300);
+});
+
+Deno.test('engine: radarr and sonarr produce identical scores (video policy is arr-agnostic, AC5)', () => {
+  const preset = resolvePreset('best-quality')!;
+  const base = { weights: preset.weights, presetBaseUpgrade: preset.baseUpgrade, customFormats: FIXTURE };
+  const radarr = computeGoalPlan({ arrType: 'radarr', ...base });
+  const sonarr = computeGoalPlan({ arrType: 'sonarr', ...base });
+  for (const decision of radarr.decisions) {
+    assertEquals(scoreOf(sonarr, decision.customFormatName), decision.score, `${decision.customFormatName} score`);
+  }
+  assertEquals(sonarr.thresholds, radarr.thresholds);
+  assert(sonarr.scoringInput.customFormatScores.every((s) => s.arrType === 'sonarr'));
 });
 
 Deno.test('engine: diffGoalPlans reports per-CF and threshold deltas', () => {

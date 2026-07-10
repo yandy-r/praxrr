@@ -298,6 +298,22 @@ Deno.test('goals presets: returns the catalog, axes, and engine version', async 
   assertEquals(body.engineVersion, '1');
 });
 
+Deno.test('goals presets: arrType=lidarr returns the audio presets and hides video-only axes (#222)', async () => {
+  const url = new URL('http://localhost/api/v1/goals/presets?arrType=lidarr');
+  const response: Response = await presetsRoute.GET({ url } as Parameters<typeof presetsRoute.GET>[0]);
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as GoalPresetsResponse;
+  assertEquals(body.presets.map((preset) => preset.id).sort(), [
+    'audio-balanced',
+    'audio-lossless-priority',
+    'audio-space-saver',
+  ]);
+  // hdrPreference + resolutionCeiling are inert for audio and are not offered as sliders.
+  assertEquals(body.axes.length, 3);
+  assert(!body.axes.some((axis) => axis.key === 'hdrPreference' || axis.key === 'resolutionCeiling'));
+  assertEquals(body.engineVersion, '1');
+});
+
 // ============================================================================
 // preview (non-persisting)
 // ============================================================================
@@ -342,12 +358,54 @@ Deno.test('goals preview: returns the plan + config diff without persisting', as
   });
 });
 
+Deno.test(
+  'goals preview: lidarr scores audio, excludes video-only with the distinct reason, and does not persist (#222)',
+  async () => {
+    await withGoalsFixture(async (databaseId, current) => {
+      const response: Response = await previewRoute.POST(
+        postEvent({
+          databaseId,
+          arrType: 'lidarr',
+          profileName: 'Movies',
+          preset: 'audio-lossless-priority',
+          weights: {
+            qualityVsSize: 100,
+            compatibility: 0,
+            hdrPreference: 50,
+            unwantedStrictness: 100,
+            resolutionCeiling: '1080p',
+          },
+        })
+      );
+      assertEquals(response.status, 200);
+      const body = (await response.json()) as GoalPreviewResponse;
+
+      // Only audio + unwanted survive; the 3 video CFs are excluded and x265 is unmatched.
+      assertEquals(body.plan.coverage, { total: 6, scored: 2, uncategorized: 4 });
+      assertEquals(body.plan.decisions.find((d) => d.customFormatName === 'TrueHD')?.category, 'audio_lossless');
+      assertEquals(
+        body.plan.uncategorized.find((cf) => cf.name === 'Dolby Vision')?.reason,
+        'excluded.video-only-on-lidarr'
+      );
+      assertEquals(body.plan.uncategorized.find((cf) => cf.name === 'x265 (Bluray)')?.reason, 'no-matching-rule');
+      // The config diff is stamped lidarr (no sibling fallback).
+      assertEquals(body.configDiff[0].arrType, 'lidarr');
+
+      const persisted = await current.cache.kb
+        .selectFrom('quality_profile_custom_formats')
+        .select('custom_format_name')
+        .execute();
+      assertEquals(persisted.length, 0);
+    });
+  }
+);
+
 Deno.test('goals preview: validation and missing-cache errors', async () => {
   await assertRejects(async () =>
     previewRoute.POST(
       postEvent({
         databaseId: 1,
-        arrType: 'lidarr',
+        arrType: 'plex',
         profileName: 'M',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
@@ -428,6 +486,37 @@ Deno.test('goals apply: logs one server-derived decision event after persistence
   assertEquals(loggedDecision.score, 321);
 });
 
+Deno.test('goals apply: accepts arrType lidarr and upserts the binding with it (#222)', async () => {
+  const logs: ApplyLogCall[] = [];
+  let capturedArrType: string | undefined;
+  const response = await applyRoute.handleGoalApplyRequest(
+    postEvent({
+      databaseId: DATABASE_ID,
+      arrType: 'lidarr',
+      profileName: 'Discography',
+      preset: 'audio-lossless-priority',
+      weights: {
+        qualityVsSize: 100,
+        compatibility: 20,
+        hdrPreference: 50,
+        unwantedStrictness: 85,
+        resolutionCeiling: '1080p',
+      },
+      expectedEngineVersion: '1',
+    }).request,
+    buildApplyDependencies(logs, {
+      upsertBinding: (input) => {
+        capturedArrType = input.arrType;
+        return { ...SERVER_BINDING, arr_type: 'lidarr' };
+      },
+    })
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(capturedArrType, 'lidarr');
+  assertEquals(logs.length, 1);
+});
+
 Deno.test('goals apply: validation and engine-version failures do not log', async () => {
   const logs: ApplyLogCall[] = [];
   const dependencies = buildApplyDependencies(logs);
@@ -436,7 +525,7 @@ Deno.test('goals apply: validation and engine-version failures do not log', asyn
     applyRoute.handleGoalApplyRequest(
       postEvent({
         databaseId: 1,
-        arrType: 'lidarr',
+        arrType: 'plex',
         profileName: 'Movies',
         preset: 'balanced',
         weights: BEST_QUALITY_WEIGHTS,
@@ -559,10 +648,51 @@ migratedTest('goals binding: null when unbound, then reflects an upserted bindin
   assertEquals(body.binding?.weights.resolutionCeiling, '2160p');
 
   const badArr = await assertRejects(async () =>
-    bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=lidarr`))
+    bindingRoute.GET(getEvent(`databaseId=${databaseId}&profileName=Movies&arrType=plex`))
   );
   assertEquals(getErrorStatus(badArr), 400);
 });
+
+migratedTest(
+  'goals binding: a lidarr binding persists (widened CHECK) and round-trips independently (#222)',
+  async () => {
+    const databaseId = databaseInstancesQueries.create({
+      uuid: crypto.randomUUID(),
+      name: 'Lidarr Binding Route DB',
+      repositoryUrl: 'https://example.invalid/repo.git',
+      localPath: '/tmp/lidarr-binding-route-db-does-not-exist',
+    });
+
+    // Persisting a lidarr binding proves the 20260718 migration widened the arr_type CHECK.
+    qualityGoalBindingQueries.upsert({
+      databaseId,
+      profileName: 'Discography',
+      arrType: 'lidarr',
+      presetId: 'audio-lossless-priority',
+      weightsJson: JSON.stringify({
+        qualityVsSize: 100,
+        compatibility: 20,
+        hdrPreference: 50,
+        unwantedStrictness: 85,
+        resolutionCeiling: '1080p',
+      }),
+      engineVersion: '1',
+      appliedAt: '2026-07-10T00:00:00.000Z',
+    });
+
+    const bound: Response = await bindingRoute.GET(
+      getEvent(`databaseId=${databaseId}&profileName=Discography&arrType=lidarr`)
+    );
+    assertEquals(bound.status, 200);
+    assertEquals(((await bound.json()) as GoalBindingResponse).binding?.presetId, 'audio-lossless-priority');
+
+    // Bindings are keyed by arr_type — radarr for the same profile is independent (no sibling fallback).
+    const radarr: Response = await bindingRoute.GET(
+      getEvent(`databaseId=${databaseId}&profileName=Discography&arrType=radarr`)
+    );
+    assertEquals(((await radarr.json()) as GoalBindingResponse).binding, null);
+  }
+);
 
 Deno.test('goals binding: empty or missing databaseId query param -> 400 (not a 200 null)', async () => {
   const empty = await assertRejects(async () =>

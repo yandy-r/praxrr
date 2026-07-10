@@ -4093,6 +4093,17 @@
         "summary": "List Quality Goal presets and slider axes",
         "description": "Returns the built-in goal presets, the slider-axis metadata, and the engine version. The editor\nrenders sliders and can run the pure engine client-side from this payload with nothing hardcoded.\n",
         "tags": ["Quality Goals"],
+        "parameters": [
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["radarr", "sonarr", "lidarr"]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Presets and axes",
@@ -4246,7 +4257,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["radarr", "sonarr"]
+              "enum": ["radarr", "sonarr", "lidarr"]
             }
           }
         ],
@@ -6473,7 +6484,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr"]
+            "enum": ["radarr", "sonarr", "lidarr"]
           },
           "changes": {
             "type": "array",
@@ -9090,7 +9101,15 @@
         "properties": {
           "id": {
             "type": "string",
-            "enum": ["best-quality", "smallest-size", "balanced", "4k-hdr-priority"]
+            "enum": [
+              "best-quality",
+              "smallest-size",
+              "balanced",
+              "4k-hdr-priority",
+              "audio-lossless-priority",
+              "audio-balanced",
+              "audio-space-saver"
+            ]
           },
           "label": {
             "type": "string"
@@ -9165,7 +9184,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr"]
+            "enum": ["radarr", "sonarr", "lidarr"]
           },
           "category": {
             "$ref": "#/components/schemas/GoalCategory"
@@ -9240,7 +9259,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr"]
+            "enum": ["radarr", "sonarr", "lidarr"]
           },
           "decisions": {
             "type": "array",
@@ -9312,7 +9331,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr"]
+            "enum": ["radarr", "sonarr", "lidarr"]
           },
           "profileName": {
             "type": "string",
@@ -9363,7 +9382,7 @@
           },
           "arrType": {
             "type": "string",
-            "enum": ["radarr", "sonarr"]
+            "enum": ["radarr", "sonarr", "lidarr"]
           },
           "profileName": {
             "type": "string"
