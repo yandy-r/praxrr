@@ -38,15 +38,17 @@ import type { OperationLayer } from '$pcd/index.ts';
 import type { OrderedItem } from '$shared/pcd/display.ts';
 import type { CompiledQuery } from 'kysely';
 
-export interface UpdateQualitiesInput {          // now EXPORTED from qualities/update.ts
+export interface UpdateQualitiesInput {
+  // now EXPORTED from qualities/update.ts
   orderedItems: OrderedItem[];
 }
 
-export interface QualityLadderRowOp {            // == existing internal QualityRowOp shape
+export interface QualityLadderRowOp {
+  // == existing internal QualityRowOp shape
   description: string;
   queries: CompiledQuery[];
-  desiredState: Record<string, unknown>;         // per-row { ordered_items: { mode, key, from, to } }
-  changedFields: string[];                        // ['quality_item:<type>:<name>']
+  desiredState: Record<string, unknown>; // per-row { ordered_items: { mode, key, from, to } }
+  changedFields: string[]; // ['quality_item:<type>:<name>']
   summary: string;
   title: string;
 }
@@ -57,17 +59,17 @@ export interface BuiltQualityLadder {
   /** Single-writeOperation payload; null when the ladder is a no-op. */
   batched: {
     queries: CompiledQuery[];
-    desiredState: Record<string, unknown>;        // full-list { ordered_items: { from, to } }
+    desiredState: Record<string, unknown>; // full-list { ordered_items: { from, to } }
     changedFields: string[];
   } | null;
 }
 
 export interface BuildQualityLadderOptions {
   databaseId: number;
-  cache: PCDCache;                                // current ladder read comes from THIS cache
+  cache: PCDCache; // current ladder read comes from THIS cache
   layer: OperationLayer;
   profileName: string;
-  input: UpdateQualitiesInput;                    // desired ladder = plan.ladderInput
+  input: UpdateQualitiesInput; // desired ladder = plan.ladderInput
   /** Goal path only: reject a ladder that would REMOVE any current row (defensive). */
   forbidRemovals?: boolean;
 }
@@ -104,8 +106,8 @@ import type { GoalResolutionCeiling } from './types.ts';
 
 /** One quality that EXISTS for the target arr, with its resolution from QUALITIES[arrType]. */
 export interface GoalQualityFact {
-  name: string;        // EXACT-CASE PCD canonical quality name (quality_api_mappings.quality_name)
-  resolution: number;  // QUALITIES[arrType][apiName].resolution
+  name: string; // EXACT-CASE PCD canonical quality name (quality_api_mappings.quality_name)
+  resolution: number; // QUALITIES[arrType][apiName].resolution
 }
 
 export interface GoalQualityLadderItem {
@@ -114,13 +116,13 @@ export interface GoalQualityLadderItem {
   enabled: boolean;
   upgradeUntil: boolean;
   position: number;
-  resolution: number | null;   // null = unmapped for arr (orphan) or all-orphan/all-junk group
-  mapped: boolean;             // false = not present/derivable for target arr → left UNCHANGED
+  resolution: number | null; // null = unmapped for arr (orphan) or all-orphan/all-junk group
+  mapped: boolean; // false = not present/derivable for target arr → left UNCHANGED
 }
 
 export interface GoalQualityLadder {
   ceiling: GoalResolutionCeiling;
-  cutoff: string | null;       // PCD name carrying upgrade_until; null when no ladder change
+  cutoff: string | null; // PCD name carrying upgrade_until; null when no ladder change
   items: GoalQualityLadderItem[];
   /** True when this profile is also compatible with a sibling arr → the reshape is shared. */
   reshapesSiblingArrs: boolean;
@@ -143,7 +145,10 @@ export function buildCeilingLadder(
   currentLadder: OrderedItem[],
   facts: GoalQualityFact[],
   compatibleWithSiblingArr: boolean
-): { ladderInput: { orderedItems: OrderedItem[] } | null; ladder: GoalQualityLadder };
+): {
+  ladderInput: { orderedItems: OrderedItem[] } | null;
+  ladder: GoalQualityLadder;
+};
 ```
 
 ### 3.2 Static junk set (PCD canonical names, arr-agnostic)
@@ -158,39 +163,41 @@ These are **PCD canonical names**, not per-arr API names, so listing them in `$s
 Ceiling → numeric threshold: `720p→720`, `1080p→1080`, `2160p→2160`.
 
 For each **quality** fact `q` (mapped for the arr):
+
 - `enabled = q.name ∉ JUNK_QUALITIES && q.resolution > 0 && q.resolution <= ceilingResolution`.
 
-Cutoff = the `Bluray-<ceiling>` row (`Bluray-720p` / `Bluray-1080p` / `Bluray-2160p`) — same PCD name in both arrs. If a `Bluray-<ceiling>` quality row **exists and is mapped** in the current ladder, exactly one `upgrade_until=1` is set on it (partial unique index). If it does **not** exist, **no cutoff is set and no ladder change is produced** — `ladderInput = null` (see §3.5; this is *not* an error).
+Cutoff = the `Bluray-<ceiling>` row (`Bluray-720p` / `Bluray-1080p` / `Bluray-2160p`) — same PCD name in both arrs. If a `Bluray-<ceiling>` quality row **exists and is mapped** in the current ladder, exactly one `upgrade_until=1` is set on it (partial unique index). If it does **not** exist, **no cutoff is set and no ladder change is produced** — `ladderInput = null` (see §3.5; this is _not_ an error).
 
 Derived per-Arr result (from `QUALITIES` resolutions verified in code):
 
 **RADARR** (`QUALITIES.radarr`, mappings.ts:234-265)
 
-| Ceiling | ENABLED (`enabled=1`) | CUTOFF (`upgrade_until=1`) | DISABLED |
-|---|---|---|---|
-| 720p | SDTV, DVD, DVD-R, WEBDL-480p, WEBRip-480p, Bluray-480p, Bluray-576p, HDTV-720p, WEBDL-720p, WEBRip-720p, Bluray-720p | **Bluray-720p** | all 1080p + all 2160p + JUNK |
-| 1080p | 720p set + HDTV-1080p, WEBDL-1080p, WEBRip-1080p, Bluray-1080p, Remux-1080p | **Bluray-1080p** | all 2160p + JUNK |
-| 2160p | 1080p set + HDTV-2160p, WEBDL-2160p, WEBRip-2160p, Bluray-2160p, Remux-2160p | **Bluray-2160p** | JUNK only |
+| Ceiling | ENABLED (`enabled=1`)                                                                                                | CUTOFF (`upgrade_until=1`) | DISABLED                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
+| 720p    | SDTV, DVD, DVD-R, WEBDL-480p, WEBRip-480p, Bluray-480p, Bluray-576p, HDTV-720p, WEBDL-720p, WEBRip-720p, Bluray-720p | **Bluray-720p**            | all 1080p + all 2160p + JUNK |
+| 1080p   | 720p set + HDTV-1080p, WEBDL-1080p, WEBRip-1080p, Bluray-1080p, Remux-1080p                                          | **Bluray-1080p**           | all 2160p + JUNK             |
+| 2160p   | 1080p set + HDTV-2160p, WEBDL-2160p, WEBRip-2160p, Bluray-2160p, Remux-2160p                                         | **Bluray-2160p**           | JUNK only                    |
 
 JUNK(radarr) = Unknown, WORKPRINT, CAM, TELESYNC, TELECINE, DVDSCR, REGIONAL, BR-DISK, Raw-HD.
 
 **SONARR** (`QUALITIES.sonarr`, mappings.ts:266-299 — no WORKPRINT/CAM/TELESYNC/TELECINE/DVDSCR/REGIONAL/DVD-R/BR-DISK)
 
-| Ceiling | ENABLED (`enabled=1`) | CUTOFF (`upgrade_until=1`) | DISABLED |
-|---|---|---|---|
-| 720p | SDTV, DVD, WEBDL-480p, WEBRip-480p, Bluray-480p, Bluray-576p, HDTV-720p, WEBDL-720p, WEBRip-720p, Bluray-720p | **Bluray-720p** | all 1080p + all 2160p + JUNK |
-| 1080p | 720p set + HDTV-1080p, WEBDL-1080p, WEBRip-1080p, Bluray-1080p, Remux-1080p | **Bluray-1080p** | all 2160p + JUNK |
-| 2160p | 1080p set + HDTV-2160p, WEBDL-2160p, WEBRip-2160p, Bluray-2160p, Remux-2160p | **Bluray-2160p** | JUNK only |
+| Ceiling | ENABLED (`enabled=1`)                                                                                         | CUTOFF (`upgrade_until=1`) | DISABLED                     |
+| ------- | ------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
+| 720p    | SDTV, DVD, WEBDL-480p, WEBRip-480p, Bluray-480p, Bluray-576p, HDTV-720p, WEBDL-720p, WEBRip-720p, Bluray-720p | **Bluray-720p**            | all 1080p + all 2160p + JUNK |
+| 1080p   | 720p set + HDTV-1080p, WEBDL-1080p, WEBRip-1080p, Bluray-1080p, Remux-1080p                                   | **Bluray-1080p**           | all 2160p + JUNK             |
+| 2160p   | 1080p set + HDTV-2160p, WEBDL-2160p, WEBRip-2160p, Bluray-2160p, Remux-2160p                                  | **Bluray-2160p**           | JUNK only                    |
 
 JUNK(sonarr) = Unknown, Raw-HD.
 
-Remux naming: the builder emits **PCD names** `Remux-1080p`/`Remux-2160p` in both arrs. `quality_api_mappings` translates to `Bluray-1080p Remux`/`Bluray-2160p Remux` for Sonarr at sync time (2.qualities.sql:98-102). **The op builder MUST NEVER write Sonarr API names into `quality_profile_qualities`.** Consequently `GoalQualityFact.name` for the Sonarr remux row is `Remux-1080p` (the PCD `quality_name`), *not* `Bluray-1080p Remux`, and its resolution is `QUALITIES.sonarr['Bluray-1080p Remux'].resolution === 1080` (§4.3, finding 5).
+Remux naming: the builder emits **PCD names** `Remux-1080p`/`Remux-2160p` in both arrs. `quality_api_mappings` translates to `Bluray-1080p Remux`/`Bluray-2160p Remux` for Sonarr at sync time (2.qualities.sql:98-102). **The op builder MUST NEVER write Sonarr API names into `quality_profile_qualities`.** Consequently `GoalQualityFact.name` for the Sonarr remux row is `Remux-1080p` (the PCD `quality_name`), _not_ `Bluray-1080p Remux`, and its resolution is `QUALITIES.sonarr['Bluray-1080p Remux'].resolution === 1080` (§4.3, finding 5).
 
 ### 3.4 Shared-ladder / cross-Arr rule (critical — full-coverage invariant)
 
 `quality_profile_qualities` has **no `arr_type` column** — the ladder is one shared row set filtered at sync. Two hard requirements follow.
 
 **(A) Full-coverage invariant (findings 4 + 9).** When `ladderInput` is non-null, `buildCeilingLadder` MUST return `ladderInput.orderedItems` containing **every** row of the current ladder, in current order:
+
 - rows whose PCD name has a `GoalQualityFact` (mapped, non-junk quality, or a group with mapped non-junk members) are emitted with their **new** `enabled`/`upgradeUntil`, keeping their current `position` and identity;
 - **every other current row** — an unmapped-for-arr quality (e.g. Radarr-only `DVD-R` under a Sonarr goal, or the orphan `HDTV-480p` mapped for neither arr), a junk quality, an all-orphan/all-junk group — is **cloned verbatim** (same `position`, `enabled`, `upgradeUntil`, `members`).
 
@@ -198,7 +205,8 @@ Because `buildQualityLadderOps` derives removals by set difference (`removedItem
 
 This makes standalone-orphan and group-member handling **consistent** (finding 2): a sibling-only quality is treated identically whether it is a standalone row or a group member — excluded from the ceiling computation and preserved verbatim, never a fatal error.
 
-**(B) The reshape is inherently shared; the value guard does NOT prevent cross-arr collisions (finding 3).** Rows mapped for **both** arrs (e.g. `Bluray-1080p`, `HDTV-720p`) are genuinely reshaped by a per-arr ceiling goal, and that reshape applies to every Arr syncing the profile. The value guard is a **TOCTOU concurrency guard** (it fires only when the *live* row differs from the op's `from` snapshot within the plan-read→write window), **not** a cross-arr semantic detector: a normal sequence "apply Radarr 720p goal, then apply Sonarr 1080p goal" reads post-Radarr state, matches its guards, and legitimately overwrites the shared rows (last-write-wins). We therefore **do not** claim the guard prevents this. Instead:
+**(B) The reshape is inherently shared; the value guard does NOT prevent cross-arr collisions (finding 3).** Rows mapped for **both** arrs (e.g. `Bluray-1080p`, `HDTV-720p`) are genuinely reshaped by a per-arr ceiling goal, and that reshape applies to every Arr syncing the profile. The value guard is a **TOCTOU concurrency guard** (it fires only when the _live_ row differs from the op's `from` snapshot within the plan-read→write window), **not** a cross-arr semantic detector: a normal sequence "apply Radarr 720p goal, then apply Sonarr 1080p goal" reads post-Radarr state, matches its guards, and legitimately overwrites the shared rows (last-write-wins). We therefore **do not** claim the guard prevents this. Instead:
+
 - `buildCeilingLadder` computes `reshapesSiblingArrs` from `compatibleWithSiblingArr` (materialized on the server via `computeCompatibleProfileNames`, §4.3): true when the target profile is also compatible with a sibling `arr_type`.
 - When `ladderInput !== null` and `reshapesSiblingArrs`, `sharedLadderNote` is set to an explicit advisory ("This profile's quality ladder is shared by every Arr that syncs it; applying this ceiling changes the enabled qualities and cutoff for those Arr instances too, not just <arrType>."). Preview surfaces it prominently (§4.5) and the decision log records it (§6). This is honest transparency in place of a false safety claim.
 
@@ -209,12 +217,14 @@ Positions are never reordered by the goal path (reorder is intentionally out of 
 `computeGoalPlan` MUST remain **total** for the CF-score path. A profile with a partial or empty ladder is a **valid** profile, not an ambiguous mapping. Therefore:
 
 **Non-fatal → `ladderInput = null`, CF plan still returned** (`qualityLadder.cutoff = null`, `qualityLadder.items` describes intent for display, no ladder ops emitted):
+
 - **No `Bluray-<ceiling>` quality row** present/mapped in the current ladder (former `missing_cutoff`).
 - **No mapped, non-junk quality at/below the ceiling** exists in the ladder (former `empty_enabled_set`).
 - A group whose members are **all junk** or **all unmapped-for-arr** (former `unmapped_group_member`) — preserved verbatim per §3.4(A), never fatal.
 - Any standalone unmapped-for-arr or junk quality — preserved verbatim.
 
 **Fatal → HTTP 422, before any write (genuine ambiguity only):**
+
 - **Ambiguous mapping** — a `quality_api_mappings` row for the arr whose `api_name` has **no** `QUALITIES[arrType]` resolution entry. Detected in the server materializer (§4.3), which throws `error(422)` directly.
 - **Straddling group** — a group whose **mapped, non-junk** members straddle the ceiling (some `<=`, some `>`). This is the only `GoalLadderMappingError` (`code: 'straddling_group'`), thrown from the pure engine and translated to 422 in `buildGoalPlan`.
 
@@ -261,36 +271,55 @@ export async function materializeQualityFacts(
 ```
 
 Reads `quality_api_mappings` where `arr_type = arrType`. For each row it MUST (finding 5):
+
 1. set `fact.name` to the **exact-case** `quality_name` column (the PCD canonical name that matches `OrderedItem.name` from `read.ts`, e.g. `Bluray-1080p`, `Remux-1080p`) — **never** lowercased, **never** the `api_name`;
 2. resolve `fact.resolution` via `QUALITIES[arrType][api_name].resolution` (e.g. Sonarr remux: `QUALITIES.sonarr['Bluray-1080p Remux'].resolution === 1080`);
 3. **throw `error(422)`** — not silently `continue` — when an `api_name` has **no** `QUALITIES[arrType]` entry (ambiguous mapping).
 
 It therefore **does not** reuse `computeCompatibleProfileNames` verbatim (that helper lowercases names and skips unresolved rows — both wrong here). It may share only the join shape, not the case-folding/skip behavior. Absence of a `quality_api_mappings` row for a name = that quality does not exist for the arr → it simply does not appear in `facts` (and its current-ladder row is preserved verbatim per §3.4(A)).
 
-`compatibleWithSiblingArr` is computed once on the server: true when the target profile's enabled/mapped quality names are also compatible with any sibling `arr_type` (reusing the existing `computeCompatibleProfileNames` path, which is appropriate here because it is a case-insensitive *compatibility* check, not a fact source).
+`compatibleWithSiblingArr` is computed once on the server: true when the target profile's enabled/mapped quality names are also compatible with any sibling `arr_type` (reusing the existing `computeCompatibleProfileNames` path, which is appropriate here because it is a case-insensitive _compatibility_ check, not a fact source).
 
 `buildGoalPlan` (`planRequest.ts:91-116`) extends to fetch the current ladder + facts + sibling-compat flag and pass them into `computeGoalPlan`:
+
 ```ts
-const currentLadder = (await qualities(cache, request.databaseId, request.profileName)).orderedItems;
+const currentLadder = (
+  await qualities(cache, request.databaseId, request.profileName)
+).orderedItems;
 const qualityFacts = await materializeQualityFacts(cache, request.arrType);
-const compatibleWithSiblingArr = await isProfileCompatibleWithSiblingArr(cache, request);
+const compatibleWithSiblingArr = await isProfileCompatibleWithSiblingArr(
+  cache,
+  request
+);
 const plan = computeGoalPlan({
-  arrType, weights, presetBaseUpgrade, customFormats,
-  qualityFacts, currentLadder, compatibleWithSiblingArr,
+  arrType,
+  weights,
+  presetBaseUpgrade,
+  customFormats,
+  qualityFacts,
+  currentLadder,
+  compatibleWithSiblingArr,
 });
 ```
+
 Wrap `computeGoalPlan` so a `GoalLadderMappingError` (only `straddling_group`) becomes `error(422, ...)`. Because **both** preview and apply call `buildGoalPlan`, genuinely ambiguous mappings fail identically and **before any write** (AC4); a merely partial ladder yields `ladderInput = null` and a normal 200 CF plan (AC5).
 
 `toWirePlan` (`responses.ts:14-17`) strips the new internal field:
+
 ```ts
-const { scoringInput: _s, ladderInput: _l, ...wire } = plan;   // qualityLadder stays on the wire
+const { scoringInput: _s, ladderInput: _l, ...wire } = plan; // qualityLadder stays on the wire
 ```
 
 ### 4.4 Preview response + sandbox (baseline parity, finding 8)
 
 `ProfileEdit` (`withSandboxCache.ts:45-48`) gains an optional ladder input:
+
 ```ts
-export interface ProfileEdit { input: UpdateScoringInput; ladderInput?: UpdateQualitiesInput; changes: GoalLadderChange[] | ProposedChange[]; }
+export interface ProfileEdit {
+  input: UpdateScoringInput;
+  ladderInput?: UpdateQualitiesInput;
+  changes: GoalLadderChange[] | ProposedChange[];
+}
 ```
 
 Two parity requirements:
@@ -304,6 +333,7 @@ Two parity requirements:
 Because `serializeQualityProfile` includes `orderedItems` (`serialize.ts:165`) and `PORTABLE_ARRAY_KEY_STRATEGIES` keys `orderedItems` by `name` (`layerDiff.ts:72-78`), `buildQualityProfileConfigDiff` (`configDiff.ts:26`) **automatically** surfaces every enable/disable/cutoff mutation as `FieldChange`s under `orderedItems["<name>"].enabled` / `orderedItems["<name>"].upgradeUntil` (camelCase) once the sandbox applies ladder ops — no diff-schema change required (AC2).
 
 **OpenAPI additions — do NOT widen the shared union (finding 11).** The impact-simulator's `ProposedChange` `oneOf` is the **input** contract for `/api/v1/simulate/impact`, whose runtime validator `validateProposedChange` only accepts `set_cf_score`/`set_profile_setting`. Widening it would document kinds the validator rejects (400) and the impact `ProfileEdit` builder cannot apply. Instead:
+
 - **`docs/api/v1/schemas/goals.yaml`:** add a **goals-only** `GoalLadderChange` `oneOf` with two variants — `SetQualityEnabledChange` (`kind:'set_quality_enabled'`, `{profileName, qualityName, qualityType, from, to}`) and `SetQualityCutoffChange` (`kind:'set_quality_cutoff'`, `{profileName, qualityName, qualityType, from, to}`) — referenced **only** by `GoalPreviewResponse.appliedChanges`/`skippedChanges` (and, per below, `GoalApplyResponse`).
 - **`docs/api/v1/schemas/impact-simulator.yaml`:** unchanged.
 - `GoalPlan` (`goals.yaml`) gains `qualityLadder` (object: `ceiling`, `cutoff` nullable, `reshapesSiblingArrs` boolean, `sharedLadderNote` nullable, `items[]` of `{name,type,enabled,upgradeUntil,position,resolution,mapped}`).
@@ -319,12 +349,14 @@ Then regen: `deno task generate:api-types` (→ `v1.d.ts`) and `deno task bundle
 ### 4.6 Apply (single atomic guarded op, findings 6 + 7 + 15)
 
 Goal apply persists scoring **and** ladder as **one** `writeOperation` (finding 7), via the **guard-enforcing** path (finding 6). New server helpers under `server/goals/`:
+
 - `buildGoalApplyOps(cache, layer, profileName, plan)` — pure-ish assembler that calls `buildScoringOps(...)` and (when `plan.ladderInput !== null`) `buildQualityLadderOps(..., forbidRemovals:true)` against the **real** cache, then merges them into one payload: `queries = [...scoringQueries, ...ladderBatched.queries]` (ladder clear-before-set order preserved), and `desiredState = { custom_format_scores: <scoring full-list>, ordered_items: <ladder full-list from/to> }`, `changedFields` = union. When `plan.ladderInput === null`, only the scoring keys are present.
 - `persistGoalApply(...)` — thin persister that writes that single op through a path setting **`runValueGuardGate: true`** (mirroring `writeOperationsFromSql`, writer.ts:741-747). Verified: with `runValueGuardGate:true` the writer runs `runValueGuardGate(...)` **before persist** and returns `{ success:false, error }` on `!gateResult.ok` (writer.ts:586-594) — so a guard-mismatched op is **rejected pre-persist**, nothing lands, and the default `override` strategy never gets to re-apply/overwrite it. This is the fix for finding 6: guards are otherwise recompile-time and per-strategy (`override` overwrites, `ask` silently withholds); we opt the goal path out of that by gating at write.
 
 > **Multi-key guard requirement (finding 7).** The value-guard gate MUST evaluate **both** the `ordered_items` full-list rule (`checkFullListConflict` / `qualityProfileQualitiesRowRule`) **and** the `custom_format_scores` scoring row rules on the single merged op. `checkFullListConflict` keys off `desiredState.ordered_items` only, so scoring guards need their own rule to run on the same op. The implementation MUST make the gate iterate **all** `desiredState` key families for one op (not assume one rule per op). §7 adds a characterization test asserting both guard shapes are present on the merged op and that a mismatch on **either** family yields `success:false`.
 
 `GoalApplyDependencies` (`apply/+server.ts:13-25`) and `DEFAULT_DEPENDENCIES` (`:20-25`) gain **`persistGoalApply: typeof persistGoalApply`** (replacing the goal path's direct use of `updateScoring`; `updateScoring`/`updateQualities` remain for their other callers). The test factory `buildApplyDependencies` (`goalsRoutes.test.ts:133-147`) MUST be updated to construct the new field, or all three existing apply tests fail to type-check. The exported handler is **`_handleGoalApplyRequest`** (`apply/+server.ts:32`) — the design text uses that exact symbol. Flow of `_handleGoalApplyRequest`:
+
 1. `buildGoalPlan(goalRequest)` — materializes facts + ladder; **fails fast 422** on genuine ambiguity before any write; returns `ladderInput: null` for merely-partial ladders (no error).
 2. `persistGoalApply({ databaseId, cache, layer:'user', profileName, plan })` — **one** guarded `writeOperation`. On `success:false` (guard conflict), return **HTTP 409** (`{ code: 'ladder_conflict' | 'scoring_conflict' }`); nothing has persisted, so no partial write (findings 6+7).
 3. On success, recompute and attach `configDiff` (finding 17) from the same `buildQualityProfileConfigDiff` path, then `upsertBinding` + decision log (existing). A test asserts apply's `configDiff` equals preview's for the same request.
@@ -338,14 +370,16 @@ See §5 for the guard/atomicity model.
 **Value guards are recompile-time and per-strategy by default (finding 6).** For an ordinary `writeOperation` (`runValueGuardGate:false`), only `cache.validateSql` runs at write time (writer.ts:562); a guarded UPDATE that matches 0 rows is **not** a SQLite error, so it persists and is reconciled only later at `compile()` recompile, where the default `override` strategy **re-applies** the goal's desired ladder over the upstream/sibling change (override.ts) — the opposite of fail-fast — and `ask` silently withholds (`conflicted_pending`), both still HTTP 200. **We therefore do not use the plain `writeOperation` path for goal apply.**
 
 **Goal apply gates at write (findings 6 + 7).** `persistGoalApply` writes the single merged op through the `runValueGuardGate:true` path. The writer runs the value-guard gate **before persist** (writer.ts:586-594) over the op's guards:
+
 - ladder: `checkFullListConflict` re-reads the live ladder and compares to `desiredState.ordered_items.to`;
 - scoring: the scoring row rules compare live scores to `desiredState.custom_format_scores`.
 
-Any mismatch → `gateResult.ok === false` → writer returns `{ success:false }` → **nothing is persisted** → apply returns **409**. This is a genuine TOCTOU concurrency guard: it protects against a manual edit or a sibling arr's goal landing in the plan-read→write window. It is **not** a cross-arr semantic guard — a *sequential* Radarr-then-Sonarr apply on shared rows is a legitimate last-write-wins reshape, surfaced (not blocked) via `sharedLadderNote` (§3.4(B)). AC3's "persists the previewed ladder" holds only when no upstream change occurred between preview and apply; otherwise apply returns 409 and the client re-previews.
+Any mismatch → `gateResult.ok === false` → writer returns `{ success:false }` → **nothing is persisted** → apply returns **409**. This is a genuine TOCTOU concurrency guard: it protects against a manual edit or a sibling arr's goal landing in the plan-read→write window. It is **not** a cross-arr semantic guard — a _sequential_ Radarr-then-Sonarr apply on shared rows is a legitimate last-write-wins reshape, surfaced (not blocked) via `sharedLadderNote` (§3.4(B)). AC3's "persists the previewed ladder" holds only when no upstream change occurred between preview and apply; otherwise apply returns 409 and the client re-previews.
 
 **Cutoff ordering.** The batched ladder payload preserves the sort so `upgrade_until→false` clears run before `upgrade_until→true` sets (`update.ts:373-379`), avoiding a `UNIQUE constraint failed` on `idx_one_upgrade_until_per_profile`.
 
 **Atomicity — no partial writes (finding 7).**
+
 - Scoring **and** ladder persist as **one** `writeOperation` (one `pcd_ops` row, one recompile). `cache.validateSql` dry-runs every statement in a `SAVEPOINT` and rolls back on any failure before persisting (cache.ts:502); the pre-persist guard gate rejects conflicts before any row is written. So the whole goal apply is all-or-nothing — a ladder conflict can no longer leave scoring committed.
 - Genuinely ambiguous mappings (AC4) are detected in `buildGoalPlan` **before** persist — no write occurs.
 - Preview is atomic per profile via the shared `SAVEPOINT`/`ROLLBACK TO`/`RELEASE`, and its sandbox rowcount check (§4.4) reports the same conflicts apply would hit.
@@ -355,6 +389,7 @@ Any mismatch → `gateResult.ok === false` → writer returns `{ success:false }
 ## 6. File-by-file change list
 
 **Create**
+
 - `packages/praxrr-app/src/lib/shared/goals/ladder.ts` — pure `buildCeilingLadder`, `GoalQualityFact`, `GoalQualityLadder`, `GoalQualityLadderItem`, `JUNK_QUALITIES`, `GoalLadderMappingError('straddling_group')`. (§3)
 - `packages/praxrr-app/src/lib/server/goals/materializeQualityFacts.ts` — server read boundary; exact-case `fact.name`, resolution via `QUALITIES[arrType][api_name]`, fail-fast 422 on ambiguous mapping. (§4.3)
 - `packages/praxrr-app/src/lib/server/goals/buildGoalApplyOps.ts` + `persistGoalApply.ts` — merge scoring+ladder into one guarded op; persist via `runValueGuardGate:true`. (§4.6, §5)
@@ -364,6 +399,7 @@ Any mismatch → `gateResult.ok === false` → writer returns `{ success:false }
 - `packages/praxrr-app/src/tests/routes/goalsApplyPersistence.test.ts` — integration apply against a real in-memory `PCDCache`; re-query proves persistence; preview↔apply ladder-op parity. (§7)
 
 **Modify**
+
 - `$shared/goals/types.ts` — extend `ComputeGoalPlanInput` (`qualityFacts`, `currentLadder`, `compatibleWithSiblingArr`) and `GoalPlan` (`ladderInput`, `qualityLadder`); bump `GOALS_ENGINE_VERSION`; rewrite `resolutionCeiling` axis description.
 - `$shared/goals/engine.ts` — `computeGoalPlan` calls `buildCeilingLadder`; stays total for CF (null ladder on partial); only `straddling_group` propagates.
 - `$shared/goals/index.ts` — re-export ladder types/fn.
@@ -385,7 +421,7 @@ Any mismatch → `gateResult.ok === false` → writer returns `{ success:false }
 - `packages/praxrr-app/src/tests/shared/goals/decisionLog.test.ts` — update `plan()` factory + full-object assertion for the new `GoalPlan` shape.
 - `packages/praxrr-app/src/tests/routes/goalsRoutes.test.ts` — extend `SEED_SQL` with `qualities` + `quality_api_mappings` + `quality_profile_qualities`; update `buildApplyDependencies` to include `persistGoalApply`; update `SERVER_GOAL_PLAN`; add preview ladder-diff, apply-persistence, and 422/409 tests.
 
-**Regression note (finding 12):** the existing passing `goalsRoutes.test.ts` "Movies" profile (zero `quality_profile_qualities`) and every `engine.test.ts planFor()` call now return `ladderInput: null` + a normal 200/CF plan — **not** 422 — because a missing cutoff/empty ladder is non-fatal. Fixtures are reseeded only to *add* ladder coverage, not to mask a regression.
+**Regression note (finding 12):** the existing passing `goalsRoutes.test.ts` "Movies" profile (zero `quality_profile_qualities`) and every `engine.test.ts planFor()` call now return `ladderInput: null` + a normal 200/CF plan — **not** 422 — because a missing cutoff/empty ladder is non-fatal. Fixtures are reseeded only to _add_ ladder coverage, not to mask a regression.
 
 ---
 

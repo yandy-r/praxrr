@@ -31,6 +31,7 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
 ### 1. Ordered batches
 
 **Batch b1 — Pure ladder engine + shared types (+ keep-green fixtures)** · dependsOn: none
+
 - Create `packages/praxrr-app/src/lib/shared/goals/ladder.ts`:
   - `import type { GoalResolutionCeiling } from './types.ts'` (**type-only back-edge, F6**).
   - `interface GoalQualityFact { name: string; resolution: number }`
@@ -53,6 +54,7 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
   - `goalsRoutes.test.ts`: `SERVER_GOAL_PLAN` (:76-114) gains `ladderInput`(likely `null`)+`qualityLadder`; bump every `engineVersion`/`expectedEngineVersion` `'1'→'2'` (:77,:122,:298,:401,:443,:459,:488); `'0'` mismatch test stays 409.
 
 **Batch b2 — `buildQualityLadderOps` extraction + `updateQualities` thin persister** · dependsOn: none
+
 - Create `.../qualities/buildQualityOps.ts`:
   - `export interface UpdateQualitiesInput { orderedItems: OrderedItem[] }`
   - `export interface QualityLadderRowOp { description; queries: CompiledQuery[]; desiredState: Record<string,unknown>; changedFields: string[]; summary; title }`
@@ -63,11 +65,13 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
 - Create `packages/praxrr-app/src/tests/pcd/qualities/buildQualityOpsCharacterization.test.ts` (AC3), mirroring `tests/pcd/scoring/buildScoringOpsCharacterization.test.ts` (5-level schema path `'../../../../../praxrr-schema/ops/0.schema.sql'`, `cache = { kb } as PCDCache` stub): value guards present (`AND enabled = <old>`, `AND position = <old>`, `AND upgrade_until = <old>`); single-`upgrade_until` throw; clear-before-set ordering; `batched.queries === ops.flatMap(o=>o.queries)`; no-op → `batched: null`; **zero-removal cross-arr** — Sonarr-goal-shaped `orderedItems` against a Radarr-populated ladder with `forbidRemovals:true` emits zero DELETE/remove ops and leaves `DVD-R, DVDSCR, REGIONAL, WORKPRINT, CAM, TELESYNC, TELECINE, BR-DISK, HDTV-480p` byte-identical.
 
 **Batch b3 — OpenAPI contracts + regen** · dependsOn: b1
+
 - Modify `docs/api/v1/schemas/goals.yaml`: add `GoalPlan.qualityLadder` (object: `ceiling`, `cutoff` nullable, `reshapesSiblingArrs` boolean, `sharedLadderNote` nullable, `items[]` of `{name,type,enabled,upgradeUntil,position,resolution(nullable),mapped}`) as a **required** property. Add `GoalApplyResponse.configDiff` (`items: $ref '../schemas/impact-simulator.yaml#/EntityConfigDiff'`), optional. Do NOT widen `impact-simulator.yaml`'s `ProposedChange`; do NOT add `GoalLadderChange`.
 - Modify `docs/api/v1/openapi.yaml`: register any new **named** schema in `components/schemas` (:951-990). If `qualityLadder`/items are inlined under `GoalPlan` (recommended), no new named registration is needed.
 - Regen (repo root; prepend `~/.deno/bin` to PATH): `deno task generate:api-types` → `v1.d.ts`; `deno task bundle:api` → `packages/praxrr-api/openapi.json` + `types.ts`; `npx prettier --write packages/praxrr-api/openapi.json`; `deno task check`. Commit only intended `v1.d.ts` deltas (regen emits tool-version noise CI does not gate); commit `openapi.json` (prettier-clean) + `types.ts`.
 
 **Batch b4 — Server materialization + plan wiring** · dependsOn: b1
+
 - Create `packages/praxrr-app/src/lib/server/goals/materializeQualityFacts.ts`: `export async function materializeQualityFacts(cache: PCDCache, arrType: GoalArrType): Promise<GoalQualityFact[]>` — read `quality_api_mappings WHERE arr_type=arrType`; per row `fact.name` = exact-case `quality_name` (never lowercased, never `api_name`); `fact.resolution = QUALITIES[arrType][api_name].resolution`; **`throw error(422)`** (not skip) when `api_name` has no `QUALITIES[arrType]` entry. Import `QUALITIES` from `$sync/mappings.ts`. Does NOT reuse `computeCompatibleProfileNames` (which lowercases + skips unresolved).
 - Create `packages/praxrr-app/src/lib/server/goals/siblingCompat.ts`: `import type { GoalRequest } from './planRequest.ts'` (**type-only back-edge, F6**); `export async function isProfileCompatibleWithSiblingArr(cache: PCDCache, request: GoalRequest): Promise<boolean>` — `siblings = ARR_APP_TYPES.filter(t => t !== request.arrType)`; true iff some sibling `t` has `(await computeCompatibleProfileNames(cache, t, [request.profileName])).has(request.profileName)`.
 - Modify `.../goals/planRequest.ts` `buildGoalPlan` (:106-115): fetch `currentLadder = (await qualities(cache, request.databaseId, request.profileName)).orderedItems`, `qualityFacts = await materializeQualityFacts(cache, request.arrType)`, `compatibleWithSiblingArr = await isProfileCompatibleWithSiblingArr(cache, request)`; pass all three into `computeGoalPlan`. Wrap so a thrown `GoalLadderMappingError` becomes `error(422, ...)`. (Both preview and apply go through `buildGoalPlan` → AC4 fails identically before any write.) `planRequest.ts` imports the **value** `isProfileCompatibleWithSiblingArr` from siblingCompat — the reverse edge is type-only, so no runtime cycle.
@@ -75,6 +79,7 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
 - Create `packages/praxrr-app/src/tests/pcd/qualities/materializeQualityFacts.test.ts` (AC1 + AC4): seed sonarr `quality_name='Remux-1080p'`, `api_name='Bluray-1080p Remux'` → assert fact `name==='Remux-1080p'` (not lowercased/api_name), `resolution===1080`; seed a row whose `api_name` has no `QUALITIES` entry → `assertRejects` + `getErrorStatus===422`.
 
 **Batch b6 — Preview/sandbox wiring + shared configDiff helper** · dependsOn: b1, b2, b4
+
 - Modify `.../pcd/sandbox/withSandboxCache.ts`: add `import { buildQualityLadderOps } from '$pcd/entities/qualityProfiles/qualities/index.ts'` (**value**) and `import type { UpdateQualitiesInput }` (via the qualities index) (**F6**). `ProfileEdit` gains `ladderInput?: UpdateQualitiesInput`. Inside the per-profile `SAVEPOINT` (after scoring ops land, :131-133 success branch), when `edit.ladderInput` is present call `buildQualityLadderOps({ databaseId, cache, layer:'user', profileName, input: edit.ladderInput, forbidRemovals:true })`; **narrow (F5):** `if ('error' in built) { /* skip profile */ }` else `if (built.batched !== null)` apply each `built.batched.queries` query via the same validate-then-`raw.prepare().run()` loop within the same savepoint. (CUT: no rowcount→skippedChange machinery; keep existing `buildReadOnly` base.)
 - Modify `.../goals/toProfileEdit.ts`: set `ladderInput: plan.ladderInput ?? undefined` on the returned `ProfileEdit` (**F2** — never assign `null` into the undefined-only optional). Leave `changes` = existing scoring `ProposedChange[]`; CUT op-derived ladder synthesis.
 - Create `packages/praxrr-app/src/lib/server/goals/computeConfigDiff.ts` (**F4 shared path**): `export async function computeGoalConfigDiff(cache: PCDCache, arrType: GoalArrType, profileName: string, plan: GoalPlan): Promise<EntityConfigDiff[]>` — run `withSandboxCache` with `edits: [toProfileEdit(profileName, plan)]`, then inside return `buildQualityProfileConfigDiff(liveCache, sandboxCache, arrType, [profileName])`. This is the single source of the goals diff for both preview and apply.
@@ -82,6 +87,7 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
 - Extend `goalsRoutes.test.ts` (AC2): extend `SEED_SQL` (:50-66) with `qualities`, `quality_api_mappings`, `quality_profile_qualities` (+ `quality_groups`/`quality_group_members` if grouped) — the existing zero-ladder `Movies` profile stays a valid 200 with `ladderInput:null`. Add a preview test asserting `body.configDiff[0].changes` contains camelCase `orderedItems["<name>"].enabled` / `orderedItems["<name>"].upgradeUntil` FieldChanges; re-query `quality_profile_qualities` unchanged (non-persistence); assert `body.plan.qualityLadder.sharedLadderNote` present when the seeded profile is sibling-compatible. (Shared file with b1/b5 — b6 runs after b1 and before b5 by dependency order.)
 
 **Batch b5 — Apply: single guarded `writeOperationsFromSql` call** · dependsOn: b1, b2, b4, b6
+
 - Create `packages/praxrr-app/src/lib/server/goals/buildGoalApplyOps.ts` — **options object with `databaseId` (F1), explicit `OperationMetadata` return type (F3):**
   - `import type { OperationMetadata } from '$pcd/ops/writer.ts'` (type-only; keeps `writeOperationsFromSql` value import direct from writer.ts) and `import { compiledQueryToSql } from '$pcd/utils/sql.ts'`.
   - `export async function buildGoalApplyOps(options: { databaseId: number; cache: PCDCache; layer: OperationLayer; profileName: string; plan: GoalPlan }): Promise<{ operations: Array<{ sql: string; metadata: OperationMetadata; desiredState: Record<string, unknown> }> } | { error: string }>`
@@ -97,7 +103,8 @@ Keep the correctness-critical invariants (full-coverage/zero-removal, `ladderInp
 - Create `packages/praxrr-app/src/tests/routes/goalsApplyPersistence.test.ts` (AC3 real-persistence + AC4-409): register a `getRawDb`-backed real in-memory cache via `setCache` + patch `databaseInstancesQueries.getById` with `conflict_strategy:'override'` (mirror `tests/pcd/ops/writer.test.ts:22-88`); seed a full ladder; run `handleGoalApplyRequest`; re-query `quality_profile_qualities` + `quality_profile_custom_formats` to prove ladder+scoring persisted; **parity** — assert apply `configDiff` deep-equals a separately-run preview `computeGoalConfigDiff(...)` for the same `plan`, and the ladder op sql equals `buildQualityLadderOps(...).batched.queries` joined the same way. **409** — mutate the registry cache between plan-read and persist so a guarded op matches 0 rows → `success:false` → 409 → re-query proves NEITHER scoring nor ladder persisted (atomic).
 
 **Batch b7 — UI: Quality ladder & cutoff card** · dependsOn: b1, b3
-- Modify `packages/praxrr-app/src/lib/client/ui/goals/GeneratedConfig.svelte`: insert a full-width "Quality ladder & cutoff" `Card` between the summary grid close (~:77) and "Generated custom-format scores" (~:80). Table over `plan.qualityLadder.items` (enabled/disabled, highlight the `cutoff` row); prominent advisory banner when `plan.qualityLadder.sharedLadderNote` non-null; "No ladder change (profile has no derivable cutoff for this ceiling)" when `plan.qualityLadder.cutoff === null`; surface `plan.qualityLadder.cutoff` in the Thresholds card. No client wiring change for `changeCount` (`+page.svelte:49` auto-inflates from `configDiff`).
+
+- Modify `packages/praxrr-app/src/lib/client/ui/goals/GeneratedConfig.svelte`: insert a full-width "Quality ladder & cutoff" `Card` between the summary grid close (~~:77) and "Generated custom-format scores" (~~:80). Table over `plan.qualityLadder.items` (enabled/disabled, highlight the `cutoff` row); prominent advisory banner when `plan.qualityLadder.sharedLadderNote` non-null; "No ladder change (profile has no derivable cutoff for this ceiling)" when `plan.qualityLadder.cutoff === null`; surface `plan.qualityLadder.cutoff` in the Thresholds card. No client wiring change for `changeCount` (`+page.svelte:49` auto-inflates from `configDiff`).
 
 ### 2. AC → test mapping
 
