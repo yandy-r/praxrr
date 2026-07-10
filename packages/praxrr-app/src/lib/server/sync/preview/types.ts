@@ -188,6 +188,14 @@ export interface SyncPreviewSectionEvidenceHash {
   readonly planHash: string;
 }
 
+/** Exact private target identity used to bind a reviewed preview to one Arr endpoint. */
+export interface SyncPreviewReviewTargetInput {
+  readonly url: string;
+  readonly credentialFingerprint: string;
+  readonly credentialKeyVersion: string;
+  readonly credentialRevision: string;
+}
+
 /**
  * Process-local authorization evidence for a reviewed preview.
  *
@@ -199,6 +207,8 @@ export interface SyncPreviewReviewBinding {
   readonly version: 1;
   readonly instanceId: number;
   readonly arrType: SyncPreviewArrType;
+  /** Hash only: raw target URLs and credential identifiers never enter public snapshots. */
+  readonly targetHash: string;
   readonly sections: readonly SyncPreviewSection[];
   readonly sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>;
   readonly evidence: Readonly<Partial<Record<SyncPreviewSection, SyncPreviewSectionEvidenceHash>>>;

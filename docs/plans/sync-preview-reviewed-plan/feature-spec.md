@@ -189,7 +189,7 @@ execution.
 {
   "error": "Reviewed sync preview is stale because live Arr configuration changed. Generate and review a new preview.",
   "code": "arr_drift",
-  "changedEvidence": "arr",
+  "changedEvidence": ["arr"],
   "changedSections": ["qualityProfiles"],
   "regenerateRequired": true,
   "staleWarning": null

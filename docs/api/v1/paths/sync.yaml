@@ -212,11 +212,11 @@ previewApply:
           The reviewed evidence matched but the write-time sync job failed, or an
           unexpected internal failure occurred. A matched write-time failure uses
           `SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync
-          History correlation when present. An unexpected failure uses only the
-          sanitized generic error response.
+          History correlation when present. An unexpected failure uses the typed,
+          sanitized `SyncPreviewApplyErrorResponse`.
         content:
           application/json:
             schema:
               oneOf:
                 - $ref: '../schemas/sync.yaml#/SyncPreviewApplyResponse'
-                - $ref: '../schemas/arr.yaml#/ErrorResponse'
+                - $ref: '../schemas/sync.yaml#/SyncPreviewApplyErrorResponse'

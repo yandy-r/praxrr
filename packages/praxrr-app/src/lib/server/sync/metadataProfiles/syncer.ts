@@ -28,6 +28,7 @@ import { getNamespaceSuffix } from '../namespace.ts';
 import { logger } from '$logger/logger.ts';
 import { HttpError } from '$http/types.ts';
 import { diffSingletonEntity, METADATA_PROFILE_ARRAY_KEY_STRATEGIES } from '../preview/sectionDiffs.ts';
+import { SyncPreviewSectionSkipped } from '../preview/sectionSkip.ts';
 import type {
   MetadataProfilesPreview,
   SyncPreviewPreparedExecutionContext,
@@ -361,12 +362,10 @@ export class MetadataProfileSyncer extends BaseSyncer {
         source: 'Preview:MetadataProfile',
         meta: { instanceId: this.instanceId },
       });
-      const result: MetadataProfilesPreview = {
-        section: 'metadataProfiles',
-        profile: null,
-      };
-
-      return result;
+      throw new SyncPreviewSectionSkipped(
+        'metadataProfiles',
+        'Metadata profile preview has no selected profile to compare'
+      );
     }
 
     const profile = await getMetadataProfileFromCache(syncConfig.databaseId, syncConfig.profileName);

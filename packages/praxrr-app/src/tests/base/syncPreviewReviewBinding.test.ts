@@ -6,7 +6,12 @@ import {
   sortReviewEvidenceSet,
   type SyncPreviewSectionReviewEvidenceInput,
 } from '$sync/preview/reviewBinding.ts';
-import type { SyncPreviewArrType, SyncPreviewReviewBinding, SyncPreviewSection } from '$sync/preview/types.ts';
+import type {
+  SyncPreviewArrType,
+  SyncPreviewReviewBinding,
+  SyncPreviewReviewTargetInput,
+  SyncPreviewSection,
+} from '$sync/preview/types.ts';
 
 const ALL_SECTIONS: readonly SyncPreviewSection[] = ['qualityProfiles', 'mediaManagement'];
 
@@ -30,6 +35,7 @@ function buildBinding(
     instanceId?: number;
     evidence?: readonly SyncPreviewSectionReviewEvidenceInput[];
     sectionConfigs?: Partial<Record<SyncPreviewSection, unknown>>;
+    target?: SyncPreviewReviewTargetInput;
   } = {}
 ): Promise<SyncPreviewReviewBinding> {
   const sectionConfigs =
@@ -38,6 +44,12 @@ function buildBinding(
   return buildSyncPreviewReviewBinding({
     instanceId: options.instanceId ?? 42,
     arrType: options.arrType ?? 'lidarr',
+    target: options.target ?? {
+      url: 'HTTP://ARR.TEST:8686/api/',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
     sections,
     sectionConfigs,
     evidence: options.evidence ?? evidenceFor(sections),
@@ -82,6 +94,44 @@ Deno.test('review binding canonicalization is stable by object key and preserves
     reorderedSemanticArray.evidence.qualityProfiles?.pcdHash,
     orderedSemanticArray.evidence.qualityProfiles?.pcdHash
   );
+});
+
+Deno.test('review binding canonicalizes target URLs and invalidates retarget or credential rotation', async () => {
+  const expected = await buildBinding(['qualityProfiles']);
+  const equivalentUrl = await buildBinding(['qualityProfiles'], {
+    target: {
+      url: 'http://arr.test:8686/api',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
+  });
+  const retargeted = await buildBinding(['qualityProfiles'], {
+    target: {
+      url: 'http://arr.test:8787/api',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
+  });
+  const rotated = await buildBinding(['qualityProfiles'], {
+    target: {
+      url: 'http://arr.test:8686/api',
+      credentialFingerprint: 'credential-v2',
+      credentialKeyVersion: 'key-v2',
+      credentialRevision: 'revision-v2',
+    },
+  });
+
+  assertEquals(expected.targetHash, equivalentUrl.targetHash);
+  assertNotEquals(expected.targetHash, retargeted.targetHash);
+  assertNotEquals(expected.targetHash, rotated.targetHash);
+  assertEquals(compareReviewedEvidence(expected, retargeted, ['qualityProfiles']), {
+    kind: 'invalidated',
+    reason: 'scope_drift',
+    changedEvidence: [],
+    changedSections: ['qualityProfiles'],
+  });
 });
 
 Deno.test('review binding sorts only explicitly declared true sets with a caller comparator', () => {
@@ -232,6 +282,12 @@ Deno.test('review binding fails closed on unsupported, non-finite, missing, and 
       buildSyncPreviewReviewBinding({
         instanceId: 1,
         arrType: 'radarr',
+        target: {
+          url: 'http://radarr.test',
+          credentialFingerprint: 'credential-v1',
+          credentialKeyVersion: 'key-v1',
+          credentialRevision: 'revision-v1',
+        },
         sections: ['metadataProfiles'],
         evidence: evidenceFor(['metadataProfiles']),
       }),
@@ -292,6 +348,8 @@ Deno.test('review binding retains hashes but never raw PCD, Arr, or material-pla
   assert(!serialized.includes('RAW_PCD_MARKER'));
   assert(!serialized.includes('RAW_ARR_MARKER'));
   assert(!serialized.includes('RAW_PLAN_MARKER'));
+  assert(!serialized.includes('ARR.TEST'));
+  assert(!serialized.includes('credential-v1'));
   assert(serialized.includes('RetainedReviewedConfig'));
   assertEquals(Object.keys(binding.evidence), ['qualityProfiles']);
   assertEquals(Object.keys(binding.evidence.qualityProfiles ?? {}).sort(), [

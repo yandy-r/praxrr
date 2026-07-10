@@ -7,6 +7,7 @@ import {
   PREVIEW_STATUS_FAILED,
   PREVIEW_STATUS_GENERATING,
   PREVIEW_STATUS_READY,
+  type SyncPreviewApplyClaimReceipt,
   type SyncPreviewCreateInput,
   type SyncPreviewGenerationPatch,
   SyncPreviewStore,
@@ -70,6 +71,12 @@ async function binding(
   return await buildSyncPreviewReviewBinding({
     instanceId: INSTANCE_ID,
     arrType: 'radarr',
+    target: {
+      url: 'http://radarr.test',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
     sections,
     sectionConfigs,
     evidence: sections.map((section) => ({
@@ -87,6 +94,21 @@ async function readyStore(id = `preview-${crypto.randomUUID()}`, ttlMs = 10_000)
   const completed = store.completeGeneration(id, completionPatch(), await binding(), NOW_MS + 1);
   if (!completed) throw new Error('fixture completion failed');
   return { store, id, created, completed };
+}
+
+async function readyStoreWithSections(sections: readonly SyncPreviewSection[]) {
+  const store = new SyncPreviewStore({ ttlMs: 10_000 });
+  const id = `preview-ordered-${crypto.randomUUID()}`;
+  const sectionOutcomes = sections.map((section) => ({ section, failure: null, skipped: false }));
+  store.create({ ...previewInput(id), sections, sectionOutcomes }, NOW_MS);
+  const completed = store.completeGeneration(
+    id,
+    { ...completionPatch(), sections, sectionOutcomes },
+    await binding(sections),
+    NOW_MS + 1
+  );
+  if (!completed) throw new Error('ordered fixture completion failed');
+  return { store, id };
 }
 
 Deno.test('preview store completes generation atomically with a private immutable binding', async () => {
@@ -144,6 +166,12 @@ Deno.test('generation completion rejects malformed or mismatched bindings withou
   const mismatched = await buildSyncPreviewReviewBinding({
     instanceId: INSTANCE_ID + 1,
     arrType: 'radarr',
+    target: {
+      url: 'http://radarr.test',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
     sections: SECTIONS,
     evidence: SECTIONS.map((section) => ({
       section,
@@ -154,6 +182,32 @@ Deno.test('generation completion rejects malformed or mismatched bindings withou
   });
   assertThrows(() => store.completeGeneration(id, completionPatch(), mismatched, NOW_MS + 3));
   assertEquals(store.get(id, NOW_MS + 4)?.status, PREVIEW_STATUS_GENERATING);
+});
+
+Deno.test('non-applicable generation is ready and cannot be claimed for apply', () => {
+  const store = new SyncPreviewStore();
+  const id = `preview-non-applicable-${crypto.randomUUID()}`;
+  store.create(previewInput(id), NOW_MS);
+  const completed = store.completeNonApplicableGeneration(
+    id,
+    {
+      sections: SECTIONS,
+      sectionOutcomes: SECTIONS.map((section) => ({ section, failure: null, skipped: true })),
+      summary: {
+        totalCreates: 0,
+        totalUpdates: 0,
+        totalDeletes: 0,
+        totalUnchanged: 0,
+      },
+    },
+    NOW_MS + 1
+  );
+  assertEquals(completed?.status, PREVIEW_STATUS_READY);
+  assertEquals(store.claimReadyForApply(id, [], NOW_MS + 2), { ok: false, reason: 'scope_drift' });
+  assertEquals(store.claimReadyForApply(id, ['qualityProfiles'], NOW_MS + 2), {
+    ok: false,
+    reason: 'scope_drift',
+  });
 });
 
 Deno.test('apply claim fails closed for every pre-claim lifecycle and binding branch', async () => {
@@ -200,12 +254,34 @@ Deno.test('apply claim fails closed for every pre-claim lifecycle and binding br
   assertEquals(expiring.store.get(expiring.id, NOW_MS + 10), null);
 });
 
+Deno.test('apply claims preserve binding order for full and partial reviewed scopes', async () => {
+  const reviewedSections = ['qualityProfiles', 'delayProfiles', 'mediaManagement'] as const;
+  const { store, id } = await readyStoreWithSections(reviewedSections);
+
+  for (const reordered of [
+    ['mediaManagement', 'delayProfiles', 'qualityProfiles'],
+    ['mediaManagement', 'qualityProfiles'],
+  ] as readonly SyncPreviewSection[][]) {
+    assertEquals(store.claimReadyForApply(id, reordered, NOW_MS + 2), {
+      ok: false,
+      reason: 'scope_drift',
+    });
+    assertEquals(store.get(id, NOW_MS + 2)?.status, PREVIEW_STATUS_READY);
+  }
+
+  const orderedSubset = store.claimReadyForApply(id, ['qualityProfiles', 'mediaManagement'], NOW_MS + 3);
+  assertEquals(orderedSubset.ok, true);
+  if (!orderedSubset.ok) return;
+  assertEquals(orderedSubset.sections, ['qualityProfiles', 'mediaManagement']);
+  assertEquals(store.releaseApplyClaim(orderedSubset.receipt, NOW_MS + 4)?.status, PREVIEW_STATUS_READY);
+});
+
 Deno.test('duplicate apply claims conflict and receipt-checked release cannot be reused', async () => {
   const { store, id } = await readyStore();
-  const first = store.claimReadyForApply(id, ['delayProfiles', 'qualityProfiles'], NOW_MS + 2);
+  const first = store.claimReadyForApply(id, ['qualityProfiles', 'delayProfiles'], NOW_MS + 2);
   assertEquals(first.ok, true);
   if (!first.ok) return;
-  assertEquals(first.sections, ['delayProfiles', 'qualityProfiles']);
+  assertEquals(first.sections, ['qualityProfiles', 'delayProfiles']);
   assertEquals(first.snapshot.status, PREVIEW_STATUS_APPLYING);
 
   assertEquals(store.claimReadyForApply(id, ['qualityProfiles'], NOW_MS + 3), {
@@ -222,6 +298,20 @@ Deno.test('duplicate apply claims conflict and receipt-checked release cannot be
   assertEquals(store.completeApplyClaim(first.receipt, { status: PREVIEW_STATUS_APPLIED }, NOW_MS + 7), null);
   assertEquals(store.get(id, NOW_MS + 7)?.status, PREVIEW_STATUS_APPLYING);
   assertEquals(store.releaseApplyClaim(second.receipt, NOW_MS + 8)?.status, PREVIEW_STATUS_READY);
+});
+
+Deno.test('applying to ready is modeled but only the current receipt owner can release it', async () => {
+  assertEquals(SyncPreviewStore.canTransition(PREVIEW_STATUS_APPLYING, PREVIEW_STATUS_READY), true);
+  const { store, id } = await readyStore();
+  const claim = store.claimReadyForApply(id, ['qualityProfiles'], NOW_MS + 2);
+  assertEquals(claim.ok, true);
+  if (!claim.ok) return;
+
+  assertThrows(() => store.transition(id, PREVIEW_STATUS_READY, NOW_MS + 3), Error, 'requires an apply claim receipt');
+  const forgedReceipt = Object.freeze({}) as SyncPreviewApplyClaimReceipt;
+  assertEquals(store.releaseApplyClaim(forgedReceipt, NOW_MS + 4), null);
+  assertEquals(store.get(id, NOW_MS + 4)?.status, PREVIEW_STATUS_APPLYING);
+  assertEquals(store.releaseApplyClaim(claim.receipt, NOW_MS + 5)?.status, PREVIEW_STATUS_READY);
 });
 
 Deno.test(

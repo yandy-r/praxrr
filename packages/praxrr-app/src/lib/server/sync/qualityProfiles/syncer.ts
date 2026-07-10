@@ -52,7 +52,7 @@ import {
 } from '../preview/sectionDiffs.ts';
 
 // Custom formats
-import { previewCustomFormats, syncCustomFormats } from '../customFormats/syncer.ts';
+import { previewCustomFormats, syncCustomFormats, writeCustomFormatPayload } from '../customFormats/syncer.ts';
 import { fetchCustomFormatFromPcd } from '../customFormats/transformer.ts';
 import type { PcdCustomFormat } from '../customFormats/transformer.ts';
 import {
@@ -140,6 +140,12 @@ interface PreparedQualityProfileBatch {
   readonly suffix: string;
   readonly customFormats: readonly PreparedCustomFormatWrite[];
   readonly qualityProfiles: readonly PreparedQualityProfileWrite[];
+}
+
+interface QualityProfilePayloadWriteResult {
+  readonly remoteId: number | null;
+  readonly summary: SyncedProfileSummary | null;
+  readonly outcome: SyncEntityOutcome;
 }
 
 interface QualityProfilesPreparedExecutionContext extends SyncPreviewPreparedExecutionContext {
@@ -675,53 +681,15 @@ export class QualityProfileSyncer extends BaseSyncer {
             throw new Error(`Reviewed current-value guard mismatch for custom format "${payload.name}"`);
           }
 
-          try {
-            let remoteId: number;
-            if (isUpdate) {
-              remoteId = plannedId;
-              await this.client.updateCustomFormat(remoteId, payload);
-            } else {
-              delete payload.id;
-              const response = await this.client.createCustomFormat(payload);
-              if (typeof response.id !== 'number') {
-                throw new Error(`Arr did not return an id for custom format "${prepared.pcdName}"`);
-              }
-              remoteId = response.id;
-            }
-            resolvedFormatIdsByBatch[batchIndex].set(prepared.pcdName, remoteId);
-            resolvedFormatIdsByArrName.set(payload.name, remoteId);
-
-            outcomes.push({
-              section: 'qualityProfiles',
-              arrType: this.instanceType,
-              entityType: 'customFormat',
-              name: prepared.pcdName,
-              action: isUpdate ? 'update' : 'create',
-              status: 'success',
-              remoteId: String(remoteId),
-              reason: null,
-            });
-          } catch (error) {
-            const { reason, protectedDetails } = sanitizeArrWriteError(error);
-            await logger.error(`Failed reviewed custom format sync for "${prepared.pcdName}"`, {
-              source: 'Sync:QualityProfiles',
-              meta: {
-                instanceId: this.instanceId,
-                pcdName: prepared.pcdName,
-                request: payload,
-                ...protectedDetails,
-              },
-            });
-            outcomes.push({
-              section: 'qualityProfiles',
-              arrType: this.instanceType,
-              entityType: 'customFormat',
-              name: prepared.pcdName,
-              action: isUpdate ? 'update' : 'create',
-              status: 'failed',
-              remoteId: isUpdate ? String(plannedId) : null,
-              reason,
-            });
+          if (!isUpdate) delete payload.id;
+          const write = await writeCustomFormatPayload(this.client, this.instanceId, this.instanceType, {
+            pcdName: prepared.pcdName,
+            payload,
+          });
+          outcomes.push(write.outcome);
+          if (write.remoteId !== null) {
+            resolvedFormatIdsByBatch[batchIndex].set(prepared.pcdName, write.remoteId);
+            resolvedFormatIdsByArrName.set(payload.name, write.remoteId);
           }
         }
       }
@@ -735,7 +703,6 @@ export class QualityProfileSyncer extends BaseSyncer {
             ...item,
             format: batchFormatIds.get(item.name) ?? resolvedFormatIdsByArrName.get(item.name) ?? item.format,
           }));
-          const isUpdate = prepared.remoteId !== null;
           const guardedId = guardedProfileIds.get(payload.name);
           if (
             (prepared.remoteId !== null && guardedId !== prepared.remoteId) ||
@@ -744,50 +711,14 @@ export class QualityProfileSyncer extends BaseSyncer {
             throw new Error(`Reviewed current-value guard mismatch for quality profile "${payload.name}"`);
           }
 
-          try {
-            let remoteId: number;
-            if (prepared.remoteId !== null) {
-              payload.id = prepared.remoteId;
-              remoteId = prepared.remoteId;
-              await this.client.updateQualityProfile(remoteId, payload);
-            } else {
-              const response = await this.client.createQualityProfile(payload);
-              remoteId = response.id;
-            }
-            syncedProfiles += 1;
-            outcomes.push({
-              section: 'qualityProfiles',
-              arrType: this.instanceType,
-              entityType: 'qualityProfile',
-              name: prepared.pcdName,
-              action: isUpdate ? 'update' : 'create',
-              status: 'success',
-              remoteId: String(remoteId),
-              reason: null,
-            });
-          } catch (error) {
-            const { reason, protectedDetails } = sanitizeArrWriteError(error);
-            await logger.error(`Failed reviewed quality profile sync for "${prepared.pcdName}"`, {
-              source: 'Sync:QualityProfiles',
-              meta: {
-                instanceId: this.instanceId,
-                pcdName: prepared.pcdName,
-                request: payload,
-                ...protectedDetails,
-              },
-            });
-            failedProfiles.add(prepared.pcdName);
-            outcomes.push({
-              section: 'qualityProfiles',
-              arrType: this.instanceType,
-              entityType: 'qualityProfile',
-              name: prepared.pcdName,
-              action: isUpdate ? 'update' : 'create',
-              status: 'failed',
-              remoteId: prepared.remoteId === null ? null : String(prepared.remoteId),
-              reason,
-            });
-          }
+          const write = await this.writeQualityProfilePayload({
+            pcdName: prepared.pcdName,
+            payload,
+            remoteId: prepared.remoteId,
+          });
+          outcomes.push(write.outcome);
+          if (write.summary) syncedProfiles += 1;
+          else failedProfiles.add(prepared.pcdName);
         }
       }
 
@@ -1329,91 +1260,114 @@ export class QualityProfileSyncer extends BaseSyncer {
         },
       });
 
-      const isUpdate = existingMap.has(suffixedName);
-      try {
-        let remoteId: number;
-        if (isUpdate) {
-          // Update existing
-          const existingId = existingMap.get(suffixedName)!;
-          arrProfile.id = existingId;
-          remoteId = existingId;
-          await this.client.updateQualityProfile(existingId, arrProfile);
-          await logger.debug(`Updated quality profile "${pcdProfile.name}"`, {
-            source: 'Sync:QualityProfiles',
-            meta: {
-              instanceId: this.instanceId,
-              profileId: existingId,
-              pcdName: pcdProfile.name,
-              suffixedName,
-            },
-          });
-        } else {
-          // Create new
-          const response = await this.client.createQualityProfile(arrProfile);
-          remoteId = response.id;
-          existingMap.set(suffixedName, response.id);
-          await logger.debug(`Created quality profile "${pcdProfile.name}"`, {
-            source: 'Sync:QualityProfiles',
-            meta: {
-              instanceId: this.instanceId,
-              profileId: response.id,
-              pcdName: pcdProfile.name,
-              suffixedName,
-            },
-          });
-        }
-
-        // Build summary for completion log
-        const scoredFormats = arrProfile.formatItems
-          .filter((f) => f.score !== 0)
-          .map((f) => ({ name: f.name, score: f.score }));
-
-        syncedProfiles.push({
-          name: pcdProfile.name,
-          action: isUpdate ? 'updated' : 'created',
-          language: arrProfile.language?.name ?? 'N/A',
-          cutoffFormatScore: arrProfile.cutoffFormatScore,
-          minFormatScore: arrProfile.minFormatScore,
-          formats: scoredFormats,
-        });
-
-        outcomes.push({
-          section: 'qualityProfiles',
-          arrType: this.instanceType,
-          entityType: 'qualityProfile',
-          name: pcdProfile.name,
-          action: isUpdate ? 'update' : 'create',
-          status: 'success',
-          remoteId: String(remoteId),
-          reason: null,
-        });
-      } catch (error) {
-        const { reason, protectedDetails } = sanitizeArrWriteError(error);
-        await logger.error(`Failed to sync quality profile "${pcdProfile.name}"`, {
-          source: 'Sync:QualityProfiles',
-          meta: {
-            instanceId: this.instanceId,
-            pcdName: pcdProfile.name,
-            suffixedName,
-            request: arrProfile,
-            ...protectedDetails,
-          },
-        });
+      const write = await this.writeQualityProfilePayload({
+        pcdName: pcdProfile.name,
+        payload: arrProfile,
+        remoteId: existingMap.get(suffixedName) ?? null,
+      });
+      outcomes.push(write.outcome);
+      if (write.summary && write.remoteId !== null) {
+        syncedProfiles.push(write.summary);
+        existingMap.set(suffixedName, write.remoteId);
+      } else {
         failedProfiles.add(pcdProfile.name);
-        outcomes.push({
-          section: 'qualityProfiles',
-          arrType: this.instanceType,
-          entityType: 'qualityProfile',
-          name: pcdProfile.name,
-          action: isUpdate ? 'update' : 'create',
-          status: 'failed',
-          remoteId: isUpdate ? String(existingMap.get(suffixedName)!) : null,
-          reason,
-        });
       }
     }
 
     return syncedProfiles;
+  }
+
+  /** Write one already-materialized quality-profile payload without re-reading evidence. */
+  private async writeQualityProfilePayload(
+    prepared: PreparedQualityProfileWrite
+  ): Promise<QualityProfilePayloadWriteResult> {
+    const payload = structuredClone(prepared.payload);
+    const isUpdate = prepared.remoteId !== null;
+
+    try {
+      let remoteId: number;
+      if (prepared.remoteId !== null) {
+        payload.id = prepared.remoteId;
+        remoteId = prepared.remoteId;
+        await this.client.updateQualityProfile(remoteId, payload);
+        await logger.debug(`Updated quality profile "${prepared.pcdName}"`, {
+          source: 'Sync:QualityProfiles',
+          meta: {
+            instanceId: this.instanceId,
+            profileId: remoteId,
+            pcdName: prepared.pcdName,
+            suffixedName: payload.name,
+          },
+        });
+      } else {
+        delete payload.id;
+        const response = await this.client.createQualityProfile(payload);
+        if (typeof response.id !== 'number' || !Number.isInteger(response.id) || response.id <= 0) {
+          throw new Error(`Arr did not return an id for quality profile "${prepared.pcdName}"`);
+        }
+        remoteId = response.id;
+        await logger.debug(`Created quality profile "${prepared.pcdName}"`, {
+          source: 'Sync:QualityProfiles',
+          meta: {
+            instanceId: this.instanceId,
+            profileId: remoteId,
+            pcdName: prepared.pcdName,
+            suffixedName: payload.name,
+          },
+        });
+      }
+
+      const formats = payload.formatItems
+        .filter((format) => format.score !== 0)
+        .map((format) => ({ name: format.name, score: format.score }));
+      return {
+        remoteId,
+        summary: {
+          name: prepared.pcdName,
+          action: isUpdate ? 'updated' : 'created',
+          language: payload.language?.name ?? 'N/A',
+          cutoffFormatScore: payload.cutoffFormatScore,
+          minFormatScore: payload.minFormatScore,
+          formats,
+        },
+        outcome: {
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: prepared.pcdName,
+          action: isUpdate ? 'update' : 'create',
+          status: 'success',
+          remoteId: String(remoteId),
+          reason: null,
+        },
+      };
+    } catch (error) {
+      const { reason, protectedDetails } = sanitizeArrWriteError(error);
+      await logger.error(`Failed to sync quality profile "${prepared.pcdName}"`, {
+        source: 'Sync:QualityProfiles',
+        meta: {
+          instanceId: this.instanceId,
+          pcdName: prepared.pcdName,
+          suffixedName: payload.name,
+          request: payload,
+          ...protectedDetails,
+        },
+      });
+      return {
+        remoteId: null,
+        summary: null,
+        outcome: {
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: 'qualityProfile',
+          name: prepared.pcdName,
+          action: isUpdate ? 'update' : 'create',
+          status: 'failed',
+          remoteId: prepared.remoteId === null ? null : String(prepared.remoteId),
+          reason,
+        },
+      };
+    }
   }
 
   private buildQualityProfilesPayloads(

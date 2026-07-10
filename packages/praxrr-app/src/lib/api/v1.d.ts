@@ -6212,8 +6212,8 @@ export interface operations {
        * @description The reviewed evidence matched but the write-time sync job failed, or an
        *     unexpected internal failure occurred. A matched write-time failure uses
        *     `SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync
-       *     History correlation when present. An unexpected failure uses only the
-       *     sanitized generic error response.
+       *     History correlation when present. An unexpected failure uses the typed,
+       *     sanitized `SyncPreviewApplyErrorResponse`.
        */
       500: {
         headers: {
@@ -6221,7 +6221,7 @@ export interface operations {
         };
         content: {
           'application/json':
-            components['schemas']['SyncPreviewApplyResponse'] | components['schemas']['ErrorResponse'];
+            components['schemas']['SyncPreviewApplyResponse'] | components['schemas']['SyncPreviewApplyErrorResponse'];
         };
       };
     };

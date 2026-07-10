@@ -3,8 +3,10 @@ import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { ReviewedSyncClaim } from '$db/queries/arrSync.ts';
 import { executeReviewedSyncJob, type ReviewedSyncExecutionDependencies } from '$jobs/handlers/arrSync.ts';
-import type { SectionHandler, SyncEntityOutcome } from '$sync/types.ts';
+import type { SectionHandler, SectionType, SyncEntityOutcome } from '$sync/types.ts';
+import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
+import { syncPreviewReviewTarget } from '$sync/preview/reviewBinding.ts';
 import type {
   SyncPreviewPreparedExecutionContext,
   SyncPreviewReviewBinding,
@@ -22,7 +24,7 @@ function instance(overrides: Partial<ArrInstance> = {}): ArrInstance {
     type: 'radarr',
     url: 'http://127.0.0.1:7878',
     external_url: null,
-    api_key_fingerprint: null,
+    api_key_fingerprint: 'credential-v1',
     api_key: 'test-key',
     tags: null,
     enabled: 1,
@@ -60,6 +62,32 @@ function prepared(
   });
 }
 
+function previewFor(
+  sections: readonly SyncPreviewSection[],
+  overrides: Partial<GeneratePreviewResult> = {}
+): GeneratePreviewResult {
+  return {
+    instanceId: 7,
+    instanceName: 'Reviewed Radarr',
+    arrType: 'radarr',
+    status: 'ready',
+    createdAtMs: NOW_MS,
+    sections: [...sections],
+    sectionOutcomes: sections.map((section) => ({ section, failure: null, skipped: false })),
+    qualityProfiles: null,
+    delayProfiles: null,
+    mediaManagement: null,
+    metadataProfiles: null,
+    summary: {
+      totalCreates: 0,
+      totalUpdates: 0,
+      totalDeletes: 0,
+      totalUnchanged: 0,
+    },
+    ...overrides,
+  };
+}
+
 async function bindingFor(
   sections: readonly SyncPreviewSection[],
   materializedEvidence: readonly SyncPreviewSectionMaterializedEvidence[],
@@ -68,6 +96,7 @@ async function bindingFor(
   return await buildSyncPreviewReviewBinding({
     instanceId: 7,
     arrType: 'radarr',
+    target: syncPreviewReviewTarget(instance()),
     sections,
     sectionConfigs,
     evidence: materializedEvidence,
@@ -79,6 +108,9 @@ interface HarnessOptions {
   actualEvidence: readonly SyncPreviewSectionMaterializedEvidence[];
   contexts: Readonly<Partial<Record<SyncPreviewSection, SyncPreviewPreparedExecutionContext>>>;
   claim?: ReviewedSyncClaim | null;
+  currentInstance?: ArrInstance;
+  preview?: GeneratePreviewResult;
+  onMaterialize?: () => void;
   sync?: (
     context: SyncPreviewPreparedExecutionContext,
     section: SyncPreviewSection
@@ -98,6 +130,8 @@ function harness(options: HarnessOptions) {
     release: 0,
     complete: 0,
     fail: 0,
+    clients: 0,
+    materializations: 0,
     capturedHistory: null as Record<string, unknown> | null,
   };
   const claim =
@@ -140,8 +174,12 @@ function harness(options: HarnessOptions) {
 
   const dependencies = {
     now: () => NOW_MS,
-    getInstance: () => instance(),
-    getClient: () => Promise.resolve(client),
+    getInstance: () => options.currentInstance ?? instance(),
+    getReviewTarget: (targetInstance: ArrInstance) => syncPreviewReviewTarget(targetInstance),
+    getClient: () => {
+      calls.clients += 1;
+      return Promise.resolve(client);
+    },
     detectVersion: () => Promise.resolve(null),
     claimSections: () => claim,
     releaseSections: () => {
@@ -156,20 +194,28 @@ function harness(options: HarnessOptions) {
       calls.fail += 1;
       return true;
     },
-    materializeReview: () =>
-      Promise.resolve({
-        preview: { sections: [...options.binding.sections] },
+    materializeReview: (
+      _instance: ArrInstance,
+      _sections: readonly SectionType[],
+      _configs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>,
+      materializeClient: BaseArrClient
+    ) => {
+      assertEquals(materializeClient, client);
+      calls.materializations += 1;
+      options.onMaterialize?.();
+      return Promise.resolve({
+        preview: options.preview ?? previewFor(options.binding.sections),
         reviewContext: {
           sectionConfigs: options.binding.sectionConfigs,
           evidence: options.actualEvidence,
           preparedExecutionContexts: options.contexts,
         },
-      }),
+      });
+    },
     createSnapshot: () => {
       calls.snapshots += 1;
       return Promise.resolve(null);
     },
-    captureChanges: () => Promise.resolve([]),
     recordHistory: (input: Record<string, unknown>) => {
       calls.history += 1;
       calls.capturedHistory = input;
@@ -218,8 +264,135 @@ Deno.test('reviewed executor validates every selected section before any write-s
     release: 0,
     complete: 0,
     fail: 1,
+    clients: 1,
+    materializations: 1,
     capturedHistory: null,
   });
+});
+
+Deno.test('reviewed executor rejects a reordered reviewed subset before claim or materialization', async () => {
+  const reviewedSections = ['qualityProfiles', 'delayProfiles', 'mediaManagement'] as const;
+  const reviewedEvidence = reviewedSections.map((section) => evidence(section));
+  const binding = await bindingFor(reviewedSections, reviewedEvidence);
+  const { calls, dependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: {
+      qualityProfiles: prepared('qualityProfiles'),
+      delayProfiles: prepared('delayProfiles'),
+      mediaManagement: prepared('mediaManagement'),
+    },
+  });
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections: ['mediaManagement', 'qualityProfiles'],
+    previewId: 'preview-reordered-subset',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result, {
+    kind: 'invalidated',
+    reason: 'scope_drift',
+    changedEvidence: [],
+    changedSections: ['mediaManagement', 'qualityProfiles'],
+    outcomes: [],
+    syncHistoryId: null,
+  });
+  assertEquals(calls.clients, 0);
+  assertEquals(calls.materializations, 0);
+  assertEquals(calls.snapshots, 0);
+  assertEquals(calls.history, 0);
+  assertEquals(calls.writes, 0);
+});
+
+Deno.test('reviewed executor expires after materialization without starting any side effect', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence);
+  let clockMs = NOW_MS;
+  const { calls, dependencies: baseDependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: { qualityProfiles: prepared('qualityProfiles') },
+    onMaterialize: () => {
+      clockMs = Date.parse(EXPIRES_AT);
+    },
+  });
+  const dependencies = {
+    ...baseDependencies,
+    now: () => clockMs,
+  } satisfies ReviewedSyncExecutionDependencies;
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-expired-after-materialization',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result, { kind: 'expired', outcomes: [], syncHistoryId: null });
+  assertEquals(calls.snapshots, 0);
+  assertEquals(calls.history, 0);
+  assertEquals(calls.writes, 0);
+  assertEquals(calls.release, 1);
+  assertEquals(calls.complete, 0);
+  assertEquals(calls.fail, 0);
+  assertEquals(calls.materializations, 1);
+});
+
+Deno.test('reviewed executor rejects same-type target retarget before creating a client or writing', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence);
+  const { calls, dependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: { qualityProfiles: prepared('qualityProfiles') },
+    currentInstance: instance({ url: 'http://127.0.0.1:8787' }),
+  });
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-retarget',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result.kind, 'invalidated');
+  assertEquals(result.kind === 'invalidated' ? result.reason : null, 'scope_drift');
+  assertEquals(calls.clients, 0);
+  assertEquals(calls.writes, 0);
+  assertEquals(calls.history, 0);
+});
+
+Deno.test('reviewed executor rejects credential rotation before creating a client or writing', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence);
+  const { calls, dependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: { qualityProfiles: prepared('qualityProfiles') },
+    currentInstance: instance({ api_key_fingerprint: 'credential-v2' }),
+  });
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-credential-rotation',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result.kind, 'invalidated');
+  assertEquals(result.kind === 'invalidated' ? result.reason : null, 'scope_drift');
+  assertEquals(calls.clients, 0);
+  assertEquals(calls.writes, 0);
+  assertEquals(calls.history, 0);
 });
 
 Deno.test('reviewed executor writes frozen prepared values after an adversarial post-validation mutation', async () => {
@@ -280,6 +453,68 @@ Deno.test('reviewed executor writes frozen prepared values after an adversarial 
   assertEquals(calls.fail, 0);
   assertEquals(calls.capturedHistory?.previewId, 'preview-frozen');
   assertEquals(calls.capturedHistory?.entityOutcomes, [outcome]);
+});
+
+Deno.test('reviewed executor records the revalidated materialized diff without a second preview read', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence, {
+    qualityProfiles: { selections: [{ databaseId: 33, profileName: 'HD' }] },
+  });
+  const reviewedChange = {
+    entityType: 'qualityProfile',
+    name: 'Reviewed HD',
+    action: 'update' as const,
+    remoteId: 12,
+    fields: [{ field: 'cutoff', type: 'changed' as const, current: 1, desired: 2 }],
+  };
+  const unchanged = {
+    entityType: 'customFormat',
+    name: 'Already aligned',
+    action: 'unchanged' as const,
+    remoteId: 8,
+    fields: [],
+  };
+  const materializedPreview = previewFor(sections, {
+    qualityProfiles: {
+      section: 'qualityProfiles',
+      customFormats: [unchanged],
+      qualityProfiles: [reviewedChange],
+    },
+    summary: {
+      totalCreates: 0,
+      totalUpdates: 1,
+      totalDeletes: 0,
+      totalUnchanged: 1,
+    },
+  });
+  const { calls, dependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: {
+      qualityProfiles: prepared('qualityProfiles', { name: 'Reviewed HD' }, binding.sectionConfigs.qualityProfiles),
+    },
+    preview: materializedPreview,
+  });
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-history-from-reviewed-materialization',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result.kind, 'executed');
+  assertEquals(calls.materializations, 1);
+  assertEquals(calls.history, 1);
+  assertEquals(calls.capturedHistory?.changes, [
+    {
+      ...reviewedChange,
+      section: 'qualityProfiles',
+      category: 'qualityProfiles',
+    },
+  ]);
 });
 
 Deno.test('reviewed executor preserves both normal/reviewed concurrency interleavings', async () => {

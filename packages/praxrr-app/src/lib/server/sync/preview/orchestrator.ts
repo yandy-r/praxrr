@@ -11,7 +11,9 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { getSection } from '../registry.ts';
 import { PREVIEW_STATUS_READY } from './store.ts';
 import { classifyPreviewFailure } from './failureReason.ts';
+import { SyncPreviewSectionSkipped } from './sectionSkip.ts';
 import type { BaseSyncer, SectionType } from '../types.ts';
+import type { BaseArrClient } from '$arr/base.ts';
 import type {
   DelayProfilesPreview,
   EntityChange,
@@ -68,6 +70,8 @@ export interface GeneratePreviewResult {
 
 export interface GeneratePreviewReviewOptions {
   readonly captureReviewContext: true;
+  /** Reuse the exact explicitly typed client at the reviewed execution boundary. */
+  readonly client?: BaseArrClient;
 }
 
 export interface GeneratePreviewWithReviewContextResult {
@@ -341,13 +345,16 @@ export async function generatePreview(
   const materializedConfigs: Partial<Record<SyncPreviewSection, unknown>> = {};
   const preparedExecutionContexts: Partial<Record<SyncPreviewSection, SyncPreviewPreparedExecutionContext>> = {};
 
-  const client = await getArrInstanceClient(
-    arrType,
-    input.instance.id,
-    input.instance.url,
-    undefined,
-    createArrInstanceClientCache()
-  );
+  const ownsClient = options?.client === undefined;
+  const client =
+    options?.client ??
+    (await getArrInstanceClient(
+      arrType,
+      input.instance.id,
+      input.instance.url,
+      undefined,
+      createArrInstanceClientCache()
+    ));
   const { id: instanceId, name: instanceName, type: instanceType } = input.instance;
 
   try {
@@ -402,6 +409,16 @@ export async function generatePreview(
           }
         }
       } catch (error) {
+        if (error instanceof SyncPreviewSectionSkipped && error.section === section) {
+          sectionOutcomes.push({
+            section,
+            result: null,
+            failure: null,
+            skipped: true,
+          });
+          continue;
+        }
+
         // Classify by error TYPE only; the raw message stays out of the outcome and is
         // recorded solely on the sanitized logger boundary below.
         const failure = classifyPreviewFailure(error, arrType);
@@ -432,7 +449,7 @@ export async function generatePreview(
       }
     }
   } finally {
-    client.close();
+    if (ownsClient) client.close();
   }
 
   const payloads = buildSectionPayloads(sectionOutcomes);

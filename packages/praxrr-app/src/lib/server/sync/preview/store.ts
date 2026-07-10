@@ -33,7 +33,7 @@ export const PREVIEW_STATUS_EXPIRED = 'expired';
  * Snapshot matrix:
  * generating -> ready | failed
  * ready     -> applying | failed
- * applying  -> applied | failed
+ * applying  -> ready (receipt-owned release only) | applied | failed
  * applied   -> (terminal)
  * failed    -> (terminal)
  * expired   -> (terminal)
@@ -41,7 +41,7 @@ export const PREVIEW_STATUS_EXPIRED = 'expired';
 export const PREVIEW_STATUS_TRANSITIONS: Record<SyncPreviewStatus, readonly SyncPreviewStatus[]> = {
   generating: ['ready', 'failed'],
   ready: ['applying', 'failed'],
-  applying: ['applied', 'failed'],
+  applying: ['ready', 'applied', 'failed'],
   applied: [],
   failed: [],
   expired: [],
@@ -137,6 +137,11 @@ export interface SyncPreviewStoreApi {
     binding: SyncPreviewReviewBinding,
     nowMs?: number
   ): SyncPreviewResult | null;
+  completeNonApplicableGeneration(
+    id: string,
+    patch: SyncPreviewGenerationPatch,
+    nowMs?: number
+  ): SyncPreviewResult | null;
   claimReadyForApply(id: string, sections: readonly SyncPreviewSection[], nowMs?: number): SyncPreviewApplyClaimResult;
   releaseApplyClaim(receipt: SyncPreviewApplyClaimReceipt, nowMs?: number): SyncPreviewResult | null;
   completeApplyClaim(
@@ -158,6 +163,7 @@ interface StoredPreview {
   createdAtMs: number;
   expiresAtMs: number;
   binding: SyncPreviewReviewBinding | null;
+  reviewAuthorization: 'pending' | 'reviewed' | 'non_applicable';
   applyOwnerToken: string | null;
 }
 
@@ -258,6 +264,8 @@ function cloneAndValidateBinding(value: unknown, snapshot: SyncPreviewResult): S
     value.instanceId !== snapshot.instanceId ||
     value.arrType !== snapshot.arrType ||
     !Array.isArray(value.sections) ||
+    typeof value.targetHash !== 'string' ||
+    !SHA256_HEX_PATTERN.test(value.targetHash) ||
     !isPlainObject(value.sectionConfigs) ||
     !isPlainObject(value.evidence)
   ) {
@@ -310,6 +318,7 @@ function cloneAndValidateBinding(value: unknown, snapshot: SyncPreviewResult): S
     version: SYNC_PREVIEW_REVIEW_BINDING_VERSION,
     instanceId: snapshot.instanceId,
     arrType: snapshot.arrType,
+    targetHash: value.targetHash,
     sections: Object.freeze([...(sections as SyncPreviewSection[])]),
     sectionConfigs: sectionConfigs as Readonly<Partial<Record<SyncPreviewSection, unknown>>>,
     evidence: Object.freeze(evidence),
@@ -335,17 +344,20 @@ function isExactReviewedSubset(
 
   const eligible = new Set(eligibleSections(snapshot));
   const seen = new Set<SyncPreviewSection>();
+  let previousBindingIndex = -1;
   for (const section of selectedSections) {
+    const bindingIndex = binding.sections.indexOf(section);
     if (
       !isReviewSection(section) ||
       seen.has(section) ||
       !eligible.has(section) ||
-      !binding.sections.includes(section) ||
+      bindingIndex <= previousBindingIndex ||
       !binding.evidence[section]
     ) {
       return false;
     }
     seen.add(section);
+    previousBindingIndex = bindingIndex;
   }
   return true;
 }
@@ -409,6 +421,7 @@ export class SyncPreviewStore {
       createdAtMs: nowMs,
       expiresAtMs: nowMs + this.ttlMs,
       binding: null,
+      reviewAuthorization: 'pending',
       applyOwnerToken: null,
     });
 
@@ -438,6 +451,7 @@ export class SyncPreviewStore {
       createdAtMs: entry.createdAtMs,
       expiresAtMs: entry.expiresAtMs,
       binding: entry.binding,
+      reviewAuthorization: entry.reviewAuthorization,
       applyOwnerToken: entry.applyOwnerToken,
     };
 
@@ -501,6 +515,42 @@ export class SyncPreviewStore {
       createdAtMs: entry.createdAtMs,
       expiresAtMs: entry.expiresAtMs,
       binding: immutableBinding,
+      reviewAuthorization: 'reviewed',
+      applyOwnerToken: null,
+    });
+    return snapshot;
+  }
+
+  /** Complete a valid preview whose requested sections produced no applicable review scope. */
+  completeNonApplicableGeneration(
+    id: string,
+    patch: SyncPreviewGenerationPatch,
+    nowMs: number = Date.now()
+  ): SyncPreviewResult | null {
+    const entry = this.previews.get(id);
+    if (!entry) {
+      this.cleanup(nowMs);
+      return null;
+    }
+    if (SyncPreviewStore.isExpired(entry.expiresAtMs, nowMs)) {
+      this.previews.delete(id);
+      return null;
+    }
+    if (entry.snapshot.status !== PREVIEW_STATUS_GENERATING) {
+      throw new Error(`Invalid preview status transition ${entry.snapshot.status} -> ${PREVIEW_STATUS_READY}`);
+    }
+
+    const snapshot = this.sanitizePatch(entry, { ...patch, status: PREVIEW_STATUS_READY }, nowMs);
+    if (eligibleSections(snapshot).length !== 0) {
+      throw new TypeError('Non-applicable preview generation cannot contain eligible sections');
+    }
+
+    this.previews.set(id, {
+      snapshot,
+      createdAtMs: entry.createdAtMs,
+      expiresAtMs: entry.expiresAtMs,
+      binding: null,
+      reviewAuthorization: 'non_applicable',
       applyOwnerToken: null,
     });
     return snapshot;
@@ -529,7 +579,14 @@ export class SyncPreviewStore {
         status: entry.snapshot.status,
       };
     }
-    if (!entry.binding || !isBindingValidForSnapshot(entry.binding, entry.snapshot)) {
+    if (entry.reviewAuthorization === 'non_applicable') {
+      return { ok: false, reason: 'scope_drift' };
+    }
+    if (
+      entry.reviewAuthorization !== 'reviewed' ||
+      !entry.binding ||
+      !isBindingValidForSnapshot(entry.binding, entry.snapshot)
+    ) {
       return { ok: false, reason: 'unverifiable_review' };
     }
     if (!isExactReviewedSubset(sections, entry.binding, entry.snapshot)) {
@@ -599,6 +656,10 @@ export class SyncPreviewStore {
       this.applyClaimReceipts.delete(receipt);
       return null;
     }
+    if (!SyncPreviewStore.canTransition(entry.snapshot.status, status)) {
+      this.applyClaimReceipts.delete(receipt);
+      return null;
+    }
 
     const snapshot: SyncPreviewResult = {
       ...entry.snapshot,
@@ -641,6 +702,7 @@ export class SyncPreviewStore {
         createdAtMs: entry.createdAtMs,
         expiresAtMs: entry.expiresAtMs,
         binding: entry.binding,
+        reviewAuthorization: entry.reviewAuthorization,
         applyOwnerToken: entry.applyOwnerToken,
       });
 

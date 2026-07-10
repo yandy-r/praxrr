@@ -25,8 +25,14 @@ import type {
   SyncPreviewEvidenceClass,
   SyncPreviewEvidenceRecorder,
   SyncPreviewPreparedExecutionContext,
+  SyncPreviewResult,
   SyncPreviewSection,
 } from '$sync/preview/types.ts';
+import { generatePreview } from '$sync/preview/orchestrator.ts';
+import { previewStore } from '$sync/preview/store.ts';
+import { resetPreviewCreateRateLimitForTests } from '$sync/preview/limits.ts';
+import { _handleSyncPreviewCreateRequest } from '../../routes/api/v1/sync/preview/+server.ts';
+import { _handleSyncPreviewApplyRequest } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
 
 import '$jobs/handlers/arrSync.ts';
 import '$sync/metadataProfiles/handler.ts';
@@ -350,6 +356,96 @@ Deno.test(
     }
   }
 );
+
+Deno.test('empty transient metadata selection is skipped and cannot reach reviewed apply writes', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const instance = createInstance(703, 'lidarr');
+  const client = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
+  const originalHasConfig = metadataProfilesHandler.hasConfig;
+  let arrReads = 0;
+  let arrWrites = 0;
+  let reviewedExecutions = 0;
+  const nowMs = Date.now();
+
+  metadataProfilesHandler.hasConfig = () => false;
+  client.getMetadataProfileSchemaOrNull = () => {
+    arrReads += 1;
+    return Promise.resolve(null);
+  };
+  client.getMetadataProfiles = () => {
+    arrReads += 1;
+    return Promise.resolve([]);
+  };
+  client.createMetadataProfile = () => {
+    arrWrites += 1;
+    return Promise.reject(new Error('empty metadata selection must not create'));
+  };
+  client.updateMetadataProfile = () => {
+    arrWrites += 1;
+    return Promise.reject(new Error('empty metadata selection must not update'));
+  };
+
+  const createRequest = new Request('http://localhost/api/v1/sync/preview', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      instanceId: instance.id,
+      sections: ['metadataProfiles'],
+      sectionConfigs: {
+        metadataProfiles: { databaseId: null, profileName: null },
+      },
+    }),
+  });
+
+  let previewId: string | null = null;
+  try {
+    const createResponse = await _handleSyncPreviewCreateRequest(createRequest, {
+      getInstanceById: (instanceId) => (instanceId === instance.id ? instance : undefined),
+      now: () => nowMs,
+      generatePreview: (input, options) => generatePreview(input, { ...options, client }),
+    });
+
+    assertEquals(createResponse.status, 200, await createResponse.clone().text());
+    const preview = (await createResponse.json()) as SyncPreviewResult;
+    previewId = preview.id;
+    assertEquals(preview.arrType, 'lidarr');
+    assertEquals(preview.sections, ['metadataProfiles']);
+    assertEquals(preview.sectionOutcomes, [{ section: 'metadataProfiles', failure: null, skipped: true }]);
+    assertEquals(preview.metadataProfiles, null);
+    assertEquals(preview.failure, null);
+    assertEquals(arrReads, 0);
+    assertEquals(arrWrites, 0);
+
+    const applyResponse = await _handleSyncPreviewApplyRequest(
+      preview.id,
+      new Request(`http://localhost/api/v1/sync/preview/${preview.id}/apply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sections: ['metadataProfiles'] }),
+      }),
+      {
+        getSectionsInProgress: () => [],
+        executeReviewedSyncJob: async () => {
+          reviewedExecutions += 1;
+          throw new Error('ineligible metadata selection must not execute');
+        },
+        now: () => nowMs + 1_000,
+      }
+    );
+
+    assertEquals(applyResponse.status, 409);
+    assertEquals(await applyResponse.json(), {
+      error: 'Cannot apply sections with failed preview generation: metadataProfiles',
+    });
+    assertEquals(reviewedExecutions, 0);
+    assertEquals(arrWrites, 0);
+  } finally {
+    if (previewId) previewStore.delete(previewId);
+    resetPreviewCreateRateLimitForTests();
+    metadataProfilesHandler.hasConfig = originalHasConfig;
+    client.close();
+  }
+});
 
 Deno.test('metadata profile review rejects Radarr and Sonarr directly without config or sibling fallback', async () => {
   const originalGetSyncConfig = arrSyncQueries.getMetadataProfilesSync;

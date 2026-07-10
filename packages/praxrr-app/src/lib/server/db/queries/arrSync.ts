@@ -88,6 +88,7 @@ interface ReviewedSyncClaimRecord {
   readonly instanceId: number;
   readonly sections: readonly SectionType[];
   readonly previousStatuses: ReadonlyMap<SectionType, SyncStatus>;
+  readonly previousShouldSync: ReadonlyMap<SectionType, number>;
 }
 
 interface ReviewedSyncSectionConfig {
@@ -198,13 +199,14 @@ function claimReviewedSyncSections(
 
   const sections = normalizeReviewedSyncSections(requestedSections);
   const previousStatuses = new Map<SectionType, SyncStatus>();
+  const previousShouldSync = new Map<SectionType, number>();
 
   try {
     runReviewedSyncSavepoint(() => {
       for (const section of sections) {
         const sectionConfig = REVIEWED_SYNC_SECTION_CONFIG[section];
-        const row = db.queryFirst<{ sync_status: string }>(
-          `SELECT sync_status FROM ${sectionConfig.table} WHERE ${sectionConfig.instanceScopeSql}`,
+        const row = db.queryFirst<{ sync_status: string; should_sync: number }>(
+          `SELECT sync_status, should_sync FROM ${sectionConfig.table} WHERE ${sectionConfig.instanceScopeSql}`,
           instanceId
         );
 
@@ -215,16 +217,18 @@ function claimReviewedSyncSections(
         const previousStatus = row.sync_status;
         const updated = db.execute(
           `UPDATE ${sectionConfig.table}
-SET sync_status = 'in_progress'
-WHERE ${sectionConfig.instanceScopeSql} AND sync_status = ?`,
+SET sync_status = 'in_progress', should_sync = 0
+WHERE ${sectionConfig.instanceScopeSql} AND sync_status = ? AND should_sync = ?`,
           instanceId,
-          previousStatus
+          previousStatus,
+          row.should_sync
         );
         if (updated !== 1) {
           throw new ReviewedSyncClaimConflict();
         }
 
         previousStatuses.set(section, previousStatus);
+        previousShouldSync.set(section, row.should_sync);
       }
     });
   } catch (error) {
@@ -240,6 +244,7 @@ WHERE ${sectionConfig.instanceScopeSql} AND sync_status = ?`,
     instanceId,
     sections,
     previousStatuses,
+    previousShouldSync,
   };
   reviewedSyncClaimRecords.set(claim, record);
   for (const section of sections) {
@@ -266,7 +271,8 @@ function finalizeReviewedSyncSections(
       for (const section of record.sections) {
         const sectionConfig = REVIEWED_SYNC_SECTION_CONFIG[section];
         const previousStatus = record.previousStatuses.get(section);
-        if (!previousStatus) {
+        const previousShouldSync = record.previousShouldSync.get(section);
+        if (!previousStatus || previousShouldSync === undefined) {
           throw new ReviewedSyncClaimConflict();
         }
 
@@ -274,15 +280,20 @@ function finalizeReviewedSyncSections(
         if (mode === 'release') {
           updated = db.execute(
             `UPDATE ${sectionConfig.table}
-SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE ? END
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE ? END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE ? END
 WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
             previousStatus,
+            previousShouldSync,
             record.instanceId
           );
         } else if (mode === 'complete') {
           updated = db.execute(
             `UPDATE ${sectionConfig.table}
-SET sync_status = 'idle', should_sync = 0, last_error = NULL, last_synced_at = ?
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'idle' END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE 0 END,
+    last_error = NULL,
+    last_synced_at = ?
 WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
             completedAt,
             record.instanceId
@@ -290,7 +301,9 @@ WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
         } else {
           updated = db.execute(
             `UPDATE ${sectionConfig.table}
-SET sync_status = 'failed', should_sync = 0, last_error = ?
+SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'failed' END,
+    should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE 0 END,
+    last_error = ?
 WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
             errorMessage ?? 'Reviewed sync failed',
             record.instanceId

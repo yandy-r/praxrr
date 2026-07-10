@@ -284,7 +284,7 @@ function reviewedRadarrTarget(overrides: Partial<ArrInstance> = {}): ArrInstance
     type: 'radarr',
     url: 'http://127.0.0.1:7878',
     external_url: null,
-    api_key_fingerprint: null,
+    api_key_fingerprint: 'credential-v1',
     api_key: 'reviewed-key',
     tags: null,
     enabled: 1,
@@ -301,6 +301,12 @@ async function reviewedQualityProfileBinding() {
   return await buildSyncPreviewReviewBinding({
     instanceId: 234,
     arrType: 'radarr',
+    target: {
+      url: 'http://127.0.0.1:7878',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'legacy',
+      credentialRevision: '2026-07-10T10:00:00.000Z',
+    },
     sections: ['qualityProfiles'],
     sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
     evidence: [
@@ -369,7 +375,6 @@ Deno.test('reviewed executor rejects version capability drift before materializa
     failedClaims: 0,
     materializations: 0,
     snapshots: 0,
-    captures: 0,
     handlers: 0,
     histories: 0,
   };
@@ -377,6 +382,12 @@ Deno.test('reviewed executor rejects version capability drift before materializa
   const dependencies = {
     now: () => Date.parse('2026-07-10T12:00:00.000Z'),
     getInstance: () => target,
+    getReviewTarget: () => ({
+      url: target.url,
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'legacy',
+      credentialRevision: target.updated_at,
+    }),
     getClient: () => Promise.resolve(client),
     detectVersion: () => Promise.resolve(resolveArrCompatibility('radarr', '3.2.2.0')),
     claimSections: () => {
@@ -394,10 +405,6 @@ Deno.test('reviewed executor rejects version capability drift before materializa
     createSnapshot: () => {
       calls.snapshots += 1;
       return Promise.resolve(null);
-    },
-    captureChanges: () => {
-      calls.captures += 1;
-      return Promise.resolve([]);
     },
     getSectionHandler: () => {
       calls.handlers += 1;
@@ -431,7 +438,6 @@ Deno.test('reviewed executor rejects version capability drift before materializa
     failedClaims: 1,
     materializations: 0,
     snapshots: 0,
-    captures: 0,
     handlers: 0,
     histories: 0,
   });

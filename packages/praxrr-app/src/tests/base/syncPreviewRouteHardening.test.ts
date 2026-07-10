@@ -122,7 +122,7 @@ function createArrInstanceFixture(): ArrInstance {
     type: 'radarr',
     url: 'http://radarr.local',
     external_url: null,
-    api_key_fingerprint: null,
+    api_key_fingerprint: 'credential-v1',
     api_key: '',
     tags: null,
     enabled: 1,
@@ -180,6 +180,12 @@ async function createReviewedSnapshot(id: string, createdAtMs: number = Date.now
   const binding = await buildSyncPreviewReviewBinding({
     instanceId: input.instanceId,
     arrType: input.arrType,
+    target: {
+      url: 'http://preview.test',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
     sections: ['qualityProfiles'],
     sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
     evidence: [
@@ -190,6 +196,39 @@ async function createReviewedSnapshot(id: string, createdAtMs: number = Date.now
         plan: { action: 'update' },
       },
     ],
+  });
+  const { status: _status, ...patch } = input;
+  previewStore.completeGeneration(id, patch, binding, createdAtMs);
+}
+
+async function createOrderedReviewedSnapshot(
+  id: string,
+  sections: readonly ('qualityProfiles' | 'delayProfiles' | 'mediaManagement')[],
+  createdAtMs: number = Date.now()
+): Promise<void> {
+  const input = {
+    ...createSnapshotInput(id),
+    sections,
+    sectionOutcomes: sections.map((section) => ({ section, failure: null, skipped: false })),
+  };
+  previewStore.create({ ...input, status: PREVIEW_STATUS_GENERATING }, createdAtMs);
+  const binding = await buildSyncPreviewReviewBinding({
+    instanceId: input.instanceId,
+    arrType: input.arrType,
+    target: {
+      url: 'http://preview.test',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
+    sections,
+    sectionConfigs: {},
+    evidence: sections.map((section) => ({
+      section,
+      pcd: { section, desired: 'reviewed' },
+      arr: { section, current: 'reviewed' },
+      plan: { section, action: 'update' },
+    })),
   });
   const { status: _status, ...patch } = input;
   previewStore.completeGeneration(id, patch, binding, createdAtMs);
@@ -356,6 +395,73 @@ Deno.test('sync preview apply releases a reviewed DB claim conflict back to read
     });
     assertEquals(response.status, 409);
     assertEquals(previewStore.get(previewId)?.status, 'ready');
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply rejects reordered reviewed scopes before execution', async () => {
+  const reviewedSections = ['qualityProfiles', 'delayProfiles', 'mediaManagement'] as const;
+  const reorderedScopes = [
+    ['mediaManagement', 'delayProfiles', 'qualityProfiles'],
+    ['mediaManagement', 'qualityProfiles'],
+  ] as const;
+
+  for (const sections of reorderedScopes) {
+    const previewId = `preview-apply-reordered-${crypto.randomUUID()}`;
+    await createOrderedReviewedSnapshot(previewId, reviewedSections);
+    let executionCount = 0;
+    try {
+      const response = await _handleSyncPreviewApplyRequest(
+        previewId,
+        createApplyRequest(previewId, JSON.stringify({ sections })),
+        {
+          getSectionsInProgress: () => [],
+          executeReviewedSyncJob: () => {
+            executionCount += 1;
+            return Promise.resolve({
+              kind: 'executed',
+              result: { status: 'success', outcomes: [], syncHistoryId: null },
+            });
+          },
+          now: Date.now,
+        }
+      );
+
+      assertEquals(response.status, 422);
+      const payload = (await response.json()) as components['schemas']['SyncPreviewApplyInvalidatedResponse'];
+      assertEquals(payload.code, 'scope_drift');
+      assertEquals(payload.changedSections, [...sections]);
+      assertEquals(executionCount, 0);
+    } finally {
+      previewStore.delete(previewId);
+    }
+  }
+});
+
+Deno.test('sync preview apply preserves an ordered reviewed subset through execution', async () => {
+  const previewId = `preview-apply-ordered-subset-${crypto.randomUUID()}`;
+  await createOrderedReviewedSnapshot(previewId, ['qualityProfiles', 'delayProfiles', 'mediaManagement']);
+  let executedSections: readonly string[] | null = null;
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles', 'mediaManagement'] })),
+      {
+        getSectionsInProgress: () => [],
+        executeReviewedSyncJob: (input) => {
+          executedSections = input.sections;
+          return Promise.resolve({
+            kind: 'executed',
+            result: { status: 'success', outcomes: [], syncHistoryId: null },
+          });
+        },
+        now: Date.now,
+      }
+    );
+
+    assertEquals(response.status, 200);
+    assertEquals(executedSections, ['qualityProfiles', 'mediaManagement']);
   } finally {
     previewStore.delete(previewId);
   }
@@ -848,6 +954,94 @@ Deno.test('sync preview create preserves successful-section evidence on partial 
     assertTypedFailure(failedSection?.failure, 'partial section');
     assertNoLeak(payload, 'partial body');
     assertNoLeak(previewStore.get(payload.id), 'partial stored');
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
+Deno.test('sync preview create returns a ready non-applicable result when no sync config exists', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const deps = createDependencies(() =>
+    Promise.resolve({
+      preview: {
+        instanceId: INSTANCE_ID,
+        instanceName: 'Preview Test Instance',
+        arrType: 'radarr',
+        status: 'ready',
+        createdAtMs: Date.now(),
+        sections: [],
+        sectionOutcomes: [],
+        qualityProfiles: null,
+        delayProfiles: null,
+        mediaManagement: null,
+        metadataProfiles: null,
+        summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+      },
+      reviewContext: { sectionConfigs: {}, evidence: [], preparedExecutionContexts: {} },
+    })
+  );
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+  assertEquals(response.status, 200);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertEquals(payload.status, 'ready');
+    assertEquals(payload.sections, []);
+    assertEquals(payload.failure, null);
+    const applyResponse = await _handleSyncPreviewApplyRequest(
+      payload.id,
+      createApplyRequest(payload.id),
+      dependenciesReturning({ status: 'success' })
+    );
+    assertEquals(applyResponse.status, 400);
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
+Deno.test('sync preview create returns a ready non-applicable result when every section is skipped', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const deps = createDependencies(() =>
+    Promise.resolve({
+      preview: {
+        instanceId: INSTANCE_ID,
+        instanceName: 'Preview Test Instance',
+        arrType: 'radarr',
+        status: 'ready',
+        createdAtMs: Date.now(),
+        sections: ['qualityProfiles', 'delayProfiles'],
+        sectionOutcomes: [
+          { section: 'qualityProfiles', failure: null, skipped: true },
+          { section: 'delayProfiles', failure: null, skipped: true },
+        ],
+        qualityProfiles: null,
+        delayProfiles: null,
+        mediaManagement: null,
+        metadataProfiles: null,
+        summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+      },
+      reviewContext: { sectionConfigs: {}, evidence: [], preparedExecutionContexts: {} },
+    })
+  );
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+  assertEquals(response.status, 200);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertEquals(payload.status, 'ready');
+    assertEquals(
+      payload.sectionOutcomes.every((outcome) => outcome.skipped),
+      true
+    );
+    assertEquals(payload.failure, null);
+    const applyResponse = await _handleSyncPreviewApplyRequest(
+      payload.id,
+      createApplyRequest(payload.id),
+      dependenciesReturning({ status: 'success' })
+    );
+    assertEquals(applyResponse.status, 400);
   } finally {
     previewStore.delete(payload.id);
     resetPreviewCreateRateLimitForTests();

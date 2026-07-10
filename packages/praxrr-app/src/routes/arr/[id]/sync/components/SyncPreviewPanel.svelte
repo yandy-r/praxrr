@@ -769,7 +769,7 @@
               disabled={regenerating || applying}
               icon={regenerating ? Loader2 : RefreshCw}
               iconColor={regenerating ? 'text-white animate-spin' : 'text-white'}
-              on:click={handleRegenerate}
+              onclick={handleRegenerate}
             />
           </div>
         {/if}

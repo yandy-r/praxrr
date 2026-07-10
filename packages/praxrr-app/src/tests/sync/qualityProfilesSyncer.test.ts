@@ -71,6 +71,10 @@ Deno.test('quality profile sync returns success false and failedProfiles when an
   assertEquals(result.itemsSynced, 1);
   assertEquals(result.failedProfiles, ['failing-profile']);
   assertEquals(result.error, 'Failed to sync 1 quality profile(s)');
+  assertEquals(
+    result.outcomes.map((outcome) => outcome.status),
+    ['failed', 'success']
+  );
 });
 
 Deno.test('quality profile sync returns success true when all quality profiles sync', async () => {
@@ -103,6 +107,34 @@ Deno.test('quality profile sync returns success true when all quality profiles s
 
   assertEquals(result.success, true);
   assertEquals(result.itemsSynced, 2);
+  assertEquals(
+    result.outcomes.map((outcome) => outcome.status),
+    ['success', 'success']
+  );
   assertEquals(result.failedProfiles, undefined);
   assertEquals(result.error, undefined);
+});
+
+Deno.test('ordinary quality profile sync treats a missing create response id as a failed write', async () => {
+  const client = {
+    getCustomFormats: () => Promise.resolve([]),
+    getQualityProfiles: () => Promise.resolve([]),
+    updateQualityProfile: () => Promise.resolve({}),
+    createQualityProfile: () => Promise.resolve({}),
+  };
+  const syncer = new QualityProfileSyncer(client as never, 12, 'Test', 'radarr');
+  const syncerAny = syncer as unknown as {
+    fetchSyncBatches: () => Promise<ReturnType<typeof createBatch>[]>;
+    getQualityMappings: () => Promise<Map<string, string>>;
+  };
+  syncerAny.fetchSyncBatches = () => Promise.resolve([createBatch(1, '-x', ['missing-id'])]);
+  syncerAny.getQualityMappings = () => Promise.resolve(new Map());
+
+  const result = await syncer.sync();
+  assertEquals(result.success, false);
+  assertEquals(result.itemsSynced, 0);
+  assertEquals(result.failedProfiles, ['missing-id']);
+  assertEquals(result.outcomes.length, 1);
+  assertEquals(result.outcomes[0].status, 'failed');
+  assertEquals(result.outcomes[0].remoteId, null);
 });

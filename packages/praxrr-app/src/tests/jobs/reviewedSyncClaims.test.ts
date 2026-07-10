@@ -126,6 +126,23 @@ function setOrdinaryPending(instanceId: number, section: SectionType): void {
   }
 }
 
+function setOrdinaryShouldSync(instanceId: number, section: SectionType): void {
+  switch (section) {
+    case 'qualityProfiles':
+      arrSyncQueries.setQualityProfilesShouldSync(instanceId, true);
+      return;
+    case 'delayProfiles':
+      arrSyncQueries.setDelayProfilesShouldSync(instanceId, true);
+      return;
+    case 'mediaManagement':
+      arrSyncQueries.setMediaManagementShouldSync(instanceId, true);
+      return;
+    case 'metadataProfiles':
+      arrSyncQueries.setMetadataProfilesShouldSync(instanceId, true);
+      return;
+  }
+}
+
 function claimOrdinary(instanceId: number, section: SectionType): boolean {
   switch (section) {
     case 'qualityProfiles':
@@ -259,6 +276,36 @@ Deno.test({
         }
       });
 
+      await t.step('reviewed claims consume pre-claim pending signals', () => {
+        for (const section of SECTIONS) {
+          setStatus(1, section, 'pending');
+          const claim = arrSyncQueries.claimReviewedSyncSections(1, [section]);
+          assertExists(claim, section);
+          assertEquals(getStatus(1, section).should_sync, 0, section);
+
+          assertEquals(arrSyncQueries.completeReviewedSyncSections(claim), true, section);
+          assertEquals(getStatus(1, section).sync_status, 'idle', section);
+          assertEquals(getStatus(1, section).should_sync, 0, section);
+        }
+      });
+
+      await t.step('reviewed completion preserves ordinary setter signals raised after claim', () => {
+        for (const section of SECTIONS) {
+          setStatus(1, section, 'pending');
+          const claim = arrSyncQueries.claimReviewedSyncSections(1, [section]);
+          assertExists(claim, section);
+          assertEquals(getStatus(1, section).should_sync, 0, section);
+
+          setOrdinaryShouldSync(1, section);
+          assertEquals(arrSyncQueries.completeReviewedSyncSections(claim), true, section);
+          assertEquals(getStatus(1, section).sync_status, 'pending', section);
+          assertEquals(getStatus(1, section).should_sync, 1, section);
+
+          assertEquals(claimOrdinary(1, section), true, section);
+          completeOrdinary(1, section);
+        }
+      });
+
       await t.step('reviewed release restores prior states and failure affects only owned rows', () => {
         setStatus(1, 'qualityProfiles', 'failed');
         setStatus(1, 'delayProfiles', 'pending');
@@ -296,6 +343,24 @@ Deno.test({
         assertEquals(arrSyncQueries.releaseReviewedSyncSections(claim), true);
         for (const section of SECTIONS) {
           assertEquals(getStatus(1, section).sync_status, 'pending', section);
+        }
+      });
+
+      await t.step('reviewed failure preserves bulk mark signals raised after claim', () => {
+        for (const section of SECTIONS) {
+          setStatus(1, section, 'idle');
+          db.execute(`UPDATE ${TABLES[section]} SET trigger = 'on_change' WHERE instance_id = 1`);
+        }
+        const claim = arrSyncQueries.claimReviewedSyncSections(1, SECTIONS);
+        assertExists(claim);
+
+        arrSyncQueries.markForSync('on_change');
+        assertEquals(arrSyncQueries.failReviewedSyncSections(claim, 'review invalidated'), true);
+        for (const section of SECTIONS) {
+          const status = getStatus(1, section);
+          assertEquals(status.sync_status, 'pending', section);
+          assertEquals(status.should_sync, 1, section);
+          assertEquals(status.last_error, 'review invalidated', section);
         }
       });
     } finally {

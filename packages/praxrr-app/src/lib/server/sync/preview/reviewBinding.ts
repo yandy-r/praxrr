@@ -12,9 +12,12 @@ import type {
   SyncPreviewArrType,
   SyncPreviewEvidenceClass,
   SyncPreviewReviewBinding,
+  SyncPreviewReviewTargetInput,
   SyncPreviewSection,
   SyncPreviewSectionEvidenceHash,
 } from './types.ts';
+import type { ArrInstance } from '$db/queries/arrInstances.ts';
+import type { ArrInstanceCredential } from '$db/queries/arrInstanceCredentials.ts';
 
 export const SYNC_PREVIEW_REVIEW_BINDING_VERSION = 1 as const;
 
@@ -59,9 +62,55 @@ export interface SyncPreviewSectionReviewEvidenceInput {
 export interface BuildSyncPreviewReviewBindingInput {
   readonly instanceId: number;
   readonly arrType: SyncPreviewArrType;
+  readonly target: SyncPreviewReviewTargetInput;
   readonly sections: readonly SyncPreviewSection[];
   readonly sectionConfigs?: Readonly<Partial<Record<SyncPreviewSection, unknown>>>;
   readonly evidence: readonly SyncPreviewSectionReviewEvidenceInput[];
+}
+
+/** Build the exact private target projection from authoritative instance/credential rows. */
+export function syncPreviewReviewTarget(
+  instance: ArrInstance,
+  credential?: ArrInstanceCredential
+): SyncPreviewReviewTargetInput {
+  const credentialFingerprint = credential?.fingerprint ?? instance.api_key_fingerprint;
+  if (!credentialFingerprint) {
+    fail('credential identity is unavailable');
+  }
+  return Object.freeze({
+    url: instance.url,
+    credentialFingerprint,
+    credentialKeyVersion: credential?.key_version ?? 'legacy',
+    credentialRevision: credential?.updated_at ?? instance.updated_at,
+  });
+}
+
+function normalizeTargetUrl(rawUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    fail('target URL must be absolute');
+  }
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) {
+    fail('target URL must use HTTP(S) without embedded credentials');
+  }
+  if (url.search || url.hash) {
+    fail('target URL may not contain a query or fragment');
+  }
+  const pathname = url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, '');
+  return `${url.origin}${pathname}`;
+}
+
+function validateTarget(target: SyncPreviewReviewTargetInput): void {
+  if (!target || typeof target !== 'object') {
+    fail('target identity is required');
+  }
+  for (const value of [target.credentialFingerprint, target.credentialKeyVersion, target.credentialRevision]) {
+    if (typeof value !== 'string' || value.length === 0 || value.length > 1_000) {
+      fail('credential identity fields must be non-empty bounded strings');
+    }
+  }
 }
 
 function fail(message: string): never {
@@ -248,6 +297,28 @@ function hashEvidence(
   );
 }
 
+/** Hash the exact canonical endpoint and non-secret credential identity for private storage. */
+export function buildSyncPreviewTargetHash(
+  input: Pick<BuildSyncPreviewReviewBindingInput, 'instanceId' | 'arrType' | 'target'>
+): Promise<string> {
+  validateTarget(input.target);
+  return sha256Hex(
+    canonicalizeReviewValue({
+      domain: HASH_DOMAIN,
+      version: SYNC_PREVIEW_REVIEW_BINDING_VERSION,
+      instanceId: input.instanceId,
+      arrType: input.arrType,
+      evidenceClass: 'target',
+      target: {
+        url: normalizeTargetUrl(input.target.url),
+        credentialFingerprint: input.target.credentialFingerprint,
+        credentialKeyVersion: input.target.credentialKeyVersion,
+        credentialRevision: input.target.credentialRevision,
+      },
+    })
+  );
+}
+
 function isReviewSection(value: unknown): value is SyncPreviewSection {
   return typeof value === 'string' && REVIEW_SECTIONS.includes(value as SyncPreviewSection);
 }
@@ -315,6 +386,7 @@ export async function buildSyncPreviewReviewBinding(
     fail('Arr type is unsupported');
   }
   validateSections(input.sections, input.arrType);
+  const targetHash = await buildSyncPreviewTargetHash(input);
 
   const sections = Object.freeze([...input.sections]);
   const sectionConfigs = cloneSectionConfigs(sections, input.sectionConfigs);
@@ -362,6 +434,7 @@ export async function buildSyncPreviewReviewBinding(
     version: SYNC_PREVIEW_REVIEW_BINDING_VERSION,
     instanceId: input.instanceId,
     arrType: input.arrType,
+    targetHash,
     sections,
     sectionConfigs,
     evidence: Object.freeze(evidence),
@@ -387,6 +460,9 @@ function isValidBinding(value: unknown): value is SyncPreviewReviewBinding {
     return false;
   }
   if (!Number.isSafeInteger(value.instanceId) || Number(value.instanceId) <= 0 || !isReviewArrType(value.arrType)) {
+    return false;
+  }
+  if (typeof value.targetHash !== 'string' || !SHA256_HEX_PATTERN.test(value.targetHash)) {
     return false;
   }
   if (!Array.isArray(value.sections)) {
@@ -470,6 +546,7 @@ export function compareReviewedEvidence(
   if (
     expectedBinding.instanceId !== actualBinding.instanceId ||
     expectedBinding.arrType !== actualBinding.arrType ||
+    expectedBinding.targetHash !== actualBinding.targetHash ||
     selectedSections.some((section) => !expectedBinding.sections.includes(section)) ||
     actualBinding.sections.length !== selectedSections.length ||
     actualBinding.sections.some((section, index) => section !== selectedSections[index])

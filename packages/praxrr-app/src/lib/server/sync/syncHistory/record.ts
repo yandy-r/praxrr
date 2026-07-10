@@ -82,8 +82,8 @@ function tag(
   return changes.filter((change) => change.action !== 'unchanged').map((change) => ({ ...change, section, category }));
 }
 
-/** Flatten a preview result into tagged, changed-only entity changes. */
-function flattenPreview(preview: GeneratePreviewResult): SyncEntityChange[] {
+/** Flatten an already-materialized preview into tagged, changed-only history changes. */
+export function flattenSyncPreviewChanges(preview: GeneratePreviewResult): SyncEntityChange[] {
   const out: SyncEntityChange[] = [];
 
   if (preview.qualityProfiles) {
@@ -135,7 +135,7 @@ export async function capturePreSyncChanges(
   }
   try {
     const preview = await generatePreview({ instance, sections });
-    return flattenPreview(preview);
+    return flattenSyncPreviewChanges(preview);
   } catch (error) {
     await logger.warn('Sync history pre-sync change capture failed (recording counts only)', {
       source: SOURCE,

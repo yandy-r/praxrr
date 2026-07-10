@@ -144,6 +144,37 @@ for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
       [arrType, arrType, arrType]
     );
     assertEquals(result.outcomes[2].name, '  Reviewed Profile  ');
+    assertEquals(result.itemsSynced, 1);
+    assertEquals(
+      result.outcomes.map((outcome) => outcome.status),
+      ['success', 'success', 'success']
+    );
+  });
+}
+
+for (const failure of ['missing-id', 'throw'] as const) {
+  Deno.test(`reviewed quality-profile ${failure} failure matches ordinary accounting`, async () => {
+    const writes: RecordedWrite[] = [];
+    const client = makeWriteOnlyClient(writes) as unknown as {
+      createQualityProfile: (payload: ArrQualityProfilePayload) => Promise<unknown>;
+    };
+    client.createQualityProfile = (payload) => {
+      writes.push({ type: 'qualityProfile', payload: structuredClone(payload) });
+      if (failure === 'throw') return Promise.reject(new Error('reviewed profile write failed'));
+      return Promise.resolve({ ...payload });
+    };
+    const syncer = new QualityProfileSyncer(client as unknown as BaseArrClient, 7, 'Reviewed', 'radarr');
+    syncer.setPreparedExecutionContext(buildContext('radarr'));
+
+    const result = await syncer.sync();
+    assertEquals(result.success, false);
+    assertEquals(result.itemsSynced, 0);
+    assertEquals(result.failedProfiles, ['  Reviewed Profile  ']);
+    assertEquals(
+      result.outcomes.map((outcome) => outcome.status),
+      ['success', 'success', 'failed']
+    );
+    assertEquals(result.outcomes[2].remoteId, null);
   });
 }
 

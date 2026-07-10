@@ -1551,7 +1551,7 @@
             }
           },
           "500": {
-            "description": "The reviewed evidence matched but the write-time sync job failed, or an\nunexpected internal failure occurred. A matched write-time failure uses\n`SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync\nHistory correlation when present. An unexpected failure uses only the\nsanitized generic error response.\n",
+            "description": "The reviewed evidence matched but the write-time sync job failed, or an\nunexpected internal failure occurred. A matched write-time failure uses\n`SyncPreviewApplyResponse` and preserves confirmed outcomes and Sync\nHistory correlation when present. An unexpected failure uses the typed,\nsanitized `SyncPreviewApplyErrorResponse`.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1560,7 +1560,7 @@
                       "$ref": "#/components/schemas/SyncPreviewApplyResponse"
                     },
                     {
-                      "$ref": "#/components/schemas/ErrorResponse"
+                      "$ref": "#/components/schemas/SyncPreviewApplyErrorResponse"
                     }
                   ]
                 }

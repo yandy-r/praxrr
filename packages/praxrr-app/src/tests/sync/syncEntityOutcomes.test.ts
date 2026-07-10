@@ -180,7 +180,29 @@ Deno.test('quality profile sync emits one terminal outcome per profile sourced f
 
   // Back-compat aggregate still reflects the failure.
   assertEquals(result.success, false);
+  assertEquals(result.itemsSynced, 2);
   assertEquals(result.failedProfiles, ['second']);
+});
+
+Deno.test('syncCustomFormats treats a missing create response id as a failed outcome', async () => {
+  const client = {
+    getCustomFormats: () => Promise.resolve([]),
+    updateCustomFormat: () => Promise.resolve({}),
+    createCustomFormat: () => Promise.resolve({}),
+  };
+  const { outcomes, pcdFormatIdMap } = await syncCustomFormats(
+    client as never,
+    10,
+    'radarr',
+    new Map([['cf-missing-id', pcdFormat('cf-missing-id')]]),
+    '-x'
+  );
+
+  assertEquals(outcomes.length, 1);
+  assertEquals(outcomes[0].status, 'failed');
+  assertEquals(outcomes[0].action, 'create');
+  assertEquals(outcomes[0].remoteId, null);
+  assertEquals(pcdFormatIdMap.has('cf-missing-id'), false);
 });
 
 // =============================================================================
@@ -269,6 +291,12 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
   const binding = await buildSyncPreviewReviewBinding({
     instanceId: 234,
     arrType: 'radarr',
+    target: {
+      url: 'http://127.0.0.1:7878',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'legacy',
+      credentialRevision: '2026-07-10T10:00:00.000Z',
+    },
     sections: ['qualityProfiles'],
     sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
     evidence: [reviewedEvidence],
@@ -279,7 +307,7 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     type: 'radarr',
     url: 'http://127.0.0.1:7878',
     external_url: null,
-    api_key_fingerprint: null,
+    api_key_fingerprint: 'credential-v1',
     api_key: 'test-key',
     tags: null,
     enabled: 1,
@@ -293,11 +321,17 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     instanceId: instance.id,
     sections: Object.freeze(['qualityProfiles'] as const),
   }) as ReviewedSyncClaim;
-  const calls = { snapshots: 0, capture: 0, history: 0, handlers: 0, failedClaim: 0 };
+  const calls = { snapshots: 0, history: 0, handlers: 0, failedClaim: 0 };
   const client = { close: () => undefined } as unknown as BaseArrClient;
   const dependencies = {
     now: () => nowMs,
     getInstance: () => instance,
+    getReviewTarget: () => ({
+      url: instance.url,
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'legacy',
+      credentialRevision: instance.updated_at,
+    }),
     getClient: () => Promise.resolve(client),
     detectVersion: () => Promise.resolve(null),
     claimSections: () => claim,
@@ -319,10 +353,6 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     createSnapshot: () => {
       calls.snapshots += 1;
       return Promise.resolve(null);
-    },
-    captureChanges: () => {
-      calls.capture += 1;
-      return Promise.resolve([]);
     },
     recordHistory: () => {
       calls.history += 1;
@@ -350,7 +380,7 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     outcomes: [],
     syncHistoryId: null,
   });
-  assertEquals(calls, { snapshots: 0, capture: 0, history: 0, handlers: 0, failedClaim: 1 });
+  assertEquals(calls, { snapshots: 0, history: 0, handlers: 0, failedClaim: 1 });
 });
 
 // =============================================================================

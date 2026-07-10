@@ -21,6 +21,8 @@ type AppInvalidatedResponse = AppComponents['schemas']['SyncPreviewApplyInvalida
 type PortableInvalidatedResponse = PortableComponents['schemas']['SyncPreviewApplyInvalidatedResponse'];
 type AppApplyResponse = AppComponents['schemas']['SyncPreviewApplyResponse'];
 type PortableApplyResponse = PortableComponents['schemas']['SyncPreviewApplyResponse'];
+type AppApplyErrorResponse = AppComponents['schemas']['SyncPreviewApplyErrorResponse'];
+type PortableApplyErrorResponse = PortableComponents['schemas']['SyncPreviewApplyErrorResponse'];
 
 const INVALIDATION_CODES = {
   pcd_drift: true,
@@ -41,6 +43,7 @@ const INVALIDATED_RESPONSE_REQUIRED = [
   'staleWarning',
 ];
 const APPLY_RESPONSE_REQUIRED = ['success', 'results', 'staleWarning', 'outcomes', 'syncHistoryId'];
+const APPLY_ERROR_RESPONSE_REQUIRED = ['failure', 'staleWarning'];
 
 const GENERATED_INVALIDATED_RESPONSE_SAMPLE = {
   error: 'Live Arr configuration changed. Nothing was applied. Generate and review a new preview.',
@@ -77,6 +80,15 @@ const GENERATED_MATCHED_FAILURE_SAMPLE = {
   ],
   syncHistoryId: 234,
 } satisfies AppApplyResponse & PortableApplyResponse;
+
+const GENERATED_UNEXPECTED_FAILURE_SAMPLE = {
+  failure: {
+    code: 'internalError',
+    message: 'An unexpected error occurred while processing the preview.',
+    recoveryAction: 'Try again; if the problem persists, check the server logs for details.',
+  },
+  staleWarning: null,
+} satisfies AppApplyErrorResponse & PortableApplyErrorResponse;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -162,10 +174,12 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
   const sourceInvalidation = getRecordProperty(sourceSchemas, 'SyncPreviewApplyInvalidationCode');
   const sourceInvalidatedResponse = getRecordProperty(sourceSchemas, 'SyncPreviewApplyInvalidatedResponse');
   const sourceApplyResponse = getRecordProperty(sourceSchemas, 'SyncPreviewApplyResponse');
+  const sourceApplyErrorResponse = getRecordProperty(sourceSchemas, 'SyncPreviewApplyErrorResponse');
   const bundledSchemas = getRecordProperty(getRecordProperty(bundled, 'components'), 'schemas');
   const bundledInvalidation = getRecordProperty(bundledSchemas, 'SyncPreviewApplyInvalidationCode');
   const bundledInvalidatedResponse = getRecordProperty(bundledSchemas, 'SyncPreviewApplyInvalidatedResponse');
   const bundledApplyResponse = getRecordProperty(bundledSchemas, 'SyncPreviewApplyResponse');
+  const bundledApplyErrorResponse = getRecordProperty(bundledSchemas, 'SyncPreviewApplyErrorResponse');
 
   const expectedCodes = Object.keys(INVALIDATION_CODES);
   assertEquals(sourceInvalidation.enum, expectedCodes);
@@ -174,8 +188,11 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
   assertEquals(bundledInvalidatedResponse.required, INVALIDATED_RESPONSE_REQUIRED);
   assertEquals(sourceApplyResponse.required, APPLY_RESPONSE_REQUIRED);
   assertEquals(bundledApplyResponse.required, APPLY_RESPONSE_REQUIRED);
+  assertEquals(sourceApplyErrorResponse.required, APPLY_ERROR_RESPONSE_REQUIRED);
+  assertEquals(bundledApplyErrorResponse.required, APPLY_ERROR_RESPONSE_REQUIRED);
   assertEquals(Object.keys(GENERATED_INVALIDATED_RESPONSE_SAMPLE), INVALIDATED_RESPONSE_REQUIRED);
   assertEquals(Object.keys(GENERATED_MATCHED_FAILURE_SAMPLE), APPLY_RESPONSE_REQUIRED);
+  assertEquals(Object.keys(GENERATED_UNEXPECTED_FAILURE_SAMPLE), APPLY_ERROR_RESPONSE_REQUIRED);
 
   const sourceApplyPath = getRecordProperty(sourcePaths, 'previewApply');
   const sourceResponses = getRecordProperty(getRecordProperty(sourceApplyPath, 'post'), 'responses');
@@ -189,7 +206,7 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
     '404': ['ErrorResponse'],
     '409': ['ErrorResponse'],
     '422': ['SyncPreviewApplyInvalidatedResponse', 'SyncPreviewApplyErrorResponse'],
-    '500': ['SyncPreviewApplyResponse', 'ErrorResponse'],
+    '500': ['SyncPreviewApplyResponse', 'SyncPreviewApplyErrorResponse'],
   } satisfies Record<string, string[]>;
 
   for (const [status, expectedSchemas] of Object.entries(expectedStatusRefs)) {
@@ -243,6 +260,12 @@ async function installReviewedPreview(id: string, nowMs: number): Promise<void> 
   const binding = await buildSyncPreviewReviewBinding({
     instanceId: preview.instanceId,
     arrType: preview.arrType,
+    target: {
+      url: 'http://preview.test',
+      credentialFingerprint: 'credential-v1',
+      credentialKeyVersion: 'key-v1',
+      credentialRevision: 'revision-v1',
+    },
     sections: preview.sections,
     sectionConfigs: { qualityProfiles: { selections: ['Reviewed HD'] } },
     evidence: [
@@ -322,14 +345,7 @@ Deno.test('reviewed apply runtime keeps invalidation, matched failure, and unexp
       } satisfies SyncPreviewApplyDependencies
     );
     assertEquals(unexpectedFailure.status, 500);
-    assertEquals(await unexpectedFailure.json(), {
-      failure: {
-        code: 'internalError',
-        message: 'An unexpected error occurred while processing the preview.',
-        recoveryAction: 'Try again; if the problem persists, check the server logs for details.',
-      },
-      staleWarning: null,
-    });
+    assertEquals(await unexpectedFailure.json(), GENERATED_UNEXPECTED_FAILURE_SAMPLE);
   } finally {
     previewStore.delete(invalidatedId);
     previewStore.delete(matchedFailureId);

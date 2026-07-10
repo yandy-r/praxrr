@@ -1,6 +1,7 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobHandlerResult, JobQueueRecord, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { arrSyncQueries, type ReviewedSyncClaim } from '$db/queries/arrSync.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
@@ -17,8 +18,18 @@ import {
 } from '$lib/server/sync/mappings.ts';
 import { logger } from '$logger/logger.ts';
 import { snapshotService } from '$pcd/snapshots/service.ts';
-import { capturePreSyncChanges, deriveSyncHistoryStatus, recordSyncHistory } from '$sync/syncHistory/record.ts';
-import { buildSyncPreviewReviewBinding, compareReviewedEvidence } from '$sync/preview/reviewBinding.ts';
+import {
+  capturePreSyncChanges,
+  deriveSyncHistoryStatus,
+  flattenSyncPreviewChanges,
+  recordSyncHistory,
+} from '$sync/syncHistory/record.ts';
+import {
+  buildSyncPreviewReviewBinding,
+  buildSyncPreviewTargetHash,
+  compareReviewedEvidence,
+  syncPreviewReviewTarget,
+} from '$sync/preview/reviewBinding.ts';
 import { generatePreview, type GeneratePreviewWithReviewContextResult } from '$sync/preview/orchestrator.ts';
 import type {
   ReviewedEvidenceComparison,
@@ -26,6 +37,7 @@ import type {
   SyncPreviewPreparedExecutionContext,
   SyncPreviewReviewBinding,
   SyncPreviewReviewInvalidationReason,
+  SyncPreviewReviewTargetInput,
 } from '$sync/preview/types.ts';
 import type {
   SyncEntityChange,
@@ -86,6 +98,7 @@ export interface ReviewedSyncExecutionDependencies {
   readonly now: () => number;
   readonly getInstance: (instanceId: number) => ArrInstance | null;
   readonly getClient: (arrType: ArrType, instanceId: number, url: string) => Promise<BaseArrClient>;
+  readonly getReviewTarget: (instance: ArrInstance) => SyncPreviewReviewTargetInput;
   readonly detectVersion: typeof detectAndRecordArrVersion;
   readonly claimSections: (instanceId: number, sections: readonly SectionType[]) => ReviewedSyncClaim | null;
   readonly releaseSections: (claim: ReviewedSyncClaim) => boolean;
@@ -94,10 +107,10 @@ export interface ReviewedSyncExecutionDependencies {
   readonly materializeReview: (
     instance: ArrInstance,
     sections: readonly SectionType[],
-    sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>
+    sectionConfigs: Readonly<Partial<Record<SyncPreviewSection, unknown>>>,
+    client: BaseArrClient
   ) => Promise<GeneratePreviewWithReviewContextResult>;
   readonly createSnapshot: typeof snapshotService.createAutoSnapshot;
-  readonly captureChanges: typeof capturePreSyncChanges;
   readonly recordHistory: typeof recordSyncHistory;
   readonly getSectionHandler: typeof getSection;
 }
@@ -374,22 +387,23 @@ const DEFAULT_REVIEWED_SYNC_DEPENDENCIES: ReviewedSyncExecutionDependencies = {
   now: Date.now,
   getInstance: (instanceId) => arrInstancesQueries.getById(instanceId) ?? null,
   getClient: (arrType, instanceId, url) => getArrInstanceClient(arrType, instanceId, url),
+  getReviewTarget: (instance) =>
+    syncPreviewReviewTarget(instance, arrInstanceCredentialsQueries.getByInstanceId(instance.id)),
   detectVersion: detectAndRecordArrVersion,
   claimSections: (instanceId, sections) => arrSyncQueries.claimReviewedSyncSections(instanceId, sections),
   releaseSections: (claim) => arrSyncQueries.releaseReviewedSyncSections(claim),
   completeSections: (claim) => arrSyncQueries.completeReviewedSyncSections(claim),
   failSections: (claim, error) => arrSyncQueries.failReviewedSyncSections(claim, error),
-  materializeReview: (instance, sections, sectionConfigs) =>
+  materializeReview: (instance, sections, sectionConfigs, client) =>
     generatePreview(
       {
         instance,
         sections: [...sections],
         sectionConfigs: { ...sectionConfigs },
       },
-      { captureReviewContext: true }
+      { captureReviewContext: true, client }
     ),
   createSnapshot: (input) => snapshotService.createAutoSnapshot(input),
-  captureChanges: capturePreSyncChanges,
   recordHistory: recordSyncHistory,
   getSectionHandler: getSection,
 };
@@ -409,6 +423,19 @@ function invalidatedReviewedSync(
   };
 }
 
+function isReviewedSectionSubsequence(
+  sections: readonly SyncPreviewSection[],
+  reviewedSections: readonly SyncPreviewSection[]
+): boolean {
+  let previousIndex = -1;
+  for (const section of sections) {
+    const index = reviewedSections.indexOf(section);
+    if (index <= previousIndex) return false;
+    previousIndex = index;
+  }
+  return true;
+}
+
 function validateReviewedScope(
   binding: SyncPreviewReviewBinding,
   sections: readonly SyncPreviewSection[],
@@ -421,6 +448,7 @@ function validateReviewedScope(
     instance.type !== binding.arrType ||
     sections.length === 0 ||
     new Set(sections).size !== sections.length ||
+    !isReviewedSectionSubsequence(sections, binding.sections) ||
     sections.some(
       (section) =>
         !SYNC_SECTION_ORDER.includes(section) ||
@@ -506,6 +534,23 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
     return claimedScopeFailure ?? invalidatedReviewedSync('scope_drift', sections);
   }
 
+  let target: SyncPreviewReviewTargetInput;
+  try {
+    target = deps.getReviewTarget(instance);
+    const currentTargetHash = await buildSyncPreviewTargetHash({
+      instanceId: instance.id,
+      arrType: input.binding.arrType,
+      target,
+    });
+    if (currentTargetHash !== input.binding.targetHash) {
+      deps.failSections(claim, 'Reviewed sync preview target changed');
+      return invalidatedReviewedSync('scope_drift', sections);
+    }
+  } catch {
+    deps.failSections(claim, 'Reviewed sync preview target could not be verified');
+    return invalidatedReviewedSync('unverifiable_review', sections);
+  }
+
   let client: BaseArrClient | null = null;
   let materialized: GeneratePreviewWithReviewContextResult;
   try {
@@ -522,7 +567,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       return invalidatedReviewedSync('scope_drift', unavailable);
     }
 
-    materialized = await deps.materializeReview(instance, sections, input.binding.sectionConfigs);
+    materialized = await deps.materializeReview(instance, sections, input.binding.sectionConfigs, client);
   } catch {
     deps.failSections(claim, 'Reviewed sync preview could not be verified');
     client?.close();
@@ -534,6 +579,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
     const actualBinding = await buildSyncPreviewReviewBinding({
       instanceId: instance.id,
       arrType: input.binding.arrType,
+      target,
       sections,
       sectionConfigs: materialized.reviewContext.sectionConfigs,
       evidence: materialized.reviewContext.evidence,
@@ -573,7 +619,6 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
     return invalidatedReviewedSync('unverifiable_review', sections);
   }
 
-  const startedAt = new Date(deps.now()).toISOString();
   const sectionResults: SyncSectionResult[] = [];
   const allOutcomes: SyncEntityOutcome[] = [];
   const results: string[] = [];
@@ -584,6 +629,15 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
   try {
     await input.beforeWrite?.();
 
+    // Materialization and its prepared-context validation may take long enough for the review
+    // receipt to expire. Re-check the authoritative deadline at the final pre-side-effect
+    // boundary so an expired review cannot create snapshots/history/outcomes or reach Arr writes.
+    if (deps.now() >= expiresAtMs) {
+      deps.releaseSections(claim);
+      return { kind: 'expired', outcomes: [], syncHistoryId: null };
+    }
+
+    const startedAt = new Date(deps.now()).toISOString();
     for (const databaseId of collectReviewedSnapshotDatabaseIds(preparedContexts, sections)) {
       await deps.createSnapshot({
         databaseId,
@@ -592,7 +646,10 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       });
     }
 
-    const changes = await deps.captureChanges(instance, [...sections]);
+    // The reviewed materialization is the authoritative, config-bound pre-write diff. Reusing it
+    // keeps history aligned with the evidence that was revalidated and avoids a second PCD/Arr
+    // preview pass (and its additional network reads) at the execution boundary.
+    const changes = flattenSyncPreviewChanges(materialized.preview);
     for (const section of sections) {
       const handler = deps.getSectionHandler(section);
       const context = preparedContexts[section]!;

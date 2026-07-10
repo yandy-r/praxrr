@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
 import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
@@ -11,7 +12,7 @@ import {
   type GeneratePreviewWithReviewContextResult,
 } from '$sync/preview/orchestrator.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
-import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
+import { buildSyncPreviewReviewBinding, syncPreviewReviewTarget } from '$sync/preview/reviewBinding.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
@@ -329,29 +330,32 @@ export async function _handleSyncPreviewCreateRequest(
         (outcome) => outcome.section === section && outcome.failure === null && !outcome.skipped
       )
     );
-    const binding = await buildSyncPreviewReviewBinding({
-      instanceId: generated.instanceId,
-      arrType: generated.arrType,
-      sections: eligibleSections,
-      sectionConfigs: reviewContext.sectionConfigs,
-      evidence: reviewContext.evidence,
-    });
+    const generationPatch = {
+      sections: generated.sections,
+      sectionOutcomes: generated.sectionOutcomes,
+      qualityProfiles: generated.qualityProfiles,
+      delayProfiles: generated.delayProfiles,
+      mediaManagement: generated.mediaManagement,
+      metadataProfiles: generated.metadataProfiles,
+      summary: generated.summary,
+      failure: topLevelFailure,
+      instanceName: generated.instanceName,
+    };
 
-    storedPreview = previewStore.completeGeneration(
-      storedPreview.id,
-      {
-        sections: generated.sections,
-        sectionOutcomes: generated.sectionOutcomes,
-        qualityProfiles: generated.qualityProfiles,
-        delayProfiles: generated.delayProfiles,
-        mediaManagement: generated.mediaManagement,
-        metadataProfiles: generated.metadataProfiles,
-        summary: generated.summary,
-        failure: topLevelFailure,
-        instanceName: generated.instanceName,
-      },
-      binding
-    )!;
+    if (eligibleSections.length === 0) {
+      storedPreview = previewStore.completeNonApplicableGeneration(storedPreview.id, generationPatch)!;
+    } else {
+      const binding = await buildSyncPreviewReviewBinding({
+        instanceId: generated.instanceId,
+        arrType: generated.arrType,
+        target: syncPreviewReviewTarget(instance, arrInstanceCredentialsQueries.getByInstanceId(instance.id)),
+        sections: eligibleSections,
+        sectionConfigs: reviewContext.sectionConfigs,
+        evidence: reviewContext.evidence,
+      });
+
+      storedPreview = previewStore.completeGeneration(storedPreview.id, generationPatch, binding)!;
+    }
 
     if (!storedPreview) {
       return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
