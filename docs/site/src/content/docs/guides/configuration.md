@@ -107,6 +107,63 @@ OIDC requires `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 
 API automation uses the `X-Api-Key` header or `?apikey=` query parameter.
 
+## Trusted proxy
+
+`TRUSTED_PROXY` is an explicit, opt-in allowlist of reverse-proxy addresses.
+Forwarded request headers (`X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP`,
+…) are honored **only** when the direct socket peer is on this list. It is
+**unset (disabled) by default** — a direct deployment sends no forwarded headers
+and needs no change.
+
+Why it matters: without an allowlist, any client can forge
+`X-Forwarded-For: 127.0.0.1` to look local. Under `AUTH=local` that spoof
+previously bypassed authentication entirely. With `TRUSTED_PROXY` set, a forged
+header from an untrusted peer is ignored and the request is graded by its real
+socket peer.
+
+### Value grammar
+
+Comma- and/or whitespace-separated tokens:
+
+| Token        | Meaning                                                     |
+| ------------ | ----------------------------------------------------------- |
+| `10.0.0.2`   | A single IPv4 address (implicit `/32`)                      |
+| `::1`        | A single IPv6 address (implicit `/128`)                     |
+| `10.0.0.0/8` | An IPv4 CIDR range                                          |
+| `fc00::/7`   | An IPv6 CIDR range                                          |
+| `loopback`   | Expands to `127.0.0.0/8`, `::1/128`                         |
+| `private`    | RFC1918 + ULA + link-local ranges (flagged as overly broad) |
+| `*` or `all` | Trust every peer — legacy behavior, flagged as overly broad |
+
+Example: `TRUSTED_PROXY=172.18.0.0/16, ::1` trusts a docker-network proxy pool
+and an IPv6 loopback proxy.
+
+### Failure behavior (fail-closed)
+
+- **Malformed tokens never grant trust.** An invalid entry (e.g. `999.0.0.0/8`,
+  `10.0.0.0/33`) is dropped and surfaced by Shield Check; the rest still parse.
+- A wholly-invalid value behaves exactly like unset (trust nobody). Parsing
+  **never throws**, so a typo cannot brick startup — Shield Check reports it
+  with an actionable fix instead.
+- `*` / `all` and supernets `≤ /7` are flagged as overly broad by Shield Check.
+
+### Reverse-proxy examples
+
+nginx passes the observed client as the last `X-Forwarded-For` hop:
+
+```nginx
+location / {
+  proxy_pass http://praxrr:6868;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Traefik and Caddy append the client to `X-Forwarded-For` automatically. In all
+cases, set `TRUSTED_PROXY` to the proxy's address as Praxrr sees it (its
+container IP / CIDR on the shared docker network, or `loopback` if the proxy
+runs on the same host).
+
 ## CSRF note
 
 During active development, SvelteKit CSRF trusted origins may include a wildcard

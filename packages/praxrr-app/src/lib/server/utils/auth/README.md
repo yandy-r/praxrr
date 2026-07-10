@@ -92,6 +92,33 @@ sequenceDiagram
     Note over U,P: Same as AUTH=on login flow
 ```
 
+#### Client IP resolution and `TRUSTED_PROXY` (issue #228)
+
+The "local IP" decision uses `getClientIp()` (`network.ts`). Forwarded headers
+(`X-Forwarded-For`, `X-Real-IP`, …) are **spoofable**, so they are honored
+**only** when the direct socket peer (`event.getClientAddress()`) is in the
+`TRUSTED_PROXY` allowlist:
+
+- **Untrusted / no proxy (default):** forwarded headers are ignored; the request
+  is graded by its real socket peer. A forged `X-Forwarded-For: 127.0.0.1` can
+  no longer produce the local bypass.
+- **Trusted proxy peer:** the client IP is taken from the hop the proxy
+  **appended** — the rightmost `X-Forwarded-For` token — never the leftmost
+  client-supplied value.
+- **Unresolvable peer:** returns the non-local sentinel `'unknown'` (fail-closed;
+  it does not grant the local bypass).
+
+Because the gate keys on the socket peer, it depends on
+`event.getClientAddress()` returning the real peer. `sveltekit-adapter-deno` does
+so today; enabling an adapter XFF/address override would defeat it.
+
+> Deferred to a follow-up (recorded on issue #228): `X-Forwarded-Host` /
+> `X-Forwarded-Proto` used for WebAuthn RP-id/origin derivation (`webauthn/rp.ts`)
+> are **not** yet gated by `TRUSTED_PROXY`. That path is `AUTH=on`-only, where a
+> forged host makes the passkey ceremony fail (fail-closed) rather than granting
+> access, and it already has explicit `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`
+> overrides.
+
 ### AUTH=oidc
 
 ```mermaid

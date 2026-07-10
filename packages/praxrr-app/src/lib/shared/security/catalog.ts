@@ -38,4 +38,10 @@ export const CHECK_CATALOG: readonly CheckMeta[] = [
     label: 'Log redaction',
     description: 'A runtime self-check that secrets are stripped from logs before they are written (issue #8).',
   },
+  {
+    id: 'proxy_trust',
+    label: 'Trusted proxy allowlist',
+    description:
+      'Whether forwarded client IPs (X-Forwarded-For) are trusted only from an explicit TRUSTED_PROXY allowlist, so a spoofed header from an untrusted peer cannot drive an AUTH=local bypass.',
+  },
 ] as const;

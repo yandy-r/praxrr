@@ -28,6 +28,10 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     },
     redactionVerified: true,
     sessionCookieSecure: false,
+    trustedProxyConfigured: false,
+    trustedProxyValidRangeCount: 0,
+    trustedProxyInvalidEntries: [],
+    trustedProxyOverlyBroad: false,
     nowIso: '2026-07-09T02:00:00.000Z',
     ...overrides,
   };
@@ -222,4 +226,128 @@ Deno.test('computeShieldReport: an unparseable instance URL degrades that row wi
   const row = report.transport.find((r) => r.instanceId === 1);
   assertEquals(row?.score, null);
   assertEquals(row?.status, 'na');
+});
+
+// --- proxy_trust (issue #228): scored only for the operator-caused live bypass; advisories otherwise --
+
+Deno.test('proxy_trust: unset under AUTH=on is inert (null, contributes 0) and adds no advisory', () => {
+  const report = computeShieldReport(makeInputs()); // authMode 'on', TRUSTED_PROXY unset
+  const check = report.checks.find((c) => c.id === 'proxy_trust');
+  assertEquals(check?.score, null);
+  assertEquals(check?.contribution, 0);
+  assert(!report.advisories.some((a) => a.id.startsWith('proxy_trust')));
+});
+
+Deno.test('proxy_trust: AUTH=on overall score/band are numerically unchanged by adding the check', () => {
+  // The compat guarantee: a healthy AUTH=on https deployment still scores exactly 95/hardened (the same
+  // number the pre-#228 engine produced — proxy_trust is null, so the rollup denominator is unshifted).
+  const report = computeShieldReport(
+    makeInputs({ instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'https://r' }] })
+  );
+  assertEquals(report.score, 95);
+  assertEquals(report.band, 'hardened');
+});
+
+Deno.test(
+  'proxy_trust: missing under a spoofable AUTH=local/0.0.0.0 context is an advisory, NOT a scored critical',
+  () => {
+    const report = computeShieldReport(makeInputs({ authMode: 'local', bindHost: '0.0.0.0' }));
+    const check = report.checks.find((c) => c.id === 'proxy_trust');
+    assertEquals(check?.score, null); // NOT a scored 0 — does not double-count control_plane_auth
+    assertEquals(check?.status, 'na');
+    assertEquals(report.bandCappedBy, null); // must not drop the band to exposed
+    const advisory = report.advisories.find((a) => a.id === 'proxy_trust_missing');
+    assert(advisory, 'a missing-proxy-trust advisory should inform without scoring');
+    assertEquals(advisory?.fix.kind, 'env-var');
+    // control_plane_auth still grades AUTH=local exactly as before (no escalation).
+    assertEquals(report.checks.find((c) => c.id === 'control_plane_auth')?.score, 60);
+  }
+);
+
+Deno.test('proxy_trust: AUTH=local + loopback bind + unset is fully inert (no advisory, no finding)', () => {
+  const report = computeShieldReport(makeInputs({ authMode: 'local', bindHost: '127.0.0.1' }));
+  assertEquals(report.checks.find((c) => c.id === 'proxy_trust')?.score, null);
+  assert(!report.advisories.some((a) => a.id.startsWith('proxy_trust')));
+});
+
+Deno.test(
+  'proxy_trust: an overly-broad allowlist under AUTH=local reopens the bypass — action/critical, band exposed',
+  () => {
+    const report = computeShieldReport(
+      makeInputs({
+        authMode: 'local',
+        bindHost: '0.0.0.0',
+        trustedProxyConfigured: true,
+        trustedProxyValidRangeCount: 0,
+        trustedProxyOverlyBroad: true,
+      })
+    );
+    const check = report.checks.find((c) => c.id === 'proxy_trust');
+    assertEquals(check?.score, 0);
+    assertEquals(check?.status, 'action');
+    assertEquals(check?.critical, true);
+    assertEquals(check?.bandCapWhenAction, 'exposed'); // the defensive band cap is declared
+    // The band is exposed: proxy_trust scoring 0 at weight 25 alongside AUTH=local (60) drags the numeric
+    // below 60 on its own, so the cap is belt-and-suspenders here rather than the decisive factor.
+    assertEquals(report.band, 'exposed');
+    assert(report.topActions.some((a) => a.checkId === 'proxy_trust' && a.fix.kind === 'env-var'));
+  }
+);
+
+Deno.test('proxy_trust: an active, valid, non-broad allowlist is a positive assurance, not a finding', () => {
+  const report = computeShieldReport(
+    makeInputs({
+      authMode: 'local',
+      bindHost: '0.0.0.0',
+      trustedProxyConfigured: true,
+      trustedProxyValidRangeCount: 1,
+      trustedProxyOverlyBroad: false,
+      trustedProxyInvalidEntries: [],
+    })
+  );
+  const check = report.checks.find((c) => c.id === 'proxy_trust');
+  assertEquals(check?.score, null);
+  assertEquals(check?.status, 'assured');
+  assert(report.assurances.some((a) => a.id === 'proxy_trust' && a.verified));
+  assert(!report.advisories.some((a) => a.id.startsWith('proxy_trust')));
+});
+
+Deno.test('proxy_trust: invalid tokens surface an advisory listing them, without a scored penalty', () => {
+  const report = computeShieldReport(
+    makeInputs({
+      authMode: 'on',
+      trustedProxyConfigured: true,
+      trustedProxyValidRangeCount: 1,
+      trustedProxyInvalidEntries: ['junk', '999.0.0.0/8'],
+    })
+  );
+  assertEquals(report.checks.find((c) => c.id === 'proxy_trust')?.score, null);
+  const advisory = report.advisories.find((a) => a.id === 'proxy_trust_invalid');
+  assert(advisory, 'invalid tokens should be surfaced as an advisory');
+  assert(advisory?.detail.some((d) => d.includes('junk')));
+  assertEquals(report.bandCappedBy, null);
+});
+
+Deno.test('proxy_trust: an overly-broad allowlist under AUTH=on is an unscored advisory (not a live bypass)', () => {
+  const report = computeShieldReport(
+    makeInputs({ authMode: 'on', trustedProxyConfigured: true, trustedProxyOverlyBroad: true })
+  );
+  assertEquals(report.checks.find((c) => c.id === 'proxy_trust')?.score, null);
+  assert(report.advisories.some((a) => a.id === 'proxy_trust_overly_broad'));
+  assertEquals(report.bandCappedBy, null);
+});
+
+Deno.test('proxy_trust: at most one proxy-trust advisory fires per report (mutual exclusivity)', () => {
+  const report = computeShieldReport(
+    makeInputs({
+      authMode: 'local',
+      bindHost: '0.0.0.0',
+      trustedProxyConfigured: true,
+      trustedProxyValidRangeCount: 1,
+      trustedProxyOverlyBroad: true, // overly-broad + spoofable -> scored row 1, so NO advisory
+      trustedProxyInvalidEntries: ['junk'],
+    })
+  );
+  assertEquals(report.advisories.filter((a) => a.id.startsWith('proxy_trust')).length, 0);
+  assertEquals(report.checks.find((c) => c.id === 'proxy_trust')?.status, 'action');
 });

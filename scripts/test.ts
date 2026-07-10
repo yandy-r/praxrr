@@ -35,12 +35,14 @@ const aliases: Record<string, string> = {
   resolvedConfig:
     'packages/praxrr-app/src/tests/pcd/resolved,packages/praxrr-app/src/tests/routes/resolvedConfigApi.test.ts',
   'security-posture':
-    'packages/praxrr-app/src/tests/shared/security,packages/praxrr-app/src/tests/shared/scoring/rollup.test.ts,packages/praxrr-app/src/tests/routes/securityPosture.test.ts,packages/praxrr-app/src/tests/logger/sanitizerRegression.test.ts',
+    'packages/praxrr-app/src/tests/shared/security,packages/praxrr-app/src/tests/shared/scoring/rollup.test.ts,packages/praxrr-app/src/tests/routes/securityPosture.test.ts,packages/praxrr-app/src/tests/logger/sanitizerRegression.test.ts,packages/praxrr-app/src/tests/base/trustedProxyConfig.test.ts,packages/praxrr-app/src/tests/base/networkTrust.test.ts',
   selectors: 'packages/praxrr-app/src/tests/upgrades/selectors.test.ts',
   'setup-wizard':
     'packages/praxrr-app/src/tests/routes/setupWizard.test.ts,packages/praxrr-app/src/tests/base/setupProgress.test.ts',
   'sync-history':
     'packages/praxrr-app/src/tests/db/syncHistoryQueries.test.ts,packages/praxrr-app/src/tests/db/syncHistoryRetention.test.ts,packages/praxrr-app/src/tests/sync/syncHistoryRecord.test.ts,packages/praxrr-app/src/tests/routes/syncHistory.test.ts,packages/praxrr-app/src/tests/jobs/syncHistoryCleanup.test.ts',
+  'trusted-proxy':
+    'packages/praxrr-app/src/tests/shared/security/trustedProxy.test.ts,packages/praxrr-app/src/tests/base/trustedProxyConfig.test.ts,packages/praxrr-app/src/tests/base/networkTrust.test.ts,packages/praxrr-app/src/tests/routes/securityPosture.test.ts',
   timeline:
     'packages/praxrr-app/src/tests/db/timelineFeedQueries.test.ts,packages/praxrr-app/src/tests/routes/timeline.test.ts',
   'url-state': 'packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',

@@ -69,11 +69,16 @@ migratedTest('GET /security-posture/summary returns a well-formed report with ze
   assert(body.score >= 0 && body.score <= 100);
   assert(['hardened', 'guarded', 'exposed', 'unknown'].includes(body.band));
 
-  // All five checks are present, in the canonical order.
+  // All six checks are present, in the canonical order (proxy_trust joined in issue #228).
   assertEquals(
     body.checks.map((c) => c.id),
     [...CHECK_IDS]
   );
+  // proxy_trust rides the wire contract; with TRUSTED_PROXY unset it is inert (null), so it must not
+  // shift the score — this pins the OpenAPI enum + wire lockstep and the numeric-invariance guarantee.
+  const proxyTrust = body.checks.find((c) => c.id === 'proxy_trust');
+  assert(proxyTrust, 'proxy_trust must be present in the wire report');
+  assertEquals(proxyTrust?.score, null);
   // Contributions sum EXACTLY to the score (the invariant survives the wire mapping).
   assertEquals(
     body.checks.reduce((total, c) => total + c.contribution, 0),

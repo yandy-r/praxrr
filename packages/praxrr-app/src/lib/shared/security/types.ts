@@ -19,7 +19,7 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * per-check score formula changes so a client can tell a report was produced by a different engine
  * generation. Declared here ONCE.
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '1';
+export const SECURITY_POSTURE_ENGINE_VERSION = '2';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -28,7 +28,7 @@ export const SECURITY_POSTURE_ENGINE_VERSION = '1';
  * regresses, so a healthy deployment is never nagged about an always-on protection.
  */
 export type SecurityCheckId =
-  'control_plane_auth' | 'arr_transport' | 'app_key_at_rest' | 'credential_rotation' | 'log_redaction';
+  'control_plane_auth' | 'arr_transport' | 'app_key_at_rest' | 'credential_rotation' | 'log_redaction' | 'proxy_trust';
 
 /** Every check id, in stable display order. */
 export const CHECK_IDS: readonly SecurityCheckId[] = [
@@ -37,6 +37,7 @@ export const CHECK_IDS: readonly SecurityCheckId[] = [
   'app_key_at_rest',
   'credential_rotation',
   'log_redaction',
+  'proxy_trust',
 ] as const;
 
 /** A check sub-score in `[0, 100]`, or `null` when it cannot be evaluated (skipped, NOT scored 0). */
@@ -178,6 +179,14 @@ export interface PostureInputs {
   readonly redactionVerified: boolean;
   /** The session cookie's `Secure` flag (const `false` today → drives the transport advisory). */
   readonly sessionCookieSecure: boolean;
+  /** `TRUSTED_PROXY` was set to a non-empty value (`cfg.mode !== 'unset'`). */
+  readonly trustedProxyConfigured: boolean;
+  /** Number of valid CIDR ranges parsed from `TRUSTED_PROXY` (`cfg.ranges.length`). */
+  readonly trustedProxyValidRangeCount: number;
+  /** Raw `TRUSTED_PROXY` tokens that were ignored as malformed (safe to echo — not secrets). */
+  readonly trustedProxyInvalidEntries: readonly string[];
+  /** `TRUSTED_PROXY` trusts every peer (wildcard, `/0`, or a supernet ≤ /7). */
+  readonly trustedProxyOverlyBroad: boolean;
   /** ISO-8601 UTC timestamp passed IN — the engine never calls `Date.now()`/`new Date()`. */
   readonly nowIso: string;
 }

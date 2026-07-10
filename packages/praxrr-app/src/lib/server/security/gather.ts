@@ -108,6 +108,8 @@ export function buildPostureInputs(): PostureInputs {
   const oidc = gatherOidcState();
   const appKey = gatherAppKeyState();
   const instances = gatherInstances();
+  // Already parsed once at Config construction (fail-closed, non-throwing); never re-parsed here.
+  const trustedProxy = config.trustedProxy;
 
   return {
     authMode: config.authMode,
@@ -122,6 +124,10 @@ export function buildPostureInputs(): PostureInputs {
     redactionVerified: verifyLogRedaction(),
     // Praxrr sets its session cookie without the Secure flag today; surfaced as an advisory.
     sessionCookieSecure: false,
+    trustedProxyConfigured: trustedProxy.mode !== 'unset',
+    trustedProxyValidRangeCount: trustedProxy.ranges.length,
+    trustedProxyInvalidEntries: trustedProxy.invalidEntries,
+    trustedProxyOverlyBroad: trustedProxy.overlyBroad,
     nowIso: new Date().toISOString(),
   };
 }

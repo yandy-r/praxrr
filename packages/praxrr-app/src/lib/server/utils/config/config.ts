@@ -2,6 +2,8 @@
  * Application configuration singleton
  */
 
+import { parseTrustedProxy, type TrustedProxyConfig } from '$shared/security/index.ts';
+
 export type AuthMode = 'on' | 'local' | 'off' | 'oidc';
 
 class Config {
@@ -30,6 +32,9 @@ class Config {
   public readonly webauthnOrigin: string | null;
   public readonly webauthnRpName: string;
   public readonly webauthnChallengeTtlSeconds: number;
+  // Explicit reverse-proxy trust allowlist (issue #228). Never null; unset => { mode: 'unset', … }.
+  // Forwarded request properties (X-Forwarded-For, etc.) are honored only from a peer in this list.
+  public readonly trustedProxy: TrustedProxyConfig;
 
   constructor() {
     // Default base path logic:
@@ -90,6 +95,15 @@ class Config {
     this.webauthnRpName = Deno.env.get('WEBAUTHN_RP_NAME')?.trim() || 'Praxrr';
     const challengeTtl = parseInt(Deno.env.get('WEBAUTHN_CHALLENGE_TTL_SECONDS') || '300', 10);
     this.webauthnChallengeTtlSeconds = Number.isFinite(challengeTtl) && challengeTtl > 0 ? challengeTtl : 300;
+
+    // Trusted-proxy allowlist (issue #228). Parsed once; fail-closed but NON-throwing so a typo cannot
+    // brick boot and Shield Check can still surface the invalid tokens.
+    this.trustedProxy = Config.parseTrustedProxyEnv();
+  }
+
+  /** Parse the TRUSTED_PROXY env var into a structured allowlist. Never throws (malformed => deny trust). */
+  private static parseTrustedProxyEnv(): TrustedProxyConfig {
+    return parseTrustedProxy(Deno.env.get('TRUSTED_PROXY') ?? null);
   }
 
   /**

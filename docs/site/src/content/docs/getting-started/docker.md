@@ -120,6 +120,27 @@ to the mounted directory.
 - **Parser:** When enabled, set `PARSER_HOST` to the parser service name
   (`parser` in production, `parser-dev` in dev compose) and `PARSER_PORT=5000`.
 
+### Behind a reverse proxy
+
+When a reverse proxy fronts Praxrr, set `TRUSTED_PROXY` to the proxy's address
+as Praxrr sees it so forwarded client IPs are honored (and spoofed ones from
+other peers are ignored). On a shared compose network that is the proxy
+container's subnet; use `loopback` if the proxy runs on the same host.
+
+```yaml
+services:
+  praxrr:
+    image: ghcr.io/yandy-r/praxrr:latest
+    environment:
+      - AUTH=local
+      - TRUSTED_PROXY=172.18.0.0/16 # the compose network the proxy sits on
+```
+
+Leaving `TRUSTED_PROXY` unset is safe (the default) but, under `AUTH=local`
+behind a proxy, every request is then graded by the proxy's own IP and must
+authenticate. See the [Trusted proxy](/guides/configuration/#trusted-proxy)
+guide for the full grammar and failure behavior.
+
 ## Parser opt-in
 
 Custom format testing and quality profile simulation require the optional

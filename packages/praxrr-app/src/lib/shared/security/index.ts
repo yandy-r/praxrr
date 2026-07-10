@@ -9,3 +9,10 @@ export { CHECK_CATALOG } from './catalog.ts';
 export { ALL_CHECKS, classifyHost, buildTransportRows } from './checks.ts';
 export { shieldBandFor, capBand, clamp0100, rollUp, HARDENED_THRESHOLD, GUARDED_THRESHOLD } from './policy.ts';
 export { computeShieldReport } from './engine.ts';
+export {
+  parseTrustedProxy,
+  isTrustedProxyPeer,
+  type CidrRange,
+  type TrustedProxyConfig,
+  type TrustedProxyMode,
+} from './trustedProxy.ts';
