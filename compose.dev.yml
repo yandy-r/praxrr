@@ -72,17 +72,17 @@ services:
       - LIDARR_INSTANCE_NAME_1=Lidarr # Optional (Generated if not provided)
       - LIDARR_INSTANCE_URL_1=http://praxrr-lidarr:8686
       - LIDARR_INSTANCE_EXTERNAL_URL_1=${LIDARR_INSTANCE_EXTERNAL_URL_1}
-      - LIDARR_INSTANCE_API_KEY_1=${PRAXRR_LIDARR_API_KEY}
+      - LIDARR_INSTANCE_API_KEY_1=${LIDARR_INSTANCE_API_KEY_1}
       - LIDARR_INSTANCE_TAGS_1=music,flac,lossless
       - RADARR_INSTANCE_NAME_1=Radarr # Optional (Generated if not provided)
       - RADARR_INSTANCE_URL_1=http://praxrr-radarr:7878
       - RADARR_INSTANCE_EXTERNAL_URL_1=${RADARR_INSTANCE_EXTERNAL_URL_1}
-      - RADARR_INSTANCE_API_KEY_1=${PRAXRR_RADARR_API_KEY}
+      - RADARR_INSTANCE_API_KEY_1=${RADARR_INSTANCE_API_KEY_1}
       - RADARR_INSTANCE_TAGS_1=movies,4k
       - SONARR_INSTANCE_NAME_1=Sonarr # Optional (Generated if not provided)
       - SONARR_INSTANCE_URL_1=http://praxrr-sonarr:8989
       - SONARR_INSTANCE_EXTERNAL_URL_1=${SONARR_INSTANCE_EXTERNAL_URL_1}
-      - SONARR_INSTANCE_API_KEY_1=${PRAXRR_SONARR_API_KEY}
+      - SONARR_INSTANCE_API_KEY_1=${SONARR_INSTANCE_API_KEY_1}
       - SONARR_INSTANCE_TAGS_1=tv,4k
       - PRAXRR_VALIDATE_INSTANCES=false
       # Optional: pull sync selections from Arr instances on startup
