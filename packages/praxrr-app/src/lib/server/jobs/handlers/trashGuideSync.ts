@@ -5,6 +5,7 @@ import { coerceTrashGuideSourceArrType, type TrashGuideSupportedArrType } from '
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import { buildTrashGuideSyncFailure, isRetryableFailureCode } from '../trashguide/syncFailure.ts';
+import type { JobFailureCode } from '$shared/jobs/evidence.ts';
 import type {
   JobHandler,
   JobHandlerResult,
@@ -13,8 +14,32 @@ import type {
   TrashGuideSyncFailureCode,
   TrashGuideSyncFailureReason,
   TrashGuideSyncJobPayload,
-  TrashGuideSyncRunEvidence
+  TrashGuideSyncRunEvidence,
 } from '../queueTypes.ts';
+
+/**
+ * Map the domain-specific TRaSH failure code (issue #238) to the generic durable
+ * {@link JobFailureCode} (issue #237) the dispatcher persists as safe job evidence. The rich
+ * TRaSH reason (source label, retry) still rides in the serialized run evidence carried in
+ * `output`; this is only the coarse, cross-job classification.
+ */
+function toJobFailureCode(code: TrashGuideSyncFailureCode | undefined): JobFailureCode {
+  switch (code) {
+    case 'source_missing':
+      return 'targetNotFound';
+    case 'network':
+      return 'gitNetwork';
+    case 'parser_failed':
+      return 'validation';
+    case 'sync_failed':
+      return 'gitNetwork';
+    case 'source_disabled':
+      return 'precondition';
+    case 'internal':
+    case undefined:
+      return 'internalError';
+  }
+}
 
 const MAX_TRANSIENT_RETRY_ATTEMPTS = 3;
 
@@ -35,7 +60,10 @@ function readNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parsePayload(payload: Record<string, unknown>, source: 'manual' | 'schedule' | 'system'): TrashGuideSyncJobPayload | null {
+function parsePayload(
+  payload: Record<string, unknown>,
+  source: 'manual' | 'schedule' | 'system'
+): TrashGuideSyncJobPayload | null {
   const sourceId = Number(payload.sourceId);
   if (!Number.isFinite(sourceId)) {
     return null;
@@ -73,7 +101,7 @@ function parsePayload(payload: Record<string, unknown>, source: 'manual' | 'sche
     requestedAt: requestedAtRaw,
     runToken: runTokenRaw,
     sourceName: sourceNameRaw,
-    sourceArrType: coerceTrashGuideSourceArrType(payload.sourceArrType) ?? undefined
+    sourceArrType: coerceTrashGuideSourceArrType(payload.sourceArrType) ?? undefined,
   };
 }
 
@@ -113,7 +141,7 @@ function countsFromSyncResult(syncResult: TrashGuideSyncResult): TrashGuideSyncC
     failedFiles: syncResult.failedFiles,
     activeOperations: syncResult.activeOperations,
     removedEntities: syncResult.removedEntities,
-    renamedEntities: syncResult.renamedEntities
+    renamedEntities: syncResult.renamedEntities,
   };
 }
 
@@ -134,7 +162,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
   const identity: SourceIdentity = {
     id: readNumber(job.payload.sourceId) ?? 0,
     name: readString(job.payload.sourceName),
-    arrType: coerceTrashGuideSourceArrType(job.payload.sourceArrType)
+    arrType: coerceTrashGuideSourceArrType(job.payload.sourceArrType),
   };
 
   function buildEvidence(fields: {
@@ -155,18 +183,21 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       failure: fields.failure,
       retry: {
         rescheduleAt: fields.rescheduleAt,
-        retryable: fields.failure ? isRetryableFailureCode(fields.failure.code) : false
-      }
+        retryable: fields.failure ? isRetryableFailureCode(fields.failure.code) : false,
+      },
     };
   }
 
   function finalize(evidence: TrashGuideSyncRunEvidence): JobHandlerResult {
-    return {
-      status: evidence.status,
-      output: JSON.stringify(evidence),
-      error: evidence.failure?.message,
-      rescheduleAt: evidence.retry.rescheduleAt
-    };
+    // The full typed TRaSH evidence (source label, counts, safe failure copy, retry) rides in
+    // `output`; a failure additionally carries the generic typed `failureCode` (issue #237) so the
+    // dispatcher persists safe cross-job evidence. Raw text never enters either channel.
+    const output = JSON.stringify(evidence);
+    const rescheduleAt = evidence.retry.rescheduleAt;
+    if (evidence.status === 'failure') {
+      return { status: 'failure', failureCode: toJobFailureCode(evidence.failure?.code), output, rescheduleAt };
+    }
+    return { status: evidence.status, output, rescheduleAt };
   }
 
   function failureEvidence(
@@ -176,7 +207,9 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     rescheduleAt: string | null,
     counts: TrashGuideSyncCounts | null = null
   ): JobHandlerResult {
-    return finalize(buildEvidence({ trigger, status, counts, failure: buildTrashGuideSyncFailure(code), rescheduleAt }));
+    return finalize(
+      buildEvidence({ trigger, status, counts, failure: buildTrashGuideSyncFailure(code), rescheduleAt })
+    );
   }
 
   try {
@@ -206,13 +239,17 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     if (trigger === 'scheduled') {
       if (!scheduleEnabled) {
         // Benign: the scheduler is disabled for this source; not an operator-facing error.
-        return finalize(buildEvidence({ trigger, status: 'cancelled', counts: null, failure: null, rescheduleAt: null }));
+        return finalize(
+          buildEvidence({ trigger, status: 'cancelled', counts: null, failure: null, rescheduleAt: null })
+        );
       }
 
       if (source.last_synced_at) {
         const dueAt = calculateNextRunFromMinutes(source.last_synced_at, source.sync_strategy);
         if (Date.now() < new Date(dueAt).getTime()) {
-          return finalize(buildEvidence({ trigger, status: 'skipped', counts: null, failure: null, rescheduleAt: dueAt }));
+          return finalize(
+            buildEvidence({ trigger, status: 'skipped', counts: null, failure: null, rescheduleAt: dueAt })
+          );
         }
       }
     }
@@ -228,7 +265,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         rescheduleAt = calculateRetryAt(job.attempts);
         void logger.warn('TRaSH sync job transient failure, scheduling retry', {
           source: 'TrashGuideSyncJob',
-          meta: { jobId: job.id, sourceId: identity.id, attempts: job.attempts, retryAt: rescheduleAt, error: message }
+          meta: { jobId: job.id, sourceId: identity.id, attempts: job.attempts, retryAt: rescheduleAt, error: message },
         });
       }
 
@@ -242,7 +279,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       const message = error instanceof Error ? error.message : String(error);
       await logger.error('TRaSH sync update check failed', {
         source: 'TrashGuideSyncJob',
-        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message }
+        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
       });
       return resolveRunFailure(message);
     }
@@ -253,9 +290,16 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         buildEvidence({
           trigger,
           status: 'skipped',
-          counts: { commitsBehind: 0, parsedFiles: 0, failedFiles: 0, activeOperations: 0, removedEntities: 0, renamedEntities: 0 },
+          counts: {
+            commitsBehind: 0,
+            parsedFiles: 0,
+            failedFiles: 0,
+            activeOperations: 0,
+            removedEntities: 0,
+            renamedEntities: 0,
+          },
           failure: null,
-          rescheduleAt: scheduledRescheduleAt
+          rescheduleAt: scheduledRescheduleAt,
         })
       );
     }
@@ -266,9 +310,16 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         buildEvidence({
           trigger,
           status: 'success',
-          counts: { commitsBehind: updates.commitsBehind, parsedFiles: 0, failedFiles: 0, activeOperations: 0, removedEntities: 0, renamedEntities: 0 },
+          counts: {
+            commitsBehind: updates.commitsBehind,
+            parsedFiles: 0,
+            failedFiles: 0,
+            activeOperations: 0,
+            removedEntities: 0,
+            renamedEntities: 0,
+          },
           failure: null,
-          rescheduleAt: scheduledRescheduleAt
+          rescheduleAt: scheduledRescheduleAt,
         })
       );
     }
@@ -280,7 +331,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       const message = error instanceof Error ? error.message : String(error);
       await logger.error('TRaSH source sync failed', {
         source: 'TrashGuideSyncJob',
-        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message }
+        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
       });
       return resolveRunFailure(message);
     }
@@ -289,13 +340,19 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       const message = syncResult.error ?? 'TRaSH sync failed';
       await logger.error('TRaSH source sync failed', {
         source: 'TrashGuideSyncJob',
-        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message }
+        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
       });
       return resolveRunFailure(message);
     }
 
     if (syncResult.parseStatus === 'failed') {
-      return failureEvidence(trigger, 'parser_failed', 'failure', scheduledRescheduleAt, countsFromSyncResult(syncResult));
+      return failureEvidence(
+        trigger,
+        'parser_failed',
+        'failure',
+        scheduledRescheduleAt,
+        countsFromSyncResult(syncResult)
+      );
     }
 
     return finalize(
@@ -304,7 +361,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         status: 'success',
         counts: countsFromSyncResult(syncResult),
         failure: null,
-        rescheduleAt: scheduledRescheduleAt
+        rescheduleAt: scheduledRescheduleAt,
       })
     );
   } catch (error) {
@@ -313,7 +370,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     const message = error instanceof Error ? error.message : String(error);
     await logger.error('TRaSH sync handler crashed', {
       source: 'TrashGuideSyncJob',
-      meta: { jobId: job.id, sourceId: identity.id, error: message }
+      meta: { jobId: job.id, sourceId: identity.id, error: message },
     });
     return failureEvidence(triggerFallback, 'internal', 'failure', null);
   }

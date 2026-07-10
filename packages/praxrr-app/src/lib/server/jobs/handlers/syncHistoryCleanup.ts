@@ -14,7 +14,7 @@ import { logger } from '$logger/logger.ts';
 const syncHistoryCleanupHandler: JobHandler = async (job) => {
   const settings = syncHistorySettingsQueries.get();
   if (settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Sync history disabled' };
+    return { status: 'cancelled', decision: 'Sync history disabled' };
   }
 
   const nextRun = calculateNextRunFromSchedule('daily');
@@ -27,16 +27,16 @@ const syncHistoryCleanupHandler: JobHandler = async (job) => {
     const output = `Pruned ${byAge} (age) + ${byCount} (cap) sync history row(s)`;
 
     if (total === 0) {
-      return { status: 'skipped', output: 'No sync history rows to prune', rescheduleAt };
+      return { status: 'skipped', decision: 'No sync history rows to prune', rescheduleAt };
     }
 
     return { status: 'success', output, rescheduleAt };
   } catch (error) {
     await logger.error('Sync history cleanup failed', {
       source: 'SyncHistoryCleanupJob',
-      meta: { jobId: job.id, error: error instanceof Error ? error.message : String(error) },
+      meta: { jobId: job.id, error },
     });
-    return { status: 'failure', error: error instanceof Error ? error.message : String(error), rescheduleAt };
+    return { status: 'failure', failureCode: 'database', rescheduleAt };
   }
 };
 

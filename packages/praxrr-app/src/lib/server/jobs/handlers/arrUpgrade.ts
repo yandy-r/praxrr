@@ -6,38 +6,43 @@ import type { FilterConfig } from '$shared/upgrades/filters.ts';
 import { processUpgradeConfig } from '$lib/server/upgrades/processor.ts';
 import { calculateCooldownUntil, calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
+import { classifyJobFailure } from '../evidence.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
 
 const upgradeRunHandler: JobHandler = async (job) => {
   const instanceId = Number(job.payload.instanceId);
   if (!Number.isFinite(instanceId)) {
-    return { status: 'failure', error: 'Invalid instance ID' };
+    return { status: 'failure', failureCode: 'invalidPayload' };
   }
 
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance) {
-    return { status: 'failure', error: 'Arr instance not found' };
+    return { status: 'failure', failureCode: 'targetNotFound' };
   }
 
   if (!isArrAppType(instance.type)) {
-    return { status: 'skipped', output: `Upgrades are not supported for unknown instance type: ${instance.type}` };
+    await logger.debug('Upgrade job skipped: unknown instance type', {
+      source: 'UpgradeJob',
+      meta: { jobId: job.id, instanceId, instanceType: instance.type },
+    });
+    return { status: 'skipped', decision: 'Upgrades not supported for this instance type' };
   }
 
   const upgradesSupported = supportsArrWorkflow(instance.type, 'upgrades');
   // Keep unsupported Lidarr messaging explicit even when a stale/disabled config exists.
   if (!upgradesSupported && instance.type === 'lidarr') {
     const label = ARR_APPS[instance.type].label;
-    return { status: 'skipped', output: `Upgrades are not supported for ${label} instances` };
+    return { status: 'skipped', decision: `Upgrades are not supported for ${label} instances` };
   }
 
   const config = upgradeConfigsQueries.getByArrInstanceId(instanceId);
   if (!config || !config.enabled) {
-    return { status: 'cancelled', output: 'Upgrade config disabled' };
+    return { status: 'cancelled', decision: 'Upgrade config disabled' };
   }
 
   if (!upgradesSupported) {
     const label = ARR_APPS[instance.type].label;
-    return { status: 'skipped', output: `Upgrades are not supported for ${label} instances` };
+    return { status: 'skipped', decision: `Upgrades are not supported for ${label} instances` };
   }
 
   // Manual runs are only allowed in dry run (unless dev)
@@ -45,7 +50,9 @@ const upgradeRunHandler: JobHandler = async (job) => {
   if (job.source === 'manual' && !config.dryRun && !isDev) {
     return {
       status: 'failure',
-      error: 'Manual runs only allowed in Dry Run mode. Enable Dry Run first.',
+      failureCode: 'precondition',
+      decision: 'Manual runs are only allowed in Dry Run mode',
+      recovery: 'Enable Dry Run in the upgrade settings, then run again.',
     };
   }
 
@@ -56,13 +63,15 @@ const upgradeRunHandler: JobHandler = async (job) => {
       if (job.source === 'manual') {
         return {
           status: 'failure',
-          error: `Upgrade cooldown active until ${cooldownUntil}`,
+          failureCode: 'precondition',
+          decision: 'Upgrade cooldown active',
+          recovery: 'Wait for the cooldown window to elapse, then run the upgrade again.',
         };
       }
 
       return {
         status: 'skipped',
-        output: 'Upgrade cooldown active',
+        decision: 'Upgrade cooldown active',
         rescheduleAt: cooldownUntil,
       };
     }
@@ -74,7 +83,7 @@ const upgradeRunHandler: JobHandler = async (job) => {
     const nextRun = calculateNextRunFromMinutes(baseRunAt, config.schedule);
     return {
       status: 'skipped',
-      output: 'No enabled upgrade filters',
+      decision: 'No enabled upgrade filters',
       rescheduleAt: job.source === 'schedule' ? nextRun : undefined,
     };
   }
@@ -94,9 +103,14 @@ const upgradeRunHandler: JobHandler = async (job) => {
 
     const output = `Processed ${log.selection.actualCount} item(s) using "${log.config.selectedFilter}"`;
     if (log.status === 'failed') {
+      await logger.error('Upgrade job reported processing errors', {
+        source: 'UpgradeJob',
+        meta: { jobId: job.id, instanceId, instanceName: instance.name, errors: log.results.errors },
+      });
       return {
         status: 'failure',
-        error: log.results.errors.join('; '),
+        failureCode: 'upstream',
+        output,
         rescheduleAt: job.source === 'schedule' ? nextRunAt : undefined,
       };
     }
@@ -119,10 +133,7 @@ const upgradeRunHandler: JobHandler = async (job) => {
       source: 'UpgradeJob',
       meta: { jobId: job.id, instanceId, instanceName: instance.name, error },
     });
-    return {
-      status: 'failure',
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return { status: 'failure', failureCode: classifyJobFailure(error) };
   }
 };
 

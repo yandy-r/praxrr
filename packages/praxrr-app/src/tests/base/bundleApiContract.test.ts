@@ -361,6 +361,7 @@ Deno.test('reviewed apply runtime keeps invalidation, matched failure, and unexp
           kind: 'executed',
           result: {
             ...GENERATED_MATCHED_FAILURE_SAMPLE.results,
+            failureCode: 'upstream',
             outcomes: GENERATED_MATCHED_FAILURE_SAMPLE.outcomes,
             syncHistoryId: GENERATED_MATCHED_FAILURE_SAMPLE.syncHistoryId,
           },

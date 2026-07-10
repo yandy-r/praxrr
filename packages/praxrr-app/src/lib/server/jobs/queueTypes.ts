@@ -1,3 +1,4 @@
+import type { JobFailureCode, SafeJobEvidence } from '$shared/jobs/evidence.ts';
 import type { TrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 
 /**
@@ -240,16 +241,46 @@ export interface JobRunHistoryRecord {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  /** Safe, back-compat summary column (failure message for failed runs); prefer `evidence`. */
   error: string | null;
+  /** Safe, back-compat summary column (output/decision preview); prefer `evidence`. */
   output: string | null;
+  /**
+   * Structured safe durable evidence (issue #237). `null` for legacy rows written before
+   * the evidence contract existed — such rows must never be shown as validated evidence.
+   */
+  evidence: SafeJobEvidence | null;
   createdAt: string;
 }
 
-export interface JobHandlerResult {
-  status: JobRunStatus;
-  output?: string;
-  error?: string;
-  rescheduleAt?: string | null;
-}
+/**
+ * What a job handler returns to the dispatcher. Discriminated by `status` so a `failure`
+ * is unrepresentable without a typed {@link JobFailureCode}. There is intentionally NO
+ * free-form `error` channel — raw exception text goes to the sanitized logger only, and
+ * the dispatcher derives the safe durable {@link SafeJobEvidence} from this result via
+ * `buildSafeJobEvidence`.
+ */
+export type JobHandlerResult =
+  | {
+      status: 'success' | 'skipped' | 'cancelled';
+      /** Safe count/summary of what ran; bounded before persistence. */
+      output?: string;
+      /** Human-readable subject name; falls back to the per-JobType descriptor when omitted. */
+      target?: string | null;
+      /** Short safe decision/skip/cancel summary; bounded before persistence. */
+      decision?: string;
+      rescheduleAt?: string | null;
+    }
+  | {
+      status: 'failure';
+      /** Typed, closed failure reason; drives the pre-authored safe message + recovery copy. */
+      failureCode: JobFailureCode;
+      output?: string;
+      target?: string | null;
+      decision?: string;
+      /** Optional static recovery override; omit to use the code's pre-authored default. */
+      recovery?: string;
+      rescheduleAt?: string | null;
+    };
 
 export type JobHandler = (job: JobQueueRecord) => Promise<JobHandlerResult>;

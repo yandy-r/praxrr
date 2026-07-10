@@ -8,7 +8,7 @@
 import type { SyncPreviewArrType } from '$sync/preview/types.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { SectionType } from '$sync/types.ts';
-import type { JobRunStatus } from '$jobs/queueTypes.ts';
+import type { JobHandlerResult, JobRunStatus } from '$jobs/queueTypes.ts';
 
 // =============================================================================
 // STATUS UNIONS
@@ -19,12 +19,7 @@ export type CanaryArrType = SyncPreviewArrType; // 'radarr' | 'sonarr' | 'lidarr
 
 /** Lifecycle status of a `canary_rollouts` row. */
 export type CanaryRolloutStatus =
-  | 'canary_running'
-  | 'awaiting_confirmation'
-  | 'rolling_out'
-  | 'completed'
-  | 'aborted'
-  | 'failed';
+  'canary_running' | 'awaiting_confirmation' | 'rolling_out' | 'completed' | 'aborted' | 'failed';
 
 /** Classified outcome of the canary sync itself. */
 export type CanaryOutcomeStatus = 'success' | 'partial' | 'failed' | 'skipped';
@@ -54,13 +49,12 @@ export interface CanaryInstanceResult {
   error?: string;
 }
 
-/** Verbatim `executeSyncJob` return shape (arrSync.ts:96). */
-export interface SyncRunResult {
-  status: JobRunStatus;
-  output?: string;
-  error?: string;
-  rescheduleAt?: string | null;
-}
+/**
+ * `executeSyncJob`'s return contract. Aliased to the canonical {@link JobHandlerResult}
+ * discriminated union so it can never drift from the primitive: a failure carries a typed
+ * `failureCode` (no free-form `error`), matching the safe-evidence model (issue #237).
+ */
+export type SyncRunResult = JobHandlerResult;
 
 // =============================================================================
 // ROW SHAPES (byte-aligned to the migration columns)

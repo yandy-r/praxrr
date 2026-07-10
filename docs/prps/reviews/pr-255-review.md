@@ -14,7 +14,7 @@ final full validation passes, and no unresolved actionable review threads remain
 
 ## Final Re-review
 
-- **Reviewed head**: merge candidate after integrating `origin/main@a690f145`
+- **Reviewed head**: merge candidate after integrating `origin/main@12da2898`
 - **Independent passes**: correctness, security, and maintainability/pattern fidelity
 - **Finding status**: 17 Fixed, 0 Open, 0 Failed
 - **Decision**: APPROVE for squash merge after the updated head's required CI checks pass
@@ -127,7 +127,7 @@ No findings.
 | ---------- | ----------------------------------------------------------------------------------------- |
 | Type check | Pass — `deno task check`, 0 errors and 0 warnings                                         |
 | Lint       | Partial — all PR files pass Prettier/Markdownlint; repo-wide lint finds 56 baseline files |
-| Tests      | Pass — `deno task test`, 2,287 passed                                                     |
+| Tests      | Pass — `deno task test`, 2,319 passed                                                     |
 | Build      | Pass — `deno task build`                                                                  |
 
 ## Files Reviewed

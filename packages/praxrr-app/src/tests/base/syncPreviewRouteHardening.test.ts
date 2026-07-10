@@ -33,6 +33,7 @@ import { classifyPreviewFailure } from '../../lib/server/sync/preview/failureRea
 import type { SyncPreviewFailureReason, SyncPreviewResult } from '../../lib/server/sync/preview/types.ts';
 import type { BaseArrClient } from '../../lib/server/utils/arr/base.ts';
 import { HttpError } from '../../lib/server/utils/http/types.ts';
+import type { JobFailureCode } from '$shared/jobs/evidence.ts';
 
 const INSTANCE_ID = 7001;
 const now = '2026-02-21T00:00:00.000Z';
@@ -252,11 +253,27 @@ async function createOrderedReviewedSnapshot(
   previewStore.completeGeneration(id, patch, binding, createdAtMs);
 }
 
-function dependenciesReturning(
-  result: Partial<SyncJobResult> & Pick<SyncJobResult, 'status'>,
-  nowMs: number = Date.now()
-): SyncPreviewApplyDependencies {
-  const full: SyncJobResult = { outcomes: [], syncHistoryId: null, ...result };
+// A returned job failure now carries a typed `failureCode` (issue #237) — there is no raw `error`
+// channel on JobHandlerResult/SyncJobResult, so the input shape mirrors that discriminated union.
+type DependenciesResult =
+  | {
+      status: 'failure';
+      failureCode: JobFailureCode;
+      output?: string;
+      outcomes?: SyncJobResult['outcomes'];
+      syncHistoryId?: SyncJobResult['syncHistoryId'];
+      rescheduleAt?: string | null;
+    }
+  | {
+      status: 'success' | 'skipped' | 'cancelled';
+      output?: string;
+      outcomes?: SyncJobResult['outcomes'];
+      syncHistoryId?: SyncJobResult['syncHistoryId'];
+      rescheduleAt?: string | null;
+    };
+
+function dependenciesReturning(result: DependenciesResult, nowMs: number = Date.now()): SyncPreviewApplyDependencies {
+  const full = { outcomes: [], syncHistoryId: null, ...result } as SyncJobResult;
   return {
     getSectionsInProgress: () => [],
     executeReviewedSyncJob: () => Promise.resolve({ kind: 'executed', result: full }),
@@ -549,7 +566,7 @@ Deno.test('sync preview apply failed body matches the generated coarse result co
       // Gap 5: a partial/failed run still carries confirmed outcomes + the durable history id.
       dependenciesReturning({
         status: 'failure',
-        error: 'Arr rejected the update',
+        failureCode: 'upstream',
         outcomes: [
           {
             section: 'qualityProfiles',
@@ -1270,19 +1287,17 @@ Deno.test('sync preview create returns a ready non-applicable result when every 
   }
 });
 
-Deno.test('sync preview apply redacts a secret-shaped job-failure error', async () => {
+Deno.test('sync preview apply maps a returned job failure to a typed executionFailed reason', async () => {
   const previewId = `preview-apply-redact-secret-job-${crypto.randomUUID()}`;
   await createReviewedSnapshot(previewId);
 
   try {
+    // The job result can no longer carry raw error text (issue #237): a failure arrives as a typed
+    // `failureCode`, and the apply surfaces only the typed `executionFailed` reason — never raw text.
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({
-        status: 'failure',
-        error: SECRET_MIX,
-        syncHistoryId: 42,
-      })
+      dependenciesReturning({ status: 'failure', failureCode: 'upstream', syncHistoryId: 42 })
     );
 
     assertEquals(response.status, 500);
@@ -1295,7 +1310,7 @@ Deno.test('sync preview apply redacts a secret-shaped job-failure error', async 
   }
 });
 
-Deno.test('sync preview apply redacts an arbitrary free-form job-failure error', async () => {
+Deno.test('sync preview apply surfaces a typed failure reason for a returned job failure', async () => {
   const previewId = `preview-apply-redact-freeform-job-${crypto.randomUUID()}`;
   await createReviewedSnapshot(previewId);
 
@@ -1303,11 +1318,7 @@ Deno.test('sync preview apply redacts an arbitrary free-form job-failure error',
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({
-        status: 'failure',
-        error: FREE_FORM,
-        syncHistoryId: null,
-      })
+      dependenciesReturning({ status: 'failure', failureCode: 'internalError', syncHistoryId: null })
     );
 
     assertEquals(response.status, 500);

@@ -335,7 +335,7 @@ export async function _handleSyncPreviewApplyRequest(
         instanceId: snapshot.instanceId,
         status: result.status,
         failureCode: failure.code,
-        error: result.error ?? null,
+        jobFailureCode: result.status === 'failure' ? result.failureCode : null,
       },
     });
     // Surface confirmed outcomes on the failure branch too — partial/failed/skipped outcomes must

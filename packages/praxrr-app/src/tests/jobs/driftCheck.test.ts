@@ -261,7 +261,7 @@ migratedTest('drift.check returns cancelled when drift detection is disabled', a
   const result = await handler(createDriftJob());
 
   assertEquals(result.status, 'cancelled');
-  assertStringIncludes(result.output!, 'disabled');
+  assertStringIncludes(result.decision!, 'disabled');
   // Disabled short-circuits before any instance work.
   assertEquals(persistedStatusIds(), []);
 });
@@ -303,7 +303,8 @@ migratedTest('drift.check backs off exponentially when the sweep body throws', a
     const result1 = await handler(createDriftJob());
 
     assertEquals(result1.status, 'failure');
-    assertEquals(result1.error, 'db exploded during sweep');
+    assert(result1.status === 'failure');
+    assertEquals(result1.failureCode, 'database');
     assertExists(result1.rescheduleAt, 'scheduled failures reschedule at the backoff gate');
     assertEquals(logged.length, 1, 'the fault is logged once');
 

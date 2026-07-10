@@ -135,7 +135,7 @@ export const configHealthSnapshotHandlerDeps: {
 const configHealthSnapshotHandler: JobHandler = async (job) => {
   const settings = configHealthSettingsQueries.get();
   if (settings.enabled !== 1) {
-    return { status: 'cancelled', output: 'Config health scoring disabled' };
+    return { status: 'cancelled', decision: 'Config health scoring disabled' };
   }
 
   const isScheduled = job.source === 'schedule';
@@ -155,7 +155,7 @@ const configHealthSnapshotHandler: JobHandler = async (job) => {
       }
       return {
         status: 'skipped',
-        output: 'No sync-capable instances to snapshot',
+        decision: 'No sync-capable instances to snapshot',
         rescheduleAt: isScheduled ? calculateNextRunFromMinutes(sweepStartedAt, settings.interval_minutes) : undefined,
       };
     }
@@ -200,15 +200,12 @@ const configHealthSnapshotHandler: JobHandler = async (job) => {
 
     await logger.error('Config health snapshot sweep failed', {
       source: 'ConfigHealthSnapshotJob',
-      meta: {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      },
+      meta: { jobId: job.id, error },
     });
 
     return {
       status: 'failure',
-      error: error instanceof Error ? error.message : String(error),
+      failureCode: 'database',
       rescheduleAt: isScheduled ? backoffUntil : undefined,
     };
   }

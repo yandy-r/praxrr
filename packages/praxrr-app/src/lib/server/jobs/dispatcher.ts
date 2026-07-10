@@ -1,6 +1,7 @@
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { buildJobDisplayName } from './display.ts';
+import { buildSafeJobEvidence, classifyJobFailure } from './evidence.ts';
 import { jobQueueRegistry } from './queueRegistry.ts';
 import type { JobHandlerResult, JobQueueRecord, JobStatus } from './queueTypes.ts';
 import { logger } from '$logger/logger.ts';
@@ -83,7 +84,7 @@ class JobDispatcher {
         job.startedAt ?? new Date().toISOString(),
         new Date().toISOString(),
         0,
-        'Handler not found'
+        buildSafeJobEvidence(job, { status: 'failure', failureCode: 'handlerNotFound' })
       );
       return;
     }
@@ -106,25 +107,20 @@ class JobDispatcher {
     try {
       result = await handler(job);
     } catch (error) {
-      result = {
-        status: 'failure',
-        error: error instanceof Error ? error.message : String(error),
-      };
+      // Redaction by construction: the raw exception is logged through the sanitized
+      // boundary; only a typed, safe failure code reaches the durable evidence.
+      await logger.error(`Job threw an unhandled error: ${job.jobType}`, {
+        source: 'JobDispatcher',
+        meta: { jobId: job.id, jobType: job.jobType, displayName, error },
+      });
+      result = { status: 'failure', failureCode: classifyJobFailure(error) };
     }
 
     const finishedAt = new Date().toISOString();
     const durationMs = Date.now() - startMs;
+    const evidence = buildSafeJobEvidence(job, result);
 
-    jobRunHistoryQueries.create(
-      job.id,
-      job.jobType,
-      result.status,
-      startedAt,
-      finishedAt,
-      durationMs,
-      result.error,
-      result.output
-    );
+    jobRunHistoryQueries.create(job.id, job.jobType, result.status, startedAt, finishedAt, durationMs, evidence);
 
     await logger.debug(`Job finished: ${job.jobType} (${result.status})`, {
       source: 'JobDispatcher',
@@ -135,7 +131,7 @@ class JobDispatcher {
         status: result.status,
         durationMs,
         rescheduleAt: result.rescheduleAt ?? null,
-        error: result.error ?? null,
+        failureCode: evidence.failure?.code ?? null,
       },
     });
 
