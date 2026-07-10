@@ -19,6 +19,16 @@ if (!Array.isArray(manifest) || manifest.length === 0) {
 if (manifest.filter((v) => v.default).length !== 1) {
 	throw new Error('versions.json must have exactly one entry with "default": true');
 }
+// Ids become filesystem + URL path segments, so reject separators, dot-prefixed names, and
+// the staging dir name. Collisions with real content dirs (e.g. "api") are caught at assembly.
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+for (const version of manifest) {
+	if (typeof version.id !== 'string' || !ID_PATTERN.test(version.id) || version.id === '.versions') {
+		throw new Error(
+			`invalid version id ${JSON.stringify(version.id)} in versions.json: must match ${ID_PATTERN} and not be ".versions"`
+		);
+	}
+}
 
 // Astro CLI resolved from the local install so this works under plain `node` (no PATH astro).
 const astroBin = path.join(siteRoot, 'node_modules', '.bin', 'astro');
@@ -50,14 +60,23 @@ for (const version of manifest) {
 	});
 }
 
-// 2. Assemble: default → dist/, others → dist/<id>/.
-for (const version of manifest) {
+// 2. Assemble: default → dist/ first, others → dist/<id>/ (guarded against colliding with
+// a real content dir the default build emitted, e.g. an id of "api" or "app").
+const assemblyOrder = [...manifest].sort((a, b) => (b.default ? 1 : 0) - (a.default ? 1 : 0));
+for (const version of assemblyOrder) {
 	const src = path.join(stageRoot, version.id);
 	if (!existsSync(path.join(src, 'index.html'))) {
 		throw new Error(`build for "${version.id}" produced no index.html at ${src}`);
 	}
 	const dest = version.default ? distDir : path.join(distDir, version.id);
-	if (!version.default) mkdirSync(dest, { recursive: true });
+	if (!version.default) {
+		if (existsSync(dest)) {
+			throw new Error(
+				`version id "${version.id}" collides with an existing path (dist/${version.id}) from the default build; choose a non-conflicting id`
+			);
+		}
+		mkdirSync(dest, { recursive: true });
+	}
 	// dest is an ancestor (default) or sibling of src, never a subdirectory of src, so
 	// Node's self-copy guard does not fire and .versions is not recursed into.
 	cpSync(src, dest, { recursive: true });

@@ -2,20 +2,40 @@
 // Starlight `Banner` override: shows a site-wide notice on every page of a version marked
 // `development` in versions.json, while preserving any per-page frontmatter banner via the
 // stock Banner component. The active version is resolved at build time from DOCS_VERSION.
+// The notice mirrors Starlight's own `.sl-banner` styling via the scoped <style> below — a
+// bare `.sl-banner` div would be unstyled because Starlight's rule is component-scoped.
 import Default from '@astrojs/starlight/components/Banner.astro';
 import versions from '../../versions.json';
 
 const current =
   versions.find((v) => v.id === process.env.DOCS_VERSION) ?? versions.find((v) => v.default);
-const showDevBanner = Boolean(current && current.development);
+const defaultVersion = versions.find((v) => v.default);
+const showDevBanner = Boolean(current && current.development && defaultVersion);
 ---
 
 {
 	showDevBanner && (
-		<div class="sl-banner">
-			You are viewing the in-development <strong>Next</strong> docs. For the current release, see{' '}
-			<a href="/">v2.0</a>.
+		<div class="sl-banner" data-pagefind-ignore>
+			You are viewing the in-development <strong>{current.label}</strong> docs. For the current
+			release, see <a href={defaultVersion.base}>{defaultVersion.label}</a>.
 		</div>
 	)
 }
 <Default />
+
+<style>
+	/* Mirrors @astrojs/starlight/components/Banner.astro so this scoped div is styled. */
+	.sl-banner {
+		--__sl-banner-text: var(--sl-color-banner-text, var(--sl-color-text-invert));
+		padding: var(--sl-nav-pad-y) var(--sl-nav-pad-x);
+		background-color: var(--sl-color-banner-bg, var(--sl-color-bg-accent));
+		color: var(--__sl-banner-text);
+		line-height: var(--sl-line-height-headings);
+		text-align: center;
+		text-wrap: balance;
+		box-shadow: var(--sl-shadow-sm);
+	}
+	.sl-banner :global(a) {
+		color: var(--__sl-banner-text);
+	}
+</style>

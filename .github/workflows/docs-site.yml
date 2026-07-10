@@ -88,26 +88,15 @@ jobs:
           PRAXRR_DB_DOCS_SOURCE: ../../.external/praxrr-db
         run: npm run build
 
-      - name: Verify versioned output
+      - name: Verify version selector rendered
         working-directory: docs/site
         run: |
           set -euo pipefail
-          total=$(find dist -name '*.html' | wc -l)
-          next=$(find dist/next -name '*.html' | wc -l)
-          default=$(( total - next ))
-          echo "html pages -> total:$total default:$default next:$next"
-          # Conservative floors + symmetry (both versions render identical pre-v2 content).
-          test "$total" -ge 180
-          test "$default" -ge 90
-          test "$next" -ge 90
-          diff=$(( default - next )); test "${diff#-}" -le 5
-          # Required structure: default at root, next under /next/, per-version search + manifest.
-          test -f dist/index.html
-          test -f dist/next/index.html
-          test -d dist/pagefind
-          test -d dist/next/pagefind
-          test -f dist/versions.json
-          # Version selector rendered with the correct selected option per version (criterion #7).
+          # Structure, per-version HTML counts, symmetry, and per-version Pagefind indexes
+          # are enforced by scripts/build-versions.mjs's guard during `npm run build` (the
+          # single source of truth). This step adds the only check the build guard does not
+          # perform: that each version renders the selector with its own option selected
+          # (acceptance criterion #7).
           grep -q '<option value="/" selected' dist/getting-started/index.html
           grep -q '<option value="/next/" selected' dist/next/getting-started/index.html
 

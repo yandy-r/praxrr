@@ -30,6 +30,11 @@ export default defineConfig({
       title: 'Praxrr',
       description: 'Documentation for the Praxrr app, PCD schema, and curated configuration database.',
       customCss: ['./src/styles/global.css'],
+      // In-development versions render the same content as the stable root, so keep them
+      // out of search indexes to avoid duplicate-content competition with the canonical docs.
+      head: activeVersion.development
+        ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex' } }]
+        : [],
       components: {
         Sidebar: './src/components/VersionedSidebar.astro',
         Banner: './src/components/VersionBanner.astro',

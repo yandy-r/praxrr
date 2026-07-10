@@ -26,7 +26,8 @@ orchestrator.
 
 - **`scripts/build-versions.mjs`** runs one `astro build` per entry with
   `DOCS_VERSION=<id>` set. `astro.config.mjs` reads `DOCS_VERSION` and sets the Astro
-  `base`, output directory, edit-link ref, and banner for that version.
+  `base`, output directory, and edit-link ref, registers the per-version `Sidebar` and
+  `Banner` component overrides, and marks `development` versions `noindex`.
 - Each build produces its own pages, its own Pagefind search index, and its own OpenAPI
   reference under its base. The orchestrator then assembles them: the default version at
   `dist/`, every other version under `dist/<id>/`. A guard verifies the assembled output
