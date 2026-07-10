@@ -337,13 +337,11 @@ without explanation:
 
 The strongest analogue is Praxrr's own recent work. Issue #227 distinguishes
 direct observed HTTPS, proxy-reported termination, insecure transport, and
-unknown context; only direct observation becomes a verified assurance. Issue
-
-# 228 distinguishes an observable overly broad live bypass from a missing proxy
-
-setting whose necessity cannot be observed. DNS grading should similarly reserve
-strong claims for the address classes actually returned and use
-advisories/unknown for topology and reachability conclusions.
+unknown context; only direct observation becomes a verified assurance. The
+explicit proxy trust follow-up (#228) distinguishes an observable overly broad
+live bypass from a missing proxy setting whose necessity cannot be observed. DNS
+grading should similarly reserve strong claims for the address classes actually
+returned and use advisories/unknown for topology and reachability conclusions.
 
 ### OWASP SSRF prevention: inspect all A and AAAA answers
 

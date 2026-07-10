@@ -262,6 +262,24 @@ Deno.test('retention is deterministic, deduplicated, capped at 16, and malformed
   assertEquals(evidence.ipv4.private, 15);
 });
 
+Deno.test('late public evidence survives bounded retention after 16 local answers', async () => {
+  const answers = [...Array.from({ length: 16 }, (_, index) => `10.0.0.${index + 1}`), '8.8.8.8'];
+  const { resolver } = resolverWith((_host, family) => resolved(family === 'A' ? answers : []));
+  const evidence = await resolver.observe('late-public.example');
+  const counted = [...Object.values(evidence.ipv4), ...Object.values(evidence.ipv6)].reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  assertEquals(evidence.ipv4.private, 15);
+  assertEquals(evidence.ipv4.public, 1);
+  assertEquals(evidence.retainedCount, DNS_TRANSPORT_POLICY.maxResultsPerHost);
+  assertEquals(counted, evidence.retainedCount);
+  assertEquals(evidence.truncated, true);
+  assertEquals(evidence.incomplete, true);
+  assert(!JSON.stringify(evidence).includes('8.8.8.8'));
+});
+
 Deno.test('positive cache uses 60s, labels cache source, and preserves original observedAt', async () => {
   let calls = 0;
   const { resolver, clock } = resolverWith((_host, family) => {

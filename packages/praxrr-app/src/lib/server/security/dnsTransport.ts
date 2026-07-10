@@ -68,6 +68,8 @@ interface MutableAddressClassCounts {
   special: number;
 }
 
+type NonPublicAddressClass = Exclude<IpAddressClass, 'public'>;
+
 interface ScopeFingerprint {
   readonly public: boolean;
   readonly nonPublic: boolean;
@@ -346,6 +348,8 @@ class DnsTransportResolverImpl implements DnsTransportResolver {
     const ipv6 = emptyCounts();
     const seen = new Set<string>();
     let retainedCount = 0;
+    let retainedPublic = false;
+    let replaceable: { counts: MutableAddressClassCounts; addressClass: NonPublicAddressClass } | null = null;
     let truncated = false;
     let malformed = false;
 
@@ -356,16 +360,23 @@ class DnsTransportResolverImpl implements DnsTransportResolver {
         const key = `${family.family}:${normalized}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (retainedCount >= this.policy.maxResultsPerHost) {
-          truncated = true;
-          continue;
-        }
-
         const addressClass = classifyIpAddress(raw);
         if (parseIpLiteral(raw) === null) malformed = true;
         const counts = family.family === 'A' ? ipv4 : ipv6;
+        if (retainedCount >= this.policy.maxResultsPerHost) {
+          truncated = true;
+          if (addressClass === 'public' && !retainedPublic && replaceable !== null) {
+            decrementCount(replaceable.counts, replaceable.addressClass);
+            incrementCount(counts, addressClass);
+            retainedPublic = true;
+          }
+          continue;
+        }
+
         incrementCount(counts, addressClass);
         retainedCount += 1;
+        if (addressClass === 'public') retainedPublic = true;
+        else replaceable = { counts, addressClass };
       }
     }
 
@@ -452,6 +463,23 @@ function incrementCount(counts: MutableAddressClassCounts, addressClass: IpAddre
       break;
     case 'special':
       counts.special += 1;
+      break;
+  }
+}
+
+function decrementCount(counts: MutableAddressClassCounts, addressClass: NonPublicAddressClass): void {
+  switch (addressClass) {
+    case 'loopback':
+      counts.loopback -= 1;
+      break;
+    case 'private':
+      counts.private -= 1;
+      break;
+    case 'link-local':
+      counts.linkLocal -= 1;
+      break;
+    case 'special':
+      counts.special -= 1;
       break;
   }
 }
