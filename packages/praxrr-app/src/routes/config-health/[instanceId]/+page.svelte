@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { RefreshCw } from 'lucide-svelte';
+  import { alertStore } from '$alerts/store';
   import Card from '$ui/card/Card.svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Badge from '$ui/badge/Badge.svelte';
@@ -57,9 +58,26 @@
   let detail: ConfigHealthDetailResponse | null = null;
   let trends: ConfigHealthTrendsResponse | null = null;
   let loading = false;
+  let recomputing = false;
   let loadError: string | null = null;
   let detailRequestId = 0;
   let verbose = false;
+
+  // Trends are supplementary — a failure to load the sparkline series must not blank the report that
+  // already resolved, so it is fetched and guarded independently under the shared supersede guard.
+  async function loadTrends(instanceId: number, requestId: number) {
+    try {
+      const trendResponse = await fetch(`/api/v1/config-health/${instanceId}/trends?days=${TREND_DAYS}`);
+      if (requestId !== detailRequestId) return;
+      if (trendResponse.ok) {
+        const nextTrends = (await trendResponse.json()) as ConfigHealthTrendsResponse;
+        if (requestId !== detailRequestId) return;
+        trends = nextTrends;
+      }
+    } catch {
+      /* sparkline is optional; ignore trend fetch failures */
+    }
+  }
 
   async function loadAll() {
     if (data.instanceId === null) return;
@@ -83,24 +101,58 @@
       if (requestId !== detailRequestId) return;
       detail = nextDetail;
 
-      // Trends are supplementary — a failure to load the sparkline series must not blank the
-      // report that already resolved above, so it is fetched and guarded independently.
-      try {
-        const trendResponse = await fetch(`/api/v1/config-health/${instanceId}/trends?days=${TREND_DAYS}`);
-        if (requestId !== detailRequestId) return;
-        if (trendResponse.ok) {
-          const nextTrends = (await trendResponse.json()) as ConfigHealthTrendsResponse;
-          if (requestId !== detailRequestId) return;
-          trends = nextTrends;
-        }
-      } catch {
-        /* sparkline is optional; ignore trend fetch failures */
-      }
+      await loadTrends(instanceId, requestId);
     } catch (err) {
       if (requestId !== detailRequestId) return;
       loadError = err instanceof Error ? err.message : 'Failed to load config health';
     } finally {
       if (requestId === detailRequestId) loading = false;
+    }
+  }
+
+  /**
+   * On-demand recompute: POST to persist a fresh snapshot, then adopt the returned detail and reload
+   * the trend series so the sparkline gains exactly one point. Distinct from Refresh (a free,
+   * unthrottled GET re-read that persists nothing). Rate-limited (429) and in-flight-bounded (409) per
+   * instance; scoring does no live Arr I/O, so a degraded instance still returns 200 (`unknown` band).
+   */
+  async function recompute() {
+    if (data.instanceId === null || recomputing) return;
+    const instanceId = data.instanceId;
+    // Supersede any in-flight GET so a slow Refresh can't clobber the POST result assigned below. That
+    // superseded loadAll early-returns without clearing its `loading` flag (its requestId no longer
+    // matches), so clear it here — otherwise the Refresh button stays disabled and spinning forever.
+    const requestId = ++detailRequestId;
+    loading = false;
+    recomputing = true;
+
+    try {
+      const response = await fetch(`/api/v1/config-health/${instanceId}/recompute`, { method: 'POST' });
+
+      if (response.status === 429) {
+        alertStore.add('warning', 'Too many recompute requests for this instance — try again shortly.');
+        return;
+      }
+      if (response.status === 409) {
+        alertStore.add('info', 'A config health recompute for this instance is already in progress.');
+        return;
+      }
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as ErrorResponse | null;
+        alertStore.add('error', body?.error ?? `Failed to recompute config health (HTTP ${response.status})`);
+        return;
+      }
+
+      const nextDetail = (await response.json()) as ConfigHealthDetailResponse;
+      if (requestId !== detailRequestId) return;
+      detail = nextDetail;
+      loadError = null;
+      await loadTrends(instanceId, requestId);
+      alertStore.add('success', `Health recomputed and saved — status: ${HEALTH_BAND_LABEL[nextDetail.overall.band]}.`);
+    } catch (err) {
+      alertStore.add('error', err instanceof Error ? err.message : 'Failed to recompute config health');
+    } finally {
+      recomputing = false;
     }
   }
 
@@ -139,15 +191,28 @@
           <Badge variant={bandVariant(detail.overall.band)}>{HEALTH_BAND_LABEL[detail.overall.band]}</Badge>
         {/if}
       </div>
-      <button
-        type="button"
-        class="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
-        disabled={loading}
-        on:click={loadAll}
-      >
-        <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-        Refresh
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          title="Re-read the current computed health (does not save a trend snapshot)"
+          class="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          disabled={loading || recomputing}
+          on:click={loadAll}
+        >
+          <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+        <button
+          type="button"
+          title="Recompute from stored drift and configuration and save a trend snapshot"
+          class="bg-accent-600 hover:bg-accent-700 dark:bg-accent-500 dark:hover:bg-accent-600 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={recomputing || (loading && !detail)}
+          on:click={recompute}
+        >
+          <RefreshCw size={14} class={recomputing ? 'animate-spin' : ''} />
+          Recompute
+        </button>
+      </div>
     </div>
 
     {#if loadError}
