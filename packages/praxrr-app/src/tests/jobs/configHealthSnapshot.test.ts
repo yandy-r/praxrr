@@ -289,7 +289,9 @@ migratedTest(
         name: 'cross-engine',
         current: (instanceId) =>
           makeReport(instanceId, 'radarr', 70, 'attention', {
-            engineVersion: '2',
+            // Must be a DIFFERENT engine generation than the current one; derive from the constant
+            // so this stays genuinely cross-engine across any CONFIG_HEALTH_ENGINE_VERSION bump.
+            engineVersion: `${CONFIG_HEALTH_ENGINE_VERSION}-cross`,
           }),
       },
       {
