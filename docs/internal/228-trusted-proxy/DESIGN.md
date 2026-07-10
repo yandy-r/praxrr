@@ -553,7 +553,7 @@ one member (`proxy_trust`), a breaking change per the type contract. The route t
       unchanged (advisory ids are free-form strings; assurance ids are free-form strings; new array
       _elements_, not new fields).
 - [ ] Regenerate the gated bundle: `deno task bundle:api` then `prettier --write
-    packages/praxrr-api/openapi.json` (the `openapi.json` mirror IS prettier-gated in CI).
+packages/praxrr-api/openapi.json` (the `openapi.json` mirror IS prettier-gated in CI).
 - [ ] `v1.d.ts`: **do not** commit a full regen (≈3300 lines of non-gated tool churn per repo memory).
       Hand-graft the single `proxy_trust` enum member if needed; routes type against
       `SecurityPostureSummaryResponse` directly, so runtime stays in lockstep without it.
