@@ -79,6 +79,18 @@ const SEED_SQL = `
     ('MoviesLadder', 'Bluray-1080p', NULL, 2, 1, 0),
     ('MoviesLadder', 'Bluray-720p', NULL, 3, 0, 0),
     ('MoviesLadder', 'DVD-R', NULL, 4, 0, 0);
+
+  -- A profile whose quality group straddles the 1080p ceiling (mapped members at 1080p AND 2160p) —
+  -- a genuinely ambiguous mapping that must fail fast (422) before any write (#221 AC4).
+  INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score, upgrade_score_increment)
+  VALUES (3, 'StraddleLadder', 0, 100, 1);
+  INSERT INTO quality_groups (quality_profile_name, name) VALUES ('StraddleLadder', 'Mixed');
+  INSERT INTO quality_group_members (quality_profile_name, quality_group_name, quality_name) VALUES
+    ('StraddleLadder', 'Mixed', 'Bluray-1080p'),
+    ('StraddleLadder', 'Mixed', 'Bluray-2160p');
+  INSERT INTO quality_profile_qualities (quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until) VALUES
+    ('StraddleLadder', NULL, 'Mixed', 1, 1, 0),
+    ('StraddleLadder', 'Bluray-720p', NULL, 2, 0, 0);
 `;
 
 const CEILING_720_WEIGHTS = {
@@ -482,6 +494,42 @@ Deno.test(
   }
 );
 
+Deno.test('goals preview: a straddling quality group fails fast with 422 before any write (#221 AC4)', async () => {
+  await withGoalsFixture(async (databaseId, current) => {
+    const rejected = await assertRejects(async () =>
+      previewRoute.POST(
+        postEvent({
+          databaseId,
+          arrType: 'radarr',
+          profileName: 'StraddleLadder',
+          preset: 'balanced',
+          weights: {
+            qualityVsSize: 50,
+            compatibility: 55,
+            hdrPreference: 50,
+            unwantedStrictness: 80,
+            resolutionCeiling: '1080p',
+          },
+        })
+      )
+    );
+    // buildGoalPlan (shared by preview AND apply) translates the GoalLadderMappingError to 422, not 500.
+    assertEquals(getErrorStatus(rejected), 422);
+
+    // The live cache ladder is untouched (fail-fast is before any write).
+    const persisted = await current.cache.kb
+      .selectFrom('quality_profile_qualities')
+      .select(['quality_group_name', 'quality_name', 'enabled'])
+      .where('quality_profile_name', '=', 'StraddleLadder')
+      .orderBy('position')
+      .execute();
+    assertEquals(persisted, [
+      { quality_group_name: 'Mixed', quality_name: null, enabled: 1 },
+      { quality_group_name: null, quality_name: 'Bluray-720p', enabled: 0 },
+    ]);
+  });
+});
+
 Deno.test('goals preview: validation and missing-cache errors', async () => {
   await assertRejects(async () =>
     previewRoute.POST(
@@ -692,6 +740,30 @@ Deno.test('goals apply: scoring and binding failures do not log', async () => {
     'Binding write failed'
   );
   assertEquals(bindingLogs, []);
+});
+
+Deno.test('goals apply: a value-guard gate rejection maps to 409 (not 500) and does not log (#221)', async () => {
+  const logs: ApplyLogCall[] = [];
+  const conflict = await assertRejects(() =>
+    applyRoute._handleGoalApplyRequest(
+      postEvent({
+        databaseId: DATABASE_ID,
+        arrType: 'radarr',
+        profileName: 'Movies',
+        preset: 'best-quality',
+        weights: BEST_QUALITY_WEIGHTS,
+        expectedEngineVersion: '2',
+      }).request,
+      buildApplyDependencies(logs, {
+        // The writer emits "Value-guard gate rejected operation N …" on a guard conflict; the route
+        // classifies that as a 409 concurrency conflict via /value-guard gate/i.
+        persistGoalApply: () =>
+          Promise.resolve({ success: false, error: 'Value-guard gate rejected operation 2 (quality_profile "Movies"): conflict' }),
+      })
+    )
+  );
+  assertEquals(getErrorStatus(conflict), 409);
+  assertEquals(logs, []);
 });
 
 // ============================================================================

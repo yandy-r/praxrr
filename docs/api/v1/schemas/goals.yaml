@@ -261,7 +261,7 @@ GoalPlan:
 
 GoalQualityLadderItem:
   type: object
-  description: One row of the ceiling-derived quality ladder (issue #221).
+  description: 'One row of the ceiling-derived quality ladder (issue #221).'
   required:
     - name
     - type
@@ -442,6 +442,7 @@ GoalApplyResponse:
   required:
     - plan
     - binding
+    - configDiff
   properties:
     plan:
       $ref: '#/GoalPlan'

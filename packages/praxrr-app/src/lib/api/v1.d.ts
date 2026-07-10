@@ -2906,7 +2906,7 @@ export interface components {
       plan: components['schemas']['GoalPlan'];
       binding: components['schemas']['GoalBinding'];
       /** @description Authoritative sandbox config diff of the persisted ladder + scoring, captured before persist so it matches the preview diff for the same request (issue #221). */
-      configDiff?: components['schemas']['EntityConfigDiff'][];
+      configDiff: components['schemas']['EntityConfigDiff'][];
     };
     GoalBindingResponse: {
       binding: components['schemas']['GoalBinding'] | null;

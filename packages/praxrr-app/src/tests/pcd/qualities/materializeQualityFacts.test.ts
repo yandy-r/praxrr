@@ -59,6 +59,25 @@ Deno.test('materializeQualityFacts: Sonarr remux fact uses the PCD name (not the
   }
 });
 
+Deno.test('materializeQualityFacts: native lidarr audio mappings materialize (resolution 0) without a false 422 (#222)', async () => {
+  const fixture = createFixture(`
+    INSERT INTO qualities (name) VALUES ('FLAC'), ('MP3-320'), ('AAC-256');
+    INSERT INTO quality_api_mappings (quality_name, arr_type, api_name) VALUES
+      ('FLAC', 'lidarr', 'FLAC'),
+      ('MP3-320', 'lidarr', 'MP3-320'),
+      ('AAC-256', 'lidarr', 'AAC-256');
+  `);
+  try {
+    const facts = await materializeQualityFacts(fixture.cache, 'lidarr');
+    assertEquals(facts.length, 3);
+    // Audio qualities carry resolution 0 (no video resolution) and must NOT trigger the 422 path.
+    assert(facts.every((fact) => fact.resolution === 0));
+    assert(facts.some((fact) => fact.name === 'FLAC'));
+  } finally {
+    await fixture.destroy();
+  }
+});
+
 Deno.test('materializeQualityFacts: an api_name with no known resolution fails fast with 422', async () => {
   const fixture = createFixture(`
     INSERT INTO qualities (name) VALUES ('Bluray-1080p'), ('Mystery-Quality');

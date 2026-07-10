@@ -9294,7 +9294,7 @@
       },
       "GoalQualityLadderItem": {
         "type": "object",
-        "description": "One row of the ceiling-derived quality ladder (issue",
+        "description": "One row of the ceiling-derived quality ladder (issue #221).",
         "required": ["name", "type", "enabled", "upgradeUntil", "position", "resolution", "mapped"],
         "properties": {
           "name": {
@@ -9489,7 +9489,7 @@
       },
       "GoalApplyResponse": {
         "type": "object",
-        "required": ["plan", "binding"],
+        "required": ["plan", "binding", "configDiff"],
         "properties": {
           "plan": {
             "$ref": "#/components/schemas/GoalPlan"

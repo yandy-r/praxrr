@@ -249,6 +249,33 @@ Deno.test('ladder: straddling group throws GoalLadderMappingError (genuine ambig
   assertThrows(() => buildCeilingLadder('1080p', ladder, facts, false), GoalLadderMappingError);
 });
 
+Deno.test('ladder: lidarr audio (resolution-0) profiles never derive a ladder — no cutoff, groups stay disabled (#222 integration)', () => {
+  // Every QUALITIES.lidarr entry has resolution 0 (audio has no video resolution). The ceiling must
+  // stay fully inert: no Bluray-<ceiling> cutoff row can exist, the resolution-0 floor keeps standalone
+  // AND grouped audio disabled, and no group can straddle (max resolution is always 0).
+  const audioFacts = factsFrom({ FLAC: 0, 'MP3-320': 0, 'AAC-256': 0 });
+  const audioLadder: OrderedItem[] = [
+    { type: 'quality', name: 'FLAC', position: 1, enabled: true, upgradeUntil: true },
+    { type: 'quality', name: 'MP3-320', position: 2, enabled: true, upgradeUntil: false },
+    {
+      type: 'group',
+      name: 'Lossy',
+      position: 3,
+      enabled: true,
+      upgradeUntil: false,
+      members: [{ name: 'AAC-256' }]
+    }
+  ];
+  for (const ceiling of CEILINGS) {
+    const { ladderInput, ladder } = buildCeilingLadder(ceiling, audioLadder, audioFacts, false);
+    assertEquals(ladderInput, null, `lidarr @${ceiling} must produce no ladder change`);
+    assertEquals(ladder.cutoff, null);
+    // The audio group's resolution-0 member must NOT enable it, even though 0 <= ceiling numerically.
+    const group = ladder.items.find((item) => item.name === 'Lossy');
+    assertEquals(group?.enabled, false, 'resolution-0 group is not enabled by a ceiling');
+  }
+});
+
 Deno.test('ladder: sharedLadderNote is set only when a change is produced and the profile is sibling-compatible', () => {
   const withSibling = buildCeilingLadder('1080p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), true);
   assert(withSibling.ladder.sharedLadderNote !== null);

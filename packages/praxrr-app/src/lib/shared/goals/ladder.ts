@@ -192,7 +192,9 @@ export function buildCeilingLadder(
           'cannot derive an unambiguous enabled state.'
       );
     }
-    const nextEnabled = maxResolution <= ceilingResolution;
+    // Mirror the standalone-quality floor: a resolution-0 (e.g. audio/pre-release) member never enables
+    // a group by ceiling, exactly as it never enables a standalone quality.
+    const nextEnabled = maxResolution > 0 && maxResolution <= ceilingResolution;
     if (nextEnabled) enabledMappedCount += 1;
     items.push({
       name: item.name,
