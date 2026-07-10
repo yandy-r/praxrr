@@ -12,13 +12,11 @@ The current Security Posture page already establishes useful patterns:
 **Non-blocking** is visible next to the title, the introduction says the audit
 informs and never blocks, unknown states are not called safe or failed,
 recommendations have concrete fixes, and the transport table exposes only the
-configured host rather than a full URL or API key. Issues #227/#248 and
-
-# 228/#249 strengthen that pattern by separating verified assurances from hedged
-
-advisories and by using wording such as "observed," "could not be observed," and
-"cannot verify." DNS grading should extend those semantics, not introduce a
-stronger-sounding "exposure detector."
+configured host rather than a full URL or API key. Issues #227/#248 and the
+explicit-proxy-trust follow-up (#228/#249) strengthen that pattern by separating
+verified assurances from hedged advisories and by using wording such as "observed,"
+"could not be observed," and "cannot verify." DNS grading should extend those
+semantics, not introduce a stronger-sounding "exposure detector."
 
 Recommended presentation:
 
@@ -340,9 +338,7 @@ without explanation:
 The strongest analogue is Praxrr's own recent work. Issue #227 distinguishes
 direct observed HTTPS, proxy-reported termination, insecure transport, and
 unknown context; only direct observation becomes a verified assurance. Issue
-
-# 228 distinguishes an observable overly broad live bypass from a missing proxy
-
+#228 distinguishes an observable overly broad live bypass from a missing proxy
 setting whose necessity cannot be observed. DNS grading should similarly reserve
 strong claims for the address classes actually returned and use
 advisories/unknown for topology and reachability conclusions.
