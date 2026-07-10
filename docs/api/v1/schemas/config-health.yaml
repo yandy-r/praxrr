@@ -233,34 +233,243 @@ ConfigHealthDetailResponse:
       items:
         $ref: '#/ConfigHealthProfileHealth'
 
-ConfigHealthTrendPoint:
+ConfigHealthTrendPointState:
+  type: string
+  description: |
+    Availability of the point's selected scope. `unknown` is persisted scoring without a measured
+    score, `profile-missing` preserves a snapshot where the exact profile was absent, and
+    `not-recorded` preserves snapshot identity when stored evidence is unusable.
+  enum:
+    - measured
+    - unknown
+    - profile-missing
+    - not-recorded
+
+ConfigHealthTrendCriterionState:
+  type: string
+  description: Availability of one persisted overall criterion observation.
+  enum:
+    - measured
+    - not-evaluated
+    - not-recorded
+
+ConfigHealthTrendInstance:
   type: object
   required:
-    - generatedAt
-    - overallScore
-    - band
+    - id
+    - name
+    - arrType
   properties:
+    id:
+      type: integer
+    name:
+      type: string
+    arrType:
+      $ref: '#/ConfigHealthArrType'
+
+ConfigHealthTrendFilter:
+  type: object
+  description: |
+    Applied absolute filter echoed for representation parity. `from=null` means unbounded history;
+    `to` is captured once per request so a later export cannot acquire newer points. Profile matching
+    preserves the exact persisted name.
+  required:
+    - from
+    - to
+    - profile
+  properties:
+    from:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    to:
+      type: string
+      format: date-time
+    profile:
+      oneOf:
+        - type: string
+          minLength: 1
+        - type: 'null'
+
+ConfigHealthTrendRetention:
+  type: object
+  description: |
+    Current global retention policy and observed availability for this instance. These values do not
+    identify why any older point is absent or prove which retention rule removed it.
+  required:
+    - days
+    - maxEntries
+    - ageCutoffAt
+    - oldestAvailableAt
+    - newestAvailableAt
+  properties:
+    days:
+      type: integer
+      minimum: 1
+    maxEntries:
+      type: integer
+      minimum: 1
+    ageCutoffAt:
+      type: string
+      format: date-time
+    oldestAvailableAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    newestAvailableAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+
+ConfigHealthTrendCounts:
+  type: object
+  required:
+    - points
+    - measured
+    - unknown
+    - missing
+  properties:
+    points:
+      type: integer
+      minimum: 0
+    measured:
+      type: integer
+      minimum: 0
+    unknown:
+      type: integer
+      minimum: 0
+    missing:
+      type: integer
+      minimum: 0
+      description: Points whose selected evidence is profile-missing or not-recorded.
+
+ConfigHealthTrendEngineBoundary:
+  type: object
+  description: Start of one contiguous persisted engine-version run in canonical point order.
+  required:
+    - engineVersion
+    - startsAt
+    - pointIndex
+  properties:
+    engineVersion:
+      type: string
+    startsAt:
+      type: string
+      format: date-time
+    pointIndex:
+      type: integer
+      minimum: 0
+
+ConfigHealthTrendCriterion:
+  type: object
+  description: |
+    One persisted overall criterion observation. Profile-scoped points do not expose criteria.
+    Nullable numeric fields remain distinct from measured zero.
+  required:
+    - id
+    - label
+    - state
+    - score
+    - weight
+    - contribution
+  properties:
+    id:
+      type: string
+    label:
+      type: string
+    state:
+      $ref: '#/ConfigHealthTrendCriterionState'
+    score:
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 100
+        - type: 'null'
+    weight:
+      oneOf:
+        - type: integer
+          minimum: 0
+        - type: 'null'
+    contribution:
+      oneOf:
+        - type: integer
+        - type: 'null'
+
+ConfigHealthTrendPoint:
+  type: object
+  description: One persisted snapshot observation in `generatedAt ASC, snapshotId ASC` order.
+  required:
+    - snapshotId
+    - generatedAt
+    - engineVersion
+    - state
+    - score
+    - band
+    - criteria
+  properties:
+    snapshotId:
+      type: integer
+      minimum: 1
     generatedAt:
       type: string
       format: date-time
-    overallScore:
-      type: integer
-      minimum: 0
-      maximum: 100
+    engineVersion:
+      type: string
+    state:
+      $ref: '#/ConfigHealthTrendPointState'
+    score:
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 100
+        - type: 'null'
     band:
-      $ref: '#/ConfigHealthBand'
+      oneOf:
+        - $ref: '#/ConfigHealthBand'
+        - type: 'null'
+    criteria:
+      type: array
+      description: Persisted overall criterion observations; empty for exact-profile scope.
+      items:
+        $ref: '#/ConfigHealthTrendCriterion'
 
 ConfigHealthTrendsResponse:
   type: object
+  description: |
+    Canonical bounded historical result shared by chart/table JSON and JSON/CSV export selection.
+    Empty selections are successful and contain `points: []` with the same metadata shape.
   required:
-    - instanceId
-    - engineVersion
+    - instance
+    - currentEngineVersion
+    - normalizedFilter
+    - retention
+    - availableProfiles
+    - counts
+    - engineBoundaries
     - points
   properties:
-    instanceId:
-      type: integer
-    engineVersion:
+    instance:
+      $ref: '#/ConfigHealthTrendInstance'
+    currentEngineVersion:
       type: string
+    normalizedFilter:
+      $ref: '#/ConfigHealthTrendFilter'
+    retention:
+      $ref: '#/ConfigHealthTrendRetention'
+    availableProfiles:
+      type: array
+      description: Exact historical profile names in deterministic order.
+      items:
+        type: string
+    counts:
+      $ref: '#/ConfigHealthTrendCounts'
+    engineBoundaries:
+      type: array
+      items:
+        $ref: '#/ConfigHealthTrendEngineBoundary'
     points:
       type: array
       items:

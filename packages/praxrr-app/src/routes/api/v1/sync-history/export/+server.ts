@@ -4,6 +4,7 @@ import { syncHistoryQueries, type SyncHistoryDetail, type SyncHistoryFilters } f
 import { parseDateBound } from '$sync/syncHistory/filters.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { logger } from '$logger/logger.ts';
+import { escapeCsvCell } from '$utils/export/csv.ts';
 
 type ErrorResponse = { error: string };
 
@@ -42,26 +43,6 @@ const CSV_COLUMNS: (keyof SyncHistoryDetail)[] = [
   'changes',
 ];
 
-/**
- * CSV field escape:
- * 1. Neutralize spreadsheet formula injection (CWE-1236) — a value whose first
- *    character is `= + - @` (or tab/CR) is evaluated as a formula by Excel/Sheets
- *    even inside quotes, so prefix it with an apostrophe. `error`/`instanceName`
- *    carry externally-influenced text, so this is a real vector.
- * 2. RFC-4180 quoting — wrap in double-quotes and double embedded quotes when the
- *    value contains a quote, comma, or newline.
- */
-function escapeCsv(value: string): string {
-  let escaped = value;
-  if (/^[=+\-@\t\r]/.test(escaped)) {
-    escaped = `'${escaped}`;
-  }
-  if (/[",\r\n]/.test(escaped)) {
-    return `"${escaped.replace(/"/g, '""')}"`;
-  }
-  return escaped;
-}
-
 function cellValue(record: SyncHistoryDetail, column: keyof SyncHistoryDetail): string {
   const value = record[column];
   if (value === null || value === undefined) {
@@ -75,9 +56,9 @@ function cellValue(record: SyncHistoryDetail, column: keyof SyncHistoryDetail): 
 
 function toCsv(records: SyncHistoryDetail[]): string {
   const rows: string[] = [];
-  rows.push(CSV_COLUMNS.map((column) => escapeCsv(column)).join(','));
+  rows.push(CSV_COLUMNS.map((column) => escapeCsvCell(column)).join(','));
   for (const record of records) {
-    rows.push(CSV_COLUMNS.map((column) => escapeCsv(cellValue(record, column))).join(','));
+    rows.push(CSV_COLUMNS.map((column) => escapeCsvCell(cellValue(record, column))).join(','));
   }
   return rows.join('\r\n');
 }

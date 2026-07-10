@@ -1,0 +1,9 @@
+/** Parse a Config Health instance path parameter without accepting numeric coercion forms. */
+export function parseConfigHealthInstanceId(raw: string | undefined): number | null {
+  if (!raw || !/^\d+$/.test(raw)) {
+    return null;
+  }
+
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}

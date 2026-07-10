@@ -1,9 +1,14 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
+import {
+  CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+  ConfigHealthTrendEvidenceLimitError,
+  configHealthSnapshotsQueries,
+  type ConfigHealthTrendEvidenceBudget,
+} from '$db/queries/configHealthSnapshots.ts';
 import {
   CONFIG_HEALTH_ENGINE_VERSION,
   type CriterionResult,
@@ -253,6 +258,303 @@ migratedTest('getTrend is scoped to one instance', () => {
   assertEquals(radarrTrend.length, 1);
   assertEquals(radarrTrend[0].arrType, 'radarr');
   assertEquals(radarrTrend[0].arrInstanceId, radarr);
+});
+
+// ---------------------------------------------------------------------------
+// searchTrend — canonical bounds, ordering, cap, isolation, and evidence
+// ---------------------------------------------------------------------------
+
+migratedTest('searchTrend applies optional inclusive canonical from and to bounds', () => {
+  const radarr = seedInstance('radarr');
+  const before = '2026-06-30T23:59:59.999Z';
+  const from = '2026-07-01T00:00:00.000Z';
+  const middle = '2026-07-05T12:00:00.000Z';
+  const to = '2026-07-10T23:59:59.999Z';
+  const after = '2026-07-11T00:00:00.000Z';
+
+  [before, from, middle, to, after].forEach((generatedAt, index) => {
+    configHealthSnapshotsQueries.insert(makeReport(radarr, 'radarr', generatedAt, 50 + index, 'attention'));
+  });
+
+  assertEquals(
+    configHealthSnapshotsQueries.searchTrend(radarr, { from, limit: 10 }).map((row) => row.generatedAt),
+    [from, middle, to, after]
+  );
+  assertEquals(
+    configHealthSnapshotsQueries.searchTrend(radarr, { to, limit: 10 }).map((row) => row.generatedAt),
+    [before, from, middle, to]
+  );
+  assertEquals(
+    configHealthSnapshotsQueries.searchTrend(radarr, { from, to, limit: 10 }).map((row) => row.generatedAt),
+    [from, middle, to],
+    'rows exactly on both bounds are included'
+  );
+});
+
+migratedTest('searchTrend orders equal timestamps by snapshot id ascending', () => {
+  const sonarr = seedInstance('sonarr');
+  const generatedAt = '2026-07-10T12:00:00.000Z';
+  const ids = [70, 20, 90].map((score) =>
+    configHealthSnapshotsQueries.insert(makeReport(sonarr, 'sonarr', generatedAt, score, 'attention'))
+  );
+
+  const trend = configHealthSnapshotsQueries.searchTrend(sonarr, { limit: 10 });
+
+  assertEquals(
+    trend.map((row) => row.id),
+    ids
+  );
+  assertEquals(
+    trend.map((row) => row.overallScore),
+    [70, 20, 90]
+  );
+});
+
+migratedTest('searchTrend isolates Radarr, Sonarr, and Lidarr snapshots', () => {
+  const radarr = seedInstance('radarr');
+  const sonarr = seedInstance('sonarr');
+  const lidarr = seedInstance('lidarr');
+  const generatedAt = '2026-07-10T12:00:00.000Z';
+
+  configHealthSnapshotsQueries.insert(makeReport(radarr, 'radarr', generatedAt, 91, 'healthy'));
+  configHealthSnapshotsQueries.insert(makeReport(sonarr, 'sonarr', generatedAt, 62, 'attention'));
+  configHealthSnapshotsQueries.insert(makeReport(lidarr, 'lidarr', generatedAt, 33, 'needs-review'));
+
+  for (const [instanceId, arrType, score] of [
+    [radarr, 'radarr', 91],
+    [sonarr, 'sonarr', 62],
+    [lidarr, 'lidarr', 33],
+  ] as const) {
+    const trend = configHealthSnapshotsQueries.searchTrend(instanceId, { limit: 10 });
+    assertEquals(trend.length, 1);
+    assertEquals(trend[0].arrInstanceId, instanceId);
+    assertEquals(trend[0].arrType, arrType);
+    assertEquals(trend[0].overallScore, score);
+  }
+});
+
+migratedTest('searchTrend returns the caller-requested cap sentinel row', () => {
+  const lidarr = seedInstance('lidarr');
+  const timestamps = [
+    '2026-07-01T00:00:00.000Z',
+    '2026-07-02T00:00:00.000Z',
+    '2026-07-03T00:00:00.000Z',
+    '2026-07-04T00:00:00.000Z',
+  ];
+  timestamps.forEach((generatedAt, index) => {
+    configHealthSnapshotsQueries.insert(makeReport(lidarr, 'lidarr', generatedAt, 40 + index, 'attention'));
+  });
+
+  const serviceCap = 2;
+  const trend = configHealthSnapshotsQueries.searchTrend(lidarr, { limit: serviceCap + 1 });
+
+  assertEquals(trend.length, serviceCap + 1);
+  assertEquals(
+    trend.map((row) => row.generatedAt),
+    timestamps.slice(0, serviceCap + 1),
+    'the query preserves the overflow sentinel instead of truncating to the service cap'
+  );
+  assertThrows(
+    () => configHealthSnapshotsQueries.searchTrend(lidarr, { limit: 0 }),
+    RangeError,
+    'positive safe integer'
+  );
+});
+
+migratedTest('trend profile names form a deterministic bounded retained union and detect Arr type changes', () => {
+  const instanceId = seedInstance('radarr');
+  const ids = ['z profile', 'A profile', 'middle profile'].map((name, index) => {
+    const id = configHealthSnapshotsQueries.insert(
+      makeReport(instanceId, 'radarr', `2026-07-0${index + 1}T00:00:00.000Z`, 70 + index, 'attention')
+    );
+    db.execute(
+      'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+      JSON.stringify([{ name, score: 80, band: 'attention' }]),
+      id
+    );
+    return id;
+  });
+
+  assertEquals(configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, 'radarr'), false);
+  assertEquals(
+    configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', { limit: 2, snapshotLimit: 10 }),
+    ['A profile', 'middle profile']
+  );
+  assertThrows(
+    () =>
+      configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+        limit: 0,
+        snapshotLimit: 10,
+      }),
+    RangeError,
+    'positive safe integer'
+  );
+  assertThrows(
+    () =>
+      configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+        limit: 10,
+        snapshotLimit: 2,
+      }),
+    ConfigHealthTrendEvidenceLimitError,
+    'safe request budget'
+  );
+
+  const emptyNameId = configHealthSnapshotsQueries.insert(
+    makeReport(instanceId, 'radarr', '2026-07-04T00:00:00.000Z', 80, 'attention')
+  );
+  const whitespaceNameId = configHealthSnapshotsQueries.insert(
+    makeReport(instanceId, 'radarr', '2026-07-05T00:00:00.000Z', 80, 'attention')
+  );
+  db.execute(
+    'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+    JSON.stringify([{ name: '', score: 80, band: 'attention' }]),
+    emptyNameId
+  );
+  db.execute(
+    'UPDATE config_health_snapshots SET profile_scores = ? WHERE id = ?',
+    JSON.stringify([{ name: '  ', score: 80, band: 'attention' }]),
+    whitespaceNameId
+  );
+  assertEquals(
+    configHealthSnapshotsQueries.listTrendProfileNames(instanceId, 'radarr', {
+      limit: 10,
+      snapshotLimit: 10,
+    }),
+    ['  ', 'A profile', 'middle profile', 'z profile'],
+    'empty names are rejected while exact whitespace-only names are preserved'
+  );
+
+  db.execute("UPDATE config_health_snapshots SET arr_type = 'sonarr' WHERE id = ?", ids[0]);
+  assertEquals(configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, 'radarr'), true);
+});
+
+migratedTest('searchTrend distinguishes valid empty arrays from malformed or non-array evidence', () => {
+  const radarr = seedInstance('radarr');
+  const emptyId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-01T00:00:00.000Z', 80, 'attention')
+  );
+  const malformedId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-02T00:00:00.000Z', 70, 'attention')
+  );
+  const nonArrayId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-03T00:00:00.000Z', 60, 'attention')
+  );
+
+  db.execute("UPDATE config_health_snapshots SET criteria_scores = '[]', profile_scores = '[]' WHERE id = ?", emptyId);
+  db.execute(
+    "UPDATE config_health_snapshots SET criteria_scores = 'not-json', profile_scores = '[' WHERE id = ?",
+    malformedId
+  );
+  db.execute(
+    "UPDATE config_health_snapshots SET criteria_scores = '{}', profile_scores = 'null' WHERE id = ?",
+    nonArrayId
+  );
+
+  const [empty, malformed, nonArray] = configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10 });
+
+  assertEquals(empty.id, emptyId);
+  assertEquals(empty.criteriaScores, []);
+  assertEquals(empty.profileScores, []);
+  assertEquals(empty.criteriaScoresValid, true);
+  assertEquals(empty.profileScoresValid, true);
+
+  for (const row of [malformed, nonArray]) {
+    assertEquals(row.criteriaScores, []);
+    assertEquals(row.profileScores, []);
+    assertEquals(row.criteriaScoresValid, false);
+    assertEquals(row.profileScoresValid, false);
+  }
+});
+
+migratedTest('searchTrend reports UTF-8 evidence bytes and rejects row, aggregate, and nested overages', () => {
+  const radarr = seedInstance('radarr');
+  const firstId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-01T00:00:00.000Z', 80, 'attention')
+  );
+  const secondId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-02T00:00:00.000Z', 70, 'attention')
+  );
+  const criteriaJson = JSON.stringify([{ label: 'Santé' }]);
+  const profileJson = JSON.stringify([{ name: 'Vidéo', score: 80, band: 'attention' }]);
+  for (const id of [firstId, secondId]) {
+    db.execute(
+      'UPDATE config_health_snapshots SET criteria_scores = ?, profile_scores = ? WHERE id = ?',
+      criteriaJson,
+      profileJson,
+      id
+    );
+  }
+
+  const rows = configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10 });
+  assertEquals(rows[0].criteriaScoresBytes, new TextEncoder().encode(criteriaJson).byteLength);
+  assertEquals(rows[0].profileScoresBytes, new TextEncoder().encode(profileJson).byteLength);
+  assertEquals('instanceName' in rows[0], false);
+  assertEquals('createdAt' in rows[0], false);
+
+  const rowBytes = rows[0].criteriaScoresBytes + rows[0].profileScoresBytes;
+  const budget = (overrides: Partial<ConfigHealthTrendEvidenceBudget>): ConfigHealthTrendEvidenceBudget => ({
+    ...CONFIG_HEALTH_TREND_EVIDENCE_BUDGET,
+    ...overrides,
+  });
+  for (const evidenceBudget of [
+    budget({ maxBytesPerRow: rowBytes - 1 }),
+    budget({ maxTotalBytes: rowBytes * 2 - 1 }),
+  ]) {
+    assertThrows(
+      () => configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10, evidenceBudget }),
+      ConfigHealthTrendEvidenceLimitError
+    );
+  }
+
+  db.execute('UPDATE config_health_snapshots SET criteria_scores = ? WHERE id = ?', JSON.stringify([{}, {}]), firstId);
+  assertThrows(
+    () =>
+      configHealthSnapshotsQueries.searchTrend(radarr, {
+        limit: 10,
+        evidenceBudget: budget({ maxCriteriaPerRow: 1 }),
+      }),
+    ConfigHealthTrendEvidenceLimitError
+  );
+});
+
+migratedTest('searchTrend rejects adversarial raw evidence through the byte preflight', () => {
+  const radarr = seedInstance('radarr');
+  const snapshotId = configHealthSnapshotsQueries.insert(
+    makeReport(radarr, 'radarr', '2026-07-01T00:00:00.000Z', 80, 'attention')
+  );
+  const hostileEvidence = `["${'x'.repeat(CONFIG_HEALTH_TREND_EVIDENCE_BUDGET.maxBytesPerRow)}"]`;
+  db.execute(
+    'UPDATE config_health_snapshots SET criteria_scores = ?, profile_scores = ? WHERE id = ?',
+    hostileEvidence,
+    hostileEvidence,
+    snapshotId
+  );
+
+  assertThrows(
+    () => configHealthSnapshotsQueries.searchTrend(radarr, { limit: 10 }),
+    ConfigHealthTrendEvidenceLimitError,
+    'safe request budget'
+  );
+});
+
+migratedTest('searchTrend bounded predicates use the instance timestamp index lexically', () => {
+  const radarr = seedInstance('radarr');
+  const plan = db.query<{ detail: string }>(
+    `EXPLAIN QUERY PLAN
+     SELECT * FROM config_health_snapshots
+      WHERE arr_instance_id = ? AND generated_at >= ? AND generated_at <= ?
+      ORDER BY generated_at ASC, id ASC
+      LIMIT ?`,
+    radarr,
+    '2026-07-01T00:00:00.000Z',
+    '2026-07-10T23:59:59.999Z',
+    10
+  );
+  const detail = plan.map((row) => row.detail).join('\n');
+
+  assert(detail.includes('idx_config_health_snapshots_instance'), detail);
+  assert(detail.includes('generated_at>?') && detail.includes('generated_at<?'), detail);
+  assertEquals(detail.includes('datetime'), false, detail);
 });
 
 // ---------------------------------------------------------------------------

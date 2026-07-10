@@ -4,6 +4,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { recomputeAndPersistInstance } from '$lib/server/health/recompute.ts';
 import { toDetailResponse } from '$lib/server/health/responses.ts';
+import { parseConfigHealthInstanceId } from '$lib/server/health/pathParams.ts';
 import {
   CONFIG_HEALTH_RECOMPUTE_RATE_LIMIT_WINDOW_MS,
   registerConfigHealthRecomputeAttempt,
@@ -13,14 +14,6 @@ import type { components } from '$api/v1.d.ts';
 
 type ErrorResponse = { error: string };
 type DetailResponse = components['schemas']['ConfigHealthDetailResponse'];
-
-function parseInstanceId(raw: string | undefined): number | null {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) {
-    return null;
-  }
-  return value;
-}
 
 /**
  * POST /api/v1/config-health/{instanceId}/recompute
@@ -39,7 +32,7 @@ function parseInstanceId(raw: string | undefined): number | null {
  * when persisting the snapshot fails.
  */
 export const POST: RequestHandler = async ({ params }) => {
-  const instanceId = parseInstanceId(params.instanceId);
+  const instanceId = parseConfigHealthInstanceId(params.instanceId);
   if (instanceId === null) {
     return json({ error: 'Invalid instance id' } satisfies ErrorResponse, { status: 400 });
   }
@@ -65,9 +58,12 @@ export const POST: RequestHandler = async ({ params }) => {
 
   const outcome = await recomputeAndPersistInstance(instance);
   if (outcome.kind === 'in_flight') {
-    return json({ error: 'A config health recompute for this instance is already in progress' } satisfies ErrorResponse, {
-      status: 409,
-    });
+    return json(
+      { error: 'A config health recompute for this instance is already in progress' } satisfies ErrorResponse,
+      {
+        status: 409,
+      }
+    );
   }
   // Defensive: only reachable if the instance is deleted between the getById above and the score.
   if (outcome.kind === 'skipped') {

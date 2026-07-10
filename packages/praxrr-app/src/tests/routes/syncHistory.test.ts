@@ -24,6 +24,8 @@ type SettingsPatchEvent = Parameters<typeof PATCH_SETTINGS>[0];
 
 type ErrorResponse = { error: string };
 
+const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r', '\n', '＝', '＋', '－', '＠'] as const;
+
 // ============================================================================
 // DB BOOTSTRAP -- mirrors tests/routes/drift.test.ts: point the db singleton at a
 // scratch SQLite file under a fresh temp base path, run the full migration chain
@@ -361,29 +363,26 @@ migratedTest('PATCH /sync-history/settings: retentionDays=0 returns 400', async 
 // REVIEW FIXES -- CSV formula injection + strict/inclusive date bounds
 // ============================================================================
 
-migratedTest('GET /sync-history/export?format=csv: neutralizes spreadsheet formula injection', async () => {
+migratedTest('GET /sync-history/export?format=csv: neutralizes every spreadsheet formula prefix', async () => {
   const radarrId = createInstance('radarr');
-  // instanceName starts with '=' (also has quotes/commas → RFC-4180 quoted too);
-  // error starts with '-' (no other special chars → apostrophe-prefixed, unquoted).
-  seedRow({
-    arrInstanceId: radarrId,
-    status: 'failed',
-    failureCount: 1,
-    instanceName: '=HYPERLINK("http://evil","x")',
-    error: '-1+cmd',
-  });
+  const payloads = FORMULA_PREFIXES.map((prefix) => `${prefix}formula, "quoted"\r\nnext`);
+  for (const payload of payloads) {
+    seedRow({
+      arrInstanceId: radarrId,
+      status: 'failed',
+      failureCount: 1,
+      instanceName: payload,
+    });
+  }
 
   const response = await GET_EXPORT(exportEvent(`instanceId=${radarrId}&format=csv`));
   assertEquals(response.status, 200);
   const csv = await response.text();
 
-  // Leading '=' neutralized with an apostrophe, then RFC-4180 quoted (contains quotes/commas).
-  assert(csv.includes('"\'=HYPERLINK('), 'formula-prefixed instanceName must be apostrophe-guarded');
-  // Leading '-' neutralized; no quoting needed.
-  assert(
-    csv.includes(",'-1+cmd,") || csv.includes(",'-1+cmd\r\n"),
-    'formula-prefixed error must be apostrophe-guarded'
-  );
+  for (const payload of payloads) {
+    const expectedCell = `"'${payload.replaceAll('"', '""')}"`;
+    assert(csv.includes(expectedCell), `formula-prefixed instanceName must be guarded: ${JSON.stringify(payload)}`);
+  }
 });
 
 migratedTest('GET /sync-history: date-only "to" includes runs recorded later that day', async () => {

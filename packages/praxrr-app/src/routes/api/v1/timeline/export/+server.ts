@@ -5,6 +5,7 @@ import { TimelineHttpError } from '$lib/server/timeline/errors.ts';
 import { exportTimeline } from '$lib/server/timeline/service.ts';
 import type { TimelineEvent } from '$lib/server/timeline/types.ts';
 import { logger } from '$logger/logger.ts';
+import { escapeCsvCell } from '$utils/export/csv.ts';
 
 type ErrorResponse = { error: string };
 type ExportFormat = 'json' | 'csv';
@@ -31,21 +32,6 @@ const CSV_COLUMNS: readonly (keyof TimelineEvent | 'scopeKind' | 'scopeId' | 'sc
   'annotations',
 ];
 
-/**
- * CSV field escape: neutralize spreadsheet formula injection (CWE-1236) then RFC-4180 quote.
- * Mirrors the sync-history export escaping.
- */
-function escapeCsv(value: string): string {
-  let escaped = value;
-  if (/^[=+\-@\t\r]/.test(escaped)) {
-    escaped = `'${escaped}`;
-  }
-  if (/[",\r\n]/.test(escaped)) {
-    return `"${escaped.replace(/"/g, '""')}"`;
-  }
-  return escaped;
-}
-
 function cellValue(event: TimelineEvent, column: (typeof CSV_COLUMNS)[number]): string {
   switch (column) {
     case 'scopeKind':
@@ -69,9 +55,9 @@ function cellValue(event: TimelineEvent, column: (typeof CSV_COLUMNS)[number]): 
 
 function toCsv(events: TimelineEvent[]): string {
   const rows: string[] = [];
-  rows.push(CSV_COLUMNS.map((column) => escapeCsv(column)).join(','));
+  rows.push(CSV_COLUMNS.map((column) => escapeCsvCell(column)).join(','));
   for (const event of events) {
-    rows.push(CSV_COLUMNS.map((column) => escapeCsv(cellValue(event, column))).join(','));
+    rows.push(CSV_COLUMNS.map((column) => escapeCsvCell(cellValue(event, column))).join(','));
   }
   return rows.join('\r\n');
 }

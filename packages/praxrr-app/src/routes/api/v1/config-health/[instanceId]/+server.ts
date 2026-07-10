@@ -4,19 +4,12 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { scoreInstance } from '$lib/server/health/service.ts';
 import { toDetailResponse } from '$lib/server/health/responses.ts';
+import { parseConfigHealthInstanceId } from '$lib/server/health/pathParams.ts';
 import { logger } from '$logger/logger.ts';
 import type { components } from '$api/v1.d.ts';
 
 type ErrorResponse = { error: string };
 type DetailResponse = components['schemas']['ConfigHealthDetailResponse'];
-
-function parseInstanceId(raw: string | undefined): number | null {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) {
-    return null;
-  }
-  return value;
-}
 
 /**
  * GET /api/v1/config-health/{instanceId}
@@ -25,7 +18,7 @@ function parseInstanceId(raw: string | undefined): number | null {
  * suggestions. 404 only when the instance is unknown; degraded states are carried in the 200 body.
  */
 export const GET: RequestHandler = async ({ params }) => {
-  const instanceId = parseInstanceId(params.instanceId);
+  const instanceId = parseConfigHealthInstanceId(params.instanceId);
   if (instanceId === null) {
     return json({ error: 'Invalid instance id' } satisfies ErrorResponse, { status: 400 });
   }
