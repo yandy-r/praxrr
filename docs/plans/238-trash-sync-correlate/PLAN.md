@@ -17,7 +17,7 @@ Ordered, dependency-aware. Verifier verdict: ready-with-fixes. Corrections folde
 ## Tasks (execution order)
 
 1. **T1 types** — `queueTypes.ts`: extend `TrashGuideSyncJobPayload` (+`sourceName?`, `sourceArrType?:
-   TrashGuideSupportedArrType`, `runToken?`); add `TrashGuideSyncFailureCode`,
+TrashGuideSupportedArrType`, `runToken?`); add `TrashGuideSyncFailureCode`,
    `TrashGuideSyncFailureReason`, `TrashGuideSyncCounts`, `TrashGuideSyncRunEvidence` (status:
    JobRunStatus), `TrashGuideSyncStatusView`. Add `coerceTrashGuideSourceArrType` to shared types.
 2. **T3 classifier** — new `lib/server/jobs/trashguide/syncFailure.ts`: `FAILURE_COPY`,

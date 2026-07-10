@@ -63,8 +63,8 @@ which dedupe-coalescing destroys. Rev 2 introduces a **per-run correlation token
 ### D3 — Typed safe failure reason; retry semantics preserved; total handler (fixes leak + Cross-Arr)
 
 - New `trashguide/syncFailure.ts` mirroring `failureReason.ts`: closed `TrashGuideSyncFailureCode`
-  + `TrashGuideSyncFailureReason { code, message, recoveryAction }` with pre-authored safe copy.
-  Codes: `source_missing`, `source_disabled`, `network`, `parser_failed`, `sync_failed`, `internal`.
+  - `TrashGuideSyncFailureReason { code, message, recoveryAction }` with pre-authored safe copy.
+    Codes: `source_missing`, `source_disabled`, `network`, `parser_failed`, `sync_failed`, `internal`.
 - The existing transient git/network detection (`isTransientGitOrNetworkError`) stays an **internal
   boolean** driving ONLY the scheduled auto-reschedule decision → **retry semantics unchanged**. The raw
   message goes ONLY to the sanitized logger. Handler returns `error: reason.message` (safe).
@@ -82,17 +82,25 @@ which dedupe-coalescing destroys. Rev 2 introduces a **per-run correlation token
 
 ```ts
 type TrashGuideSyncCounts = {
-  commitsBehind: number; parsedFiles: number; failedFiles: number;
-  activeOperations: number; removedEntities: number; renamedEntities: number;
+  commitsBehind: number;
+  parsedFiles: number;
+  failedFiles: number;
+  activeOperations: number;
+  removedEntities: number;
+  renamedEntities: number;
 };
 interface TrashGuideSyncRunEvidence {
   schemaVersion: 1;
   runToken: string | null;
-  source: { id: number; name: string | null; arrType: 'radarr' | 'sonarr' | null };
+  source: {
+    id: number;
+    name: string | null;
+    arrType: 'radarr' | 'sonarr' | null;
+  };
   trigger: 'manual' | 'scheduled';
   requestedAt: string | null;
-  status: 'success' | 'failure' | 'skipped' | 'cancelled';   // === job_run_history.status
-  counts: TrashGuideSyncCounts | null;                       // null on failure/cancel-before-fetch
+  status: 'success' | 'failure' | 'skipped' | 'cancelled'; // === job_run_history.status
+  counts: TrashGuideSyncCounts | null; // null on failure/cancel-before-fetch
   failure: TrashGuideSyncFailureReason | null;
   retry: { rescheduleAt: string | null; retryable: boolean };
 }
@@ -102,25 +110,25 @@ interface TrashGuideSyncRunEvidence {
 No-updates / auto-pull-disabled nuance is visible via counts (e.g. `commitsBehind`, `activeOperations=0`),
 so no separate `outcome` enum is needed. Per-branch mapping (all handler terminals):
 
-| Handler branch | status | counts | failure | retry.retryable |
-|---|---|---|---|---|
-| invalid payload | failure | null | internal | false |
-| source not found | cancelled | null | source_missing | false |
-| source disabled | cancelled | null | source_disabled | false |
-| not-due (scheduled) | skipped | null | null | — |
-| no updates (scheduled) | skipped | zeros | null | — |
-| auto-pull disabled | success | commitsBehind only | null | — |
-| checkForUpdates throw | failure | null | network\|sync_failed | true |
-| sync() throw / !success | failure | null | network\|sync_failed | true |
-| parseStatus==='failed' | failure | partial | parser_failed | true |
-| success | success | full | null | — |
+| Handler branch          | status    | counts             | failure              | retry.retryable |
+| ----------------------- | --------- | ------------------ | -------------------- | --------------- |
+| invalid payload         | failure   | null               | internal             | false           |
+| source not found        | cancelled | null               | source_missing       | false           |
+| source disabled         | cancelled | null               | source_disabled      | false           |
+| not-due (scheduled)     | skipped   | null               | null                 | —               |
+| no updates (scheduled)  | skipped   | zeros              | null                 | —               |
+| auto-pull disabled      | success   | commitsBehind only | null                 | —               |
+| checkForUpdates throw   | failure   | null               | network\|sync_failed | true            |
+| sync() throw / !success | failure   | null               | network\|sync_failed | true            |
+| parseStatus==='failed'  | failure   | partial            | parser_failed        | true            |
+| success                 | success   | full               | null                 | —               |
 
 ### Wire surfaces (single source of truth = `trashGuideSyncQueue.ts`)
 
 - `TrashGuideSyncStatusView`:
   `{ sourceId, sourceName:string|null, arrType, queueId:number|null,
-     current:{ status, runAt, startedAt, attempts, runToken:string|null }|null,
-     latestRun:{ id,status,startedAt,finishedAt,durationMs, evidence:Evidence|null }|null }`
+   current:{ status, runAt, startedAt, attempts, runToken:string|null }|null,
+   latestRun:{ id,status,startedAt,finishedAt,durationMs, evidence:Evidence|null }|null }`
   Built by one `getTrashGuideSyncStatus(sourceId)`, reused by the POST response and the GET resolver.
 - `EnqueueManualTrashGuideSyncResult`:
   `{ status:'queued', runToken, view }` | `{ status:'already_running', runToken, view }`.

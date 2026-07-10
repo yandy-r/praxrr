@@ -134,7 +134,7 @@ TrashGuideSyncRunEvidence:
 
 TrashGuideSyncStatusView:
   type: object
-  description: 'Single wire view of a source''s current queue slot + latest terminal run, reused by the POST response and the GET status resolver.'
+  description: "Single wire view of a source's current queue slot + latest terminal run, reused by the POST response and the GET status resolver."
   required:
     - sourceId
     - sourceName
