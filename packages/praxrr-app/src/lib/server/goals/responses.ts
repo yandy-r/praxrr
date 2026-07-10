@@ -10,9 +10,9 @@ import type { components } from '$api/v1.d.ts';
 type WireGoalPlan = components['schemas']['GoalPlan'];
 type WireGoalBinding = components['schemas']['GoalBinding'];
 
-/** Drop the internal `scoringInput` — the wire plan exposes decisions (which already carry scores). */
+/** Drop the internal `scoringInput` + `ladderInput` — the wire plan exposes decisions + qualityLadder. */
 export function toWirePlan(plan: GoalPlan): WireGoalPlan {
-  const { scoringInput: _scoringInput, ...wire } = plan;
+  const { scoringInput: _scoringInput, ladderInput: _ladderInput, ...wire } = plan;
   return wire;
 }
 

@@ -42,5 +42,7 @@ export function toProfileEdit(profileName: string, plan: GoalPlan): ProfileEdit 
     }
   );
 
-  return { input: plan.scoringInput, changes };
+  // The desired quality ladder (issue #221) rides alongside the scoring input so the sandbox applies
+  // both in one savepoint; `null` (no ladder change) becomes `undefined` for the optional field.
+  return { input: plan.scoringInput, ladderInput: plan.ladderInput ?? undefined, changes };
 }

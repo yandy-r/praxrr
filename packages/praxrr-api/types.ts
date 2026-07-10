@@ -2834,6 +2834,28 @@ export interface components {
       upgradeScoreIncrement: number;
     };
     /** @description Deterministic translation of a goal into concrete scores + thresholds. */
+    /** @description One row of the ceiling-derived quality ladder (issue #221). */
+    GoalQualityLadderItem: {
+      name: string;
+      /** @enum {string} */
+      type: 'quality' | 'group';
+      enabled: boolean;
+      upgradeUntil: boolean;
+      position: number;
+      resolution: number | null;
+      /** @description False when the row is not present/derivable for the target arr (left unchanged). */
+      mapped: boolean;
+    };
+    /** @description Ceiling-derived quality-ladder configuration (issue #221), always shown before persistence. A per-arr ceiling reshapes the shared quality_profile_qualities row set for every Arr that syncs the profile; sharedLadderNote surfaces that when the profile is sibling-compatible. */
+    GoalQualityLadder: {
+      ceiling: components['schemas']['GoalResolutionCeiling'];
+      /** @description PCD quality name carrying the cutoff; null when no ladder change is derivable. */
+      cutoff: string | null;
+      items: components['schemas']['GoalQualityLadderItem'][];
+      reshapesSiblingArrs: boolean;
+      sharedLadderNote: string | null;
+    };
+    /** @description Deterministic translation of a goal into concrete scores + thresholds. */
     GoalPlan: {
       engineVersion: string;
       /** @enum {string} */
@@ -2842,6 +2864,7 @@ export interface components {
       uncategorized: components['schemas']['GoalUncategorizedCf'][];
       thresholds: components['schemas']['GoalThresholds'];
       coverage: components['schemas']['GoalCoverage'];
+      qualityLadder: components['schemas']['GoalQualityLadder'];
     };
     /** @description Persisted intent metadata for a goal-governed quality profile. */
     GoalBinding: {
@@ -2885,6 +2908,8 @@ export interface components {
     GoalApplyResponse: {
       plan: components['schemas']['GoalPlan'];
       binding: components['schemas']['GoalBinding'];
+      /** @description Authoritative sandbox config diff of the persisted ladder + scoring, captured before persist so it matches the preview diff for the same request (issue #221). */
+      configDiff: components['schemas']['EntityConfigDiff'][];
     };
     GoalBindingResponse: {
       binding: components['schemas']['GoalBinding'] | null;
