@@ -134,6 +134,14 @@ export const notificationTypes: NotificationType[] = [
     description: 'Notification when an Arr instance diverges from its desired configuration',
   },
 
+  // Config Health
+  {
+    id: 'health.degraded',
+    label: 'Config Health Decreased',
+    category: 'Config Health',
+    description: 'Notification when Config Health records a meaningful decrease for an Arr instance',
+  },
+
   // Sync (Arr push sync — audit trail)
   {
     id: 'sync.failed',

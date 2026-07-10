@@ -1,5 +1,5 @@
-import { db } from '../db.ts';
 import type { CriterionResult, HealthArrType, HealthBand, HealthReport } from '$shared/health/index.ts';
+import { db } from '../db.ts';
 
 /**
  * Row shape for config_health_snapshots (byte-aligned to the migration columns).
@@ -79,7 +79,11 @@ export const configHealthSnapshotsQueries = {
    * re-entrancy-safe (see the drift persist rationale).
    */
   insert(report: HealthReport): number {
-    const profileScores: SnapshotProfileScore[] = report.profiles.map((p) => ({ name: p.name, score: p.score, band: p.band }));
+    const profileScores: SnapshotProfileScore[] = report.profiles.map((p) => ({
+      name: p.name,
+      score: p.score,
+      band: p.band,
+    }));
     db.execute(
       `INSERT INTO config_health_snapshots (
 				arr_instance_id, instance_name, arr_type, engine_version,
@@ -97,6 +101,24 @@ export const configHealthSnapshotsQueries = {
     );
     const row = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() AS id');
     return row?.id ?? 0;
+  },
+
+  /**
+   * Immediately preceding persisted snapshot for one instance, based on append order.
+   *
+   * The current snapshot id is part of the boundary so an overlapping later insert cannot change
+   * which persisted row preceded the caller's snapshot.
+   */
+  getPrevious(instanceId: number, currentSnapshotId: number): ConfigHealthSnapshotDetail | undefined {
+    const row = db.queryFirst<ConfigHealthSnapshotRow>(
+      `SELECT * FROM config_health_snapshots
+			 WHERE arr_instance_id = ? AND id < ?
+			 ORDER BY id DESC
+			 LIMIT 1`,
+      instanceId,
+      currentSnapshotId
+    );
+    return row ? rowToDetail(row) : undefined;
   },
 
   /**
