@@ -23,6 +23,7 @@ import { PCDCache } from '../database/cache.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { ResolvedConfigDatabaseNotFoundError } from '../resolved/layers.ts';
 import { buildScoringOps, type UpdateScoringInput } from '../entities/qualityProfiles/scoring/update.ts';
+import { buildQualityLadderOps, type UpdateQualitiesInput } from '../entities/qualityProfiles/qualities/index.ts';
 import { logger } from '$logger/logger.ts';
 import type { components } from '$api/v1.d.ts';
 
@@ -44,6 +45,8 @@ export interface SandboxReport {
 
 export interface ProfileEdit {
   input: UpdateScoringInput;
+  /** Optional desired quality ladder (issue #221); applied in the same savepoint as scoring. */
+  ladderInput?: UpdateQualitiesInput;
   changes: ProposedChange[];
 }
 
@@ -104,24 +107,49 @@ export async function withSandboxCache<T>(
       const savepoint = `sandbox_sp_${savepointCounter++}`;
       raw.exec(`SAVEPOINT ${savepoint}`);
       let failReason: string | null = null;
+
+      /** Apply one compiled query to the ephemeral cache; returns a failure reason or null. */
+      const applyQuery = (query: { sql: string; parameters: readonly unknown[] }): string | null => {
+        const params = query.parameters as SqlBindParam[];
+        try {
+          if (params.length === 0) {
+            const validation = cache.validateSql([query.sql]);
+            if (!validation.valid) return validation.error ?? 'invalid SQL';
+          }
+          raw.prepare(query.sql).run(...params);
+          return null;
+        } catch (err) {
+          return String(err);
+        }
+      };
+
       for (const op of built.ops) {
         for (const query of op.queries) {
-          const params = query.parameters as SqlBindParam[];
-          try {
-            if (params.length === 0) {
-              const validation = cache.validateSql([query.sql]);
-              if (!validation.valid) {
-                failReason = validation.error ?? 'invalid SQL';
-                break;
-              }
-            }
-            raw.prepare(query.sql).run(...params);
-          } catch (err) {
-            failReason = String(err);
-            break;
-          }
+          failReason = applyQuery(query);
+          if (failReason !== null) break;
         }
         if (failReason !== null) break;
+      }
+
+      // Quality-ladder ops (issue #221) apply in the SAME savepoint, so scoring + ladder are atomic
+      // per profile: a ladder failure rolls back the scoring already applied above.
+      if (failReason === null && edit.ladderInput) {
+        const ladderBuilt = await buildQualityLadderOps({
+          databaseId,
+          cache,
+          layer: 'user',
+          profileName,
+          input: edit.ladderInput,
+          forbidRemovals: true
+        });
+        if ('error' in ladderBuilt) {
+          failReason = ladderBuilt.error;
+        } else if (ladderBuilt.batched !== null) {
+          for (const query of ladderBuilt.batched.queries) {
+            failReason = applyQuery(query);
+            if (failReason !== null) break;
+          }
+        }
       }
 
       if (failReason !== null) {

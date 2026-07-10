@@ -80,6 +80,73 @@
     </Card>
   </div>
 
+  <!-- Quality ladder & cutoff (issue #221) — always shown before persistence -->
+  <Card>
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Quality ladder &amp; cutoff</h3>
+      {#if plan.qualityLadder.cutoff}
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">
+          ceiling {plan.qualityLadder.ceiling} · cutoff
+          <span class="font-mono text-neutral-700 dark:text-neutral-300">{plan.qualityLadder.cutoff}</span>
+        </span>
+      {/if}
+    </div>
+
+    {#if plan.qualityLadder.sharedLadderNote}
+      <p
+        class="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+      >
+        {plan.qualityLadder.sharedLadderNote}
+      </p>
+    {/if}
+
+    {#if plan.qualityLadder.cutoff === null}
+      <p class="text-xs text-neutral-500 dark:text-neutral-400">
+        No ladder change — this profile has no derivable cutoff for the {plan.qualityLadder.ceiling} ceiling, so its quality
+        ladder is left untouched.
+      </p>
+    {:else}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="text-xs text-neutral-500 dark:text-neutral-400">
+            <tr>
+              <th class="pr-3 pb-2 font-medium">Quality</th>
+              <th class="pr-3 pb-2 font-medium">Status</th>
+              <th class="pb-2 font-medium">Cutoff</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each plan.qualityLadder.items as item (item.name)}
+              <tr
+                class="border-t border-neutral-100 dark:border-neutral-800 {item.upgradeUntil
+                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30'
+                  : ''}"
+              >
+                <td class="py-1.5 pr-3 font-medium text-neutral-900 dark:text-neutral-100">
+                  {item.name}
+                  {#if item.type === 'group'}<span class="ml-1 text-xs font-normal text-neutral-400">(group)</span>{/if}
+                  {#if !item.mapped}<span class="ml-1 text-xs font-normal text-neutral-400">· unchanged</span>{/if}
+                </td>
+                <td class="py-1.5 pr-3">
+                  {#if item.enabled}
+                    <span class="text-emerald-600 dark:text-emerald-400">Enabled</span>
+                  {:else}
+                    <span class="text-neutral-400 dark:text-neutral-500">Disabled</span>
+                  {/if}
+                </td>
+                <td class="py-1.5 text-xs">
+                  {#if item.upgradeUntil}
+                    <span class="font-medium text-emerald-600 dark:text-emerald-400">Upgrade until</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </Card>
+
   <!-- Generated scores (transparency — always shown) -->
   <Card>
     <h3 class="mb-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Generated custom-format scores</h3>
