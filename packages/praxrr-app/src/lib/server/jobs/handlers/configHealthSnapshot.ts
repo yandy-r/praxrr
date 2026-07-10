@@ -3,8 +3,10 @@ import { configHealthNotificationStateQueries } from '$db/queries/configHealthNo
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
 import {
-  assessHealthDegradation,
+  assessHealthDegradation as assessHealthDegradationDefault,
   buildHealthDegradedNotification,
+  type HealthDegradationAssessment,
+  type HealthDegradationSnapshot,
   type HealthDegradedEvent,
 } from '$lib/server/health/degradation.ts';
 import { scoreInstance as scoreInstanceDefault } from '$lib/server/health/service.ts';
@@ -35,6 +37,10 @@ const BACKOFF_CAP_MS = 6 * 60 * 60 * 1000; // 6 hours
 export interface ConfigHealthSnapshotInstanceDeps {
   readonly scoreInstance: (instanceId: number) => Promise<HealthReport | null>;
   readonly sendHealthDegraded: (event: HealthDegradedEvent) => Promise<void>;
+  readonly assessHealthDegradation: (
+    previous: HealthDegradationSnapshot | undefined,
+    current: HealthDegradationSnapshot
+  ) => Promise<HealthDegradationAssessment>;
 }
 
 async function sendHealthDegradedDefault(event: HealthDegradedEvent): Promise<void> {
@@ -72,6 +78,7 @@ export async function snapshotInstance(
 ): Promise<void> {
   const scoreInstance = deps.scoreInstance ?? scoreInstanceDefault;
   const sendHealthDegraded = deps.sendHealthDegraded ?? sendHealthDegradedDefault;
+  const assessHealthDegradation = deps.assessHealthDegradation ?? assessHealthDegradationDefault;
   let currentSnapshotId: number;
   let report: HealthReport;
 
@@ -101,18 +108,29 @@ export async function snapshotInstance(
     const assessment = await assessHealthDegradation(previous, current);
 
     if (assessment.kind === 'recovery') {
-      configHealthNotificationStateQueries.clear(instanceId);
+      configHealthNotificationStateQueries.rearm(instanceId, currentSnapshotId);
       return;
     }
     if (assessment.kind !== 'degradation') return;
 
     const { event } = assessment;
-    if (!configHealthNotificationStateQueries.claim(instanceId, event.signature, event.generatedAt)) return;
+    if (
+      !configHealthNotificationStateQueries.claim(instanceId, currentSnapshotId, event.signature, event.generatedAt)
+    ) {
+      return;
+    }
     await sendHealthDegraded(event);
   } catch (error) {
     await logSnapshotError('Config health snapshot notification failed for instance', instanceId, error);
   }
 }
+
+/** Narrow mutable seam used to prove registered-handler failure isolation without external services. */
+export const configHealthSnapshotHandlerDeps: {
+  snapshotInstance: (instanceId: number) => Promise<void>;
+} = {
+  snapshotInstance,
+};
 
 const configHealthSnapshotHandler: JobHandler = async (job) => {
   const settings = configHealthSettingsQueries.get();
@@ -143,7 +161,11 @@ const configHealthSnapshotHandler: JobHandler = async (job) => {
     }
 
     const chunk = eligible.filter((instance) => instance.id > cursor).slice(0, SWEEP_CHUNK_SIZE);
-    await processBatches(chunk, (instance) => snapshotInstance(instance.id), CONCURRENCY);
+    await processBatches(
+      chunk,
+      (instance) => configHealthSnapshotHandlerDeps.snapshotInstance(instance.id),
+      CONCURRENCY
+    );
 
     const lastProcessedId = chunk.length > 0 ? chunk[chunk.length - 1].id : cursor;
     const moreRemain = eligible.some((instance) => instance.id > lastProcessedId);

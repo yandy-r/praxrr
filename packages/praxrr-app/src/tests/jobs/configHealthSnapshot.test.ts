@@ -6,12 +6,16 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { configHealthNotificationStateQueries } from '$db/queries/configHealthNotificationState.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
+import { notificationHistoryQueries } from '$db/queries/notificationHistory.ts';
+import { notificationServicesQueries } from '$db/queries/notificationServices.ts';
 // Side-effect import registers the 'config-health.snapshot' handler.
-import { snapshotInstance } from '$jobs/handlers/configHealthSnapshot.ts';
+import { configHealthSnapshotHandlerDeps, snapshotInstance } from '$jobs/handlers/configHealthSnapshot.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobHandler, JobQueueRecord } from '$jobs/queueTypes.ts';
-import type { HealthDegradedEvent } from '$lib/server/health/degradation.ts';
+import { assessHealthDegradation, type HealthDegradedEvent } from '$lib/server/health/degradation.ts';
 import { notificationManager } from '$lib/server/notifications/NotificationManager.ts';
+import { DiscordNotifier } from '$lib/server/notifications/notifiers/discord/DiscordNotifier.ts';
+import { NotificationTypes } from '$lib/server/notifications/types.ts';
 import {
   CONFIG_HEALTH_ENGINE_VERSION,
   type CriterionResult,
@@ -131,6 +135,16 @@ async function persistReport(report: HealthReport, events: HealthDegradedEvent[]
       events.push(event);
     },
   });
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve = (): void => {
+    throw new Error('Deferred resolver was not initialized');
+  };
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 // ============================================================================
@@ -296,7 +310,14 @@ migratedTest(
       const instanceId = seedInstance('radarr');
       const events: HealthDegradedEvent[] = [];
       await persistReport(makeReport(instanceId, 'radarr', 79, 'attention'), events);
-      configHealthNotificationStateQueries.claim(instanceId, `existing-${scenario.name}`, '2026-07-18T11:00:00.000Z');
+      const baselineSnapshotId = configHealthSnapshotsQueries.getTrend(instanceId).at(-1)?.id;
+      assertExists(baselineSnapshotId);
+      configHealthNotificationStateQueries.claim(
+        instanceId,
+        baselineSnapshotId,
+        `existing-${scenario.name}`,
+        '2026-07-18T11:00:00.000Z'
+      );
       await persistReport(
         {
           ...scenario.current(instanceId),
@@ -369,6 +390,99 @@ migratedTest('snapshotInstance overlapping identical regressions produce one cla
   assertEquals(configHealthSnapshotsQueries.getTrend(instanceId).length, 3);
   assertEquals(events.length, 1);
   assertEquals(configHealthNotificationStateQueries.get(instanceId)?.notifiedSignature, events[0].signature);
+});
+
+migratedTest('newer recovery tombstone rejects an older degradation that finishes late', async () => {
+  const instanceId = seedInstance('radarr');
+  const events: HealthDegradedEvent[] = [];
+  await persistReport(makeReport(instanceId, 'radarr', 79, 'attention'), events);
+
+  const assessmentReady = deferred();
+  const releaseOlder = deferred();
+  const older = snapshotInstance(instanceId, {
+    scoreInstance: async () =>
+      makeReport(instanceId, 'radarr', 74, 'attention', {
+        generatedAt: '2026-07-18T13:00:00.000Z',
+      }),
+    assessHealthDegradation: async (previous, current) => {
+      const assessment = await assessHealthDegradation(previous, current);
+      assessmentReady.resolve();
+      await releaseOlder.promise;
+      return assessment;
+    },
+    sendHealthDegraded: async (event) => {
+      events.push(event);
+    },
+  });
+
+  await assessmentReady.promise;
+  await snapshotInstance(instanceId, {
+    scoreInstance: async () =>
+      makeReport(instanceId, 'radarr', 79, 'attention', {
+        generatedAt: '2026-07-18T14:00:00.000Z',
+      }),
+    sendHealthDegraded: async (event) => {
+      events.push(event);
+    },
+  });
+  releaseOlder.resolve();
+  await older;
+
+  const newestSnapshotId = configHealthSnapshotsQueries.getTrend(instanceId).at(-1)?.id;
+  const state = configHealthNotificationStateQueries.get(instanceId);
+  assertExists(newestSnapshotId);
+  assertExists(state);
+  assertEquals(events, []);
+  assertEquals(state.lastSnapshotId, newestSnapshotId);
+  assertEquals(state.notifiedSignature, null);
+});
+
+migratedTest('newer degradation rejects a distinct older degradation that finishes late', async () => {
+  const instanceId = seedInstance('sonarr');
+  const events: HealthDegradedEvent[] = [];
+  await persistReport(makeReport(instanceId, 'sonarr', 84, 'attention'), events);
+
+  const assessmentReady = deferred();
+  const releaseOlder = deferred();
+  const older = snapshotInstance(instanceId, {
+    scoreInstance: async () =>
+      makeReport(instanceId, 'sonarr', 79, 'attention', {
+        generatedAt: '2026-07-18T13:00:00.000Z',
+      }),
+    assessHealthDegradation: async (previous, current) => {
+      const assessment = await assessHealthDegradation(previous, current);
+      assessmentReady.resolve();
+      await releaseOlder.promise;
+      return assessment;
+    },
+    sendHealthDegraded: async (event) => {
+      events.push(event);
+    },
+  });
+
+  await assessmentReady.promise;
+  await snapshotInstance(instanceId, {
+    scoreInstance: async () =>
+      makeReport(instanceId, 'sonarr', 74, 'attention', {
+        generatedAt: '2026-07-18T14:00:00.000Z',
+      }),
+    sendHealthDegraded: async (event) => {
+      events.push(event);
+    },
+  });
+  releaseOlder.resolve();
+  await older;
+
+  const newestSnapshotId = configHealthSnapshotsQueries.getTrend(instanceId).at(-1)?.id;
+  const state = configHealthNotificationStateQueries.get(instanceId);
+  assertExists(newestSnapshotId);
+  assertExists(state);
+  assertEquals(
+    events.map((event) => event.currentScore),
+    [74]
+  );
+  assertEquals(state.lastSnapshotId, newestSnapshotId);
+  assertEquals(state.notifiedSignature, events[0].signature);
 });
 
 migratedTest('snapshotInstance preserves explicit Radarr, Sonarr, and Lidarr event payloads', async () => {
@@ -472,6 +586,97 @@ migratedTest('snapshotInstance contains production notification manager failures
   assertExists(configHealthNotificationStateQueries.get(instanceId));
 });
 
+migratedTest('snapshotInstance isolates real notification-history failure after provider delivery', async () => {
+  const instanceId = seedInstance('radarr');
+  await persistReport(makeReport(instanceId, 'radarr', 79, 'attention'));
+  notificationServicesQueries.create({
+    id: 'health-history-failure',
+    name: 'Health history failure',
+    serviceType: 'discord',
+    enabled: true,
+    config: { webhook_url: 'https://discord.com/api/webhooks/history-failure' },
+    enabledTypes: [NotificationTypes.HEALTH_DEGRADED],
+  });
+
+  const originalNotify = DiscordNotifier.prototype.notify;
+  const originalHistoryCreate = notificationHistoryQueries.create;
+  let providerCalls = 0;
+  try {
+    DiscordNotifier.prototype.notify = () => {
+      providerCalls++;
+      return Promise.resolve();
+    };
+    notificationHistoryQueries.create = () => {
+      throw new Error('history unavailable');
+    };
+
+    await snapshotInstance(instanceId, {
+      scoreInstance: async () =>
+        makeReport(instanceId, 'radarr', 74, 'attention', {
+          generatedAt: '2026-07-18T13:00:00.000Z',
+        }),
+    });
+  } finally {
+    DiscordNotifier.prototype.notify = originalNotify;
+    notificationHistoryQueries.create = originalHistoryCreate;
+  }
+
+  assertEquals(providerCalls, 1);
+  assertEquals(configHealthSnapshotsQueries.getTrend(instanceId).length, 2);
+  const state = configHealthNotificationStateQueries.get(instanceId);
+  assertExists(state);
+  assertEquals(state.notifiedSignature === null, false);
+});
+
+migratedTest(
+  'registered handler keeps success cursor reschedule and backoff after post-insert notification failures',
+  async () => {
+    const handler = getHandler();
+    const instanceIds = Array.from({ length: 6 }, () => seedInstance('sonarr'));
+    for (const instanceId of instanceIds) {
+      configHealthSnapshotsQueries.insert(
+        makeReport(instanceId, 'sonarr', 79, 'attention', {
+          generatedAt: '2026-07-18T12:00:00.000Z',
+        })
+      );
+    }
+
+    const originalSnapshotInstance = configHealthSnapshotHandlerDeps.snapshotInstance;
+    let result: Awaited<ReturnType<JobHandler>>;
+    try {
+      configHealthSnapshotHandlerDeps.snapshotInstance = async (instanceId) => {
+        await snapshotInstance(instanceId, {
+          scoreInstance: async () =>
+            makeReport(instanceId, 'sonarr', 74, 'attention', {
+              generatedAt: '2026-07-18T13:00:00.000Z',
+            }),
+          sendHealthDegraded: async () => {
+            throw new Error('provider unavailable');
+          },
+        });
+      };
+      result = await handler(createSnapshotJob({ source: 'schedule' }));
+    } finally {
+      configHealthSnapshotHandlerDeps.snapshotInstance = originalSnapshotInstance;
+    }
+
+    assertEquals(result.status, 'success');
+    assertStringIncludes(result.output ?? '', 'continuing sweep');
+    assertExists(result.rescheduleAt);
+    const settings = configHealthSettingsQueries.get();
+    assertEquals(settings.sweep_cursor, instanceIds[4]);
+    assertExists(settings.sweep_started_at);
+    assertEquals(settings.error_count, 0);
+    assertEquals(settings.backoff_until, null);
+    assertEquals(settings.last_run_at, null);
+    for (const instanceId of instanceIds.slice(0, 5)) {
+      assertEquals(configHealthSnapshotsQueries.getTrend(instanceId).length, 2);
+      assertExists(configHealthNotificationStateQueries.get(instanceId));
+    }
+    assertEquals(configHealthSnapshotsQueries.getTrend(instanceIds[5]).length, 1);
+  }
+);
+
 migratedTest('health.degraded manual harness: repeat and recovery re-arm', async () => {
   const instanceId = seedInstance('radarr');
   const capturedEvents: HealthDegradedEvent[] = [];
@@ -495,7 +700,9 @@ migratedTest('health.degraded manual harness: repeat and recovery re-arm', async
     }),
     capturedEvents
   );
-  assertEquals(configHealthNotificationStateQueries.get(instanceId), undefined, 'recovery must re-arm silently');
+  const rearmed = configHealthNotificationStateQueries.get(instanceId);
+  assertExists(rearmed, 'recovery must leave a monotonic re-arm tombstone');
+  assertEquals(rearmed.notifiedSignature, null, 'recovery must re-arm silently');
   await persistReport(
     makeReport(instanceId, 'radarr', 74, 'attention', {
       generatedAt: '2026-07-18T16:00:00.000Z',

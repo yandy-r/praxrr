@@ -19,14 +19,13 @@ false, so the Svelte form and server action helpers need no rewrite.
   discriminated result such as incomparable, quiet, recovery, or degradation.
 
 - **Persist first, side effect second**: `configHealthSnapshot.ts` currently scores and inserts inside a
-  per-instance no-throw shell. Read the previous row before scoring, insert the current report, then run a
+  per-instance no-throw shell. Insert the current report, read its ID-bounded predecessor, then run a
   separately guarded assessment/claim/dispatch phase. Snapshot insertion remains the primary success
   boundary; every later error is logged and swallowed.
 
-- **Deterministic adjacent lookup**: Add `getLatest(instanceId)` to
-  `db/queries/configHealthSnapshots.ts`, mapping through the existing `rowToDetail` and ordering by
-  `datetime(generated_at) DESC, id DESC`. The ID tie-break is required because equal generation timestamps
-  are valid. Do not load `getTrend()` and select in memory.
+- **Deterministic adjacent lookup**: Add narrow `getPrevious(instanceId, currentSnapshotId)` to
+  `db/queries/configHealthSnapshots.ts`, selecting `id < currentSnapshotId`, ordering by `id DESC`,
+  and using the instance/ID predecessor index. Do not load `getTrend()` or parse profile JSON.
 
 - **Strict basis parity**: Comparable snapshots must have the same non-empty engine version, non-null same
   instance, valid Arr type, known band, finite integer score in `[0,100]`, and the same scored criterion IDs
@@ -38,18 +37,17 @@ false, so the Svelte form and server action helpers need no rewrite.
   timestamps, row IDs, names, labels, previous evidence, and display text. Use SHA-256 through Web Crypto;
   `pcd/snapshots/fingerprint.ts` demonstrates hex encoding. Do not reuse drift's eight-character FNV hash.
 
-- **Statement-atomic claim**: Model the query module after raw-SQL modules such as `driftStatus.ts`:
-  `INSERT ... ON CONFLICT(arr_instance_id) DO UPDATE ... WHERE notified_signature <>
-excluded.notified_signature`, and return `db.execute(...) > 0`. `DatabaseManager.execute()` returns
-  affected rows, so one statement both arbitrates overlaps and reports the winner. `clear()` is one DELETE;
-  `get()` is diagnostics/test support only.
+- **Statement-atomic monotonic state**: Model the query module after raw-SQL modules such as
+  `driftStatus.ts`, but condition both claim and re-arm upserts on a newer `last_snapshot_id`.
+  `notified_snapshot_id` distinguishes a signature-changing dispatch winner from an identical
+  signature that only advances the high-water mark. `get()` is diagnostics/test support only.
 
 - **No nested transaction**: The snapshot sweep uses `processBatches(..., CONCURRENCY=3)` on one SQLite
   connection. Existing snapshot/drift queries deliberately use bare statement-atomic `db.execute` because
-  nested `BEGIN` calls are not re-entrancy-safe. Claim, clear, insert, and lookup must not wrap themselves in
+  nested `BEGIN` calls are not re-entrancy-safe. Claim, re-arm, insert, and lookup must not wrap themselves in
   `db.transaction()`.
 
-- **Recovery re-arm**: Clear state only for a comparable better band or same-band gain of at least five.
+- **Recovery re-arm**: Write a newer nullable tombstone for a comparable better band or same-band gain of at least five.
   Preserve state across unknown, malformed, changed-basis, cross-engine, unchanged, and small-gain samples.
   Recovery is synchronous database state maintenance and emits no event.
 
@@ -119,8 +117,8 @@ excluded.notified_signature`, and return `db.execute(...) > 0`. `DatabaseManager
 
 - `packages/praxrr-app/src/lib/server/health/degradation.ts`: pure policy, signature, contributors, event DTO.
 - `packages/praxrr-app/src/lib/server/db/migrations/20260719_create_config_health_notification_state.ts`:
-  PK/FK cascade state table with non-empty signature and timestamps.
-- `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`: atomic claim, clear, get.
+  PK/FK cascade state table with monotonic high-water/tombstone fields and predecessor index.
+- `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`: atomic claim, re-arm, get.
 - Focused tests, preferably `src/tests/shared/health/degradation.test.ts` or `src/tests/health/degradation.test.ts`
   plus `src/tests/db/configHealthNotificationState.test.ts`; create notification manager/catalog coverage if
   no suitable notification test file exists.
@@ -128,10 +126,10 @@ excluded.notified_signature`, and return `db.execute(...) > 0`. `DatabaseManager
 ### Modify
 
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`: statically import and register migration 20260719
-  after 20260717.
-- `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`: add deterministic `getLatest`.
-- `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`: previous-read, insert-ID capture,
-  guarded assess/clear/claim/dispatch.
+  after 20260718.
+- `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`: add indexed `getPrevious`.
+- `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`: insert-ID capture,
+  predecessor read, and guarded assess/re-arm/claim/dispatch.
 - `packages/praxrr-app/src/lib/server/notifications/types.ts`: add `HEALTH_DEGRADED`.
 - `packages/praxrr-app/src/lib/shared/notifications/types.ts`: add the Config Health catalog row.
 - `packages/praxrr-app/src/tests/db/configHealthSnapshots.test.ts` and

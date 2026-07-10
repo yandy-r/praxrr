@@ -42,7 +42,7 @@ work runs afterward inside a separate no-throw boundary. See
 `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`.
 
 **Statement-atomic SQLite operations**: Concurrent `processBatches` work must not open nested
-transactions. Use single insert, clear, and conditional upsert statements. See
+transactions. Use single insert and monotonic conditional upsert statements for claim and re-arm. See
 `packages/praxrr-app/src/lib/server/db/queries/driftStatus.ts`.
 
 **Atomic claim before dispatch**: Claim a changed current-state signature with one conditional upsert;

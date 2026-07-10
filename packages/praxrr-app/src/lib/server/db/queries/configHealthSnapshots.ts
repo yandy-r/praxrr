@@ -42,6 +42,31 @@ export interface ConfigHealthSnapshotDetail {
   createdAt: string;
 }
 
+interface ConfigHealthDegradationSnapshotRow {
+  id: number;
+  arr_instance_id: number | null;
+  instance_name: string;
+  arr_type: string;
+  engine_version: string;
+  overall_score: number;
+  band: string;
+  criteria_scores: string;
+  generated_at: string;
+}
+
+/** Persisted subset required by Config Health degradation assessment. */
+export interface ConfigHealthDegradationSnapshotDetail {
+  id: number;
+  arrInstanceId: number | null;
+  instanceName: string;
+  arrType: HealthArrType;
+  engineVersion: string;
+  overallScore: number;
+  band: HealthBand;
+  criteriaScores: CriterionResult[];
+  generatedAt: string;
+}
+
 function parseJsonArray<T>(raw: string): T[] {
   try {
     const parsed = JSON.parse(raw);
@@ -64,6 +89,20 @@ function rowToDetail(row: ConfigHealthSnapshotRow): ConfigHealthSnapshotDetail {
     profileScores: parseJsonArray<SnapshotProfileScore>(row.profile_scores),
     generatedAt: row.generated_at,
     createdAt: row.created_at,
+  };
+}
+
+function rowToDegradationDetail(row: ConfigHealthDegradationSnapshotRow): ConfigHealthDegradationSnapshotDetail {
+  return {
+    id: row.id,
+    arrInstanceId: row.arr_instance_id,
+    instanceName: row.instance_name,
+    arrType: row.arr_type as HealthArrType,
+    engineVersion: row.engine_version,
+    overallScore: row.overall_score,
+    band: row.band as HealthBand,
+    criteriaScores: parseJsonArray<CriterionResult>(row.criteria_scores),
+    generatedAt: row.generated_at,
   };
 }
 
@@ -109,16 +148,18 @@ export const configHealthSnapshotsQueries = {
    * The current snapshot id is part of the boundary so an overlapping later insert cannot change
    * which persisted row preceded the caller's snapshot.
    */
-  getPrevious(instanceId: number, currentSnapshotId: number): ConfigHealthSnapshotDetail | undefined {
-    const row = db.queryFirst<ConfigHealthSnapshotRow>(
-      `SELECT * FROM config_health_snapshots
+  getPrevious(instanceId: number, currentSnapshotId: number): ConfigHealthDegradationSnapshotDetail | undefined {
+    const row = db.queryFirst<ConfigHealthDegradationSnapshotRow>(
+      `SELECT id, arr_instance_id, instance_name, arr_type, engine_version,
+					overall_score, band, criteria_scores, generated_at
+			 FROM config_health_snapshots
 			 WHERE arr_instance_id = ? AND id < ?
 			 ORDER BY id DESC
 			 LIMIT 1`,
       instanceId,
       currentSnapshotId
     );
-    return row ? rowToDetail(row) : undefined;
+    return row ? rowToDegradationDetail(row) : undefined;
   },
 
   /**

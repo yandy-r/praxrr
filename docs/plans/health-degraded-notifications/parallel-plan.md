@@ -18,8 +18,8 @@ at-most-once attempts, and the existing notification manager. Work is already is
   serialization/parsing and home for the predecessor lookup.
 - `packages/praxrr-app/src/lib/server/db/migrations/20260714_create_config_health_tables.ts`:
   Existing snapshot/settings schema conventions and timestamp/FK policy.
-- `packages/praxrr-app/src/lib/server/db/migrations.ts`: Static migration registry; next version is
-  `20260718`.
+- `packages/praxrr-app/src/lib/server/db/migrations.ts`: Static migration registry; this feature uses
+  `20260719` after main's `20260718` migration.
 - `packages/praxrr-app/src/lib/server/sync/drift/persist.ts`: Closest notification, signature,
   recovery, and compact embed precedent; do not copy its post-send mark race.
 - `packages/praxrr-app/src/lib/server/db/queries/driftStatus.ts`: Statement-atomic latest-state query
@@ -97,6 +97,7 @@ Validate this task with
 - `docs/plans/health-degraded-notifications/feature-spec.md`
 - `packages/praxrr-app/src/lib/server/db/migrations/20260714_create_config_health_tables.ts`
 - `packages/praxrr-app/src/lib/server/db/migrations/20260717_create_webauthn_tables.ts`
+- `packages/praxrr-app/src/lib/server/db/migrations/20260718_widen_quality_goal_bindings_arr_type.ts`
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`
 
 **Instructions**
@@ -109,12 +110,11 @@ Files to Modify
 
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`
 
-Create and register reversible migration `20260719` after `20260717`. The
-`config_health_notification_state` table has `arr_instance_id` as PK/FK to `arr_instances(id)` with
-`ON DELETE CASCADE`, a non-empty `notified_signature`, ISO UTC `notified_at`, and non-null
-`created_at`/`updated_at` bookkeeping timestamps. The PK is the only index. Do not reference a
-snapshot row, edit the historical `20260714` migration, or couple this state to snapshot retention.
-Enforce the non-empty signature with `CHECK (length(notified_signature) > 0)` in SQLite.
+Create and register reversible migration `20260719` after `20260718`. The state table has an
+instance PK/FK, a positive monotonic `last_snapshot_id`, nullable signature/time/notification-ID
+tombstone fields with paired constraints, and bookkeeping timestamps. Also add the snapshot
+predecessor index on `(arr_instance_id, id DESC)`. Snapshot IDs are ordering values, not FKs, so
+retention cannot erase dedup authority.
 
 #### Task 1.3: Add deterministic persisted-predecessor retrieval Depends on [none]
 
@@ -170,7 +170,7 @@ the actions persist only explicitly checked IDs.
 
 ### Phase 2: Atomic Deduplication Persistence
 
-#### Task 2.1: Implement atomic claim, clear, and diagnostic state queries Depends on [1.2]
+#### Task 2.1: Implement monotonic claim, re-arm, and diagnostic state queries Depends on [1.2]
 
 **READ THESE BEFORE TASK**
 
@@ -186,17 +186,11 @@ Files to Create
 - `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`
 - `packages/praxrr-app/src/tests/db/configHealthNotificationState.test.ts`
 
-Implement row/detail types plus `get(instanceId)`, `clear(instanceId)`, and
-`claim(instanceId, signature, notifiedAt)`. Reject an empty signature. Claim must be one
-statement-atomic `INSERT ... ON CONFLICT(arr_instance_id) DO UPDATE ... WHERE notified_signature <>
-excluded.notified_signature`, update claim/bookkeeping timestamps, and return whether
-`db.execute(...)` affected a row. `get()` is diagnostics/tests only; never use read-then-write to
-arbitrate dispatch. Require `notifiedAt` to parse as a finite ISO timestamp, preserve `created_at` on
-conflict, and update only `notified_signature`, `notified_at`, and `updated_at`. Do not open a
-transaction.
-
-Test the real migration chain, first claim, identical no-op, changed signature, overlapping claim
-winner, timestamp update, clear/get, FK enforcement, and instance-delete cascade.
+Implement row/detail types plus `get(instanceId)`, `rearm(instanceId, currentSnapshotId)`, and
+`claim(instanceId, currentSnapshotId, signature, notifiedAt)`. Both mutations are one conditional
+upsert that accepts only newer snapshot IDs. Identical signatures advance the high-water mark but
+do not win dispatch; recovery stores a nullable tombstone. Test schema constraints, changed and
+identical claims, stale rejection, overlapping winners, re-arm, FK enforcement, and cascade.
 
 ### Phase 3: Snapshot Producer Convergence
 
@@ -220,8 +214,8 @@ Files to Modify
 In `snapshotInstance`, score and persist the report, retain its ID, then load the immediately
 preceding same-instance row using `getPrevious(instanceId, currentSnapshotId)` before entering the
 separately guarded notification phase. Incomparable/quiet outcomes preserve
-state; recovery synchronously clears state without emitting; degradation atomically claims its
-signature and only the winning claim builds/sends `health.degraded` through the existing generic plus
+state; recovery synchronously writes a monotonic re-arm tombstone without emitting; degradation
+atomically claims its signature and only the current-snapshot winner builds/sends `health.degraded` through the existing generic plus
 Discord builder. Keep the event Arr type explicit and the detail path instance-scoped. Do not call
 `DiscordNotifier` directly, scan historical pairs, open a transaction, retry delivery, or let any
 assessment/state/render/manager/provider/history/logging error escape into snapshot, batch, sweep,
@@ -327,8 +321,8 @@ unrelated files.
   precedent for message shape but not sufficient concurrency control for this feature.
 - Keep state through unknown, malformed, cross-engine, changed-basis, and small improvements. Clearing
   on uncertainty creates false recovery/regression alert cycles.
-- Do not wrap concurrent snapshot work in `db.transaction()`. Individual insert, conditional claim,
-  and clear statements are the safe atomic units on the shared SQLite connection.
+- Do not wrap concurrent snapshot work in `db.transaction()`. Individual insert and monotonic
+  claim/re-arm statements are the safe atomic units on the shared SQLite connection.
 - Treat the shared event catalog as the only settings contract. Existing create/edit behavior already
   makes a newly added ID opt-in, so UI/action changes would add scope and risk without value.
 - Keep foundation owners file-disjoint. The handler task is the only convergence point and must wait

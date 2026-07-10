@@ -4,7 +4,7 @@
 
 Implement issue #223 in the established feature worktree as nine tasks across parallel foundations,
 atomic persistence, producer integration, and closeout. Each task owns 1–3 files. Read the immediate
-predecessor, persist the current snapshot, then run assessment, clear/claim, render, and manager
+predecessor after persisting the current snapshot, then run assessment, re-arm/claim, render, and manager
 dispatch in a separate no-throw phase. A conditional SQLite claim is the durable at-most-once gate;
 meaningful comparable recovery silently re-arms the next episode.
 
@@ -30,16 +30,16 @@ signature stability, ranking/fallback, control stripping, and embed limits.
 **Files (2):** `packages/praxrr-app/src/lib/server/db/migrations/20260719_create_config_health_notification_state.ts`
 (new), `packages/praxrr-app/src/lib/server/db/migrations.ts`.
 
-Register reversible migration `20260719` after `20260717`: instance PK/FK cascade, non-empty
-signature, claim/bookkeeping times, no snapshot FK or extra index.
+Register reversible migration `20260719` after `20260718`: instance PK/FK cascade, monotonic
+high-water/tombstone fields, claim/bookkeeping times, no snapshot FK, and the predecessor index.
 
-#### T3 — Latest persisted snapshot
+#### T3 — Persisted predecessor
 
 **Files (2):** `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`,
 `packages/praxrr-app/src/tests/db/configHealthSnapshots.test.ts`.
 
-Add `getLatest(instanceId)` through `rowToDetail`, ordered by generated time then ID descending.
-Test empty baseline, instance scope, timestamp order, equal-time tie-break, and parsing fidelity.
+Add narrow `getPrevious(instanceId, currentSnapshotId)`, ordered by append ID descending and backed
+by the instance/ID index. Test empty baseline, instance scope, overlap adjacency, parsing, and query plan.
 
 #### T4 — Opt-in event contract
 
@@ -58,9 +58,9 @@ test catalog helpers. Existing catalog-driven settings remain false until explic
 `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts` (new),
 `packages/praxrr-app/src/tests/db/configHealthNotificationState.test.ts` (new).
 
-Implement empty-signature rejection plus `claim`, `clear`, and diagnostic `get`. Claim must be one
-conditional `INSERT ... ON CONFLICT DO UPDATE ... WHERE`; affected rows gate dispatch. Test the real
-migration, first/changed/same/overlapping claims, timestamps, clear/get, FK, and instance cascade.
+Implement input rejection plus monotonic `claim`, `rearm`, and diagnostic `get` conditional upserts.
+Test the real migration constraints, first/changed/identical/stale/overlapping claims, re-arm, FK,
+and instance cascade.
 
 ### Phase 3 — Batch B2: convergence
 

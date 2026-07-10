@@ -47,9 +47,10 @@ snapshots.
 
 Before delivery, Praxrr atomically claims a signature for the current degraded state. This makes the
 send attempt at most once for that state, including overlapping job work and process restarts. A
-comparable recovery to a better band, or a same-band gain of at least five points, silently clears
-the claim so a later degradation can notify again. Uncertain or incomparable snapshots neither
-notify nor re-arm the event.
+comparable recovery to a better band, or a same-band gain of at least five points, silently writes
+a newer re-arm tombstone so a later degradation can notify again without allowing older overlapping
+snapshot work to restore stale state. Uncertain or incomparable snapshots neither notify nor re-arm
+the event.
 
 The notification includes previous and current score/band evidence, the Arr app and instance,
 bounded contributor context, the snapshot time, and the instance detail path

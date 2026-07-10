@@ -53,7 +53,7 @@ a manual run does not make itself recurring.
 
 Snapshot insertion is the primary-operation boundary. Only after the insert succeeds does the
 handler read the adjacent persisted predecessor and evaluate a possible `health.degraded` event.
-Assessment, state claim or clear, rendering, notification manager, provider, history, and secondary
+Assessment, state claim or re-arm, rendering, notification manager, provider, history, and secondary
 logging failures are contained by that post-insert boundary. They do not undo the snapshot, fail
 sibling instances, change sweep progress, or activate the snapshot handler's failure backoff.
 

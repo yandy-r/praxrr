@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
@@ -137,7 +137,7 @@ migratedTest('getPrevious keeps overlapping same-instance inserts adjacent to ea
   assertEquals(configHealthSnapshotsQueries.getPrevious(radarr, overlappingCurrentId)?.id, firstCurrentId);
 });
 
-migratedTest('getPrevious parses persisted criteria and profile score JSON', () => {
+migratedTest('getPrevious parses persisted criteria without reading unrelated profile score JSON', () => {
   const lidarr = seedInstance('lidarr');
   const criterion: CriterionResult = {
     id: 'drift',
@@ -169,15 +169,32 @@ migratedTest('getPrevious parses persisted criteria and profile score JSON', () 
       },
     ],
   });
+  db.execute("UPDATE config_health_snapshots SET profile_scores = 'not-json' WHERE id = ?", baselineId);
   const currentId = configHealthSnapshotsQueries.insert(makeReport(lidarr, 'lidarr', isoDaysAgo(1), 55, 'attention'));
 
   const previous = configHealthSnapshotsQueries.getPrevious(lidarr, currentId);
   assertEquals(previous?.id, baselineId);
   assertEquals(previous?.criteriaScores, [criterion]);
-  assertEquals(previous?.profileScores, [
-    { name: 'Music', score: 60, band: 'attention' },
-    { name: 'Lossless', score: 88, band: 'healthy' },
-  ]);
+  assertEquals(previous && 'profileScores' in previous, false);
+});
+
+migratedTest('getPrevious uses the instance/id predecessor index without a temporary sort', () => {
+  const radarr = seedInstance('radarr');
+  const plan = db.query<{ detail: string }>(
+    `EXPLAIN QUERY PLAN
+     SELECT id, arr_instance_id, instance_name, arr_type, engine_version,
+            overall_score, band, criteria_scores, generated_at
+       FROM config_health_snapshots
+      WHERE arr_instance_id = ? AND id < ?
+      ORDER BY id DESC
+      LIMIT 1`,
+    radarr,
+    Number.MAX_SAFE_INTEGER
+  );
+  const detail = plan.map((row) => row.detail).join('\n');
+
+  assert(detail.includes('idx_config_health_snapshots_instance_id_desc'), detail);
+  assertEquals(detail.includes('USE TEMP B-TREE'), false, detail);
 });
 
 // ---------------------------------------------------------------------------

@@ -69,8 +69,9 @@ There is no new external API, public emission endpoint, package, or notification
    cross-engine, or changed-basis comparisons never emit.
 6. **Durable deduplication**: The system atomically claims the current degraded-state signature per
    instance before dispatch. An unchanged signature cannot dispatch twice across overlap or restart.
-7. **Recovery re-arms**: A better band or same-band gain of at least five points clears the state.
-   Unknown, incomparable, and smaller gains preserve it. Recovery itself never emits.
+7. **Recovery re-arms**: A better band or same-band gain of at least five points writes a nullable
+   re-arm tombstone at the current snapshot high-water mark. Unknown, incomparable, and smaller
+   gains preserve state. Recovery itself never emits, and stale overlapping work cannot overwrite it.
 8. **Opt-in only**: A service receives the event only when enabled and its existing `enabled_types`
    array explicitly contains `health.degraded`. No existing row is backfilled and no historical pair
    is replayed when the event is enabled.
@@ -91,7 +92,7 @@ There is no new external API, public emission endpoint, package, or notification
 | `unknown` at either endpoint              | No event or recovery           | Unmeasurable is not worse or better                 |
 | Engine version changes                    | No event or recovery           | New scoring policy establishes a boundary           |
 | Criterion availability/weight changes     | No event or recovery           | Prevents settings/data availability false positives |
-| Meaningful recovery, then same regression | Emit once for new episode      | Recovery clears prior state                         |
+| Meaningful recovery, then same regression | Emit once for new episode      | Recovery writes a newer re-arm tombstone            |
 | Delivery fails after claim                | Snapshot/job succeed; no retry | Intentional at-most-once attempt contract           |
 
 ### Success Criteria
@@ -117,9 +118,9 @@ config-health.snapshot
   -> read immediately preceding row where id < current snapshot id
   -> pure degradation assessment
        -> incomparable/quiet: stop
-       -> recovery: clear per-instance state
+       -> recovery: atomically re-arm at current snapshot id
        -> degradation: build canonical current-state signature
-  -> atomic claim(signature)
+  -> atomic claim(currentSnapshotId, signature)
        -> unchanged/already claimed: stop
        -> claimed: dispatch health.degraded best effort
   -> return normal snapshot/job result
@@ -133,24 +134,28 @@ nested transaction under `processBatches`.
 
 #### `config_health_notification_state`
 
-| Field                | Type     | Constraints                                | Description                              |
-| -------------------- | -------- | ------------------------------------------ | ---------------------------------------- |
-| `arr_instance_id`    | INTEGER  | PK, FK `arr_instances(id)`, cascade delete | One dedup state per live instance        |
-| `notified_signature` | TEXT     | NOT NULL, non-empty                        | Opaque canonical degraded-state identity |
-| `notified_at`        | TEXT     | NOT NULL                                   | ISO-8601 UTC claim time                  |
-| `created_at`         | DATETIME | NOT NULL, default current time             | Initial state creation                   |
-| `updated_at`         | DATETIME | NOT NULL, default current time             | Last changed state                       |
+| Field                  | Type     | Constraints                                | Description                                    |
+| ---------------------- | -------- | ------------------------------------------ | ---------------------------------------------- |
+| `arr_instance_id`      | INTEGER  | PK, FK `arr_instances(id)`, cascade delete | One dedup state per live instance              |
+| `last_snapshot_id`     | INTEGER  | NOT NULL, positive                         | Monotonic processed-transition high-water mark |
+| `notified_signature`   | TEXT     | Nullable; non-empty when present           | Opaque canonical degraded-state identity       |
+| `notified_at`          | TEXT     | Nullable with signature                    | ISO-8601 UTC time of the dispatched claim      |
+| `notified_snapshot_id` | INTEGER  | Nullable positive ID with signature        | Snapshot whose changed signature won dispatch  |
+| `created_at`           | DATETIME | NOT NULL, default current time             | Initial state creation                         |
+| `updated_at`           | DATETIME | NOT NULL, default current time             | Last accepted monotonic transition             |
 
-The primary key is the only required index. This state remains independent from append-only snapshot
-retention. Migration `20260719_create_config_health_notification_state.ts` creates and drops the
-table and is registered after migration `20260717`.
+The state remains independent from append-only snapshot retention, so snapshot IDs are ordering
+values rather than foreign keys. Migration `20260719_create_config_health_notification_state.ts`
+creates the table plus the predecessor index on `(arr_instance_id, id DESC)` and is registered after
+main's migration `20260718`.
 
 #### Atomic query contract
 
-- `claim(instanceId, signature, notifiedAt): boolean` uses a single `INSERT ... ON CONFLICT DO
-UPDATE ... WHERE notified_signature <> excluded.notified_signature`; dispatch occurs only when an
-  insert/update affected a row.
-- `clear(instanceId): boolean` removes a state row after meaningful comparable recovery.
+- `claim(instanceId, currentSnapshotId, signature, notifiedAt): boolean` uses one conditional
+  `INSERT ... ON CONFLICT DO UPDATE` that rejects older snapshot IDs, advances the high-water mark,
+  and returns true only when the current snapshot changed the signature and won dispatch.
+- `rearm(instanceId, currentSnapshotId): boolean` writes a nullable-signature tombstone only when
+  the recovery snapshot is newer than the stored high-water mark.
 - `get(instanceId)` exists for tests/diagnostics, not for deciding whether a claim wins.
 
 #### Signature contract
@@ -215,17 +220,17 @@ added. The fixed five-point policy is exported from the health degradation modul
   recovery policy, signature creation, criterion ranking, bounded notification DTO/builder.
 - `packages/praxrr-app/src/lib/server/db/migrations/20260719_create_config_health_notification_state.ts`:
   forward state-table migration.
-- `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`: atomic claim,
-  clear, and diagnostic get.
+- `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`: monotonic atomic
+  claim/re-arm transitions and diagnostic get.
 - Focused pure and database tests for the degradation module and state queries.
 
 #### Files to Modify
 
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`: register `20260719`.
-- `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`: deterministic
+- `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`: indexed, narrow
   `getPrevious(instanceId, currentSnapshotId)` lookup by append order.
 - `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`: score, insert, read the
-  persisted predecessor, then assess/clear/claim/dispatch in a separate no-throw phase.
+  persisted predecessor, then assess/re-arm/claim/dispatch in a separate no-throw phase.
 - `packages/praxrr-app/src/lib/server/notifications/types.ts`: add the server constant.
 - `packages/praxrr-app/src/lib/shared/notifications/types.ts`: add the opt-in catalog entry.
 - Config Health snapshot/query tests and notification catalog/manager tests.
@@ -301,7 +306,7 @@ existing dynamic event catalog.
 
 1. **Domain policy**: comparability, five-point trigger/recovery, signature, contributor ranking,
    safe bounded rendering, and pure tests.
-2. **Persistence**: forward migration, atomic conditional claim/clear queries, predecessor lookup,
+2. **Persistence**: forward migration, monotonic conditional claim/re-arm queries, indexed predecessor lookup,
    and database tests.
 3. **Integration**: event registration, post-insert orchestration, best-effort dispatch, job and
    notification tests.

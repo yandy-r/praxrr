@@ -3,14 +3,15 @@
 ## Executive Summary
 
 Implement `health.degraded` as a post-persistence extension of the existing
-`config-health.snapshot` job. For each instance, read the latest persisted snapshot, compute and
-insert the new report, then run a separately guarded degradation phase that compares the adjacent
-persisted pair, clears state on meaningful recovery, or atomically claims a new degraded-state
+`config-health.snapshot` job. For each instance, compute and insert the new report, read its
+immediate persisted predecessor by append ID, then run a separately guarded degradation phase that
+compares the adjacent pair, re-arms on meaningful recovery, or atomically claims a new degraded-state
 signature before dispatching through `NotificationManager`.
 
 The durable state must live in a dedicated per-instance table, not in append-only snapshots or
 process memory. This makes deduplication survive restart and retention pruning, while the conditional
-SQLite upsert prevents overlapping workers from dispatching the same signature twice. The comparison,
+SQLite upserts enforce a monotonic snapshot high-water mark, preventing overlapping workers from
+restoring stale state or dispatching the same signature twice. The comparison,
 signature, contributor selection, and payload projection belong in one deterministic health-domain
 module; database ownership remains in query modules and provider routing remains unchanged. This
 worktree is already established; no worktree or branch setup is needed.
@@ -37,23 +38,23 @@ worktree is already established; no worktree or branch setup is needed.
 
 ```text
 config-health.snapshot
-  -> getLatest(instanceId)                         previous persisted evidence
   -> scoreInstance(instanceId)
   -> insert(report)                                primary success boundary
+  -> getPrevious(instanceId, currentSnapshotId)    adjacent persisted evidence
   -> guarded post-insert phase
        -> assess(previous, current)
           -> incomparable / quiet                  preserve notification state
-          -> meaningful recovery                   clear(instanceId)
+          -> meaningful recovery                   rearm(instanceId, currentSnapshotId)
           -> meaningful degradation
                -> build stable current-state signature
-               -> claim(instanceId, signature)     one conditional UPSERT
+               -> claim(instanceId, currentSnapshotId, signature)
                -> claimed only: build event + dispatch health.degraded
   -> return the existing per-instance/sweep result regardless of secondary failure
 ```
 
-`getLatest()` must run before insertion and order by `datetime(generated_at) DESC, id DESC`; the ID
-tie-break makes equal generation timestamps deterministic. Assessment runs only after `insert()`
-succeeds. The first snapshot is baseline-only.
+`getPrevious()` runs after insertion and selects the same-instance row with `id < currentSnapshotId`
+ordered by `id DESC`; the current ID boundary keeps the predecessor deterministic under overlap.
+Assessment runs only after `insert()` succeeds. The first snapshot is baseline-only.
 
 Comparability is intentionally stricter than matching instance IDs: both rows must refer to the same
 non-null instance, have the same non-empty engine version, known bands, finite integer scores in
@@ -62,7 +63,7 @@ arrays, so the domain module must validate parsed criteria rather than trusting 
 
 Band order is `healthy` -> `attention` -> `needs-review`; `unknown` is never ordered. A worse band or
 same-band drop of at least `HEALTH_DEGRADATION_MIN_SCORE_DROP = 5` degrades. A better band or same-band
-gain of at least five clears state. All other outcomes preserve state and emit nothing.
+gain of at least five writes a newer re-arm tombstone. All other outcomes preserve state and emit nothing.
 
 ### Integration points
 
@@ -80,16 +81,16 @@ gain of at least five clears state. All other outcomes preserve state and emit n
 | File                                                                                                   | Required responsibility                                                                                                                                                                |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/praxrr-app/src/lib/server/health/degradation.ts`                                             | New deterministic validation, comparability, trigger/recovery policy, canonical signature, contributor ranking, `HealthDegradedEvent`, and bounded generic/Discord projection helpers. |
-| `packages/praxrr-app/src/lib/server/db/migrations/20260719_create_config_health_notification_state.ts` | New one-row-per-instance state table with PK/FK cascade, non-empty signature, claim timestamp, and bookkeeping timestamps.                                                             |
-| `packages/praxrr-app/src/lib/server/db/migrations.ts`                                                  | Import and register migration `20260719` after `20260717`.                                                                                                                             |
-| `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`                       | New `claim`, `clear`, and diagnostic `get`; `claim` is one conditional `INSERT ... ON CONFLICT DO UPDATE ... WHERE` and returns `db.execute(...) > 0`.                                 |
-| `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`                               | Add instance-scoped deterministic `getLatest()` using descending generated time plus ID.                                                                                               |
-| `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`                             | Own previous-read -> score -> insert -> guarded assessment -> clear/claim -> dispatch ordering while preserving the never-throw per-instance contract.                                 |
+| `packages/praxrr-app/src/lib/server/db/migrations/20260719_create_config_health_notification_state.ts` | New one-row-per-instance monotonic state table plus the snapshot predecessor index.                                                                                                    |
+| `packages/praxrr-app/src/lib/server/db/migrations.ts`                                                  | Import and register migration `20260719` after `20260718`.                                                                                                                             |
+| `packages/praxrr-app/src/lib/server/db/queries/configHealthNotificationState.ts`                       | New monotonic `claim`, `rearm`, and diagnostic `get` conditional upserts.                                                                                                              |
+| `packages/praxrr-app/src/lib/server/db/queries/configHealthSnapshots.ts`                               | Add indexed, narrow `getPrevious(instanceId, currentSnapshotId)` by append order.                                                                                                      |
+| `packages/praxrr-app/src/lib/server/jobs/handlers/configHealthSnapshot.ts`                             | Own score -> insert -> predecessor -> guarded assessment -> re-arm/claim -> dispatch ordering while preserving the never-throw per-instance contract.                                  |
 | `packages/praxrr-app/src/lib/server/notifications/types.ts`                                            | Add the server event constant.                                                                                                                                                         |
 | `packages/praxrr-app/src/lib/shared/notifications/types.ts`                                            | Add label `Config Health Decreased`, category `Config Health`, and concise opt-in description.                                                                                         |
 | `packages/praxrr-app/src/tests/shared/health/degradation.test.ts`                                      | New exhaustive pure policy, malformed input, signature stability/sensitivity, ranking, and payload-bound tests.                                                                        |
-| `packages/praxrr-app/src/tests/db/configHealthNotificationState.test.ts`                               | New migration, insert/update/no-op claim, clear, and instance-cascade coverage.                                                                                                        |
-| `packages/praxrr-app/src/tests/db/configHealthSnapshots.test.ts`                                       | Extend with latest-row scoping, descending order, and equal-time ID tie-break tests.                                                                                                   |
+| `packages/praxrr-app/src/tests/db/configHealthNotificationState.test.ts`                               | New migration constraints, monotonic claim/re-arm, stale rejection, and instance-cascade coverage.                                                                                     |
+| `packages/praxrr-app/src/tests/db/configHealthSnapshots.test.ts`                                       | Extend with predecessor scoping, append ordering, narrow parsing, and query-plan coverage.                                                                                             |
 | `packages/praxrr-app/src/tests/jobs/configHealthSnapshot.test.ts`                                      | Extend with baseline, eligible edges, suppression, recovery re-arm, repeat/overlap dedup, explicit Arr type, and delivery-failure isolation.                                           |
 | `scripts/test.ts`                                                                                      | Include new tests in `config-health`; add a `notifications` alias covering catalog/manager or focused notification integration tests.                                                  |
 | `ROADMAP.md`                                                                                           | Record issue #223 delivery without changing runtime contracts.                                                                                                                         |
@@ -101,7 +102,7 @@ gain of at least five clears state. All other outcomes preserve state and emit n
 - Do not wrap `snapshotInstance()` or the claim path in `db.transaction()`. `processBatches()` runs
   three instance processors through `Promise.all` on the shared SQLite connection, where nested
   `BEGIN` calls are not re-entrant.
-- Snapshot insert, recovery delete, and conditional claim are independently statement-atomic.
+- Snapshot insert and monotonic recovery/claim upserts are independently statement-atomic.
 - Claim occurs before dispatch. A successful claim followed by process/provider failure intentionally
   loses that attempt; this is the specified at-most-once contract, not a retry/outbox workflow.
 - State identity excludes timestamps, snapshot IDs, labels, names, and display text. Include versioned
@@ -142,7 +143,7 @@ gain of at least five clears state. All other outcomes preserve state and emit n
 1. **Batch A — independent foundations:**
    - Implement and test `degradation.ts`.
    - Implement migration/state queries and database tests.
-   - Add `getLatest()` and its focused tests.
+   - Add indexed `getPrevious()` and its focused tests.
    - Add notification constant/catalog entry and catalog tests.
 2. **Batch B — integration after Batch A interfaces settle:** update the snapshot handler and job
    tests using the final assessment result, event, and query contracts.
@@ -163,9 +164,9 @@ merge contention.
   do not replay historical pairs when a service opts in.
 - Unknown, malformed, cross-engine, changed-basis, unchanged, improving-below-recovery-threshold, and
   degrading-below-trigger-threshold pairs are quiet and preserve claim state.
-- Recovery is silent and only meaningful comparable improvement clears state.
-- `config_health_notification_state` uses `arr_instance_id` as its sole required index and cascades on
-  instance deletion; it remains independent of snapshot retention.
+- Recovery is silent and only meaningful comparable improvement writes a newer re-arm tombstone.
+- `config_health_notification_state` cascades on instance deletion and remains independent of snapshot
+  retention; the snapshot history has an `(arr_instance_id, id DESC)` predecessor index.
 - The manager remains the service router. Do not call `DiscordNotifier` directly or bypass explicit
   `enabled_types` filtering and per-service history.
 - Do not add thresholds, global enablement, backfill, retries, an outbox, endpoint/schema changes, new
