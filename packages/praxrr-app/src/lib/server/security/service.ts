@@ -10,6 +10,6 @@ import { computeShieldReport, type ShieldReport } from '$shared/security/index.t
 import { buildPostureInputs } from './gather.ts';
 
 /** Materialize the current deployment's facts and score them into a live {@link ShieldReport}. */
-export function computeShield(): ShieldReport {
-  return computeShieldReport(buildPostureInputs());
+export function computeShield(event?: { request?: Request; url?: URL }): ShieldReport {
+  return computeShieldReport(buildPostureInputs(event));
 }

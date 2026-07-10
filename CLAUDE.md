@@ -158,7 +158,9 @@ Checklist (required for Arr-touching changes):
 
 ## Environment Variables
 
-Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).
+Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location), `PRAXRR_COOKIE_SECURE` (`auto`|`on`|`off`, default `auto`).
+
+`PRAXRR_COOKIE_SECURE` controls the session cookie `Secure` flag: `auto` (default) marks it `Secure` only when the observed request transport is direct HTTPS or a proxy reporting `X-Forwarded-Proto: https`; `on` always marks it `Secure` (HTTPS-only deployments, including a TLS-terminating proxy that omits `X-Forwarded-Proto`); `off` never marks it `Secure` (plain-http LAN / dev escape hatch). Invalid or empty values fall back to `auto`.
 
 ### Monorepo and PCD Contract Notes
 

@@ -6,7 +6,15 @@
  */
 
 import { assert, assertEquals } from '@std/assert';
-import { SECURITY_POSTURE_ENGINE_VERSION, computeShieldReport, type PostureInputs } from '$shared/security/index.ts';
+import {
+  SECURITY_POSTURE_ENGINE_VERSION,
+  computeShieldReport,
+  type CookieSecureMode,
+  type PostureInputs,
+  type SessionPosture,
+  type SessionTransport,
+  type ShieldFix,
+} from '$shared/security/index.ts';
 
 function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
   return {
@@ -27,15 +35,36 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
       instanceKeyVersions: [{ instanceId: 1, keyVersion: '1' }],
     },
     redactionVerified: true,
-    sessionCookieSecure: false,
+    session: { transport: 'unknown', cookieSecure: false, cookieSecureMode: 'auto' },
     nowIso: '2026-07-09T02:00:00.000Z',
     ...overrides,
   };
 }
 
+/** Build a session posture, computing `cookieSecure` exactly as `resolveCookieSecure(mode, transport)` does. */
+function sessionPosture(transport: SessionTransport, mode: CookieSecureMode = 'auto'): SessionPosture {
+  const cookieSecure =
+    mode === 'on' ? true : mode === 'off' ? false : transport === 'direct-secure' || transport === 'proxy-terminated';
+  return { transport, cookieSecure, cookieSecureMode: mode };
+}
+
+/** Every observable (transport × mode) posture — session state must never move a score. */
+const ALL_SESSIONS: readonly SessionPosture[] = [
+  sessionPosture('direct-secure', 'on'),
+  sessionPosture('direct-secure', 'off'),
+  sessionPosture('proxy-terminated', 'auto'),
+  sessionPosture('proxy-terminated', 'off'),
+  sessionPosture('insecure', 'auto'),
+  sessionPosture('insecure', 'on'),
+  sessionPosture('unknown', 'auto'),
+  sessionPosture('unknown', 'on'),
+];
+
 Deno.test('computeShieldReport: stamps the engine version and generatedAt from nowIso', () => {
   const report = computeShieldReport(makeInputs());
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '2'); // report-surface bump for session posture (#227)
   assertEquals(report.engineVersion, SECURITY_POSTURE_ENGINE_VERSION);
+  assertEquals(report.engineVersion, '2');
   assertEquals(report.generatedAt, '2026-07-09T02:00:00.000Z');
 });
 
@@ -222,4 +251,237 @@ Deno.test('computeShieldReport: an unparseable instance URL degrades that row wi
   const row = report.transport.find((r) => r.instanceId === 1);
   assertEquals(row?.score, null);
   assertEquals(row?.status, 'na');
+});
+
+// --- session posture (issue #227): unscored advisory/assurance surface --------------------------
+
+Deno.test('computeShieldReport: pinned scores, band caps, and recoverablePoints are identical across every transport state', () => {
+  // Session posture is appended AFTER rollup/contributions/capBand and feeds none of them, so every
+  // pinned value must be byte-identical no matter which transport the report-viewer's request used.
+  for (const session of ALL_SESSIONS) {
+    const hardened = computeShieldReport(
+      makeInputs({ session, instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'https://r' }] })
+    );
+    assertEquals(hardened.score, 95);
+    assertEquals(hardened.band, 'hardened');
+
+    const guarded = computeShieldReport(
+      makeInputs({
+        session,
+        authMode: 'local',
+        instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'http://10.0.0.5' }],
+      })
+    );
+    assertEquals(guarded.score, 64);
+    assertEquals(guarded.band, 'guarded');
+    assertEquals(guarded.bandCappedBy, null);
+
+    const exposed = computeShieldReport(
+      makeInputs({
+        session,
+        authMode: 'off',
+        bindHost: '127.0.0.1',
+        instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'http://10.0.0.5' }],
+      })
+    );
+    assertEquals(exposed.score, 59);
+    assertEquals(exposed.band, 'exposed');
+
+    const transportCapped = computeShieldReport(
+      makeInputs({
+        session,
+        authMode: 'on',
+        appApiKeyPresent: false,
+        instances: [
+          { id: 1, name: 'Secure', arrType: 'radarr', url: 'https://secure' },
+          { id: 2, name: 'Exposed', arrType: 'sonarr', url: 'http://8.8.8.8' },
+        ],
+      })
+    );
+    assertEquals(transportCapped.score, 85);
+    assertEquals(transportCapped.band, 'guarded');
+    assertEquals(transportCapped.bandCappedBy?.checkId, 'arr_transport');
+
+    const authCapped = computeShieldReport(
+      makeInputs({
+        session,
+        authMode: 'off',
+        bindHost: '0.0.0.0',
+        instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'https://r' }],
+      })
+    );
+    assertEquals(authCapped.band, 'exposed');
+    assertEquals(authCapped.bandCappedBy?.checkId, 'control_plane_auth');
+
+    const recoverable = computeShieldReport(
+      makeInputs({ session, authMode: 'local', appApiKeyPresent: false, instances: [] })
+    );
+    assertEquals(recoverable.checks.find((c) => c.id === 'control_plane_auth')?.recoverablePoints, 40);
+
+    for (const report of [hardened, guarded, exposed, transportCapped, authCapped, recoverable]) {
+      const sum = report.checks.reduce((total, c) => total + c.contribution, 0);
+      assertEquals(sum, report.score, `${session.transport}/${session.cookieSecureMode}: contributions must equal score`);
+    }
+  }
+});
+
+Deno.test('computeShieldReport: session posture is unscored — direct-secure(on) and unknown yield the same score/band', () => {
+  const directSecure = computeShieldReport(makeInputs({ session: sessionPosture('direct-secure', 'on') }));
+  const unknown = computeShieldReport(makeInputs({ session: sessionPosture('unknown') }));
+  assertEquals(directSecure.score, unknown.score);
+  assertEquals(directSecure.band, unknown.band);
+});
+
+Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 2 for every transport', () => {
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '2');
+  for (const session of ALL_SESSIONS) {
+    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '2');
+  }
+});
+
+Deno.test('computeShieldReport: per-(transport × mode) session advisory + assurance table', () => {
+  const table: readonly {
+    transport: SessionTransport;
+    mode: CookieSecureMode;
+    expectAdvisory: boolean;
+    fixKind?: ShieldFix['kind'];
+    fixName?: string;
+    expectSecureAssurance: boolean;
+  }[] = [
+    { transport: 'direct-secure', mode: 'auto', expectAdvisory: false, expectSecureAssurance: true },
+    { transport: 'direct-secure', mode: 'on', expectAdvisory: false, expectSecureAssurance: true },
+    {
+      transport: 'direct-secure',
+      mode: 'off',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'proxy-terminated',
+      mode: 'auto',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'proxy-terminated',
+      mode: 'on',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'proxy-terminated',
+      mode: 'off',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    { transport: 'insecure', mode: 'auto', expectAdvisory: true, fixKind: 'docs', expectSecureAssurance: false },
+    { transport: 'insecure', mode: 'off', expectAdvisory: true, fixKind: 'docs', expectSecureAssurance: false },
+    {
+      transport: 'insecure',
+      mode: 'on',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'unknown',
+      mode: 'auto',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'unknown',
+      mode: 'off',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+    {
+      transport: 'unknown',
+      mode: 'on',
+      expectAdvisory: true,
+      fixKind: 'env-var',
+      fixName: 'PRAXRR_COOKIE_SECURE',
+      expectSecureAssurance: false,
+    },
+  ];
+  for (const row of table) {
+    const label = `${row.transport}/${row.mode}`;
+    const report = computeShieldReport(makeInputs({ session: sessionPosture(row.transport, row.mode) }));
+    const advisory = report.advisories.find((a) => a.id === 'session_cookie_transport');
+    if (row.expectAdvisory) {
+      assert(advisory, `${label} must emit a session_cookie_transport advisory`);
+      assertEquals(advisory.fix.kind, row.fixKind, `${label} fix kind`);
+      if (row.fixName !== undefined) {
+        assert(advisory.fix.kind === 'env-var');
+        assertEquals(advisory.fix.name, row.fixName, `${label} fix name`);
+      }
+    } else {
+      assertEquals(advisory, undefined, `${label} must NOT emit an advisory`);
+    }
+    const secure = report.assurances.find((a) => a.id === 'session_cookie_secure');
+    if (row.expectSecureAssurance) {
+      assert(secure?.verified, `${label} must affirm session_cookie_secure`);
+    } else {
+      assertEquals(secure, undefined, `${label} must NOT affirm session_cookie_secure`);
+    }
+    assert(
+      report.assurances.some((a) => a.id === 'session_secret' && a.verified),
+      `${label} session_secret must always be verified`
+    );
+    assert(
+      report.assurances.some((a) => a.id === 'session_cookie_protections' && a.verified),
+      `${label} session_cookie_protections must always be verified`
+    );
+  }
+});
+
+Deno.test('computeShieldReport: proxy-terminated is trusted-termination, never a verified Secure assurance (false-safe guard)', () => {
+  // Praxrr only observed a spoofable X-Forwarded-Proto: https and cannot verify the external TLS leg,
+  // so the Secure cookie there must surface as a hedged advisory — never the confirmed-secure assurance.
+  for (const mode of ['auto', 'on'] as const) {
+    const report = computeShieldReport(makeInputs({ session: sessionPosture('proxy-terminated', mode) }));
+    assert(
+      report.advisories.some((a) => a.id === 'session_cookie_transport'),
+      `proxy-terminated/${mode} must emit a hedged advisory`
+    );
+    assert(
+      !report.assurances.some((a) => a.id === 'session_cookie_secure'),
+      `proxy-terminated/${mode} must never affirm session_cookie_secure`
+    );
+  }
+});
+
+Deno.test('computeShieldReport: every advisory carries a non-none fix (advisory actionability invariant)', () => {
+  for (const session of ALL_SESSIONS) {
+    const report = computeShieldReport(makeInputs({ session }));
+    for (const advisory of report.advisories) {
+      assert(
+        advisory.fix.kind !== 'none',
+        `${session.transport}/${session.cookieSecureMode} advisory ${advisory.id} must carry a fix`
+      );
+    }
+  }
+});
+
+Deno.test('computeShieldReport: session advisory/assurance copy never carries a secret substring', () => {
+  for (const session of ALL_SESSIONS) {
+    const report = computeShieldReport(makeInputs({ session }));
+    const serialized = JSON.stringify({ advisories: report.advisories, assurances: report.assurances }).toLowerCase();
+    assert(!serialized.includes('api_key'), `${session.transport} advisory copy must not contain api_key`);
+    assert(!serialized.includes('password'), `${session.transport} advisory copy must not contain password`);
+    assert(!serialized.includes('deadbeef'), `${session.transport} advisory copy must not contain deadbeef`);
+  }
 });

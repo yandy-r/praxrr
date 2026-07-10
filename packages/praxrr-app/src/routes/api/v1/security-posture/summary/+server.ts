@@ -15,9 +15,9 @@ type ErrorResponse = { error: string };
  * secret value. Degraded/not-applicable states ride in the 200 body (per-check `score:null`); this
  * returns 500 only on an internal error.
  */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async (event) => {
   try {
-    const report = computeShield();
+    const report = computeShield(event);
     return json(toSummaryResponse(report) satisfies SecurityPostureSummaryResponse);
   } catch (error) {
     await logger.error('Failed to build security posture summary', {

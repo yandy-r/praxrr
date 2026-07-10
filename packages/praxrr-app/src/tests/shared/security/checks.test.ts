@@ -27,7 +27,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     instances: [],
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
     redactionVerified: true,
-    sessionCookieSecure: false,
+    session: { transport: 'unknown', cookieSecure: false, cookieSecureMode: 'auto' },
     nowIso: '2026-07-09T00:00:00.000Z',
     ...overrides,
   };

@@ -19,6 +19,7 @@ import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredential
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
+import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
 import type { InstanceFact, PostureInputs, RotationFacts, ShieldArrType } from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
@@ -104,10 +105,14 @@ function verifyLogRedaction(): boolean {
 }
 
 /** Build the fully-materialized {@link PostureInputs} for the current deployment. Never throws. */
-export function buildPostureInputs(): PostureInputs {
+export function buildPostureInputs(event?: { request?: Request; url?: URL }): PostureInputs {
   const oidc = gatherOidcState();
   const appKey = gatherAppKeyState();
   const instances = gatherInstances();
+
+  const transport = resolveSessionTransport(event);
+  const cookieSecureMode = config.cookieSecureMode;
+  const cookieSecure = resolveCookieSecure(cookieSecureMode, transport);
 
   return {
     authMode: config.authMode,
@@ -120,8 +125,7 @@ export function buildPostureInputs(): PostureInputs {
     instances,
     rotation: gatherRotation(instances),
     redactionVerified: verifyLogRedaction(),
-    // Praxrr sets its session cookie without the Secure flag today; surfaced as an advisory.
-    sessionCookieSecure: false,
+    session: { transport, cookieSecure, cookieSecureMode },
     nowIso: new Date().toISOString(),
   };
 }

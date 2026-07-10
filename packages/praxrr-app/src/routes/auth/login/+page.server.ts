@@ -6,6 +6,7 @@ import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
 import { verifyPassword } from '$auth/password.ts';
+import { sessionCookieOptions } from '$auth/sessionCookie.ts';
 import { getClientIp } from '$auth/network.ts';
 import { parseUserAgent } from '$auth/userAgent.ts';
 import { analyzeLoginFailure, formatLoginFailure } from '$auth/loginAnalysis.ts';
@@ -88,13 +89,7 @@ export const actions: Actions = {
 
     // Set session cookie
     const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-    cookies.set('session', sessionId, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      expires,
-    });
+    cookies.set('session', sessionId, sessionCookieOptions(event, expires));
 
     // Redirect to home
     throw redirect(303, '/');

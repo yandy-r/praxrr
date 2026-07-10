@@ -143,50 +143,51 @@ This runs the parser service and Vite dev server concurrently. See
 
 ### Environment Variables
 
-| Variable                            | Default                                | Description                                                                          |
-| ----------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------ |
-| `PUID`                              | `1000`                                 | User ID for file permissions                                                         |
-| `PGID`                              | `1000`                                 | Group ID for file permissions                                                        |
-| `UMASK`                             | `022`                                  | File creation mask                                                                   |
-| `TZ`                                | `Etc/UTC`                              | Timezone for scheduling                                                              |
-| `PORT`                              | `6868`                                 | Web UI port                                                                          |
-| `HOST`                              | `0.0.0.0`                              | Bind address                                                                         |
-| `APP_BASE_PATH`                     | `/config`                              | Base path for data, logs, backups                                                    |
-| `AUTH`                              | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                              |
-| `PARSER_HOST`                       | `localhost`                            | Parser service host                                                                  |
-| `PARSER_PORT`                       | `5000`                                 | Parser service port                                                                  |
-| `PRAXRR_DEFAULT_DB_TOKEN`           | `your_token`                           | Default database token                                                               |
-| `PRAXRR_DEFAULT_DB_GIT_USERNAME`    | `your_username`                        | Default database Git username                                                        |
-| `PRAXRR_DEFAULT_DB_GIT_EMAIL`       | `your_email`                           | Default database Git email                                                           |
-| `PRAXRR_DEFAULT_DB_URL`             | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                                 |
-| `PRAXRR_DEFAULT_DB_BRANCH`          | `main`                                 | Default PCD auto-link branch.                                                        |
-| `PRAXRR_DEFAULT_DB_NAME`            | `Praxrr-DB`                            | Default PCD display name                                                             |
-| `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `latest`, `1.0.0`)  |
-| `PRAXRR_VALIDATE_INSTANCES`         | `false`                                | Validate env-managed instances against Arr API during startup (optional).            |
-| `PULL_ON_START`                     | `false`                                | Pull sync selections from Arr instances on startup (non-blocking background job).    |
-| `PULL_ON_START_MAX_CONCURRENCY`     | _unset_                                | Max concurrent Arr instance pulls (optional, positive integer).                      |
-| `PULL_ON_START_TIMEOUT_MS`          | _unset_                                | Per-instance pull timeout in milliseconds (optional, positive integer).              |
-| `ARR_CREDENTIAL_MASTER_KEY`         | _required for Arr access_              | Base64-encoded 32-byte master key for AES-GCM encryption and HMAC fingerprinting     |
-| `ARR_CREDENTIAL_MASTER_KEY_VERSION` | _required for Arr access_              | Version label for the active master key, used for encryption and lookup              |
-| `ARR_CREDENTIAL_PREVIOUS_KEYS`      | _unset_                                | Optional JSON map of previous versions to base64 keys for decryption during rotation |
-| `RADARR_INSTANCE_URL_<N>`           | _unset_                                | `http://radarr:7878` (required with matching `RADARR_INSTANCE_API_KEY_<N>`)          |
-| `RADARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `RADARR_INSTANCE_URL_<N>`)                           |
-| `RADARR_INSTANCE_NAME_<N>`          | `Radarr`, `Radarr 2`...                | Optional display name                                                                |
-| `RADARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                        |
-| `RADARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                        |
-| `RADARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                          |
-| `SONARR_INSTANCE_URL_<N>`           | _unset_                                | `http://sonarr:8989` (required with matching `SONARR_INSTANCE_API_KEY_<N>`)          |
-| `SONARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `SONARR_INSTANCE_URL_<N>`)                           |
-| `SONARR_INSTANCE_NAME_<N>`          | _unset_                                | Optional display name                                                                |
-| `SONARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                        |
-| `SONARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                        |
-| `SONARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                          |
-| `LIDARR_INSTANCE_URL_<N>`           | _unset_                                | `http://lidarr:8686` (required with matching `LIDARR_INSTANCE_API_KEY_<N>`)          |
-| `LIDARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `LIDARR_INSTANCE_URL_<N>`)                           |
-| `LIDARR_INSTANCE_NAME_<N>`          | _unset_                                | Optional display name                                                                |
-| `LIDARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                        |
-| `LIDARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                        |
-| `LIDARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                          |
+| Variable                            | Default                                | Description                                                                                                                  |
+| ----------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `PUID`                              | `1000`                                 | User ID for file permissions                                                                                                 |
+| `PGID`                              | `1000`                                 | Group ID for file permissions                                                                                                |
+| `UMASK`                             | `022`                                  | File creation mask                                                                                                           |
+| `TZ`                                | `Etc/UTC`                              | Timezone for scheduling                                                                                                      |
+| `PORT`                              | `6868`                                 | Web UI port                                                                                                                  |
+| `HOST`                              | `0.0.0.0`                              | Bind address                                                                                                                 |
+| `APP_BASE_PATH`                     | `/config`                              | Base path for data, logs, backups                                                                                            |
+| `AUTH`                              | `on`                                   | Auth mode: `on`, `local`, `off`, `oidc`                                                                                      |
+| `PRAXRR_COOKIE_SECURE`              | `auto`                                 | Session cookie `Secure` flag: `auto` (Secure over direct HTTPS or trusted proxy), `on` (always Secure), `off` (never Secure) |
+| `PARSER_HOST`                       | `localhost`                            | Parser service host                                                                                                          |
+| `PARSER_PORT`                       | `5000`                                 | Parser service port                                                                                                          |
+| `PRAXRR_DEFAULT_DB_TOKEN`           | `your_token`                           | Default database token                                                                                                       |
+| `PRAXRR_DEFAULT_DB_GIT_USERNAME`    | `your_username`                        | Default database Git username                                                                                                |
+| `PRAXRR_DEFAULT_DB_GIT_EMAIL`       | `your_email`                           | Default database Git email                                                                                                   |
+| `PRAXRR_DEFAULT_DB_URL`             | `https://github.com/yandy-r/praxrr-db` | Default PCD auto-link repository URL                                                                                         |
+| `PRAXRR_DEFAULT_DB_BRANCH`          | `main`                                 | Default PCD auto-link branch.                                                                                                |
+| `PRAXRR_DEFAULT_DB_NAME`            | `Praxrr-DB`                            | Default PCD display name                                                                                                     |
+| `PRAXRR_SCHEMA_REF`                 | manifest value                         | Override schema dependency ref (tag or branch, e.g. `v2`, `dev`, `latest`, `1.0.0`)                                          |
+| `PRAXRR_VALIDATE_INSTANCES`         | `false`                                | Validate env-managed instances against Arr API during startup (optional).                                                    |
+| `PULL_ON_START`                     | `false`                                | Pull sync selections from Arr instances on startup (non-blocking background job).                                            |
+| `PULL_ON_START_MAX_CONCURRENCY`     | _unset_                                | Max concurrent Arr instance pulls (optional, positive integer).                                                              |
+| `PULL_ON_START_TIMEOUT_MS`          | _unset_                                | Per-instance pull timeout in milliseconds (optional, positive integer).                                                      |
+| `ARR_CREDENTIAL_MASTER_KEY`         | _required for Arr access_              | Base64-encoded 32-byte master key for AES-GCM encryption and HMAC fingerprinting                                             |
+| `ARR_CREDENTIAL_MASTER_KEY_VERSION` | _required for Arr access_              | Version label for the active master key, used for encryption and lookup                                                      |
+| `ARR_CREDENTIAL_PREVIOUS_KEYS`      | _unset_                                | Optional JSON map of previous versions to base64 keys for decryption during rotation                                         |
+| `RADARR_INSTANCE_URL_<N>`           | _unset_                                | `http://radarr:7878` (required with matching `RADARR_INSTANCE_API_KEY_<N>`)                                                  |
+| `RADARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `RADARR_INSTANCE_URL_<N>`)                                                                   |
+| `RADARR_INSTANCE_NAME_<N>`          | `Radarr`, `Radarr 2`...                | Optional display name                                                                                                        |
+| `RADARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                                                                |
+| `RADARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                                                                |
+| `RADARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                                                                  |
+| `SONARR_INSTANCE_URL_<N>`           | _unset_                                | `http://sonarr:8989` (required with matching `SONARR_INSTANCE_API_KEY_<N>`)                                                  |
+| `SONARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `SONARR_INSTANCE_URL_<N>`)                                                                   |
+| `SONARR_INSTANCE_NAME_<N>`          | _unset_                                | Optional display name                                                                                                        |
+| `SONARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                                                                |
+| `SONARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                                                                |
+| `SONARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                                                                  |
+| `LIDARR_INSTANCE_URL_<N>`           | _unset_                                | `http://lidarr:8686` (required with matching `LIDARR_INSTANCE_API_KEY_<N>`)                                                  |
+| `LIDARR_INSTANCE_API_KEY_<N>`       | _unset_                                | API key (required with matching `LIDARR_INSTANCE_URL_<N>`)                                                                   |
+| `LIDARR_INSTANCE_NAME_<N>`          | _unset_                                | Optional display name                                                                                                        |
+| `LIDARR_INSTANCE_EXTERNAL_URL_<N>`  | _unset_                                | Optional browser URL override                                                                                                |
+| `LIDARR_INSTANCE_TAGS_<N>`          | _unset_                                | Optional comma-separated tags                                                                                                |
+| `LIDARR_INSTANCE_ENABLED_<N>`       | `true`                                 | Optional, `true` or `false`                                                                                                  |
 
 ### Arr environment-managed instance examples
 
