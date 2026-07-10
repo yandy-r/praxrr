@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert';
 import type { ArrDelayProfile } from '$arr/types.ts';
 import { LidarrClient } from '$arr/clients/lidarr.ts';
 import { RadarrClient } from '$arr/clients/radarr.ts';
@@ -220,7 +220,11 @@ Deno.test('delay profile review evidence captures exact config, PCD, desired, ta
       targetResolution: 'fixed-default-id',
     });
     assertEquals(recorder.arr.liveTargetProfile, target);
-    assertEquals(recorder.arr.remoteIdentity, { id: 17, order: 4, tags: [8, 3] });
+    assertEquals(recorder.arr.remoteIdentity, {
+      id: 17,
+      order: 4,
+      tags: [8, 3],
+    });
     assertEquals(recorder.arr.targetResolution, {
       arrType: 'radarr',
       strategy: 'fixed-default-id',
@@ -382,7 +386,10 @@ Deno.test(
     };
 
     const writeSyncer = new DelayProfileSyncer(writeClient, 1, 'Reviewed Radarr');
-    writeSyncer.setPreviewConfig({ databaseId: 999, profileName: 'Mutated saved config' });
+    writeSyncer.setPreviewConfig({
+      databaseId: 999,
+      profileName: 'Mutated saved config',
+    });
     writeSyncer.setPreparedExecutionContext(recorder.prepared!);
     try {
       const result = await writeSyncer.sync();
@@ -412,3 +419,26 @@ Deno.test(
     }
   }
 );
+
+Deno.test('delay-profile transient overrides fail closed for every supported Arr type', async () => {
+  const cases = [
+    ['radarr', createRadarr(liveDelayProfile())],
+    ['sonarr', createSonarr(liveDelayProfile())],
+    ['lidarr', createLidarr([liveDelayProfile()])],
+  ] as const;
+
+  for (const [arrType, client] of cases) {
+    const syncer = new DelayProfileSyncer(client, 999_001, `Invalid ${arrType}`);
+    syncer.setPreviewConfig({ databaseId: DATABASE_ID });
+    try {
+      await assertRejects(
+        () => syncer.generatePreview(),
+        Error,
+        'Invalid reviewed delay profile configuration',
+        `${arrType} must not fall back to saved delay-profile config`
+      );
+    } finally {
+      client.close();
+    }
+  }
+});

@@ -2365,12 +2365,9 @@ export interface components {
     SyncPreviewSectionConfigs: {
       /** @description Effective quality-profile section configuration to review and bind. */
       qualityProfiles?: unknown;
-      /** @description Effective delay-profile section configuration to review and bind. */
-      delayProfiles?: unknown;
-      /** @description Effective media-management section configuration to review and bind. */
-      mediaManagement?: unknown;
-      /** @description Effective metadata-profile section configuration to review and bind. */
-      metadataProfiles?: unknown;
+      delayProfiles?: components['schemas']['SyncPreviewNamedProfileSectionConfig'];
+      mediaManagement?: components['schemas']['SyncPreviewMediaManagementSectionConfig'];
+      metadataProfiles?: components['schemas']['SyncPreviewNamedProfileSectionConfig'];
     };
     SyncPreviewApplyRequest: {
       /** @description Optional section filters for preview application */
@@ -4878,6 +4875,72 @@ export interface components {
       /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
       reason: string;
     };
+    /**
+     * @description Complete transient delay/metadata profile selection. Both fields must be
+     *     null to select no profile, or both must contain a valid selection.
+     */
+    SyncPreviewNamedProfileSectionConfig: {
+      databaseId: number | null;
+      profileName: string | null;
+    } & (
+      | {
+          databaseId?: number;
+          profileName?: string;
+        }
+      | {
+          /** @enum {unknown|null} */
+          databaseId?: null;
+          /** @enum {unknown|null} */
+          profileName?: null;
+        }
+    );
+    /**
+     * @description Complete transient media-management selection. Each database/name pair
+     *     must either be null/null or contain a positive database ID and non-empty name.
+     */
+    SyncPreviewMediaManagementSectionConfig: {
+      namingDatabaseId: number | null;
+      namingConfigName: string | null;
+      qualityDefinitionsDatabaseId: number | null;
+      qualityDefinitionsConfigName: string | null;
+      mediaSettingsDatabaseId: number | null;
+      mediaSettingsConfigName: string | null;
+    } & ((
+      | {
+          namingDatabaseId?: number;
+          namingConfigName?: string;
+        }
+      | {
+          /** @enum {unknown|null} */
+          namingDatabaseId?: null;
+          /** @enum {unknown|null} */
+          namingConfigName?: null;
+        }
+    ) &
+      (
+        | {
+            qualityDefinitionsDatabaseId?: number;
+            qualityDefinitionsConfigName?: string;
+          }
+        | {
+            /** @enum {unknown|null} */
+            qualityDefinitionsDatabaseId?: null;
+            /** @enum {unknown|null} */
+            qualityDefinitionsConfigName?: null;
+          }
+      ) &
+      (
+        | {
+            mediaSettingsDatabaseId?: number;
+            mediaSettingsConfigName?: string;
+          }
+        | {
+            /** @enum {unknown|null} */
+            mediaSettingsDatabaseId?: null;
+            /** @enum {unknown|null} */
+            mediaSettingsConfigName?: null;
+          }
+      ));
     /**
      * @description Optional metadata for hybrid JSON/YAML migration envelopes.
      *     Existing payloads are backward-compatible when omitted.

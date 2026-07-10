@@ -210,6 +210,35 @@ Deno.test('non-applicable generation is ready and cannot be claimed for apply', 
   });
 });
 
+Deno.test('non-applicable generation rejects failed sections without changing generating state', () => {
+  const store = new SyncPreviewStore();
+  const id = `preview-failed-not-non-applicable-${crypto.randomUUID()}`;
+  store.create(previewInput(id), NOW_MS);
+  const sectionFailure = buildPreviewFailure('sectionErrors', 'radarr');
+
+  assertThrows(
+    () =>
+      store.completeNonApplicableGeneration(
+        id,
+        {
+          sections: SECTIONS,
+          sectionOutcomes: SECTIONS.map((section) => ({ section, failure: sectionFailure, skipped: false })),
+          failure: sectionFailure,
+          summary: {
+            totalCreates: 0,
+            totalUpdates: 0,
+            totalDeletes: 0,
+            totalUnchanged: 0,
+          },
+        },
+        NOW_MS + 1
+      ),
+    TypeError,
+    'only clean skipped sections'
+  );
+  assertEquals(store.get(id, NOW_MS + 2)?.status, PREVIEW_STATUS_GENERATING);
+});
+
 Deno.test('apply claim fails closed for every pre-claim lifecycle and binding branch', async () => {
   const missingStore = new SyncPreviewStore();
   assertEquals(missingStore.claimReadyForApply('missing', ['qualityProfiles'], NOW_MS), {

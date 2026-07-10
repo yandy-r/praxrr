@@ -146,6 +146,23 @@ Deno.test('review binding sorts only explicitly declared true sets with a caller
   assertThrows(() => sortReviewEvidenceSet([{ name: 'same' }, { name: 'same' }], () => 0), TypeError, 'ambiguous');
 });
 
+Deno.test('review binding enforces one aggregate canonical byte budget before serialization', () => {
+  const oversized = Array.from({ length: 17 }, (_, index) => ({
+    name: `${String(index).padStart(2, '0')}:${'x'.repeat(999_997)}`,
+  }));
+
+  assertThrows(() => canonicalizeReviewValue(oversized), TypeError, 'canonical byte limit exceeded');
+  assertThrows(
+    () =>
+      sortReviewEvidenceSet(oversized, (left, right) => {
+        if (left.name === right.name) return 0;
+        return left.name < right.name ? -1 : 1;
+      }),
+    TypeError,
+    'canonical byte limit exceeded'
+  );
+});
+
 Deno.test('review binding clones effective config immutably and includes it only in PCD evidence', async () => {
   const sourceConfig = {
     databaseId: 7,

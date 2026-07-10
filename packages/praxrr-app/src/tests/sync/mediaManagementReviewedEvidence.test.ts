@@ -1,4 +1,4 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { MediaManagementSyncer } from '../../lib/server/sync/mediaManagement/syncer.ts';
 import type {
   SyncPreviewEvidenceClass,
@@ -110,18 +110,39 @@ Deno.test(
         },
       ],
       radarr_quality_definitions: [
-        { name: ' Quality Exact ', quality_name: 'Web', min_size: 11, max_size: 111, preferred_size: 61 },
-        { name: ' Quality Exact ', quality_name: 'Bluray', min_size: 22, max_size: 222, preferred_size: 72 },
+        {
+          name: ' Quality Exact ',
+          quality_name: 'Web',
+          min_size: 11,
+          max_size: 111,
+          preferred_size: 61,
+        },
+        {
+          name: ' Quality Exact ',
+          quality_name: 'Bluray',
+          min_size: 22,
+          max_size: 222,
+          preferred_size: 72,
+        },
       ],
       quality_api_mappings: [
         { quality_name: 'Web', arr_type: 'radarr', api_name: 'WEBDL-1080p' },
-        { quality_name: 'Bluray', arr_type: 'radarr', api_name: 'Bluray-1080p' },
+        {
+          quality_name: 'Bluray',
+          arr_type: 'radarr',
+          api_name: 'Bluray-1080p',
+        },
       ],
     };
     setCache(databaseId, fakeCache(rows));
     const restoreTrash = patchTrashSelectionsEmpty();
 
-    const liveMedia = { id: 41, downloadPropersAndRepacks: 'doNotPrefer', enableMediaInfo: false, preserve: 'media' };
+    const liveMedia = {
+      id: 41,
+      downloadPropersAndRepacks: 'doNotPrefer',
+      enableMediaInfo: false,
+      preserve: 'media',
+    };
     const liveNaming = {
       id: 42,
       renameMovies: false,
@@ -237,6 +258,26 @@ Deno.test(
     }
   }
 );
+
+Deno.test('media-management transient overrides fail closed for Radarr, Sonarr and Lidarr', async () => {
+  for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
+    const syncer = new MediaManagementSyncer({} as BaseArrClient, 999_002, `Invalid ${arrType}`, arrType);
+    syncer.setPreviewConfig({
+      namingDatabaseId: 234,
+      namingConfigName: null,
+      qualityDefinitionsDatabaseId: null,
+      qualityDefinitionsConfigName: null,
+      mediaSettingsDatabaseId: null,
+      mediaSettingsConfigName: null,
+    });
+    await assertRejects(
+      () => syncer.generatePreview(),
+      Error,
+      'Invalid reviewed media-management configuration',
+      `${arrType} must not fall back to saved media-management config`
+    );
+  }
+});
 
 Deno.test('media-management source dispatch stays explicit for Radarr, Sonarr and Lidarr', () => {
   type SourceResolver = () => { entityType: string } | null;
@@ -358,7 +399,11 @@ Deno.test(
       await syncer.generatePreview();
 
       const capabilities = recorder.evidence.arr.capabilities as {
-        naming: { appliedFields: string[]; missingFields: string[]; unsupportedSourceFields: string[] };
+        naming: {
+          appliedFields: string[];
+          missingFields: string[];
+          unsupportedSourceFields: string[];
+        };
       };
       assertEquals(capabilities.naming.appliedFields, ['renameTracks']);
       assertEquals(capabilities.naming.missingFields, [
@@ -369,8 +414,14 @@ Deno.test(
         'standardTrackFormat',
       ]);
       assertEquals(capabilities.naming.unsupportedSourceFields, ['artist_name']);
-      const desired = recorder.prepared?.desired as { naming: { payload: Row } };
-      assertEquals(desired.naming.payload, { id: 77, renameTracks: true, opaque: 'preserve' });
+      const desired = recorder.prepared?.desired as {
+        naming: { payload: Row };
+      };
+      assertEquals(desired.naming.payload, {
+        id: 77,
+        renameTracks: true,
+        opaque: 'preserve',
+      });
     } finally {
       restoreTrash();
       clearAllCaches();

@@ -101,15 +101,36 @@ function metadataReviewCache(rowsByTable: Record<string, ReviewRow[]>): PCDCache
 
 function metadataRows(): Record<string, ReviewRow[]> {
   return {
-    lidarr_metadata_profiles: [{ id: 8, name: REVIEW_PROFILE_NAME, description: 'reviewed source' }],
+    lidarr_metadata_profiles: [
+      {
+        id: 8,
+        name: REVIEW_PROFILE_NAME,
+        description: 'reviewed source',
+      },
+    ],
     lidarr_metadata_profile_primary_types: [
-      { metadata_profile_name: REVIEW_PROFILE_NAME, type_id: 0, name: 'Album', allowed: 1 },
+      {
+        metadata_profile_name: REVIEW_PROFILE_NAME,
+        type_id: 0,
+        name: 'Album',
+        allowed: 1,
+      },
     ],
     lidarr_metadata_profile_secondary_types: [
-      { metadata_profile_name: REVIEW_PROFILE_NAME, type_id: 0, name: 'Studio', allowed: 1 },
+      {
+        metadata_profile_name: REVIEW_PROFILE_NAME,
+        type_id: 0,
+        name: 'Studio',
+        allowed: 1,
+      },
     ],
     lidarr_metadata_profile_release_statuses: [
-      { metadata_profile_name: REVIEW_PROFILE_NAME, status_id: 0, name: 'Official', allowed: 1 },
+      {
+        metadata_profile_name: REVIEW_PROFILE_NAME,
+        status_id: 0,
+        name: 'Official',
+        allowed: 1,
+      },
     ],
   };
 }
@@ -274,12 +295,29 @@ Deno.test(
     const target: LidarrMetadataProfile = {
       id: 44,
       name: targetName,
-      primaryAlbumTypes: [{ albumType: { id: 0, name: 'Album' }, allowed: false }],
-      secondaryAlbumTypes: [{ albumType: { id: 0, name: 'Studio' }, allowed: false }],
-      releaseStatuses: [{ releaseStatus: { id: 0, name: 'Official' }, allowed: false }],
+      primaryAlbumTypes: [
+        {
+          albumType: { id: 0, name: 'Album' },
+          allowed: false,
+        },
+      ],
+      secondaryAlbumTypes: [
+        {
+          albumType: { id: 0, name: 'Studio' },
+          allowed: false,
+        },
+      ],
+      releaseStatuses: [
+        {
+          releaseStatus: { id: 0, name: 'Official' },
+          allowed: false,
+        },
+      ],
     };
     const schema: LidarrMetadataProfileSchema | null = null;
-    const previewClient = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
+    const previewClient = new LidarrClient('http://lidarr.test', 'key', {
+      retries: 0,
+    });
     previewClient.getMetadataProfileSchemaOrNull = () => Promise.resolve(schema);
     previewClient.getMetadataProfiles = () => Promise.resolve([structuredClone(target)]);
     previewClient.createMetadataProfile = () => Promise.reject(new Error('preview must not write'));
@@ -287,7 +325,10 @@ Deno.test(
 
     const recorder = new MetadataEvidenceRecorder();
     const syncer = new MetadataProfileSyncer(previewClient, 701, 'Reviewed Lidarr');
-    syncer.setPreviewConfig({ databaseId: REVIEW_DATABASE_ID, profileName: REVIEW_PROFILE_NAME });
+    syncer.setPreviewConfig({
+      databaseId: REVIEW_DATABASE_ID,
+      profileName: REVIEW_PROFILE_NAME,
+    });
     syncer.setPreviewEvidenceRecorder(recorder);
 
     try {
@@ -304,7 +345,10 @@ Deno.test(
         index: 2,
         suffix: getNamespaceSuffix(2),
       });
-      assertEquals(recorder.evidence.arr.metadataSchema, { available: false, value: null });
+      assertEquals(recorder.evidence.arr.metadataSchema, {
+        available: false,
+        value: null,
+      });
       assertEquals(recorder.evidence.arr.liveTargetProfile, target);
       assertEquals(recorder.evidence.arr.targetIdentity, {
         name: targetName,
@@ -323,8 +367,13 @@ Deno.test(
         throw new Error('reviewed write must not reread saved config');
       };
 
-      let write: { id: number; payload: LidarrMetadataProfileCreatePayload & { id: number } } | null = null;
-      const writeClient = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
+      let write: {
+        id: number;
+        payload: LidarrMetadataProfileCreatePayload & { id: number };
+      } | null = null;
+      const writeClient = new LidarrClient('http://lidarr.test', 'key', {
+        retries: 0,
+      });
       writeClient.getMetadataProfileSchema = () => Promise.reject(new Error('reviewed write rematerialized schema'));
       writeClient.getMetadataProfiles = () => Promise.reject(new Error('reviewed write rematerialized target'));
       writeClient.createMetadataProfile = () => Promise.reject(new Error('reviewed update changed action'));
@@ -334,7 +383,10 @@ Deno.test(
       };
 
       const writer = new MetadataProfileSyncer(writeClient, 701, 'Reviewed Lidarr');
-      writer.setPreviewConfig({ databaseId: 999, profileName: 'mutated config' });
+      writer.setPreviewConfig({
+        databaseId: 999,
+        profileName: 'mutated config',
+      });
       writer.setPreparedExecutionContext(recorder.prepared);
       try {
         const result = await writer.sync();
@@ -343,7 +395,10 @@ Deno.test(
         assertEquals(result.outcomes[0]?.remoteId, '44');
         assertEquals(write, {
           id: 44,
-          payload: { ...(recorder.prepared.desired as LidarrMetadataProfileCreatePayload), id: 44 },
+          payload: {
+            ...(recorder.prepared.desired as LidarrMetadataProfileCreatePayload),
+            id: 44,
+          },
         });
       } finally {
         writeClient.close();
@@ -356,6 +411,23 @@ Deno.test(
     }
   }
 );
+
+Deno.test('Lidarr metadata transient override fails closed when only one selection field is provided', async () => {
+  const client = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
+  const syncer = new MetadataProfileSyncer(client, 999_003, 'Invalid Lidarr metadata');
+  syncer.setPreviewConfig({ databaseId: REVIEW_DATABASE_ID });
+
+  try {
+    await assertRejects(
+      () => syncer.generatePreview(),
+      Error,
+      'Invalid reviewed metadata profile configuration',
+      'Lidarr must not fall back to saved metadata-profile config'
+    );
+  } finally {
+    client.close();
+  }
+});
 
 Deno.test('empty transient metadata selection is skipped and cannot reach reviewed apply writes', async () => {
   resetPreviewCreateRateLimitForTests();
@@ -401,6 +473,15 @@ Deno.test('empty transient metadata selection is skipped and cannot reach review
   try {
     const createResponse = await _handleSyncPreviewCreateRequest(createRequest, {
       getInstanceById: (instanceId) => (instanceId === instance.id ? instance : undefined),
+      getReviewClient: () =>
+        Promise.resolve({
+          client,
+          credentialIdentity: {
+            fingerprint: instance.api_key_fingerprint!,
+            keyVersion: 'legacy',
+            revision: instance.updated_at,
+          },
+        }),
       now: () => nowMs,
       generatePreview: (input, options) => generatePreview(input, { ...options, client }),
     });
@@ -410,7 +491,13 @@ Deno.test('empty transient metadata selection is skipped and cannot reach review
     previewId = preview.id;
     assertEquals(preview.arrType, 'lidarr');
     assertEquals(preview.sections, ['metadataProfiles']);
-    assertEquals(preview.sectionOutcomes, [{ section: 'metadataProfiles', failure: null, skipped: true }]);
+    assertEquals(preview.sectionOutcomes, [
+      {
+        section: 'metadataProfiles',
+        failure: null,
+        skipped: true,
+      },
+    ]);
     assertEquals(preview.metadataProfiles, null);
     assertEquals(preview.failure, null);
     assertEquals(arrReads, 0);
@@ -452,7 +539,12 @@ Deno.test('metadata profile review rejects Radarr and Sonarr directly without co
   let configReads = 0;
   arrSyncQueries.getMetadataProfilesSync = () => {
     configReads += 1;
-    return { databaseId: null, profileName: null, trigger: 'manual', cron: null };
+    return {
+      databaseId: null,
+      profileName: null,
+      trigger: 'manual',
+      cron: null,
+    };
   };
 
   try {
@@ -690,7 +782,10 @@ Deno.test({
       try {
         metadataProfilesHandler.createSyncer = () => ({
           sync: async () => ({ success: true, itemsSynced: 7, outcomes: [] }),
-          generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
+          generatePreview: async () => ({
+            section: 'metadataProfiles',
+            profile: null,
+          }),
           setPreviewConfig: () => undefined,
           clearPreviewConfig: () => undefined,
         });
@@ -709,7 +804,10 @@ Deno.test({
             error: 'Metadata profile sync failed for reporting test',
             outcomes: [],
           }),
-          generatePreview: async () => ({ section: 'metadataProfiles', profile: null }),
+          generatePreview: async () => ({
+            section: 'metadataProfiles',
+            profile: null,
+          }),
           setPreviewConfig: () => undefined,
           clearPreviewConfig: () => undefined,
         });

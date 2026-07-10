@@ -313,7 +313,9 @@ Deno.test({
         assertExists(releaseClaim);
         assertEquals(arrSyncQueries.releaseReviewedSyncSections(releaseClaim), true);
         assertEquals(getStatus(1, 'qualityProfiles').sync_status, 'failed');
+        assertEquals(getStatus(1, 'qualityProfiles').should_sync, 0);
         assertEquals(getStatus(1, 'delayProfiles').sync_status, 'pending');
+        assertEquals(getStatus(1, 'delayProfiles').should_sync, 1);
 
         setStatus(1, 'qualityProfiles', 'idle');
         setStatus(1, 'delayProfiles', 'idle');

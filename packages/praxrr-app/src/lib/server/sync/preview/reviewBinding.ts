@@ -17,7 +17,7 @@ import type {
   SyncPreviewSectionEvidenceHash,
 } from './types.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
-import type { ArrInstanceCredential } from '$db/queries/arrInstanceCredentials.ts';
+import type { ArrInstanceCredentialIdentity } from '$arr/arrInstanceClients.ts';
 
 export const SYNC_PREVIEW_REVIEW_BINDING_VERSION = 1 as const;
 
@@ -49,8 +49,11 @@ type ReviewHashClass = SyncPreviewEvidenceClass | 'plan';
 
 interface CanonicalizationState {
   nodes: number;
+  bytes: number;
   readonly ancestors: WeakSet<object>;
 }
+
+const canonicalTextEncoder = new TextEncoder();
 
 export interface SyncPreviewSectionReviewEvidenceInput {
   readonly section: SyncPreviewSection;
@@ -71,17 +74,17 @@ export interface BuildSyncPreviewReviewBindingInput {
 /** Build the exact private target projection from authoritative instance/credential rows. */
 export function syncPreviewReviewTarget(
   instance: ArrInstance,
-  credential?: ArrInstanceCredential
+  credentialIdentity?: ArrInstanceCredentialIdentity
 ): SyncPreviewReviewTargetInput {
-  const credentialFingerprint = credential?.fingerprint ?? instance.api_key_fingerprint;
+  const credentialFingerprint = credentialIdentity?.fingerprint ?? instance.api_key_fingerprint;
   if (!credentialFingerprint) {
     fail('credential identity is unavailable');
   }
   return Object.freeze({
     url: instance.url,
     credentialFingerprint,
-    credentialKeyVersion: credential?.key_version ?? 'legacy',
-    credentialRevision: credential?.updated_at ?? instance.updated_at,
+    credentialKeyVersion: credentialIdentity?.keyVersion ?? 'legacy',
+    credentialRevision: credentialIdentity?.revision ?? instance.updated_at,
   });
 }
 
@@ -137,6 +140,13 @@ function countNode(state: CanonicalizationState): void {
   }
 }
 
+function countCanonicalFragment(state: CanonicalizationState, fragment: string): void {
+  state.bytes += canonicalTextEncoder.encode(fragment).byteLength;
+  if (state.bytes > REVIEW_CANONICAL_LIMITS.maxCanonicalBytes) {
+    fail('canonical byte limit exceeded');
+  }
+}
+
 function cloneCanonical(value: unknown, state: CanonicalizationState, depth: number): CanonicalValue {
   if (depth > REVIEW_CANONICAL_LIMITS.maxDepth) {
     fail('depth limit exceeded');
@@ -145,6 +155,7 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
   countNode(state);
 
   if (value === null || typeof value === 'boolean') {
+    countCanonicalFragment(state, value === null ? 'null' : String(value));
     return value;
   }
 
@@ -152,6 +163,7 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
     if (value.length > REVIEW_CANONICAL_LIMITS.maxStringLength) {
       fail('string limit exceeded');
     }
+    countCanonicalFragment(state, JSON.stringify(value));
     return value;
   }
 
@@ -159,7 +171,9 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
     if (!Number.isFinite(value)) {
       fail('numbers must be finite');
     }
-    return Object.is(value, -0) ? 0 : value;
+    const normalized = Object.is(value, -0) ? 0 : value;
+    countCanonicalFragment(state, JSON.stringify(normalized));
+    return normalized;
   }
 
   if (typeof value !== 'object') {
@@ -185,13 +199,16 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
         }
       }
 
+      countCanonicalFragment(state, '[');
       const cloned: CanonicalValue[] = [];
       for (let index = 0; index < value.length; index += 1) {
         if (!Object.prototype.hasOwnProperty.call(value, index)) {
           fail('sparse arrays are not supported');
         }
+        if (index > 0) countCanonicalFragment(state, ',');
         cloned.push(cloneCanonical(value[index], state, depth + 1));
       }
+      countCanonicalFragment(state, ']');
       return Object.freeze(cloned);
     }
 
@@ -209,8 +226,9 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
       fail('object key limit exceeded');
     }
 
+    countCanonicalFragment(state, '{');
     const cloned: Record<string, CanonicalValue> = Object.create(null);
-    for (const key of keys.sort(compareCanonicalKeys)) {
+    for (const [index, key] of keys.sort(compareCanonicalKeys).entries()) {
       const descriptor = descriptors[key];
       if (!descriptor.enumerable || !('value' in descriptor)) {
         fail('non-enumerable and accessor properties are not supported');
@@ -218,8 +236,12 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
       if (key.length > REVIEW_CANONICAL_LIMITS.maxStringLength) {
         fail('object key limit exceeded');
       }
+      if (index > 0) countCanonicalFragment(state, ',');
+      countCanonicalFragment(state, JSON.stringify(key));
+      countCanonicalFragment(state, ':');
       cloned[key] = cloneCanonical(descriptor.value, state, depth + 1);
     }
+    countCanonicalFragment(state, '}');
     return Object.freeze(cloned);
   } finally {
     state.ancestors.delete(value);
@@ -227,7 +249,7 @@ function cloneCanonical(value: unknown, state: CanonicalizationState, depth: num
 }
 
 function canonicalClone(value: unknown): CanonicalValue {
-  return cloneCanonical(value, { nodes: 0, ancestors: new WeakSet<object>() }, 0);
+  return cloneCanonical(value, { nodes: 0, bytes: 0, ancestors: new WeakSet<object>() }, 0);
 }
 
 /**
@@ -236,9 +258,6 @@ function canonicalClone(value: unknown): CanonicalValue {
  */
 export function canonicalizeReviewValue(value: unknown): string {
   const canonical = JSON.stringify(canonicalClone(value));
-  if (new TextEncoder().encode(canonical).byteLength > REVIEW_CANONICAL_LIMITS.maxCanonicalBytes) {
-    fail('canonical byte limit exceeded');
-  }
   return canonical;
 }
 
@@ -254,7 +273,9 @@ export function sortReviewEvidenceSet<T>(
     fail('array limit exceeded');
   }
 
-  const cloned = values.map((value) => canonicalClone(value)) as T[];
+  // Clone the collection as one canonical value so node and byte limits apply to the aggregate,
+  // rather than resetting for every element before the later binding hash sees the set.
+  const cloned = [...(canonicalClone(values) as readonly T[])];
   cloned.sort((left, right) => {
     const order = comparator(left, right);
     if (!Number.isFinite(order)) {

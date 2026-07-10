@@ -4,13 +4,20 @@
 **Mode**: PR
 **Author**: yandy-r
 **Branch**: feat/sync-preview-reviewed-plan → main
-**Decision**: REQUEST CHANGES
+**Decision**: APPROVE
 
 ## Summary
 
-The reviewed-plan architecture is well covered and passes type checking, tests, build, and
-changed-file formatting, but four high-severity gaps can still violate contract fidelity or the
-exact reviewed target/pending-sync guarantees. All findings below must be resolved before merge.
+The reviewed-plan architecture and both fix passes now satisfy the reviewed target, exact-plan,
+pending-sync, contract-fidelity, and bounded-resource guarantees. All 17 findings are fixed, the
+final full validation passes, and no unresolved actionable review threads remain.
+
+## Final Re-review
+
+- **Reviewed head**: working tree after `ac7f8e69` follow-up fixes
+- **Independent passes**: correctness, security, and maintainability/pattern fidelity
+- **Finding status**: 17 Fixed, 0 Open, 0 Failed
+- **Decision**: APPROVE for squash merge after the updated head's required CI checks pass
 
 ## Findings
 
@@ -19,6 +26,12 @@ exact reviewed target/pending-sync guarantees. All findings below must be resolv
 No findings.
 
 ### HIGH
+
+- **[F016]** `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts:535` — Pre-side-effect reviewed invalidations call `failSections`, consuming an initially pending ordinary signal and replacing its prior state with `failed` even though no snapshot, history, outcome, or Arr write occurred.
+  - **Status**: Fixed
+  - **Category**: Security
+  - **Suggested fix**: Release every reviewed claim rejected before the first external/audit side effect so its exact prior pending/`should_sync` state is restored; reserve `failSections` for failures after side effects begin and add initially-pending invalidation coverage.
+  - **Evidence**: Every post-claim validation/capability/evidence/preparation exit now calls `releaseSections`; execution tracks the first snapshot, sync, or history side effect and releases on earlier exceptions while retaining failure finalization afterward. Focused executor and DB-claim tests prove an initially pending row returns to `pending` with `should_sync=1` and no write-side evidence.
 
 - **[F001]** `docs/api/v1/paths/sync.yaml:222` — The 500 contract advertises `ErrorResponse`, but the runtime returns `SyncPreviewApplyErrorResponse`, breaking generated-client type fidelity.
   - **Status**: Fixed
@@ -40,7 +53,31 @@ No findings.
   - **Category**: Completeness
   - **Suggested fix**: Represent an intentional non-applicable preview result while continuing to reject empty apply claims, and add zero-config plus all-skipped create tests.
 
+- **[F015]** `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts:537` — Credential identity and the client are acquired by separate reads during apply, while preview creation binds a credential read performed after generation, so rotation between either pair can bind or execute with a credential different from `targetHash`.
+  - **Status**: Fixed
+  - **Category**: Security
+  - **Suggested fix**: Load one authoritative credential snapshot and derive both the private target identity and client from it for preview creation and reviewed apply, reuse that exact client for evidence and writes, and add adversarial rotation-between-read tests for both paths.
+  - **Evidence**: `getArrInstanceReviewClient` now returns one client/identity lease from a single credential-row snapshot; preview generation, target hashing, revalidation, and writes reuse that lease. Adversarial create/apply tests rotate the authoritative credential after acquisition and prove the bound v1 client/identity cannot be switched. Focused suites pass 74 tests and `deno task check` reports 0 errors/warnings.
+
 ### MEDIUM
+
+- **[F013]** `packages/praxrr-app/src/routes/api/v1/sync/preview/+server.ts:345` — A preview whose every requested section failed is classified as non-applicable, persisted as `ready`, and returned with HTTP 200 instead of the documented failed 500 response.
+  - **Status**: Fixed
+  - **Category**: Correctness
+  - **Suggested fix**: Restrict non-applicable completion to clean zero-section or all-skipped results, persist zero-eligible failed results as `status: failed`, return HTTP 500, and add route/store regression tests.
+  - **Evidence**: The route now persists zero-eligible section failures as `status: failed` and returns 500; the store rejects failed/non-skipped non-applicable completions, with focused route/store tests covering failure, zero-section, and all-skipped outcomes.
+
+- **[F014]** `packages/praxrr-app/src/lib/server/sync/delayProfiles/syncer.ts:362` — Invalid or partial transient configs for delay profiles, metadata profiles, and media management are treated as absent and silently fall back to saved configuration, so preview/apply can target state the request did not review.
+  - **Status**: Fixed
+  - **Category**: Correctness
+  - **Suggested fix**: Track whether a transient override was explicitly supplied, fail closed when a provided override is invalid, preserve saved-config fallback only when no override exists, and add per-Arr invalid/partial override tests.
+  - **Evidence**: `BaseSyncer` now tracks explicit override presence, the orchestrator propagates own-property overrides including null/undefined, and shared strict parsers are reused by the route and all affected syncers. OpenAPI and generated portable/app declarations define the same complete config shapes. Focused Radarr/Sonarr/Lidarr delay and media tests, Lidarr metadata tests, route rejection tests, and generated contract samples cover invalid/partial overrides without saved-config fallback.
+
+- **[F017]** `packages/praxrr-app/src/lib/server/sync/preview/reviewBinding.ts:237` — The 16 MiB canonical limit is checked only after the complete clone and JSON string are allocated, and true-set cloning resets limits per element, so adversarial evidence can exhaust memory before rejection.
+  - **Status**: Fixed
+  - **Category**: Performance
+  - **Suggested fix**: Enforce one incremental encoded aggregate budget during canonical traversal, share it across every element of a true set, abort before cloning or serializing beyond the limit, and add adversarial aggregate-size tests.
+  - **Evidence**: Canonical traversal now accounts exact JSON fragment bytes before retaining each value, aborts at the shared 16 MiB budget, and clones true sets as one aggregate canonical value. Oversized canonical and true-set regression cases fail closed before final serialization; focused suites and type checking pass.
 
 - **[F005]** `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts:492` — Expiry is checked only before version detection and materialization, so a receipt can expire during validation and still cross the write boundary.
   - **Status**: Fixed
@@ -90,7 +127,7 @@ No findings.
 | ---------- | ----------------------------------------------------------------------------------------- |
 | Type check | Pass — `deno task check`, 0 errors and 0 warnings                                         |
 | Lint       | Partial — all PR files pass Prettier/Markdownlint; repo-wide lint finds 56 baseline files |
-| Tests      | Pass — `deno task test`, 2,232 passed                                                     |
+| Tests      | Pass — `deno task test`, 2,261 passed                                                     |
 | Build      | Pass — `deno task build`                                                                  |
 
 ## Files Reviewed

@@ -23,6 +23,10 @@ type AppApplyResponse = AppComponents['schemas']['SyncPreviewApplyResponse'];
 type PortableApplyResponse = PortableComponents['schemas']['SyncPreviewApplyResponse'];
 type AppApplyErrorResponse = AppComponents['schemas']['SyncPreviewApplyErrorResponse'];
 type PortableApplyErrorResponse = PortableComponents['schemas']['SyncPreviewApplyErrorResponse'];
+type AppNamedProfileConfig = AppComponents['schemas']['SyncPreviewNamedProfileSectionConfig'];
+type PortableNamedProfileConfig = PortableComponents['schemas']['SyncPreviewNamedProfileSectionConfig'];
+type AppMediaManagementConfig = AppComponents['schemas']['SyncPreviewMediaManagementSectionConfig'];
+type PortableMediaManagementConfig = PortableComponents['schemas']['SyncPreviewMediaManagementSectionConfig'];
 
 const INVALIDATION_CODES = {
   pcd_drift: true,
@@ -89,6 +93,20 @@ const GENERATED_UNEXPECTED_FAILURE_SAMPLE = {
   },
   staleWarning: null,
 } satisfies AppApplyErrorResponse & PortableApplyErrorResponse;
+
+const GENERATED_NAMED_PROFILE_CONFIG_SAMPLE = {
+  databaseId: 234,
+  profileName: 'Reviewed profile',
+} satisfies AppNamedProfileConfig & PortableNamedProfileConfig;
+
+const GENERATED_MEDIA_MANAGEMENT_CONFIG_SAMPLE = {
+  namingDatabaseId: 234,
+  namingConfigName: 'Reviewed naming',
+  qualityDefinitionsDatabaseId: null,
+  qualityDefinitionsConfigName: null,
+  mediaSettingsDatabaseId: null,
+  mediaSettingsConfigName: null,
+} satisfies AppMediaManagementConfig & PortableMediaManagementConfig;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -229,6 +247,21 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
       `bundled response mapping drifted for ${status}`
     );
   }
+});
+
+Deno.test('transient section config contract is typed identically in app and portable bundles', () => {
+  assertEquals(GENERATED_NAMED_PROFILE_CONFIG_SAMPLE, {
+    databaseId: 234,
+    profileName: 'Reviewed profile',
+  });
+  assertEquals(GENERATED_MEDIA_MANAGEMENT_CONFIG_SAMPLE, {
+    namingDatabaseId: 234,
+    namingConfigName: 'Reviewed naming',
+    qualityDefinitionsDatabaseId: null,
+    qualityDefinitionsConfigName: null,
+    mediaSettingsDatabaseId: null,
+    mediaSettingsConfigName: null,
+  });
 });
 
 function reviewedPreview(id: string): Omit<SyncPreviewResult, 'createdAt' | 'expiresAt'> {

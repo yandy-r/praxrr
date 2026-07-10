@@ -362,6 +362,7 @@ export async function generatePreview(
       const handler = getSection(section);
       const hasSectionPreviewConfig =
         input.sectionConfigs !== undefined && Object.prototype.hasOwnProperty.call(input.sectionConfigs, section);
+      const sectionPreviewConfig = input.sectionConfigs?.[section];
       let syncer: BaseSyncer | null = null;
       let reviewRecorder: SectionReviewRecorder | null = null;
 
@@ -378,8 +379,8 @@ export async function generatePreview(
       try {
         syncer = handler.createSyncer(client, input.instance);
         const contextAwareSyncer = syncer as ReviewContextAwareSyncer;
-        if (input.sectionConfigs?.[section] !== undefined) {
-          syncer.setPreviewConfig(input.sectionConfigs[section]);
+        if (hasSectionPreviewConfig) {
+          syncer.setPreviewConfig(sectionPreviewConfig);
         }
         if (options?.captureReviewContext) {
           reviewRecorder = new SectionReviewRecorder(section);
@@ -401,8 +402,8 @@ export async function generatePreview(
           materializedEvidence.push(captured.evidence);
           if (captured.effectiveConfig !== undefined) {
             materializedConfigs[section] = captured.effectiveConfig;
-          } else if (input.sectionConfigs?.[section] !== undefined) {
-            materializedConfigs[section] = cloneAndFreeze(input.sectionConfigs[section]);
+          } else if (hasSectionPreviewConfig) {
+            materializedConfigs[section] = cloneAndFreeze(sectionPreviewConfig);
           }
           if (captured.preparedExecutionContext) {
             preparedExecutionContexts[section] = captured.preparedExecutionContext;

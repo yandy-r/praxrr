@@ -65,12 +65,27 @@
 
 None.
 
+## Final Re-review Fixes
+
+The updated head received a second independent correctness, security, and maintainability pass.
+Five additional findings were recorded in the source artifact and fixed before approval:
+
+| ID   | Severity | Status | Resolution                                                                                                               |
+| ---- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| F013 | MEDIUM   | Fixed  | All-section failures persist and return a failed 500 result; only clean skipped/no-config generations are non-applicable |
+| F014 | MEDIUM   | Fixed  | Explicit transient section configs use strict shared parsers and fail closed without saved-config fallback               |
+| F015 | HIGH     | Fixed  | One authoritative credential lease supplies both the private target identity and the exact client used for preview/apply |
+| F016 | HIGH     | Fixed  | Every pre-side-effect invalidation releases the claim and exactly restores prior ordinary pending state                  |
+| F017 | MEDIUM   | Fixed  | Canonical review evidence uses one incremental aggregate byte budget before cloning or serialization can exceed it       |
+
+Final source status: **17 Fixed, 0 Open, 0 Failed**.
+
 ## Validation Results
 
 | Check                   | Result                                                                                          |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | Type check              | Pass — `deno task check`; Svelte 0 errors, 0 warnings                                           |
-| Tests                   | Pass — `deno task test`; 2,250 passed, 0 failed                                                 |
+| Tests                   | Pass — `deno task test`; 2,261 passed, 0 failed                                                 |
 | Build                   | Pass — `deno task build`                                                                        |
 | API generation          | Pass — generation + bundle + Prettier is deterministic across two runs                          |
 | API contract            | Pass — 3 bundled/runtime contract tests                                                         |
@@ -79,6 +94,6 @@ None.
 
 ## Next Steps
 
-- Re-run the formal PR review against the updated head
-- Commit and push the fix set and this report
-- Monitor required GitHub checks to green before squash merge
+- Commit and push the approved follow-up fix set and updated review artifacts
+- Monitor the updated head's required GitHub checks to green
+- Squash merge and verify issue closure

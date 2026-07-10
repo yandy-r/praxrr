@@ -20,12 +20,8 @@ import { SonarrClient } from '$arr/clients/sonarr.ts';
 import type { DelayProfilesPreview, SyncPreviewPreparedExecutionContext } from '../preview/types.ts';
 import { logger } from '$logger/logger.ts';
 import { diffSingletonEntity } from '../preview/sectionDiffs.ts';
+import { parseNamedProfilePreviewConfig } from '../preview/sectionConfigs.ts';
 import { getUnsupportedSyncSectionReason, isSyncSectionSupported, type SyncArrType } from '../mappings.ts';
-
-interface DelayProfilesPreviewConfig {
-  databaseId: number | null;
-  profileName: string | null;
-}
 
 type DelayProfileTargetResolution =
   | {
@@ -74,46 +70,6 @@ interface DelayProfilePreparedExecutionContext extends SyncPreviewPreparedExecut
     readonly targetProfile: ArrDelayProfile;
     readonly targetResolution: DelayProfileTargetResolution;
   };
-}
-
-function parseDelayProfilesPreviewConfig(rawConfig: unknown): DelayProfilesPreviewConfig | null {
-  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
-    return null;
-  }
-
-  const value = rawConfig as Record<string, unknown>;
-  if (!('databaseId' in value) || !('profileName' in value)) {
-    return null;
-  }
-
-  const rawDatabaseId = value.databaseId;
-  const rawProfileName = value.profileName;
-  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
-  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
-
-  if (databaseId === null && profileName === null) {
-    return {
-      databaseId: null,
-      profileName: null,
-    };
-  }
-
-  if (databaseId === null || profileName === null) {
-    return null;
-  }
-
-  return {
-    databaseId,
-    profileName,
-  };
-}
-
-function parsePositiveInt(rawValue: unknown): number | null {
-  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
-    return null;
-  }
-
-  return rawValue;
 }
 
 export class DelayProfileSyncer extends BaseSyncer {
@@ -211,7 +167,10 @@ export class DelayProfileSyncer extends BaseSyncer {
       if (!profile) {
         await logger.warn(`Profile "${syncConfig.profileName}" not found`, {
           source: 'Preview:DelayProfile',
-          meta: { instanceId: this.instanceId, profileName: syncConfig.profileName },
+          meta: {
+            instanceId: this.instanceId,
+            profileName: syncConfig.profileName,
+          },
         });
         throw new Error(
           JSON.stringify({
@@ -359,9 +318,15 @@ export class DelayProfileSyncer extends BaseSyncer {
     };
   }
 
-  private getDelayProfilesSyncConfig(): { databaseId: number | null; profileName: string | null } {
-    const previewConfig = parseDelayProfilesPreviewConfig(this.getPreviewConfig());
-    if (previewConfig) {
+  private getDelayProfilesSyncConfig(): {
+    databaseId: number | null;
+    profileName: string | null;
+  } {
+    if (this.hasPreviewConfig()) {
+      const previewConfig = parseNamedProfilePreviewConfig(this.getPreviewConfig());
+      if (!previewConfig) {
+        throw new Error('Invalid reviewed delay profile configuration');
+      }
       return previewConfig;
     }
 
@@ -476,7 +441,11 @@ export class DelayProfileSyncer extends BaseSyncer {
     const transformed = this.transform(profile);
     await logger.debug(`Syncing "${profile.name}" delay profile`, {
       source: 'Sync:DelayProfile',
-      meta: { instanceId: this.instanceId, profileName: profile.name, targetProfileId: profileId },
+      meta: {
+        instanceId: this.instanceId,
+        profileName: profile.name,
+        targetProfileId: profileId,
+      },
     });
 
     const existingProfile = this.client instanceof LidarrClient ? targetProfile : null;
@@ -506,7 +475,11 @@ export class DelayProfileSyncer extends BaseSyncer {
       const { reason, protectedDetails } = sanitizeArrWriteError(error);
       await logger.error(`Failed to sync delay profile "${profileName}" to "${this.instanceName}"`, {
         source: 'Sync:DelayProfile',
-        meta: { instanceId: this.instanceId, targetProfileId: profileId, ...protectedDetails },
+        meta: {
+          instanceId: this.instanceId,
+          targetProfileId: profileId,
+          ...protectedDetails,
+        },
       });
       return {
         success: false,
@@ -521,7 +494,11 @@ export class DelayProfileSyncer extends BaseSyncer {
       meta: { instanceId: this.instanceId, remoteId: profileId },
     });
 
-    return { success: true, itemsSynced: 1, outcomes: [outcome('success', String(profileId), null)] };
+    return {
+      success: true,
+      itemsSynced: 1,
+      outcomes: [outcome('success', String(profileId), null)],
+    };
   }
 
   /**

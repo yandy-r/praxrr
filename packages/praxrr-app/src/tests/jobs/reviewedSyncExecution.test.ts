@@ -111,6 +111,7 @@ interface HarnessOptions {
   currentInstance?: ArrInstance;
   preview?: GeneratePreviewResult;
   onMaterialize?: () => void;
+  onAcquireReviewClient?: () => void;
   sync?: (
     context: SyncPreviewPreparedExecutionContext,
     section: SyncPreviewSection
@@ -151,8 +152,9 @@ function harness(options: HarnessOptions) {
     getPendingInstanceIds: () => [],
     getScheduledConfigs: () => [],
     hasConfig: () => true,
-    createSyncer: () =>
-      ({
+    createSyncer: (syncClient) => {
+      assertEquals(syncClient, client);
+      return {
         setPreparedExecutionContext: (context: SyncPreviewPreparedExecutionContext) => {
           activeContext = structuredClone(context);
         },
@@ -169,16 +171,25 @@ function harness(options: HarnessOptions) {
             ? await options.sync(activeContext, section)
             : { success: true, itemsSynced: 0, outcomes: [] };
         },
-      }) as never,
+      } as never;
+    },
   });
 
   const dependencies = {
     now: () => NOW_MS,
     getInstance: () => options.currentInstance ?? instance(),
-    getReviewTarget: (targetInstance: ArrInstance) => syncPreviewReviewTarget(targetInstance),
-    getClient: () => {
+    getReviewClient: () => {
       calls.clients += 1;
-      return Promise.resolve(client);
+      options.onAcquireReviewClient?.();
+      const targetInstance = options.currentInstance ?? instance();
+      return Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: targetInstance.api_key_fingerprint!,
+          keyVersion: 'legacy',
+          revision: targetInstance.updated_at,
+        },
+      });
     },
     detectVersion: () => Promise.resolve(null),
     claimSections: () => claim,
@@ -261,13 +272,58 @@ Deno.test('reviewed executor validates every selected section before any write-s
     snapshots: 0,
     history: 0,
     writes: 0,
-    release: 0,
+    release: 1,
     complete: 0,
-    fail: 1,
+    fail: 0,
     clients: 1,
     materializations: 1,
     capturedHistory: null,
   });
+});
+
+Deno.test('pre-write invalidation exactly restores an initially pending ordinary signal', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence);
+  const { calls, dependencies: baseDependencies } = harness({
+    binding,
+    actualEvidence: [evidence('qualityProfiles', { pcd: { revision: 2 } })],
+    contexts: { qualityProfiles: prepared('qualityProfiles') },
+  });
+  let queueState = { status: 'pending', shouldSync: 1 };
+  const dependencies = {
+    ...baseDependencies,
+    claimSections: (instanceId: number, selectedSections: readonly SectionType[]) => {
+      assertEquals(queueState, { status: 'pending', shouldSync: 1 });
+      queueState = { status: 'in_progress', shouldSync: 0 };
+      return baseDependencies.claimSections(instanceId, selectedSections);
+    },
+    releaseSections: (claim: ReviewedSyncClaim) => {
+      const released = baseDependencies.releaseSections(claim);
+      queueState = { status: 'pending', shouldSync: 1 };
+      return released;
+    },
+    failSections: (claim: ReviewedSyncClaim, error: string) => {
+      queueState = { status: 'failed', shouldSync: 0 };
+      return baseDependencies.failSections(claim, error);
+    },
+  } satisfies ReviewedSyncExecutionDependencies;
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-initially-pending-invalidated',
+    expiresAt: EXPIRES_AT,
+    dependencies,
+  });
+
+  assertEquals(result.kind, 'invalidated');
+  assertEquals(queueState, { status: 'pending', shouldSync: 1 });
+  assertEquals(calls.release, 1);
+  assertEquals(calls.fail, 0);
+  assertEquals(calls.snapshots, 0);
+  assertEquals(calls.history, 0);
+  assertEquals(calls.writes, 0);
 });
 
 Deno.test('reviewed executor rejects a reordered reviewed subset before claim or materialization', async () => {
@@ -343,7 +399,7 @@ Deno.test('reviewed executor expires after materialization without starting any 
   assertEquals(calls.materializations, 1);
 });
 
-Deno.test('reviewed executor rejects same-type target retarget before creating a client or writing', async () => {
+Deno.test('reviewed executor rejects same-type target retarget before materialization or writing', async () => {
   const sections = ['qualityProfiles'] as const;
   const reviewedEvidence = [evidence('qualityProfiles')];
   const binding = await bindingFor(sections, reviewedEvidence);
@@ -364,12 +420,12 @@ Deno.test('reviewed executor rejects same-type target retarget before creating a
 
   assertEquals(result.kind, 'invalidated');
   assertEquals(result.kind === 'invalidated' ? result.reason : null, 'scope_drift');
-  assertEquals(calls.clients, 0);
+  assertEquals(calls.clients, 1);
   assertEquals(calls.writes, 0);
   assertEquals(calls.history, 0);
 });
 
-Deno.test('reviewed executor rejects credential rotation before creating a client or writing', async () => {
+Deno.test('reviewed executor rejects credential rotation before materialization or writing', async () => {
   const sections = ['qualityProfiles'] as const;
   const reviewedEvidence = [evidence('qualityProfiles')];
   const binding = await bindingFor(sections, reviewedEvidence);
@@ -390,9 +446,39 @@ Deno.test('reviewed executor rejects credential rotation before creating a clien
 
   assertEquals(result.kind, 'invalidated');
   assertEquals(result.kind === 'invalidated' ? result.reason : null, 'scope_drift');
-  assertEquals(calls.clients, 0);
+  assertEquals(calls.clients, 1);
   assertEquals(calls.writes, 0);
   assertEquals(calls.history, 0);
+});
+
+Deno.test('reviewed executor cannot switch credentials between target hashing and client acquisition', async () => {
+  const sections = ['qualityProfiles'] as const;
+  const reviewedEvidence = [evidence('qualityProfiles')];
+  const binding = await bindingFor(sections, reviewedEvidence);
+  let authoritativeCredential = 'credential-v1';
+  const { calls, dependencies } = harness({
+    binding,
+    actualEvidence: reviewedEvidence,
+    contexts: { qualityProfiles: prepared('qualityProfiles') },
+    onAcquireReviewClient: () => {
+      // Rotation happens after the atomic lease snapshot. The leased client and identity remain v1.
+      authoritativeCredential = 'credential-v2';
+    },
+  });
+
+  const result = await executeReviewedSyncJob({
+    binding,
+    sections,
+    previewId: 'preview-credential-lease-race',
+    expiresAt: EXPIRES_AT,
+    beforeWrite: () => assertEquals(authoritativeCredential, 'credential-v2'),
+    dependencies,
+  });
+
+  assertEquals(result.kind, 'executed');
+  assertEquals(calls.clients, 1);
+  assertEquals(calls.materializations, 1);
+  assertEquals(calls.writes, 1);
 });
 
 Deno.test('reviewed executor writes frozen prepared values after an adversarial post-validation mutation', async () => {

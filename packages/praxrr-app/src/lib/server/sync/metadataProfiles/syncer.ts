@@ -16,8 +16,8 @@ import type {
   MetadataProfileReleaseStatusToggle,
 } from '$pcd/entities/metadataProfiles/read.ts';
 import type {
-  LidarrMetadataProfileCreatePayload,
   LidarrMetadataProfile,
+  LidarrMetadataProfileCreatePayload,
   LidarrMetadataProfileSchema,
   LidarrProfilePrimaryAlbumTypeItem,
   LidarrProfileReleaseStatusItem,
@@ -28,17 +28,13 @@ import { getNamespaceSuffix } from '../namespace.ts';
 import { logger } from '$logger/logger.ts';
 import { HttpError } from '$http/types.ts';
 import { diffSingletonEntity, METADATA_PROFILE_ARRAY_KEY_STRATEGIES } from '../preview/sectionDiffs.ts';
+import { parseNamedProfilePreviewConfig } from '../preview/sectionConfigs.ts';
 import { SyncPreviewSectionSkipped } from '../preview/sectionSkip.ts';
 import type {
   MetadataProfilesPreview,
   SyncPreviewPreparedExecutionContext,
   SyncPreviewSectionResult,
 } from '../preview/types.ts';
-
-interface MetadataProfilesPreviewConfig {
-  databaseId: number | null;
-  profileName: string | null;
-}
 
 interface MetadataProfilePreparedExecutionContext extends SyncPreviewPreparedExecutionContext {
   readonly section: 'metadataProfiles';
@@ -59,46 +55,6 @@ interface MetadataProfilePreparedExecutionContext extends SyncPreviewPreparedExe
   readonly currentGuards: {
     readonly targetProfile: LidarrMetadataProfile | null;
   };
-}
-
-function parseMetadataProfilesPreviewConfig(rawConfig: unknown): MetadataProfilesPreviewConfig | null {
-  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) {
-    return null;
-  }
-
-  const value = rawConfig as Record<string, unknown>;
-  if (!('databaseId' in value) || !('profileName' in value)) {
-    return null;
-  }
-
-  const rawDatabaseId = value.databaseId;
-  const rawProfileName = value.profileName;
-  const databaseId = rawDatabaseId === null || rawDatabaseId === undefined ? null : parsePositiveInt(rawDatabaseId);
-  const profileName = typeof rawProfileName === 'string' && rawProfileName.length > 0 ? rawProfileName : null;
-
-  if (databaseId === null && profileName === null) {
-    return {
-      databaseId: null,
-      profileName: null,
-    };
-  }
-
-  if (databaseId === null || profileName === null) {
-    return null;
-  }
-
-  return {
-    databaseId,
-    profileName,
-  };
-}
-
-function parsePositiveInt(rawValue: unknown): number | null {
-  if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue <= 0) {
-    return null;
-  }
-
-  return rawValue;
 }
 
 const METADATA_PROFILE_SCHEMA_FALLBACK: Omit<LidarrMetadataProfileSchema, 'id' | 'name'> = {
@@ -601,9 +557,15 @@ export class MetadataProfileSyncer extends BaseSyncer {
     return [];
   }
 
-  private getMetadataProfilesSyncConfig(): { databaseId: number | null; profileName: string | null } {
-    const previewConfig = parseMetadataProfilesPreviewConfig(this.getPreviewConfig());
-    if (previewConfig) {
+  private getMetadataProfilesSyncConfig(): {
+    databaseId: number | null;
+    profileName: string | null;
+  } {
+    if (this.hasPreviewConfig()) {
+      const previewConfig = parseNamedProfilePreviewConfig(this.getPreviewConfig());
+      if (!previewConfig) {
+        throw new Error('Invalid reviewed metadata profile configuration');
+      }
       return previewConfig;
     }
 
@@ -655,7 +617,10 @@ export class MetadataProfileSyncer extends BaseSyncer {
     let writeOutcome: SyncEntityOutcome;
     try {
       if (target) {
-        await lidarrClient.updateMetadataProfile(target.id, { ...desired, id: target.id });
+        await lidarrClient.updateMetadataProfile(target.id, {
+          ...desired,
+          id: target.id,
+        });
 
         await logger.info(`Updated metadata profile "${sourceProfileName}" on "${this.instanceName}"`, {
           source: 'Sync:MetadataProfile',
@@ -670,7 +635,11 @@ export class MetadataProfileSyncer extends BaseSyncer {
 
         await logger.info(`Created metadata profile "${sourceProfileName}" on "${this.instanceName}"`, {
           source: 'Sync:MetadataProfile',
-          meta: { instanceId: this.instanceId, remoteName: desired.name, remoteId: created.id },
+          meta: {
+            instanceId: this.instanceId,
+            remoteName: desired.name,
+            remoteId: created.id,
+          },
         });
         writeOutcome = outcome('success', 'create', created.id != null ? String(created.id) : null, null);
       }

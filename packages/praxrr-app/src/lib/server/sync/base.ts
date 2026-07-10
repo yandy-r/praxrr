@@ -25,6 +25,7 @@ export abstract class BaseSyncer {
   protected instanceId: number;
   protected instanceName: string;
   private previewConfig: unknown = null;
+  private previewConfigProvided = false;
   private previewEvidenceRecorder: SyncPreviewEvidenceRecorder | null = null;
   private preparedExecutionContext: Readonly<SyncPreviewPreparedExecutionContext> | null = null;
 
@@ -103,12 +104,19 @@ export abstract class BaseSyncer {
     return this.previewConfig;
   }
 
+  /** Distinguish no override from an explicitly supplied null/undefined/invalid override. */
+  protected hasPreviewConfig(): boolean {
+    return this.previewConfigProvided;
+  }
+
   public setPreviewConfig(previewConfig: unknown): void {
     this.previewConfig = previewConfig;
+    this.previewConfigProvided = true;
   }
 
   public clearPreviewConfig(): void {
     this.previewConfig = null;
+    this.previewConfigProvided = false;
   }
 
   /** Attach private reviewed-preview evidence capture for the lifetime of one materialization. */

@@ -321,21 +321,26 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     instanceId: instance.id,
     sections: Object.freeze(['qualityProfiles'] as const),
   }) as ReviewedSyncClaim;
-  const calls = { snapshots: 0, history: 0, handlers: 0, failedClaim: 0 };
+  const calls = { snapshots: 0, history: 0, handlers: 0, releasedClaim: 0, failedClaim: 0 };
   const client = { close: () => undefined } as unknown as BaseArrClient;
   const dependencies = {
     now: () => nowMs,
     getInstance: () => instance,
-    getReviewTarget: () => ({
-      url: instance.url,
-      credentialFingerprint: 'credential-v1',
-      credentialKeyVersion: 'legacy',
-      credentialRevision: instance.updated_at,
-    }),
-    getClient: () => Promise.resolve(client),
+    getReviewClient: () =>
+      Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: 'credential-v1',
+          keyVersion: 'legacy',
+          revision: instance.updated_at,
+        },
+      }),
     detectVersion: () => Promise.resolve(null),
     claimSections: () => claim,
-    releaseSections: () => true,
+    releaseSections: () => {
+      calls.releasedClaim += 1;
+      return true;
+    },
     completeSections: () => true,
     failSections: () => {
       calls.failedClaim += 1;
@@ -380,7 +385,7 @@ Deno.test('review evidence invalidation creates no confirmed outcome or Sync His
     outcomes: [],
     syncHistoryId: null,
   });
-  assertEquals(calls, { snapshots: 0, history: 0, handlers: 0, failedClaim: 1 });
+  assertEquals(calls, { snapshots: 0, history: 0, handlers: 0, releasedClaim: 1, failedClaim: 0 });
 });
 
 // =============================================================================

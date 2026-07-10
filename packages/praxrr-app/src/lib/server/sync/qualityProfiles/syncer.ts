@@ -1135,9 +1135,8 @@ export class QualityProfileSyncer extends BaseSyncer {
   }
 
   private getQualityProfilesSyncConfig(): QualityProfilesPreviewConfig {
-    const rawPreviewConfig = this.getPreviewConfig();
-    if (rawPreviewConfig !== null) {
-      const previewConfig = parseQualityProfilesPreviewConfig(rawPreviewConfig);
+    if (this.hasPreviewConfig()) {
+      const previewConfig = parseQualityProfilesPreviewConfig(this.getPreviewConfig());
       if (!previewConfig) {
         throw new Error('Invalid reviewed quality profile configuration');
       }

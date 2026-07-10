@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertMatch } from '@std/assert';
 import {
-  POST as createPreviewPost,
   _handleSyncPreviewCreateRequest,
+  POST as createPreviewPost,
   type SyncPreviewCreateDependencies,
 } from '../../routes/api/v1/sync/preview/+server.ts';
 import {
@@ -10,14 +10,17 @@ import {
   type SyncPreviewApplyDependencies,
 } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
 import type { components } from '$api/v1.d.ts';
-import { arrInstancesQueries, type ArrInstance } from '../../lib/server/db/queries/arrInstances.ts';
+import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import {
-  previewStore,
   PREVIEW_STATUS_GENERATING,
   PREVIEW_STATUS_READY,
+  previewStore,
   type SyncPreviewCreateInput,
 } from '../../lib/server/sync/preview/store.ts';
-import { buildSyncPreviewReviewBinding } from '../../lib/server/sync/preview/reviewBinding.ts';
+import {
+  buildSyncPreviewReviewBinding,
+  buildSyncPreviewTargetHash,
+} from '../../lib/server/sync/preview/reviewBinding.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
   PREVIEW_MAX_SNAPSHOTS,
@@ -28,6 +31,7 @@ import {
 import type { GeneratePreviewResult } from '../../lib/server/sync/preview/orchestrator.ts';
 import { classifyPreviewFailure } from '../../lib/server/sync/preview/failureReason.ts';
 import type { SyncPreviewFailureReason, SyncPreviewResult } from '../../lib/server/sync/preview/types.ts';
+import type { BaseArrClient } from '../../lib/server/utils/arr/base.ts';
 import { HttpError } from '../../lib/server/utils/http/types.ts';
 
 const INSTANCE_ID = 7001;
@@ -102,9 +106,19 @@ function createPreviewCreateRequest(instanceId: number = INSTANCE_ID): Request {
 function createDependencies(
   generatePreview: SyncPreviewCreateDependencies['generatePreview']
 ): SyncPreviewCreateDependencies {
+  const client = { close: () => undefined } as unknown as BaseArrClient;
   return {
     generatePreview,
     getInstanceById: () => createArrInstanceFixture(),
+    getReviewClient: (_type, instance) =>
+      Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: instance.api_key_fingerprint!,
+          keyVersion: 'legacy',
+          revision: instance.updated_at,
+        },
+      }),
     now: () => Date.now(),
   };
 }
@@ -209,7 +223,11 @@ async function createOrderedReviewedSnapshot(
   const input = {
     ...createSnapshotInput(id),
     sections,
-    sectionOutcomes: sections.map((section) => ({ section, failure: null, skipped: false })),
+    sectionOutcomes: sections.map((section) => ({
+      section,
+      failure: null,
+      skipped: false,
+    })),
   };
   previewStore.create({ ...input, status: PREVIEW_STATUS_GENERATING }, createdAtMs);
   const binding = await buildSyncPreviewReviewBinding({
@@ -390,7 +408,12 @@ Deno.test('sync preview apply releases a reviewed DB claim conflict back to read
   try {
     const response = await _handleSyncPreviewApplyRequest(previewId, createApplyRequest(previewId), {
       getSectionsInProgress: () => [],
-      executeReviewedSyncJob: () => Promise.resolve({ kind: 'claim_conflict', outcomes: [], syncHistoryId: null }),
+      executeReviewedSyncJob: () =>
+        Promise.resolve({
+          kind: 'claim_conflict',
+          outcomes: [],
+          syncHistoryId: null,
+        }),
       now: Date.now,
     });
     assertEquals(response.status, 409);
@@ -492,7 +515,10 @@ Deno.test('sync preview apply skipped body matches the generated success contrac
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({ status: 'skipped', output: 'No changes required' })
+      dependenciesReturning({
+        status: 'skipped',
+        output: 'No changes required',
+      })
     );
 
     assertEquals(response.status, 200);
@@ -786,6 +812,37 @@ Deno.test('sync preview create rejects oversized request payloads', async () => 
   assertMatch(payload.error, /exceeds .* bytes/i);
 });
 
+Deno.test('sync preview create rejects partial transient section configs before instance lookup', async () => {
+  const invalidConfigs = [
+    { delayProfiles: { databaseId: 234 } },
+    { metadataProfiles: { databaseId: 234 } },
+    {
+      mediaManagement: {
+        namingDatabaseId: 234,
+        namingConfigName: null,
+        qualityDefinitionsDatabaseId: null,
+        qualityDefinitionsConfigName: null,
+        mediaSettingsDatabaseId: null,
+        mediaSettingsConfigName: null,
+      },
+    },
+  ];
+
+  for (const sectionConfigs of invalidConfigs) {
+    const response = await createPreviewPost({
+      request: new Request('http://localhost/api/v1/sync/preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ instanceId: INSTANCE_ID, sectionConfigs }),
+      }),
+    } as unknown as Parameters<typeof createPreviewPost>[0]);
+
+    assertEquals(response.status, 400);
+    const payload = (await response.json()) as ErrorResponse;
+    assertMatch(payload.error, /Invalid .* section config/);
+  }
+});
+
 Deno.test('sync preview create enforces per-instance rate limits', async () => {
   const originalGetById = arrInstancesQueries.getById;
   const instance = createArrInstanceFixture();
@@ -855,6 +912,84 @@ Deno.test('sync preview create enforces preview-store capacity limits', async ()
 
 // --- Issue #235: failure-evidence redaction ------------------------------------------------
 
+Deno.test('sync preview creation binds the same credential lease used for generation', async () => {
+  resetPreviewCreateRateLimitForTests();
+  let authoritativeCredential = 'credential-v1';
+  let leaseCount = 0;
+  let closeCount = 0;
+  const client = { close: () => (closeCount += 1) } as unknown as BaseArrClient;
+  const deps = {
+    ...createDependencies(() => {
+      assertEquals(authoritativeCredential, 'credential-v2');
+      return Promise.resolve({
+        preview: {
+          instanceId: INSTANCE_ID,
+          instanceName: 'Preview Test Instance',
+          arrType: 'radarr' as const,
+          status: 'ready' as const,
+          createdAtMs: Date.now(),
+          sections: ['qualityProfiles' as const],
+          sectionOutcomes: [{ section: 'qualityProfiles' as const, failure: null, skipped: false }],
+          qualityProfiles: { section: 'qualityProfiles' as const, customFormats: [], qualityProfiles: [] },
+          delayProfiles: null,
+          mediaManagement: null,
+          metadataProfiles: null,
+          summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+        },
+        reviewContext: {
+          sectionConfigs: {},
+          evidence: [
+            {
+              section: 'qualityProfiles' as const,
+              pcd: { desired: 1 },
+              arr: { current: 1 },
+              plan: { action: 'unchanged' },
+            },
+          ],
+          preparedExecutionContexts: {},
+        },
+      });
+    }),
+    getReviewClient: () => {
+      leaseCount += 1;
+      authoritativeCredential = 'credential-v2';
+      return Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: 'credential-v1',
+          keyVersion: 'legacy',
+          revision: now,
+        },
+      });
+    },
+  };
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertEquals(response.status, 200);
+    const claim = previewStore.claimReadyForApply(payload.id, ['qualityProfiles']);
+    assert(claim.ok);
+    const expectedTargetHash = await buildSyncPreviewTargetHash({
+      instanceId: INSTANCE_ID,
+      arrType: 'radarr',
+      target: {
+        url: 'http://radarr.local',
+        credentialFingerprint: 'credential-v1',
+        credentialKeyVersion: 'legacy',
+        credentialRevision: now,
+      },
+    });
+    assertEquals(claim.binding.targetHash, expectedTargetHash);
+    previewStore.releaseApplyClaim(claim.receipt);
+    assertEquals(leaseCount, 1);
+    assertEquals(closeCount, 1);
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
 Deno.test('sync preview create redacts a secret-shaped total generation failure', async () => {
   resetPreviewCreateRateLimitForTests();
   const deps = createDependencies(() => Promise.reject(new Error(SECRET_MIX)));
@@ -911,13 +1046,26 @@ Deno.test('sync preview create preserves successful-section evidence on partial 
     ],
     qualityProfiles: {
       section: 'qualityProfiles',
-      customFormats: [{ entityType: 'customFormat', name: 'HDR10', action: 'create', remoteId: null, fields: [] }],
+      customFormats: [
+        {
+          entityType: 'customFormat',
+          name: 'HDR10',
+          action: 'create',
+          remoteId: null,
+          fields: [],
+        },
+      ],
       qualityProfiles: [],
     },
     delayProfiles: null,
     mediaManagement: null,
     metadataProfiles: null,
-    summary: { totalCreates: 1, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+    summary: {
+      totalCreates: 1,
+      totalUpdates: 0,
+      totalDeletes: 0,
+      totalUnchanged: 0,
+    },
   };
   const deps = createDependencies(() =>
     Promise.resolve({
@@ -960,6 +1108,62 @@ Deno.test('sync preview create preserves successful-section evidence on partial 
   }
 });
 
+Deno.test('sync preview create returns a failed 500 result when every requested section fails', async () => {
+  resetPreviewCreateRateLimitForTests();
+  const deps = createDependencies(() =>
+    Promise.resolve({
+      preview: {
+        instanceId: INSTANCE_ID,
+        instanceName: 'Preview Test Instance',
+        arrType: 'radarr',
+        status: 'ready',
+        createdAtMs: Date.now(),
+        sections: ['qualityProfiles', 'delayProfiles'],
+        sectionOutcomes: [
+          {
+            section: 'qualityProfiles',
+            failure: SAMPLE_FAILURE,
+            skipped: false,
+          },
+          { section: 'delayProfiles', failure: SAMPLE_FAILURE, skipped: false },
+        ],
+        qualityProfiles: null,
+        delayProfiles: null,
+        mediaManagement: null,
+        metadataProfiles: null,
+        summary: {
+          totalCreates: 0,
+          totalUpdates: 0,
+          totalDeletes: 0,
+          totalUnchanged: 0,
+        },
+      },
+      reviewContext: {
+        sectionConfigs: {},
+        evidence: [],
+        preparedExecutionContexts: {},
+      },
+    })
+  );
+
+  const response = await _handleSyncPreviewCreateRequest(createPreviewCreateRequest(), deps);
+  assertEquals(response.status, 500);
+  const payload = (await response.json()) as SyncPreviewResult;
+  try {
+    assertEquals(payload.status, 'failed');
+    assertEquals(payload.failure?.code, 'sectionErrors');
+    assertEquals(payload.sectionOutcomes.length, 2);
+    assertEquals(
+      payload.sectionOutcomes.every((outcome) => outcome.failure !== null),
+      true
+    );
+    assertEquals(previewStore.get(payload.id)?.status, 'failed');
+  } finally {
+    previewStore.delete(payload.id);
+    resetPreviewCreateRateLimitForTests();
+  }
+});
+
 Deno.test('sync preview create returns a ready non-applicable result when no sync config exists', async () => {
   resetPreviewCreateRateLimitForTests();
   const deps = createDependencies(() =>
@@ -976,9 +1180,18 @@ Deno.test('sync preview create returns a ready non-applicable result when no syn
         delayProfiles: null,
         mediaManagement: null,
         metadataProfiles: null,
-        summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+        summary: {
+          totalCreates: 0,
+          totalUpdates: 0,
+          totalDeletes: 0,
+          totalUnchanged: 0,
+        },
       },
-      reviewContext: { sectionConfigs: {}, evidence: [], preparedExecutionContexts: {} },
+      reviewContext: {
+        sectionConfigs: {},
+        evidence: [],
+        preparedExecutionContexts: {},
+      },
     })
   );
 
@@ -1020,9 +1233,18 @@ Deno.test('sync preview create returns a ready non-applicable result when every 
         delayProfiles: null,
         mediaManagement: null,
         metadataProfiles: null,
-        summary: { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 },
+        summary: {
+          totalCreates: 0,
+          totalUpdates: 0,
+          totalDeletes: 0,
+          totalUnchanged: 0,
+        },
       },
-      reviewContext: { sectionConfigs: {}, evidence: [], preparedExecutionContexts: {} },
+      reviewContext: {
+        sectionConfigs: {},
+        evidence: [],
+        preparedExecutionContexts: {},
+      },
     })
   );
 
@@ -1056,7 +1278,11 @@ Deno.test('sync preview apply redacts a secret-shaped job-failure error', async 
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({ status: 'failure', error: SECRET_MIX, syncHistoryId: 42 })
+      dependenciesReturning({
+        status: 'failure',
+        error: SECRET_MIX,
+        syncHistoryId: 42,
+      })
     );
 
     assertEquals(response.status, 500);
@@ -1077,7 +1303,11 @@ Deno.test('sync preview apply redacts an arbitrary free-form job-failure error',
     const response = await _handleSyncPreviewApplyRequest(
       previewId,
       createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
-      dependenciesReturning({ status: 'failure', error: FREE_FORM, syncHistoryId: null })
+      dependenciesReturning({
+        status: 'failure',
+        error: FREE_FORM,
+        syncHistoryId: null,
+      })
     );
 
     assertEquals(response.status, 500);

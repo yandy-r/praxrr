@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
+import { getArrInstanceReviewClient, type ArrInstanceReviewClient } from '$arr/arrInstanceClients.ts';
 import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
 import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
@@ -13,6 +13,7 @@ import {
 } from '$sync/preview/orchestrator.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
 import { buildSyncPreviewReviewBinding, syncPreviewReviewTarget } from '$sync/preview/reviewBinding.ts';
+import { parseMediaManagementPreviewConfig, parseNamedProfilePreviewConfig } from '$sync/preview/sectionConfigs.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
 import {
   PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
@@ -59,12 +60,14 @@ export interface SyncPreviewCreateDependencies {
     options: GeneratePreviewReviewOptions
   ) => Promise<GeneratePreviewWithReviewContextResult>;
   readonly getInstanceById: typeof arrInstancesQueries.getById;
+  readonly getReviewClient: typeof getArrInstanceReviewClient;
   readonly now: () => number;
 }
 
 const DEFAULT_CREATE_DEPENDENCIES: SyncPreviewCreateDependencies = {
   generatePreview,
   getInstanceById: (id: number) => arrInstancesQueries.getById(id),
+  getReviewClient: getArrInstanceReviewClient,
   now: Date.now,
 };
 
@@ -120,7 +123,18 @@ function parseSectionConfigs(rawSectionConfigs: unknown): Partial<Record<Section
       throw new Error(`Invalid section config key: ${rawSection}`);
     }
 
-    parsed[rawSection as SectionType] = rawConfig;
+    const section = rawSection as SectionType;
+    if (section === 'delayProfiles' || section === 'metadataProfiles') {
+      const config = parseNamedProfilePreviewConfig(rawConfig);
+      if (!config) throw new Error(`Invalid ${section} section config`);
+      parsed[section] = config;
+    } else if (section === 'mediaManagement') {
+      const config = parseMediaManagementPreviewConfig(rawConfig);
+      if (!config) throw new Error('Invalid mediaManagement section config');
+      parsed[section] = config;
+    } else {
+      parsed[section] = rawConfig;
+    }
   }
 
   return parsed;
@@ -308,7 +322,9 @@ export async function _handleSyncPreviewCreateRequest(
 
   const requestedSections = requestPayload.sections?.length ? requestPayload.sections : undefined;
 
+  let reviewClient: ArrInstanceReviewClient | null = null;
   try {
+    reviewClient = await dependencies.getReviewClient(instance.type, instance);
     const { preview: generated, reviewContext } = await dependencies.generatePreview(
       {
         instance,
@@ -316,7 +332,7 @@ export async function _handleSyncPreviewCreateRequest(
         sectionConfigs: requestPayload.sectionConfigs,
         nowMs,
       },
-      { captureReviewContext: true }
+      { captureReviewContext: true, client: reviewClient.client }
     );
 
     // Preserve successful-section evidence: a partial generation stays `ready` (successful
@@ -342,13 +358,24 @@ export async function _handleSyncPreviewCreateRequest(
       instanceName: generated.instanceName,
     };
 
+    if (eligibleSections.length === 0 && hasFailedSection) {
+      storedPreview = previewStore.updateResult(storedPreview.id, {
+        ...generationPatch,
+        status: PREVIEW_STATUS_FAILED,
+      })!;
+      if (!storedPreview) {
+        return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
+      }
+      return json(storedPreview, { status: 500 });
+    }
+
     if (eligibleSections.length === 0) {
       storedPreview = previewStore.completeNonApplicableGeneration(storedPreview.id, generationPatch)!;
     } else {
       const binding = await buildSyncPreviewReviewBinding({
         instanceId: generated.instanceId,
         arrType: generated.arrType,
-        target: syncPreviewReviewTarget(instance, arrInstanceCredentialsQueries.getByInstanceId(instance.id)),
+        target: syncPreviewReviewTarget(instance, reviewClient.credentialIdentity),
         sections: eligibleSections,
         sectionConfigs: reviewContext.sectionConfigs,
         evidence: reviewContext.evidence,
@@ -385,6 +412,8 @@ export async function _handleSyncPreviewCreateRequest(
 
     // Return the failed snapshot (status 'failed' + typed, safe failure) — never raw text.
     return json(failedPreview ?? { ...storedPreview, status: PREVIEW_STATUS_FAILED, failure }, { status: 500 });
+  } finally {
+    reviewClient?.client.close();
   }
 }
 

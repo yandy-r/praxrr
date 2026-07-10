@@ -541,8 +541,14 @@ export class SyncPreviewStore {
     }
 
     const snapshot = this.sanitizePatch(entry, { ...patch, status: PREVIEW_STATUS_READY }, nowMs);
-    if (eligibleSections(snapshot).length !== 0) {
-      throw new TypeError('Non-applicable preview generation cannot contain eligible sections');
+    const hasExactSkippedOutcomes =
+      snapshot.sectionOutcomes.length === snapshot.sections.length &&
+      snapshot.sections.every((section, index) => {
+        const outcome = snapshot.sectionOutcomes[index];
+        return outcome?.section === section && outcome.failure === null && outcome.skipped;
+      });
+    if (snapshot.failure !== null || eligibleSections(snapshot).length !== 0 || !hasExactSkippedOutcomes) {
+      throw new TypeError('Non-applicable preview generation must contain only clean skipped sections');
     }
 
     this.previews.set(id, {

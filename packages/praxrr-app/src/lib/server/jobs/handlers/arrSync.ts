@@ -1,9 +1,12 @@
 import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobHandlerResult, JobQueueRecord, JobType } from '../queueTypes.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
-import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { arrSyncQueries, type ReviewedSyncClaim } from '$db/queries/arrSync.ts';
-import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import {
+  getArrInstanceClient,
+  getArrInstanceReviewClient,
+  type ArrInstanceReviewClient,
+} from '$arr/arrInstanceClients.ts';
 import { detectAndRecordArrVersion } from '$arr/instanceCompatibility.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrType } from '$arr/types.ts';
@@ -97,8 +100,7 @@ interface ReviewedExecutionSyncer extends BaseSyncer {
 export interface ReviewedSyncExecutionDependencies {
   readonly now: () => number;
   readonly getInstance: (instanceId: number) => ArrInstance | null;
-  readonly getClient: (arrType: ArrType, instanceId: number, url: string) => Promise<BaseArrClient>;
-  readonly getReviewTarget: (instance: ArrInstance) => SyncPreviewReviewTargetInput;
+  readonly getReviewClient: (instance: ArrInstance) => Promise<ArrInstanceReviewClient>;
   readonly detectVersion: typeof detectAndRecordArrVersion;
   readonly claimSections: (instanceId: number, sections: readonly SectionType[]) => ReviewedSyncClaim | null;
   readonly releaseSections: (claim: ReviewedSyncClaim) => boolean;
@@ -386,9 +388,7 @@ export const __testOnly = {
 const DEFAULT_REVIEWED_SYNC_DEPENDENCIES: ReviewedSyncExecutionDependencies = {
   now: Date.now,
   getInstance: (instanceId) => arrInstancesQueries.getById(instanceId) ?? null,
-  getClient: (arrType, instanceId, url) => getArrInstanceClient(arrType, instanceId, url),
-  getReviewTarget: (instance) =>
-    syncPreviewReviewTarget(instance, arrInstanceCredentialsQueries.getByInstanceId(instance.id)),
+  getReviewClient: async (instance) => await getArrInstanceReviewClient(instance.type as ArrType, instance),
   detectVersion: detectAndRecordArrVersion,
   claimSections: (instanceId, sections) => arrSyncQueries.claimReviewedSyncSections(instanceId, sections),
   releaseSections: (claim) => arrSyncQueries.releaseReviewedSyncSections(claim),
@@ -519,7 +519,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
 
   const expiresAtMs = Date.parse(input.expiresAt);
   if (!Number.isFinite(expiresAtMs)) {
-    deps.failSections(claim, 'Reviewed sync preview could not be verified');
+    deps.releaseSections(claim);
     return invalidatedReviewedSync('unverifiable_review', sections);
   }
   if (deps.now() >= expiresAtMs) {
@@ -530,31 +530,27 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
   const instance = deps.getInstance(input.binding.instanceId);
   const claimedScopeFailure = validateReviewedScope(input.binding, sections, instance);
   if (claimedScopeFailure || !instance) {
-    deps.failSections(claim, 'Reviewed sync preview scope changed');
+    deps.releaseSections(claim);
     return claimedScopeFailure ?? invalidatedReviewedSync('scope_drift', sections);
   }
 
+  let client: BaseArrClient | null = null;
   let target: SyncPreviewReviewTargetInput;
+  let materialized: GeneratePreviewWithReviewContextResult;
   try {
-    target = deps.getReviewTarget(instance);
+    const reviewClient = await deps.getReviewClient(instance);
+    client = reviewClient.client;
+    target = syncPreviewReviewTarget(instance, reviewClient.credentialIdentity);
     const currentTargetHash = await buildSyncPreviewTargetHash({
       instanceId: instance.id,
       arrType: input.binding.arrType,
       target,
     });
     if (currentTargetHash !== input.binding.targetHash) {
-      deps.failSections(claim, 'Reviewed sync preview target changed');
+      deps.releaseSections(claim);
+      client.close();
       return invalidatedReviewedSync('scope_drift', sections);
     }
-  } catch {
-    deps.failSections(claim, 'Reviewed sync preview target could not be verified');
-    return invalidatedReviewedSync('unverifiable_review', sections);
-  }
-
-  let client: BaseArrClient | null = null;
-  let materialized: GeneratePreviewWithReviewContextResult;
-  try {
-    client = await deps.getClient(input.binding.arrType, instance.id, instance.url);
     const detected = await deps.detectVersion(instance.id, instance.type, client);
     const detectedVersion = detected?.detectedVersion ?? instance.detected_version;
     const unavailable = sections.filter(
@@ -562,14 +558,14 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
         resolveSyncSectionAvailability(input.binding.arrType, section, detectedVersion).status === 'unavailable'
     );
     if (unavailable.length > 0) {
-      deps.failSections(claim, 'Reviewed sync preview target capability changed');
+      deps.releaseSections(claim);
       client.close();
       return invalidatedReviewedSync('scope_drift', unavailable);
     }
 
     materialized = await deps.materializeReview(instance, sections, input.binding.sectionConfigs, client);
   } catch {
-    deps.failSections(claim, 'Reviewed sync preview could not be verified');
+    deps.releaseSections(claim);
     client?.close();
     return invalidatedReviewedSync('unverifiable_review', sections);
   }
@@ -595,7 +591,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
   }
 
   if (comparison.kind === 'invalidated') {
-    deps.failSections(claim, 'Reviewed sync preview evidence changed');
+    deps.releaseSections(claim);
     client.close();
     return {
       kind: 'invalidated',
@@ -614,7 +610,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       return !context || context.section !== section;
     })
   ) {
-    deps.failSections(claim, 'Reviewed sync preview execution values could not be verified');
+    deps.releaseSections(claim);
     client.close();
     return invalidatedReviewedSync('unverifiable_review', sections);
   }
@@ -625,6 +621,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
   let itemsSynced = 0;
   let failures = 0;
   let ranSections = 0;
+  let sideEffectsStarted = false;
 
   try {
     await input.beforeWrite?.();
@@ -639,6 +636,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
 
     const startedAt = new Date(deps.now()).toISOString();
     for (const databaseId of collectReviewedSnapshotDatabaseIds(preparedContexts, sections)) {
+      sideEffectsStarted = true;
       await deps.createSnapshot({
         databaseId,
         trigger: 'sync',
@@ -657,6 +655,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       ranSections += 1;
       try {
         syncer.setPreparedExecutionContext(context);
+        sideEffectsStarted = true;
         const result = await syncer.sync();
         allOutcomes.push(...result.outcomes);
         itemsSynced += result.itemsSynced;
@@ -698,6 +697,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
 
     const historyStatus = deriveSyncHistoryStatus(ranSections, failures, sectionResults, allOutcomes);
     const finishedAt = new Date(deps.now()).toISOString();
+    sideEffectsStarted = true;
     const syncHistoryId = deps.recordHistory({
       arrInstanceId: instance.id,
       instanceName: instance.name,
@@ -738,7 +738,11 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Reviewed sync execution failed';
-    deps.failSections(claim, 'Reviewed sync execution failed');
+    if (sideEffectsStarted) {
+      deps.failSections(claim, 'Reviewed sync execution failed');
+    } else {
+      deps.releaseSections(claim);
+    }
     return {
       kind: 'executed',
       result: {

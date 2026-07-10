@@ -325,7 +325,7 @@ Deno.test('reviewed executor rejects target Arr-family drift before claims or mu
   const calls = { claims: 0, clients: 0, materializations: 0, histories: 0 };
   const dependencies = {
     getInstance: () => reviewedRadarrTarget({ type: 'sonarr' }),
-    getClient: () => {
+    getReviewClient: () => {
       calls.clients += 1;
       return Promise.reject(new Error('scope drift must not create a client'));
     },
@@ -372,6 +372,7 @@ Deno.test('reviewed executor rejects version capability drift before materializa
   const calls = {
     claims: 0,
     closes: 0,
+    releases: 0,
     failedClaims: 0,
     materializations: 0,
     snapshots: 0,
@@ -382,17 +383,23 @@ Deno.test('reviewed executor rejects version capability drift before materializa
   const dependencies = {
     now: () => Date.parse('2026-07-10T12:00:00.000Z'),
     getInstance: () => target,
-    getReviewTarget: () => ({
-      url: target.url,
-      credentialFingerprint: 'credential-v1',
-      credentialKeyVersion: 'legacy',
-      credentialRevision: target.updated_at,
-    }),
-    getClient: () => Promise.resolve(client),
+    getReviewClient: () =>
+      Promise.resolve({
+        client,
+        credentialIdentity: {
+          fingerprint: 'credential-v1',
+          keyVersion: 'legacy',
+          revision: target.updated_at,
+        },
+      }),
     detectVersion: () => Promise.resolve(resolveArrCompatibility('radarr', '3.2.2.0')),
     claimSections: () => {
       calls.claims += 1;
       return claim;
+    },
+    releaseSections: () => {
+      calls.releases += 1;
+      return true;
     },
     failSections: () => {
       calls.failedClaims += 1;
@@ -435,7 +442,8 @@ Deno.test('reviewed executor rejects version capability drift before materializa
   assertEquals(calls, {
     claims: 1,
     closes: 1,
-    failedClaims: 1,
+    releases: 1,
+    failedClaims: 0,
     materializations: 0,
     snapshots: 0,
     handlers: 0,

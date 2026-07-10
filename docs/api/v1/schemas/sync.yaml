@@ -29,11 +29,139 @@ SyncPreviewSectionConfigs:
     qualityProfiles:
       description: Effective quality-profile section configuration to review and bind.
     delayProfiles:
-      description: Effective delay-profile section configuration to review and bind.
+      $ref: '#/SyncPreviewNamedProfileSectionConfig'
     mediaManagement:
-      description: Effective media-management section configuration to review and bind.
+      $ref: '#/SyncPreviewMediaManagementSectionConfig'
     metadataProfiles:
-      description: Effective metadata-profile section configuration to review and bind.
+      $ref: '#/SyncPreviewNamedProfileSectionConfig'
+
+SyncPreviewNamedProfileSectionConfig:
+  type: object
+  additionalProperties: false
+  required:
+    - databaseId
+    - profileName
+  description: |
+    Complete transient delay/metadata profile selection. Both fields must be
+    null to select no profile, or both must contain a valid selection.
+  properties:
+    databaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    profileName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+  allOf:
+    - anyOf:
+        - properties:
+            databaseId:
+              type: integer
+              minimum: 1
+            profileName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            databaseId:
+              nullable: true
+              enum: [null]
+            profileName:
+              nullable: true
+              enum: [null]
+
+SyncPreviewMediaManagementSectionConfig:
+  type: object
+  additionalProperties: false
+  required:
+    - namingDatabaseId
+    - namingConfigName
+    - qualityDefinitionsDatabaseId
+    - qualityDefinitionsConfigName
+    - mediaSettingsDatabaseId
+    - mediaSettingsConfigName
+  description: |
+    Complete transient media-management selection. Each database/name pair
+    must either be null/null or contain a positive database ID and non-empty name.
+  properties:
+    namingDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    namingConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+    qualityDefinitionsDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    qualityDefinitionsConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+    mediaSettingsDatabaseId:
+      type: integer
+      minimum: 1
+      nullable: true
+    mediaSettingsConfigName:
+      type: string
+      minLength: 1
+      pattern: '.*\S.*'
+      nullable: true
+  allOf:
+    - anyOf:
+        - properties:
+            namingDatabaseId:
+              type: integer
+              minimum: 1
+            namingConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            namingDatabaseId:
+              nullable: true
+              enum: [null]
+            namingConfigName:
+              nullable: true
+              enum: [null]
+    - anyOf:
+        - properties:
+            qualityDefinitionsDatabaseId:
+              type: integer
+              minimum: 1
+            qualityDefinitionsConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            qualityDefinitionsDatabaseId:
+              nullable: true
+              enum: [null]
+            qualityDefinitionsConfigName:
+              nullable: true
+              enum: [null]
+    - anyOf:
+        - properties:
+            mediaSettingsDatabaseId:
+              type: integer
+              minimum: 1
+            mediaSettingsConfigName:
+              type: string
+              minLength: 1
+              pattern: '.*\S.*'
+        - properties:
+            mediaSettingsDatabaseId:
+              nullable: true
+              enum: [null]
+            mediaSettingsConfigName:
+              nullable: true
+              enum: [null]
 
 SyncPreviewApplyRequest:
   type: object
