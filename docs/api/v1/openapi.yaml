@@ -696,6 +696,8 @@ paths:
     $ref: './paths/config-health.yaml#/summary'
   /config-health/{instanceId}:
     $ref: './paths/config-health.yaml#/detail'
+  /config-health/{instanceId}/recompute:
+    $ref: './paths/config-health.yaml#/recompute'
   /config-health/{instanceId}/trends:
     $ref: './paths/config-health.yaml#/trends'
   /config-health/settings:
