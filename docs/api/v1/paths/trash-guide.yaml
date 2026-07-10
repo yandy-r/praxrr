@@ -1,0 +1,85 @@
+# TRaSH Guide manual-sync correlation paths (issue #238).
+
+sync:
+  post:
+    operationId: syncTrashGuideSource
+    summary: Enqueue a manual TRaSH source sync
+    description: |
+      Enqueues a manual sync for the TRaSH source and returns the per-run correlation token plus a
+      source-labeled status view, so the initiating surface can link to exactly one current-or-terminal
+      run. An already-running source dedupes onto the in-flight run (409) instead of acking a new one.
+    tags:
+      - Trash Guide
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: TRaSH source ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Sync queued (or coalesced onto a pending run)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSyncQueuedResponse'
+      '400':
+        description: Invalid source ID
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: TRaSH source not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: A sync is already running for this source — links to the existing run
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSyncDedupeResponse'
+      '500':
+        description: Failed to enqueue the sync
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  get:
+    operationId: getTrashGuideSyncStatus
+    summary: Resolve current + latest terminal run for a TRaSH source
+    description: |
+      Returns the source's current queue slot and latest terminal run evidence, used to poll a
+      queued/running sync to its exact terminal run. Read-only and safe for a since-deleted source:
+      identity falls back to the durable snapshot, so it does not 404 on that case.
+    tags:
+      - Trash Guide
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: TRaSH source ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Current + latest terminal run view
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSyncStatusView'
+      '400':
+        description: Invalid source ID
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to resolve sync status
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

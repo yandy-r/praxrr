@@ -707,10 +707,14 @@ export const actions: Actions = {
     try {
       trashGuideSyncQueries.assertScope(id, sourceId);
       const queued = enqueueManualTrashGuideSourceSync(sourceId);
+      const statusUrl = `/api/v1/trash-guide/sources/${sourceId}/sync`;
       if (queued.status === 'already_running') {
         return fail(409, {
           error: 'TRaSH sync is already running for this source',
-          run: queued.run,
+          deduped: true,
+          runToken: queued.runToken,
+          statusUrl,
+          view: queued.view,
         });
       }
 
@@ -719,16 +723,19 @@ export const actions: Actions = {
         meta: {
           instanceId: id,
           sourceId,
-          jobId: queued.job.id,
-          jobStatus: queued.job.status,
-          runAt: queued.job.runAt,
+          queueId: queued.view.queueId,
+          runToken: queued.runToken,
+          jobStatus: queued.view.current?.status ?? null,
+          runAt: queued.view.current?.runAt ?? null,
         },
       });
 
       return {
         success: true,
         message: 'TRaSH source sync queued',
-        job: queued.job,
+        runToken: queued.runToken,
+        statusUrl,
+        view: queued.view,
       };
     } catch (error) {
       const mapped = mapTrashGuideActionError(error);

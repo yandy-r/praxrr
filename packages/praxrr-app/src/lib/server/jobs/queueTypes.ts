@@ -1,4 +1,5 @@
 import type { JobFailureCode, SafeJobEvidence } from '$shared/jobs/evidence.ts';
+import type { TrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 
 /**
  * Ordered inventory of every queued workflow Praxrr can dispatch.
@@ -65,6 +66,87 @@ export interface TrashGuideSyncJobPayload {
   sourceId: number;
   trigger: 'manual' | 'scheduled';
   requestedAt?: string;
+  /**
+   * Correlation token minted at enqueue and preserved across dedupe-coalesced triggers (issue #238).
+   * Exists during queued/running (in the queue payload) before any run-history row is created, so a
+   * manual initiating surface can link to its run by id rather than by timestamp matching. It
+   * correlates the initiating request(s) to their run; because a scheduled auto-reschedule reuses the
+   * same slot payload, consecutive scheduled runs of one source may carry the same token — the durable
+   * per-run identity therefore remains `job_run_history.id`, which the token narrows to but never replaces.
+   */
+  runToken?: string;
+  /** Durable source-identity snapshot so a since-deleted/disabled source stays identifiable (#238). */
+  sourceName?: string;
+  sourceArrType?: TrashGuideSupportedArrType;
+}
+
+/** Closed, safe vocabulary of manual/scheduled TRaSH sync failure reasons (issue #238). */
+export type TrashGuideSyncFailureCode =
+  'source_missing' | 'source_disabled' | 'network' | 'parser_failed' | 'sync_failed' | 'internal';
+
+/**
+ * Typed, closed, SAFE failure evidence for a TRaSH sync run.
+ *
+ * `message`/`recoveryAction` are pre-authored safe copy — they never contain raw exception text,
+ * git/parser diagnostics, credentials, or hostnames. Mirrors `SyncPreviewFailureReason`.
+ */
+export interface TrashGuideSyncFailureReason {
+  readonly code: TrashGuideSyncFailureCode;
+  readonly message: string;
+  readonly recoveryAction: string;
+}
+
+/** Fetched/applied counts carried in terminal TRaSH sync evidence. */
+export interface TrashGuideSyncCounts {
+  commitsBehind: number;
+  parsedFiles: number;
+  failedFiles: number;
+  activeOperations: number;
+  removedEntities: number;
+  renamedEntities: number;
+}
+
+/**
+ * Versioned, structured terminal evidence for one TRaSH sync run (issue #238), serialized into
+ * `job_run_history.output`. `job_run_history` has no FK to the source, so this snapshot survives a
+ * source hard-delete. `status` reuses `JobRunStatus` to avoid a second spelling of terminal state.
+ */
+export interface TrashGuideSyncRunEvidence {
+  schemaVersion: 1;
+  runToken: string | null;
+  source: { id: number; name: string | null; arrType: TrashGuideSupportedArrType | null };
+  trigger: 'manual' | 'scheduled';
+  requestedAt: string | null;
+  status: JobRunStatus;
+  counts: TrashGuideSyncCounts | null;
+  failure: TrashGuideSyncFailureReason | null;
+  retry: { rescheduleAt: string | null; retryable: boolean };
+}
+
+/**
+ * The single wire view of a source's current queue slot + latest terminal run, built once by
+ * `getTrashGuideSyncStatus` and reused by the POST response and the GET status resolver (issue #238).
+ */
+export interface TrashGuideSyncStatusView {
+  sourceId: number;
+  sourceName: string | null;
+  arrType: TrashGuideSupportedArrType | null;
+  queueId: number | null;
+  current: {
+    status: JobStatus;
+    runAt: string;
+    startedAt: string | null;
+    attempts: number;
+    runToken: string | null;
+  } | null;
+  latestRun: {
+    id: number;
+    status: JobRunStatus;
+    startedAt: string;
+    finishedAt: string;
+    durationMs: number;
+    evidence: TrashGuideSyncRunEvidence | null;
+  } | null;
 }
 
 export interface ArrPullStartupJobPayload {

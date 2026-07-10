@@ -6,6 +6,7 @@ import {
   type TrashGuideEntityCacheWithSource,
 } from '$db/queries/trashGuideEntityCache.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
+import { logger } from '$logger/logger.ts';
 import {
   trashGuideManager,
   TrashGuideSourceConflictError,
@@ -16,7 +17,12 @@ import {
 import { TrashGuideFetcherError } from '$lib/server/trashguide/types.ts';
 import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts';
 import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
-import type { JobQueueRecord, JobRunHistoryRecord } from '$jobs/queueTypes.ts';
+import type {
+  JobQueueRecord,
+  JobRunHistoryRecord,
+  TrashGuideSyncRunEvidence,
+  TrashGuideSyncStatusView,
+} from '$jobs/queueTypes.ts';
 import { POST as sourcesPost } from '../../routes/api/v1/trash-guide/sources/+server.ts';
 import {
   DELETE as sourceByIdDelete,
@@ -24,7 +30,10 @@ import {
   PUT as sourceByIdPut,
 } from '../../routes/api/v1/trash-guide/sources/[id]/+server.ts';
 import { GET as sourceEntitiesGet } from '../../routes/api/v1/trash-guide/sources/[id]/entities/+server.ts';
-import { POST as sourceSyncPost } from '../../routes/api/v1/trash-guide/sources/[id]/sync/+server.ts';
+import {
+  GET as sourceSyncGet,
+  POST as sourceSyncPost,
+} from '../../routes/api/v1/trash-guide/sources/[id]/sync/+server.ts';
 
 type Restore = () => void;
 
@@ -68,7 +77,8 @@ function createJobRecord(
   id: number,
   status: JobQueueRecord['status'],
   runAt: string,
-  sourceId: number
+  sourceId: number,
+  runToken?: string
 ): JobQueueRecord {
   return {
     id,
@@ -79,6 +89,7 @@ function createJobRecord(
       sourceId,
       trigger: 'manual',
       requestedAt: runAt,
+      ...(runToken !== undefined ? { runToken } : {}),
     },
     source: 'manual',
     dedupeKey: `trashguide.sync:${sourceId}`,
@@ -89,6 +100,23 @@ function createJobRecord(
     createdAt: runAt,
     updatedAt: runAt,
   };
+}
+
+/**
+ * Build a `trashGuideSourcesQueries.getById` stand-in that returns a live source snapshot.
+ *
+ * The sync queue helper resolves durable source identity via `getById` (issue #238), so every sync
+ * test must patch it; this keeps the fake source in one place with an app-consistent `arr_type`.
+ */
+function patchedSourceLookup(
+  arrType: TrashGuideSource['arr_type'] = 'radarr'
+): typeof trashGuideSourcesQueries.getById {
+  return ((id: number) =>
+    createTrashGuideSource({
+      id,
+      name: `TRaSH ${arrType} ${id}`,
+      arr_type: arrType,
+    })) as typeof trashGuideSourcesQueries.getById;
 }
 
 Deno.test('trash guide sources POST rejects unsupported create fields', async () => {
@@ -397,6 +425,8 @@ Deno.test({
     const restores: Restore[] = [];
 
     let capturedRunAt: string | null = null;
+    let mintedRunToken: string | null = null;
+    let slot: JobQueueRecord | undefined;
     const notifiedRunAts: string[] = [];
 
     patchTarget(
@@ -405,12 +435,8 @@ Deno.test({
       (() => createSourceResponse(41, 'radarr')) as typeof trashGuideManager.getSource,
       restores
     );
-    patchTarget(
-      jobQueueQueries,
-      'getByDedupeKey',
-      (() => undefined) as typeof jobQueueQueries.getByDedupeKey,
-      restores
-    );
+    patchTarget(trashGuideSourcesQueries, 'getById', patchedSourceLookup(), restores);
+    patchTarget(jobQueueQueries, 'getByDedupeKey', (() => slot) as typeof jobQueueQueries.getByDedupeKey, restores);
     patchTarget(
       jobQueueQueries,
       'upsertScheduled',
@@ -425,11 +451,15 @@ Deno.test({
         assertEquals(payload.sourceId, 41);
         assertEquals(payload.trigger, 'manual');
         assertEquals(typeof payload.requestedAt, 'string');
+        assertEquals(typeof payload.runToken, 'string');
         capturedRunAt = input.runAt;
-        return createJobRecord(901, 'queued', input.runAt, Number(payload.sourceId));
+        mintedRunToken = payload.runToken ?? null;
+        slot = createJobRecord(901, 'queued', input.runAt, payload.sourceId, payload.runToken);
+        return slot;
       }) as typeof jobQueueQueries.upsertScheduled,
       restores
     );
+    patchTarget(jobRunHistoryQueries, 'getByQueueId', (() => []) as typeof jobRunHistoryQueries.getByQueueId, restores);
     patchTarget(
       jobDispatcher,
       'notifyJobEnqueued',
@@ -448,21 +478,24 @@ Deno.test({
       const payload = (await response.json()) as {
         success: boolean;
         queued: boolean;
-        job: {
-          id: number;
-          status: string;
-          runAt: string;
-          source: string;
-          attempts: number;
-        };
+        runToken: string;
+        statusUrl: string;
+        view: TrashGuideSyncStatusView;
       };
 
       assertEquals(payload.success, true);
       assertEquals(payload.queued, true);
-      assertEquals(payload.job.id, 901);
+      assertEquals(typeof payload.runToken, 'string');
+      assertEquals(payload.statusUrl, '/api/v1/trash-guide/sources/41/sync');
+      assertEquals(payload.view.sourceId, 41);
+      assertEquals(payload.view.current?.status, 'queued');
+      assertEquals(typeof payload.view.current?.runToken, 'string');
+
       if (!capturedRunAt) {
         throw new Error('Expected upsertScheduled to be called');
       }
+      assertEquals(payload.runToken, mintedRunToken);
+      assertEquals(payload.view.current?.runToken, mintedRunToken);
       assertEquals(notifiedRunAts, [capturedRunAt]);
     } finally {
       for (const restore of restores.reverse()) {
@@ -485,17 +518,11 @@ Deno.test({
       (() => createSourceResponse(52, 'sonarr')) as typeof trashGuideManager.getSource,
       restores
     );
+    patchTarget(trashGuideSourcesQueries, 'getById', patchedSourceLookup('sonarr'), restores);
     patchTarget(
       jobQueueQueries,
       'getByDedupeKey',
-      (() => createJobRecord(920, 'running', runningAt, 52)) as typeof jobQueueQueries.getByDedupeKey,
-      restores
-    );
-    patchTarget(
-      jobQueueQueries,
-      'getById',
-      ((id: number) =>
-        id === 920 ? createJobRecord(920, 'running', runningAt, 52) : undefined) as typeof jobQueueQueries.getById,
+      (() => createJobRecord(920, 'running', runningAt, 52, 'run-token-920')) as typeof jobQueueQueries.getByDedupeKey,
       restores
     );
     patchTarget(jobRunHistoryQueries, 'getByQueueId', (() => []) as typeof jobRunHistoryQueries.getByQueueId, restores);
@@ -516,17 +543,21 @@ Deno.test({
       assertEquals(response.status, 409);
       const payload = (await response.json()) as {
         error: string;
-        run: {
-          queueId: number;
-          current: { status: string; runAt: string; startedAt: string | null };
-        };
+        deduped: boolean;
+        runToken: string;
+        statusUrl: string;
+        view: TrashGuideSyncStatusView;
       };
 
       assertMatch(payload.error, /already running/i);
-      assertEquals(payload.run.queueId, 920);
-      assertEquals(payload.run.current.status, 'running');
-      assertEquals(payload.run.current.runAt, runningAt);
-      assertEquals(payload.run.current.startedAt, runningAt);
+      assertEquals(payload.deduped, true);
+      assertEquals(payload.runToken, 'run-token-920');
+      assertEquals(payload.statusUrl, '/api/v1/trash-guide/sources/52/sync');
+      assertEquals(payload.view.queueId, 920);
+      assertEquals(payload.view.current?.status, 'running');
+      assertEquals(payload.view.current?.runAt, runningAt);
+      assertEquals(payload.view.current?.startedAt, runningAt);
+      assertEquals(payload.view.current?.runToken, 'run-token-920');
     } finally {
       for (const restore of restores.reverse()) {
         restore();
@@ -555,29 +586,25 @@ Deno.test({
       createdAt: '2026-02-25T04:05:05.000Z',
     };
 
+    // The queue slot races from queued -> running between the read and the upsert; the mock advances
+    // the dedupe slot on upsert so the rebuilt status view reflects the now-running slot.
+    let slot: JobQueueRecord | undefined = createJobRecord(940, 'queued', runningAt, 54, 'run-token-940');
+
     patchTarget(
       trashGuideManager,
       'getSource',
       (() => createSourceResponse(54, 'radarr')) as typeof trashGuideManager.getSource,
       restores
     );
-    patchTarget(
-      jobQueueQueries,
-      'getByDedupeKey',
-      (() => createJobRecord(940, 'queued', runningAt, 54)) as typeof jobQueueQueries.getByDedupeKey,
-      restores
-    );
+    patchTarget(trashGuideSourcesQueries, 'getById', patchedSourceLookup(), restores);
+    patchTarget(jobQueueQueries, 'getByDedupeKey', (() => slot) as typeof jobQueueQueries.getByDedupeKey, restores);
     patchTarget(
       jobQueueQueries,
       'upsertScheduled',
-      (() => createJobRecord(941, 'running', runningAt, 54)) as typeof jobQueueQueries.upsertScheduled,
-      restores
-    );
-    patchTarget(
-      jobQueueQueries,
-      'getById',
-      ((id: number) =>
-        id === 941 ? createJobRecord(941, 'running', runningAt, 54) : undefined) as typeof jobQueueQueries.getById,
+      (() => {
+        slot = createJobRecord(941, 'running', runningAt, 54, 'run-token-941');
+        return slot;
+      }) as typeof jobQueueQueries.upsertScheduled,
       restores
     );
     patchTarget(
@@ -603,42 +630,29 @@ Deno.test({
       assertEquals(response.status, 409);
       const payload = (await response.json()) as {
         error: string;
-        run: {
-          queueId: number;
-          current: {
-            status: string;
-            runAt: string;
-            startedAt: string | null;
-            attempts: number;
-            source: string;
-          };
-          latestRun: {
-            id: number;
-            status: string;
-            startedAt: string;
-            finishedAt: string;
-            durationMs: number;
-            error: string | null;
-            output: string | null;
-          } | null;
-        };
+        deduped: boolean;
+        runToken: string;
+        statusUrl: string;
+        view: TrashGuideSyncStatusView;
       };
 
       assertMatch(payload.error, /already running/i);
-      assertEquals(payload.run.queueId, 941);
-      assertEquals(payload.run.current.status, 'running');
-      assertEquals(payload.run.current.runAt, runningAt);
-      assertEquals(payload.run.current.startedAt, runningAt);
-      assertEquals(payload.run.current.source, 'manual');
-      assertEquals(payload.run.current.attempts, 0);
-      assertEquals(payload.run.latestRun, {
+      assertEquals(payload.deduped, true);
+      assertEquals(payload.runToken, 'run-token-941');
+      assertEquals(payload.statusUrl, '/api/v1/trash-guide/sources/54/sync');
+      assertEquals(payload.view.queueId, 941);
+      assertEquals(payload.view.current?.status, 'running');
+      assertEquals(payload.view.current?.runAt, runningAt);
+      assertEquals(payload.view.current?.startedAt, runningAt);
+      assertEquals(payload.view.current?.attempts, 0);
+      assertEquals(payload.view.current?.runToken, 'run-token-941');
+      assertEquals(payload.view.latestRun, {
         id: 512,
         status: 'failure',
         startedAt: '2026-02-25T04:05:00.000Z',
         finishedAt: '2026-02-25T04:05:05.000Z',
         durationMs: 5000,
-        error: 'network timeout',
-        output: null,
+        evidence: null,
       });
     } finally {
       for (const restore of restores.reverse()) {
@@ -649,31 +663,145 @@ Deno.test({
 });
 
 Deno.test({
-  name: 'trash guide source sync POST returns 500 if running queue metadata disappears',
+  name: 'trash guide source sync GET returns status view with latest run evidence',
   sanitizeResources: false,
   fn: async () => {
     const restores: Restore[] = [];
-    const runningAt = '2026-02-25T01:23:45.000Z';
+    const queuedAt = '2026-02-27T08:00:00.000Z';
+    const counts = {
+      commitsBehind: 0,
+      parsedFiles: 12,
+      failedFiles: 0,
+      activeOperations: 5,
+      removedEntities: 1,
+      renamedEntities: 2,
+    };
+    const evidence: TrashGuideSyncRunEvidence = {
+      schemaVersion: 1,
+      runToken: 'run-token-950',
+      source: { id: 88, name: 'TRaSH radarr 88', arrType: 'radarr' },
+      trigger: 'manual',
+      requestedAt: queuedAt,
+      status: 'success',
+      counts,
+      failure: null,
+      retry: { rescheduleAt: null, retryable: false },
+    };
+    const terminalRun: JobRunHistoryRecord = {
+      id: 777,
+      queueId: 950,
+      jobType: 'trashguide.sync',
+      status: 'success',
+      startedAt: '2026-02-27T08:00:01.000Z',
+      finishedAt: '2026-02-27T08:00:09.000Z',
+      durationMs: 8000,
+      error: null,
+      output: JSON.stringify(evidence),
+      createdAt: '2026-02-27T08:00:09.000Z',
+    };
+
+    patchTarget(trashGuideSourcesQueries, 'getById', patchedSourceLookup(), restores);
+    patchTarget(
+      jobQueueQueries,
+      'getByDedupeKey',
+      (() => createJobRecord(950, 'queued', queuedAt, 88, 'run-token-950')) as typeof jobQueueQueries.getByDedupeKey,
+      restores
+    );
+    patchTarget(
+      jobRunHistoryQueries,
+      'getByQueueId',
+      (() => [terminalRun]) as typeof jobRunHistoryQueries.getByQueueId,
+      restores
+    );
+
+    try {
+      const response = await sourceSyncGet({
+        params: { id: '88' },
+      } as unknown as Parameters<typeof sourceSyncGet>[0]);
+
+      assertEquals(response.status, 200);
+      const payload = (await response.json()) as TrashGuideSyncStatusView;
+
+      assertEquals(payload.sourceId, 88);
+      assertEquals(payload.sourceName, 'TRaSH radarr 88');
+      assertEquals(payload.arrType, 'radarr');
+      assertEquals(payload.queueId, 950);
+      assertEquals(payload.current?.status, 'queued');
+      assertEquals(payload.current?.runToken, 'run-token-950');
+      assertEquals(payload.latestRun?.id, 777);
+      assertEquals(payload.latestRun?.status, 'success');
+      assertEquals(payload.latestRun?.evidence?.counts, counts);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test('trash guide source sync POST validates numeric source id', async () => {
+  const response = await sourceSyncPost({
+    params: { id: 'not-a-number' },
+  } as unknown as Parameters<typeof sourceSyncPost>[0]);
+
+  assertEquals(response.status, 400);
+  const payload = (await response.json()) as { error: string };
+  assertEquals(payload.error, 'Invalid source id');
+});
+
+Deno.test({
+  name: 'trash guide source sync POST returns 404 when the source is missing',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
 
     patchTarget(
       trashGuideManager,
       'getSource',
-      (() => createSourceResponse(53, 'sonarr')) as typeof trashGuideManager.getSource,
-      restores
-    );
-    patchTarget(
-      jobQueueQueries,
-      'getByDedupeKey',
-      (() => createJobRecord(930, 'running', runningAt, 53)) as typeof jobQueueQueries.getByDedupeKey,
-      restores
-    );
-    patchTarget(jobQueueQueries, 'getById', (() => undefined) as typeof jobQueueQueries.getById, restores);
-    patchTarget(
-      jobQueueQueries,
-      'upsertScheduled',
       (() => {
-        throw new Error('did not expect upsertScheduled when running job metadata is missing');
-      }) as typeof jobQueueQueries.upsertScheduled,
+        throw new TrashGuideSourceNotFoundError(404);
+      }) as typeof trashGuideManager.getSource,
+      restores
+    );
+
+    try {
+      const response = await sourceSyncPost({
+        params: { id: '404' },
+      } as unknown as Parameters<typeof sourceSyncPost>[0]);
+
+      assertEquals(response.status, 404);
+      const payload = (await response.json()) as { error: string };
+      assertEquals(payload.error, 'TRaSH source 404 not found');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide source sync POST maps unexpected source-lookup failures to 500',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let logged = false;
+
+    patchTarget(
+      trashGuideManager,
+      'getSource',
+      (() => {
+        throw new Error('unexpected lookup failure');
+      }) as typeof trashGuideManager.getSource,
+      restores
+    );
+    patchTarget(
+      logger,
+      'error',
+      (() => {
+        logged = true;
+        return Promise.resolve();
+      }) as typeof logger.error,
       restores
     );
 
@@ -684,8 +812,8 @@ Deno.test({
 
       assertEquals(response.status, 500);
       const payload = (await response.json()) as { error: string };
-
-      assertStringIncludes(payload.error, 'queueId=930');
+      assertEquals(payload.error, 'unexpected lookup failure');
+      assertEquals(logged, true);
     } finally {
       for (const restore of restores.reverse()) {
         restore();
