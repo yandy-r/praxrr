@@ -42,9 +42,10 @@ The best next order is:
    (#20/#215), Config Health Scoring foundation (#22/#217), and Transparent Automation foundation
    (#21/#213) are in. The implemented Transparent Automation completion slice ([#240](https://github.com/yandy-r/praxrr/pull/240), pending merge)
    adds Sync Preview planned-change narration, server-derived Quality Goals rationale, evidence-bounded
-   Resolved Config provenance, and an exhaustive queued/direct workflow audit. Confirmed entity outcomes,
-   exact field lineage, and the audit's remaining evidence gaps are explicitly owned by #231, #232, and
-   #234-#239 rather than being treated as shipped behavior.
+   Resolved Config provenance, and an exhaustive queued/direct workflow audit. Confirmed entity outcomes
+   and the audit's remaining evidence gaps are explicitly owned by #232 and #234-#239 rather than being
+   treated as shipped behavior; exact field lineage (#231) is implemented in
+   [#251](https://github.com/yandy-r/praxrr/pull/251) (pending merge).
 3. Handle parser migration and deferred ecosystem expansion only when they become release or
    maintenance blockers.
 
@@ -195,7 +196,7 @@ Notes:
   the exact server-generated Quality Goals rationale only after both writes succeed, and describes
   Resolved Config only as Base-side, User override, User-created, unavailable, or conflict-ambiguous.
   Confirmed per-entity outcomes remain owned by #232; exact nested schema/default/base/tweaks/user
-  lineage remains owned by #231.
+  lineage is implemented in [#251](https://github.com/yandy-r/praxrr/pull/251) (pending merge).
 - The exhaustive automation audit dispositions every current queued and required direct workflow.
   Remaining gaps are owned by Sync Preview plan binding #234, Sync Preview failure redaction #235,
   Quality Goals partial-write recovery #236, queued-job safe durable evidence #237, TRaSH manual-run
@@ -336,7 +337,7 @@ the timeline lands as the visual layer over audit, rollback, canary, and health 
 
 ### Advanced Capabilities
 
-- [ ] #21 - Transparent Automation Engine — foundation + drift surface shipped in [#213](https://github.com/yandy-r/praxrr/pull/213); completion slice implemented in [#240](https://github.com/yandy-r/praxrr/pull/240), pending merge; remaining evidence contracts: [#231](https://github.com/yandy-r/praxrr/issues/231), [#232](https://github.com/yandy-r/praxrr/issues/232), [#234](https://github.com/yandy-r/praxrr/issues/234)-[#239](https://github.com/yandy-r/praxrr/issues/239)
+- [ ] #21 - Transparent Automation Engine — foundation + drift surface shipped in [#213](https://github.com/yandy-r/praxrr/pull/213); completion slice implemented in [#240](https://github.com/yandy-r/praxrr/pull/240), pending merge; exact field lineage [#231](https://github.com/yandy-r/praxrr/issues/231) implemented in [#251](https://github.com/yandy-r/praxrr/pull/251), pending merge; remaining evidence contracts: [#232](https://github.com/yandy-r/praxrr/issues/232), [#234](https://github.com/yandy-r/praxrr/issues/234)-[#239](https://github.com/yandy-r/praxrr/issues/239)
 - [x] #20 - Quality Goals foundation ([#215](https://github.com/yandy-r/praxrr/pull/215)); follow-ups: [#221](https://github.com/yandy-r/praxrr/issues/221), [#222](https://github.com/yandy-r/praxrr/issues/222), [#33](https://github.com/yandy-r/praxrr/issues/33)
 - [x] #22 - Config Health Scoring foundation ([#217](https://github.com/yandy-r/praxrr/pull/217)); [#223](https://github.com/yandy-r/praxrr/issues/223) shipped in [#244](https://github.com/yandy-r/praxrr/pull/244), [#224](https://github.com/yandy-r/praxrr/issues/224) shipped in [#246](https://github.com/yandy-r/praxrr/pull/246), and [#225](https://github.com/yandy-r/praxrr/issues/225) shipped in [#245](https://github.com/yandy-r/praxrr/pull/245); [#226](https://github.com/yandy-r/praxrr/issues/226) is implemented in [#247](https://github.com/yandy-r/praxrr/pull/247) pending merge
 - [x] #28 - Ecosystem Security Posture / Shield Check foundation ([#220](https://github.com/yandy-r/praxrr/pull/220)); session hardening [#227](https://github.com/yandy-r/praxrr/issues/227) shipped in [#248](https://github.com/yandy-r/praxrr/pull/248); explicit proxy trust [#228](https://github.com/yandy-r/praxrr/issues/228) shipped in [#249](https://github.com/yandy-r/praxrr/pull/249); open follow-up: [#229](https://github.com/yandy-r/praxrr/issues/229)
