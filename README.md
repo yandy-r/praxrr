@@ -74,6 +74,8 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 > proxy's own IP and must authenticate. This closes a spoofed-`X-Forwarded-For` bypass; see the
 > [Trusted proxy guide](docs/site/src/content/docs/guides/configuration.md).
 
+<!-- markdownlint-disable-next-line MD028 -->
+
 > [!NOTE] CSRF origin checks are currently configured with a wildcard
 > (`kit.csrf.trustedOrigins = ['*']`) to avoid proxy-origin mismatches during active development
 > (for example when running behind Traefik or other reverse proxies with TLS termination). This is a
