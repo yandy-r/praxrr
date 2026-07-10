@@ -37,6 +37,11 @@ export interface LineageIndex {
   getStack(table: string, rowKey: RowKey, column: string): readonly CellLineage[] | undefined;
   /** Remove every cell belonging to a row (on DELETE). */
   evictRow(table: string, rowKey: RowKey): void;
+  /**
+   * Migrate every cell of a row from `oldKey` to `newKey` (on a key-column rename), so prior
+   * writers stay attached to the row's post-rename business key. No-op when `oldKey === newKey`.
+   */
+  rekeyRow(table: string, oldKey: RowKey, newKey: RowKey): void;
 }
 
 function cellKey(table: string, rowKey: RowKey, column: string): string {
@@ -72,6 +77,30 @@ export function createLineageIndex(): LineageIndex {
       for (const column of cols) stacks.delete(cellKey(table, rowKey, column));
       rowColumns.delete(tag);
     },
+    rekeyRow(table, oldKey, newKey) {
+      if (oldKey === newKey) return;
+      const oldTag = rowTag(table, oldKey);
+      const cols = rowColumns.get(oldTag);
+      if (!cols) return;
+      const newTag = rowTag(table, newKey);
+      let newCols = rowColumns.get(newTag);
+      if (!newCols) {
+        newCols = new Set<string>();
+        rowColumns.set(newTag, newCols);
+      }
+      for (const column of cols) {
+        const oldStack = stacks.get(cellKey(table, oldKey, column));
+        if (!oldStack) continue;
+        const newCell = cellKey(table, newKey, column);
+        const existing = stacks.get(newCell);
+        // Prior (old-key) writers precede any new-key writers in replay order.
+        if (existing) existing.unshift(...oldStack);
+        else stacks.set(newCell, oldStack);
+        stacks.delete(cellKey(table, oldKey, column));
+        newCols.add(column);
+      }
+      rowColumns.delete(oldTag);
+    },
   };
 }
 
@@ -79,8 +108,10 @@ interface PendingCapture {
   readonly ws: WriteSet;
   /** INSERT: rowids present before exec. */
   readonly beforeRowids?: Set<number>;
-  /** UPDATE/DELETE: rowKeys of matched rows, resolved before exec. */
+  /** DELETE: rowKeys of matched rows, resolved before exec (rows are gone after). */
   readonly rowKeys?: RowKey[];
+  /** UPDATE: matched rowids + their pre-exec business keys, so a key-column rename can re-resolve. */
+  readonly updates?: Array<{ rowid: number; oldKey: RowKey | null }>;
 }
 
 interface OpIdentity {
@@ -110,6 +141,15 @@ function opIdentity(op: Operation, parseStatus: 'parsed' | 'ambiguous'): OpIdent
 function snapshotRowids(db: Database, table: string): Set<number> {
   const rows = db.prepare(`SELECT rowid AS rid FROM "${table}"`).all() as Array<{ rid: number }>;
   return new Set(rows.map((r) => Number(r.rid)));
+}
+
+/** Read the rowids of rows matching `whereExpr` (or all rows when null). */
+function matchedRowids(db: Database, table: string, whereExpr: string | null): number[] {
+  const sql = whereExpr
+    ? `SELECT rowid AS rid FROM "${table}" WHERE ${whereExpr}`
+    : `SELECT rowid AS rid FROM "${table}"`;
+  const rows = db.prepare(sql).all() as Array<{ rid: number }>;
+  return rows.map((r) => Number(r.rid));
 }
 
 /** Read the business-key `RowKey`s of rows matching `whereExpr` (or all rows when null). */
@@ -160,8 +200,16 @@ export function createLineageObserver(index: LineageIndex): {
           if (!(ws.table in LINEAGE_TABLE_KEYS)) continue;
           if (ws.kind === 'insert') {
             pending.push({ ws, beforeRowids: snapshotRowids(db, ws.table) });
-          } else {
+          } else if (ws.kind === 'delete') {
             pending.push({ ws, rowKeys: matchedRowKeys(db, ws.table, ws.whereExpr) });
+          } else {
+            // UPDATE: capture matched rowids + their current keys so an UPDATE that renames a
+            // key column can re-resolve the post-exec key (and migrate prior writers).
+            const updates = matchedRowids(db, ws.table, ws.whereExpr).map((rowid) => ({
+              rowid,
+              oldKey: rowKeyForRowid(db, ws.table, rowid),
+            }));
+            pending.push({ ws, updates });
           }
         }
       } catch {
@@ -200,10 +248,14 @@ export function createLineageObserver(index: LineageIndex): {
             }
             continue;
           }
-          // update
-          for (const rowKey of p.rowKeys ?? []) {
+          // update: re-read each matched row's CURRENT key (post-exec). If the key column was
+          // renamed, migrate prior writers to the new key first, then attribute this op's columns.
+          for (const { rowid, oldKey } of p.updates ?? []) {
+            const newKey = rowKeyForRowid(db, ws.table, rowid);
+            if (newKey === null) continue;
+            if (oldKey !== null && oldKey !== newKey) index.rekeyRow(ws.table, oldKey, newKey);
             for (const column of ws.columns) {
-              index.push(ws.table, rowKey, column, {
+              index.push(ws.table, newKey, column, {
                 sourceLayer: id.sourceLayer,
                 opId: id.opId,
                 opRef: id.opRef,

@@ -237,8 +237,17 @@ async function buildSchemaDefaultMap(pcdPath: string): Promise<SchemaDefaultMap>
 }
 
 /**
- * Parse (and memoize per `pcdPath`) the schema-default map. The schema DDL is static per PCD,
- * so memoization is safe; tests use unique temp dirs so there is no cross-test contamination.
+ * Parse (and memoize per `pcdPath`) the schema-default map. The schema DDL is treated as static
+ * for the process lifetime, so the map is cached by `pcdPath` (tests use unique temp dirs, so
+ * there is no cross-test contamination; `clearSchemaDefaultsCache` resets it).
+ *
+ * Staleness note: if a schema DEFAULT literal were to change on disk at a stable `pcdPath` without
+ * a process restart (schema files are normally restart/relink-gated), a never-explicitly-written
+ * column whose replayed value reflects the NEW default would be compared against the cached OLD
+ * literal and classified `ambiguous` rather than `schema-default`. This is safe-direction — it can
+ * only downgrade an implicit default to the honest `ambiguous` state, never fabricate a false
+ * source — so it is acceptable; wire a `clearSchemaDefaultsCache()` call into the relink path if
+ * live schema swaps become supported.
  */
 export function parseSchemaDefaults(pcdPath: string): Promise<SchemaDefaultMap> {
   const cached = schemaCache.get(pcdPath);

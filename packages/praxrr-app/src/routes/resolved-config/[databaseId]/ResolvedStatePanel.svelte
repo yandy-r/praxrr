@@ -106,11 +106,15 @@
 
   $: fields = state?.entity ? Object.entries(state.entity) : [];
   $: overrides = (state?.overrides ?? []) as FieldChange[];
-  // Per-field lineage lookup keyed by the diff field path (top-level scalar keys match directly;
-  // nested paths are surfaced via the raw JSON region).
+  // Per-field lineage lookup keyed by the diff field path. Top-level scalar keys match the entity
+  // field table's `Source` column directly; nested/array paths (e.g. conditions["X"].negate) do not
+  // correspond to a top-level key, so they are listed in the full lineage table below instead.
+  $: lineage = (state?.lineage ?? []) as FieldLineage[];
   $: lineageByField = new Map<string, FieldLineage>(
-    (state?.lineage ?? []).map((entry) => [entry.fieldPath, entry] as [string, FieldLineage])
+    lineage.map((entry) => [entry.fieldPath, entry] as [string, FieldLineage])
   );
+  // Nested/array leaves (paths that are not a bare top-level key) — surfaced in a dedicated table.
+  $: nestedLineage = lineage.filter((entry) => /[.[]/.test(entry.fieldPath));
   $: provenance = state
     ? explainResolvedProvenance({
         // Entity names are selected from the resolved-layer list, so a loaded base response has
@@ -317,6 +321,36 @@
           </tbody>
         </table>
       </div>
+
+      {#if activeLayer === 'resolved' && nestedLineage.length > 0}
+        <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <div
+            class="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs font-medium tracking-wide text-neutral-500 uppercase dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400"
+          >
+            Nested field lineage
+          </div>
+          <table class="w-full text-sm">
+            <tbody>
+              {#each nestedLineage as entry (entry.fieldPath)}
+                {@const meta = formatLineage(entry)}
+                <tr class="border-t border-neutral-200 first:border-t-0 dark:border-neutral-800">
+                  <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">{entry.fieldPath}</td>
+                  <td class="px-4 py-2 align-top whitespace-nowrap">
+                    <span class="inline-flex items-center gap-1.5" title={meta.detail}>
+                      <Badge variant={meta.variant}>{meta.label}</Badge>
+                      {#if entry.status === 'resolved' && entry.sourceKind !== 'schema-default'}
+                        <span class="text-xs text-neutral-400 dark:text-neutral-500">
+                          {meta.explicit ? 'explicit' : 'default'}
+                        </span>
+                      {/if}
+                    </span>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
 
       <button
         type="button"

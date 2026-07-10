@@ -302,7 +302,10 @@ function collectMediaSettings(c: LeafCollector, p: PortableMediaSettings, table:
 }
 
 function collectQualityDefinitions(c: LeafCollector, p: PortableQualityDefinitions, table: string): void {
-  c.scalar('name', table, { name: p.name }, 'name');
+  // The config `name` is a grouping key spanning every entry row (PK is `(name, quality_name)`), so
+  // it has no single backing cell — attribute honestly as unavailable rather than pick an arbitrary
+  // entry row. Each `entries[...]` leaf below is a single row and IS attributable.
+  c.unavailable('name');
   for (const entry of p.entries) {
     const base = keyedPath('entries', entry.quality_name);
     const row = { name: p.name, quality_name: entry.quality_name };

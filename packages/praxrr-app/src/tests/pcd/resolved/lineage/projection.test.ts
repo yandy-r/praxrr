@@ -7,6 +7,7 @@
 import { assert } from '@std/assert';
 import { computeUserOverrides } from '$pcd/index.ts';
 import { collectEntityLeaves } from '$pcd/resolved/lineage/projection.ts';
+import { LINEAGE_TABLE_KEYS } from '$pcd/resolved/lineage/tableKeys.ts';
 import type { ArrAppType } from '$shared/arr/capabilities.ts';
 import type { ResolvedEntityPayload, ResolvedEntityType } from '$pcd/resolved/types.ts';
 
@@ -19,12 +20,31 @@ function assertCoversDiff(
 ): void {
   const overrides = computeUserOverrides(base, resolved);
   assert(overrides.length > 0, `${label}: fixture must produce at least one diff path`);
-  const leafPaths = new Set(collectEntityLeaves(entityType, arrType, resolved).map((l) => l.fieldPath));
+  const leaves = collectEntityLeaves(entityType, arrType, resolved);
+  const leafPaths = new Set(leaves.map((l) => l.fieldPath));
   for (const change of overrides) {
     assert(
       leafPaths.has(change.field),
       `${label}: projector missing leaf for diff path "${change.field}"; have: ${[...leafPaths].join(', ')}`
     );
+  }
+  // Every attributable leaf must carry a resolvable row key: its backing table must be lineage-keyed
+  // and its rowValues must supply every key column. This catches a projector whose rowValues drift
+  // from LINEAGE_TABLE_KEYS (e.g. a wrong id column), which would otherwise silently resolve to no
+  // row (unavailable/spurious schema-default) with all path-coverage tests still green.
+  for (const leaf of leaves) {
+    if (leaf.column === null) continue;
+    const keyColumns = LINEAGE_TABLE_KEYS[leaf.table];
+    assert(
+      keyColumns,
+      `${label}: leaf "${leaf.fieldPath}" backing table "${leaf.table}" has no LINEAGE_TABLE_KEYS entry`
+    );
+    for (const keyColumn of keyColumns) {
+      assert(
+        keyColumn in leaf.rowValues,
+        `${label}: leaf "${leaf.fieldPath}" rowValues missing key column "${keyColumn}" for table "${leaf.table}"`
+      );
+    }
   }
 }
 

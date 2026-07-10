@@ -396,3 +396,84 @@ Deno.test(
     }
   }
 );
+
+Deno.test('lineage: a key-column rename keeps prior-writer attribution on the renamed entity (AC1/AC4)', async () => {
+  const fixture = await setUp({
+    baseOps: [makeOp({ id: 1, sql: "INSERT INTO custom_formats (name, include_in_rename) VALUES ('Old CF', 0)" })],
+    // Rename the key column: the business key changes from 'Old CF' to 'New CF'.
+    userOps: [
+      makeOp({
+        id: 10,
+        origin: 'user',
+        sql: 'update "custom_formats" set "name" = \'New CF\' where "name" = \'Old CF\'',
+      }),
+    ],
+  });
+  try {
+    const { lineage } = await fixture.run('customFormat', 'New CF');
+    // The rename op established the name.
+    const name = byPath(lineage, 'name');
+    assertEquals(name.sourceKind, 'user-op');
+    assertEquals(name.opId, 10);
+    // A column written BEFORE the rename must still resolve to its original base op (its cell was
+    // migrated to the new key) — never orphaned to unavailable/schema-default.
+    const include = byPath(lineage, 'includeInRename');
+    assertEquals(include.sourceKind, 'base-op');
+    assertEquals(include.opId, 1);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+// ============================================================================
+// AC6 — end-to-end resolution for a per-Arr family (naming) and the metadata profile
+// (whose child tables use divergent type_id / status_id business keys).
+// ============================================================================
+
+Deno.test('lineage: per-Arr radarr naming resolves scalar leaves end-to-end (AC6 arr mapping)', async () => {
+  const fixture = await setUp({
+    baseOps: [
+      makeOp({
+        id: 1,
+        sql: "INSERT INTO radarr_naming (name, movie_format, movie_folder_format) VALUES ('R', 'fmt', 'folder')",
+      }),
+    ],
+  });
+  try {
+    const { lineage } = await fixture.run('naming', 'R', 'radarr');
+    assertEquals(byPath(lineage, 'movieFormat').sourceKind, 'base-op');
+    // colon_replacement_format was not written -> its DEFAULT 'smart' surfaces as schema-default.
+    assertEquals(byPath(lineage, 'colonReplacementFormat').sourceKind, 'schema-default');
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+Deno.test(
+  'lineage: lidarr metadata profile resolves nested type/status arrays end-to-end (AC6 nested + key divergence)',
+  async () => {
+    const fixture = await setUp({
+      baseOps: [
+        makeOp({ id: 1, sql: "INSERT INTO lidarr_metadata_profiles (name, description) VALUES ('MP', 'd')" }),
+        makeOp({
+          id: 2,
+          sql: "INSERT INTO lidarr_metadata_profile_primary_types (metadata_profile_name, type_id, name, allowed) VALUES ('MP', 0, 'Album', 1)",
+        }),
+        makeOp({
+          id: 3,
+          sql: "INSERT INTO lidarr_metadata_profile_release_statuses (metadata_profile_name, status_id, name, allowed) VALUES ('MP', 0, 'Official', 1)",
+        }),
+      ],
+    });
+    try {
+      const { lineage } = await fixture.run('lidarrMetadataProfile', 'MP', 'lidarr');
+      assertEquals(byPath(lineage, 'name').sourceKind, 'base-op');
+      // type_id-keyed child table.
+      assertEquals(byPath(lineage, 'primaryTypes["Album"].allowed').sourceKind, 'base-op');
+      // status_id-keyed child table (the divergent key) resolves its backing row too.
+      assertEquals(byPath(lineage, 'releaseStatuses["Official"].allowed').sourceKind, 'base-op');
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
