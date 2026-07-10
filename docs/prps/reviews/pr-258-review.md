@@ -1,10 +1,10 @@
 # PR Review #258 — feat(canary): persist remaining preview evidence
 
-**Reviewed**: 2026-07-10T20:29:00Z
+**Reviewed**: 2026-07-10T20:39:00Z
 **Mode**: PR
 **Author**: yandy-r
 **Branch**: feat/239-canary-preview-evidence → main
-**Decision**: REQUEST CHANGES
+**Decision**: APPROVE
 
 ## Worktree Setup
 
@@ -12,7 +12,7 @@
 
 ## Summary
 
-The durable availability contract, exact-target checks, safe failure mapping, UI distinction, and regression coverage are strong. Promotion still needs to bind explicit requested sections to each stored preview, and the changed native gate controls should follow the repository's Svelte 5 event-handler convention.
+Re-review of head `bd23999f` confirms both findings are fixed with no new findings. Promotion now binds non-empty explicit section sequences throughout generation, persistence, reads, and authorization while preserving null/empty configured-section semantics; the native gate controls follow the Svelte 5 handler convention.
 
 ## Findings
 
@@ -40,7 +40,7 @@ The durable availability contract, exact-target checks, safe failure mapping, UI
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Type check | Pass — `deno task check` (0 errors, 0 warnings)                                                                                            |
 | Lint       | Pass for changed files; project-wide `tsc` substep reproduces unchanged `settings/about/+page.server.ts:56` baseline failure on clean main |
-| Tests      | Pass — 2,208 passed, 0 failed; focused Canary suites 65 passed                                                                             |
+| Tests      | Pass — 2,213 passed, 0 failed; focused query/coordinator/UI suites 38 passed                                                               |
 | Build      | Pass — `deno task build`                                                                                                                   |
 
 ## Files Reviewed
