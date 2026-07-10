@@ -16,6 +16,7 @@
 import { PCDCache } from '../database/cache.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
+import { createLineageIndex, createLineageObserver, type LineageIndex } from './lineage/lineageIndex.ts';
 
 const SOURCE = 'ResolvedConfigLayers';
 
@@ -78,6 +79,37 @@ export async function withSnapshotCache<T>(
  */
 export async function withCurrentCache<T>(databaseId: number, fn: (cache: PCDCache) => Promise<T>): Promise<T> {
   return withEphemeralCache(databaseId, { layers: ALL_LAYERS, label: 'current' }, fn);
+}
+
+/**
+ * Builds a fresh, read-only, all-layers replay of the CURRENT resolved state with per-op
+ * write capture enabled, then runs `fn` with both the cache and the populated `LineageIndex`.
+ * Same lifecycle guarantees as the other `with*Cache` helpers: never registered via
+ * `setCache`, always closed. Used by the field-lineage engine (issue #231).
+ */
+export async function withInstrumentedCache<T>(
+  databaseId: number,
+  fn: (cache: PCDCache, index: LineageIndex) => Promise<T>
+): Promise<T> {
+  const instance = databaseInstancesQueries.getById(databaseId);
+  if (!instance) {
+    throw new ResolvedConfigDatabaseNotFoundError(databaseId);
+  }
+
+  const cache = new PCDCache(instance.local_path, databaseId);
+  const index = createLineageIndex();
+  const observer = createLineageObserver(index);
+  const startTime = performance.now();
+  try {
+    await cache.buildReadOnly({ layers: ALL_LAYERS }, { onOp: observer });
+    return await fn(cache, index);
+  } finally {
+    cache.close();
+    await logger.debug('withInstrumentedCache: ephemeral instrumented cache closed', {
+      source: SOURCE,
+      meta: { databaseId, timingMs: Math.round(performance.now() - startTime) }
+    });
+  }
 }
 
 /**

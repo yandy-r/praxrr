@@ -12,7 +12,21 @@ import { databaseInstancesQueries, disableDatabaseInstance } from '$db/queries/d
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
-import type { CacheBuildStats, ValidationResult } from '../core/types.ts';
+import type { CacheBuildStats, Operation, ValidationResult } from '../core/types.ts';
+
+/**
+ * Optional per-op hooks for `buildReadOnly`. Used by the field-lineage engine to capture
+ * per-op writes during an ephemeral replay. When omitted, `buildReadOnly` is byte-identical
+ * to its prior behavior — `build()` (the live registered cache) never passes hooks.
+ */
+export interface BuildReadOnlyHooks {
+  onOp?: {
+    /** Runs immediately before `db.exec(op.sql)`. */
+    before(op: Operation, db: Database): void;
+    /** Runs immediately after a successful `db.exec(op.sql)`. Skipped when exec throws. */
+    after(op: Operation, db: Database): void;
+  };
+}
 import { uuid } from '$shared/utils/uuid.ts';
 import { evaluateValueGuardApply, evaluateValueGuardError } from '../migration/valueGuardGate.ts';
 
@@ -304,10 +318,13 @@ export class PCDCache {
    * `close()` when done. It must NEVER be registered via `setCache()` — the cache
    * registry is reserved exclusively for instances produced by `build()`.
    */
-  async buildReadOnly(options: {
-    layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
-    snapshotOpIds?: ReadonlySet<number>;
-  }): Promise<void> {
+  async buildReadOnly(
+    options: {
+      layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
+      snapshotOpIds?: ReadonlySet<number>;
+    },
+    hooks?: BuildReadOnlyHooks
+  ): Promise<void> {
     // 1-2. Create in-memory database, initialize Kysely, and register SQL helper functions
     //      (identical bootstrap to build() step 1-2).
     this.bootstrap();
@@ -324,9 +341,14 @@ export class PCDCache {
     validateOperations(operations);
 
     // 4. Execute operations in order - no value guards, no history writes, no state mutation.
+    //    An optional `onOp` hook wraps each exec to capture per-op writes for field lineage;
+    //    when absent this loop is byte-identical to its prior behavior. `after` runs only when
+    //    exec succeeds, so an op that fails (and is warn-skipped below) establishes nothing.
     for (const operation of operations) {
       try {
+        hooks?.onOp?.before(operation, this.db!);
         this.db!.exec(operation.sql);
+        hooks?.onOp?.after(operation, this.db!);
       } catch (error) {
         if (operation.layer === 'schema') {
           throw new Error(
