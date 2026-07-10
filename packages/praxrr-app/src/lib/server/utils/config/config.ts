@@ -2,7 +2,19 @@
  * Application configuration singleton
  */
 
+import { parseTrustedProxy, type TrustedProxyConfig } from '$shared/security/index.ts';
+import type { CookieSecureMode } from '$shared/security/types.ts';
+
 export type AuthMode = 'on' | 'local' | 'off' | 'oidc';
+
+/**
+ * Parse the `PRAXRR_COOKIE_SECURE` env value into a {@link CookieSecureMode}. Pure and
+ * unit-testable (no `Deno.env` access); invalid/empty/undefined values fall back to `auto`.
+ */
+export function parseCookieSecureMode(raw: string | undefined): CookieSecureMode {
+  const v = (raw ?? 'auto').trim().toLowerCase();
+  return (['auto', 'on', 'off'].includes(v) ? v : 'auto') as CookieSecureMode;
+}
 
 class Config {
   private basePath: string;
@@ -11,6 +23,7 @@ class Config {
   public readonly port: number;
   public readonly host: string;
   public readonly authMode: AuthMode;
+  public readonly cookieSecureMode: CookieSecureMode;
   public readonly validateInstances: boolean;
   public readonly pullOnStart: boolean;
   public readonly mcpEnabled: boolean;
@@ -30,6 +43,9 @@ class Config {
   public readonly webauthnOrigin: string | null;
   public readonly webauthnRpName: string;
   public readonly webauthnChallengeTtlSeconds: number;
+  // Explicit reverse-proxy trust allowlist (issue #228). Never null; unset => { mode: 'unset', … }.
+  // Forwarded request properties (X-Forwarded-For, etc.) are honored only from a peer in this list.
+  public readonly trustedProxy: TrustedProxyConfig;
 
   constructor() {
     // Default base path logic:
@@ -63,6 +79,9 @@ class Config {
     const auth = (Deno.env.get('AUTH') || 'on').toLowerCase();
     this.authMode = ['on', 'local', 'off', 'oidc'].includes(auth) ? (auth as AuthMode) : 'on';
 
+    // Session cookie Secure intent: 'auto' (default), 'on', 'off'. Invalid/unset -> 'auto' (fail-safe).
+    this.cookieSecureMode = parseCookieSecureMode(Deno.env.get('PRAXRR_COOKIE_SECURE'));
+
     const rawValidateInstances = Deno.env.get('PRAXRR_VALIDATE_INSTANCES')?.trim().toLowerCase();
     this.validateInstances = ['1', 'true', 'yes', 'on'].includes(rawValidateInstances || '');
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
@@ -90,6 +109,15 @@ class Config {
     this.webauthnRpName = Deno.env.get('WEBAUTHN_RP_NAME')?.trim() || 'Praxrr';
     const challengeTtl = parseInt(Deno.env.get('WEBAUTHN_CHALLENGE_TTL_SECONDS') || '300', 10);
     this.webauthnChallengeTtlSeconds = Number.isFinite(challengeTtl) && challengeTtl > 0 ? challengeTtl : 300;
+
+    // Trusted-proxy allowlist (issue #228). Parsed once; fail-closed but NON-throwing so a typo cannot
+    // brick boot and Shield Check can still surface the invalid tokens.
+    this.trustedProxy = Config.parseTrustedProxyEnv();
+  }
+
+  /** Parse the TRUSTED_PROXY env var into a structured allowlist. Never throws (malformed => deny trust). */
+  private static parseTrustedProxyEnv(): TrustedProxyConfig {
+    return parseTrustedProxy(Deno.env.get('TRUSTED_PROXY') ?? null);
   }
 
   /**

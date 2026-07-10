@@ -36,6 +36,8 @@ const APP_KEY_AT_REST_WEIGHT = 15;
 const CREDENTIAL_ROTATION_WEIGHT = 15;
 /** Weight the redaction tripwire carries ONLY when it fails; it is weight 0 (excluded) when it passes. */
 const LOG_REDACTION_FAIL_WEIGHT = 25;
+/** Weight `proxy_trust` carries ONLY in the one live-bypass state; it is weight 0 in every other. */
+const PROXY_TRUST_FAIL_WEIGHT = 25;
 
 // --- transport score tiers --------------------------------------------------------------------
 
@@ -136,8 +138,9 @@ export function classifyHost(rawHost: string): HostClass {
 /**
  * Loopback BIND detection for the auth check. The wildcard binds `0.0.0.0` and `::` bind ALL
  * interfaces and are therefore NOT loopback — only `localhost`, `::1`, and `127.0.0.0/8` are.
+ * Exported so the engine's proxy-trust advisory builder shares the same "spoofable context" rule.
  */
-function isLoopbackBindHost(rawHost: string): boolean {
+export function isLoopbackBindHost(rawHost: string): boolean {
   const host = stripBrackets(rawHost.trim().toLowerCase());
   if (host === 'localhost' || host === '::1') return true;
   return isIpv4(host) && Number(host.split('.')[0]) === 127;
@@ -609,6 +612,90 @@ const logRedaction: SecurityCheck = {
   },
 };
 
+// --- proxy_trust (scored ONLY when an operator opened a live X-Forwarded-For bypass) --------------
+
+const ID_PROXY_TRUST: SecurityCheckId = 'proxy_trust';
+const LABEL_PROXY_TRUST = 'Trusted proxy allowlist';
+
+/**
+ * Grades the explicit `TRUSTED_PROXY` allowlist (issue #228). It carries weight in exactly ONE state:
+ * an operator who trusts every peer (`overlyBroad`) while `AUTH=local` on a non-loopback bind, which
+ * re-enables the spoofable X-Forwarded-For local-address bypass. That is the only state that is both
+ * operator-caused AND an observably live auth-decision risk, so it is the only one scored / critical.
+ * Every other state is `null` (excluded from the rollup): the missing / invalid / not-live cases are
+ * surfaced as unscored advisories by the engine (Praxrr cannot observe whether a proxy is in front, so
+ * it must not turn an unset default into a failing grade), and the active-and-valid good state is a
+ * verified assurance. Mirrors the `log_redaction` fail-only-weight idiom.
+ */
+const proxyTrust: SecurityCheck = {
+  id: ID_PROXY_TRUST,
+  label: LABEL_PROXY_TRUST,
+  weight: PROXY_TRUST_FAIL_WEIGHT,
+  score(inputs) {
+    const configured = inputs.trustedProxyConfigured;
+    // The only context where getClientIp drives an auth decision reachable from a non-loopback iface.
+    const spoofableContext = inputs.authMode === 'local' && !isLoopbackBindHost(inputs.bindHost);
+
+    // Row 1 — overly-broad live bypass: the ONE scored, weighted, band-capping state.
+    if (configured && inputs.trustedProxyOverlyBroad && spoofableContext) {
+      return result(
+        ID_PROXY_TRUST,
+        LABEL_PROXY_TRUST,
+        0,
+        PROXY_TRUST_FAIL_WEIGHT,
+        'action',
+        true,
+        'exposed',
+        [
+          'TRUSTED_PROXY trusts every peer (a wildcard, /0, or a supernet ≤ /7) while AUTH=local and Praxrr is bound to a non-loopback interface — it re-enables spoofable X-Forwarded-For trust and reopens the AUTH=local local-address bypass to any remote client.',
+        ],
+        [
+          rec(
+            'Overly broad TRUSTED_PROXY reopens the AUTH=local bypass',
+            [
+              'Any remote client can forge X-Forwarded-For to appear local and skip authentication. Narrow TRUSTED_PROXY to your reverse proxy’s exact address or CIDR, or set AUTH=on so every client authenticates.',
+            ],
+            'danger',
+            { kind: 'env-var', name: 'TRUSTED_PROXY', label: "Narrow TRUSTED_PROXY to the proxy's address" }
+          ),
+        ]
+      );
+    }
+
+    // Row 2 — active & valid: excluded from the score, surfaced as a positive assurance in the engine.
+    if (
+      configured &&
+      inputs.trustedProxyValidRangeCount > 0 &&
+      !inputs.trustedProxyOverlyBroad &&
+      inputs.trustedProxyInvalidEntries.length === 0
+    ) {
+      return result(
+        ID_PROXY_TRUST,
+        LABEL_PROXY_TRUST,
+        null,
+        0,
+        'assured',
+        false,
+        null,
+        [
+          `TRUSTED_PROXY names ${inputs.trustedProxyValidRangeCount} proxy range(s); forwarded client IPs are honored only from those peers, and spoofed headers from any other peer are ignored.`,
+        ],
+        []
+      );
+    }
+
+    // Rows 3–6 — inert here: the state is either advisory-only (rows 3/4/5, built in engine.ts) or a
+    // genuinely-inert direct/loopback deployment (row 6). Either way proxy_trust scores null/na and
+    // shifts no denominator, so AUTH=on and default AUTH=local reports stay numerically unchanged.
+    const detail = configured
+      ? ['TRUSTED_PROXY is set but is not a live auth-bypass risk in this mode; see the advisories for any follow-up.']
+      : [
+          'TRUSTED_PROXY is not set: forwarded headers are ignored and every request is graded by its real socket peer.',
+        ];
+    return result(ID_PROXY_TRUST, LABEL_PROXY_TRUST, null, 0, 'na', false, null, detail, []);
+  },
+};
+
 /** The check registry, in stable display order. Adding a check is one entry here. */
 export const ALL_CHECKS: readonly SecurityCheck[] = [
   controlPlaneAuth,
@@ -616,4 +703,5 @@ export const ALL_CHECKS: readonly SecurityCheck[] = [
   appKeyAtRest,
   credentialRotation,
   logRedaction,
+  proxyTrust,
 ];

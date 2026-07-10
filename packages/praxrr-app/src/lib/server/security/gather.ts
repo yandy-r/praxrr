@@ -19,7 +19,14 @@ import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredential
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
-import type { InstanceFact, PostureInputs, RotationFacts, ShieldArrType } from '$shared/security/index.ts';
+import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
+import type {
+  InstanceFact,
+  PostureInputs,
+  RotationFacts,
+  SessionRequestContext,
+  ShieldArrType,
+} from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
 const STRONG_APP_KEY_MIN_LENGTH = 32;
@@ -104,10 +111,16 @@ function verifyLogRedaction(): boolean {
 }
 
 /** Build the fully-materialized {@link PostureInputs} for the current deployment. Never throws. */
-export function buildPostureInputs(): PostureInputs {
+export function buildPostureInputs(event?: SessionRequestContext): PostureInputs {
   const oidc = gatherOidcState();
   const appKey = gatherAppKeyState();
   const instances = gatherInstances();
+
+  const transport = resolveSessionTransport(event);
+  const cookieSecureMode = config.cookieSecureMode;
+  const cookieSecure = resolveCookieSecure(cookieSecureMode, transport);
+  // Already parsed once at Config construction (fail-closed, non-throwing); never re-parsed here.
+  const trustedProxy = config.trustedProxy;
 
   return {
     authMode: config.authMode,
@@ -120,8 +133,11 @@ export function buildPostureInputs(): PostureInputs {
     instances,
     rotation: gatherRotation(instances),
     redactionVerified: verifyLogRedaction(),
-    // Praxrr sets its session cookie without the Secure flag today; surfaced as an advisory.
-    sessionCookieSecure: false,
+    session: { transport, cookieSecure, cookieSecureMode },
+    trustedProxyConfigured: trustedProxy.mode !== 'unset',
+    trustedProxyValidRangeCount: trustedProxy.ranges.length,
+    trustedProxyInvalidEntries: trustedProxy.invalidEntries,
+    trustedProxyOverlyBroad: trustedProxy.overlyBroad,
     nowIso: new Date().toISOString(),
   };
 }

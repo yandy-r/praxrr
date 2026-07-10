@@ -26,9 +26,9 @@ const VALID_TYPES = ['radarr', 'sonarr', 'lidarr'];
 export const POST: RequestHandler = async (event) => {
   assertSetupInProgress();
 
-  // Note: getClientIp trusts proxy headers (X-Forwarded-For, etc) and is
-  // spoofable without a trusted-proxy allowlist; this is a defense-in-depth
-  // limitation, not a substitute for network-level rate limiting.
+  // getClientIp honors forwarded headers only from a peer in the TRUSTED_PROXY allowlist (issue #228);
+  // an untrusted peer's forged X-Forwarded-For is ignored, so this rate-limit key is the real socket
+  // peer. Still defense-in-depth, not a substitute for network-level rate limiting.
   const clientIp = getClientIp(event);
   if (!registerRateLimitAttempt(clientIp)) {
     return json({ success: false, reason: 'rate_limited' }, { status: 429 });

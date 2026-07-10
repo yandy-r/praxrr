@@ -6,6 +6,9 @@
  * https://github.com/Sonarr/Sonarr/blob/develop/src/NzbDrone.Common/Extensions/IpAddressExtensions.cs
  */
 
+import { config } from '$config';
+import { isTrustedProxyPeer, type TrustedProxyConfig } from '$shared/security/index.ts';
+
 /**
  * Check if an IP address is a local/private network address
  *
@@ -103,34 +106,72 @@ const IP_HEADERS = [
 ];
 
 /**
- * Extract client IP from request
- *
- * Checks common proxy headers in order (like Overseerr's approach),
- * then falls back to SvelteKit's getClientAddress()
+ * Fail-closed sentinel returned when the socket peer cannot be resolved. `isLocalAddress('unknown')` is
+ * false, so an unresolvable peer DENIES the AUTH=local bypass instead of granting it (the old default of
+ * `'127.0.0.1'` did the opposite — its whole failure mode was granting the bypass).
  */
-export function getClientIp(event: { getClientAddress: () => string; request: Request }): string {
-  const headers = event.request.headers;
+const UNKNOWN_PEER = 'unknown';
 
-  // Check proxy headers in order
+/**
+ * Take the RIGHTMOST non-empty comma-separated token — the hop the trusted proxy itself appended (its
+ * observed peer), not the leftmost client-chosen value an attacker can forge. nginx
+ * (`$proxy_add_x_forwarded_for`), Traefik, and Caddy all APPEND the observed client to X-Forwarded-For,
+ * so `X-Forwarded-For: 127.0.0.1, 203.0.113.9` yields `203.0.113.9`, not the spoofed `127.0.0.1`.
+ */
+function rightmostForwarded(headerValue: string): string | null {
+  const parts = headerValue
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts[parts.length - 1] : null;
+}
+
+/**
+ * Extract the client IP from a request, honoring forwarded headers ONLY when the direct socket peer is
+ * an explicitly trusted proxy (`TRUSTED_PROXY`, issue #228).
+ *
+ * Trust is keyed on the DIRECT peer (`event.getClientAddress()`), never on header presence: a forged
+ * `X-Forwarded-For: 127.0.0.1` from an untrusted peer is ignored, closing the AUTH=local spoofing
+ * bypass. When the peer IS trusted, the proxy-appended hop is used (rightmost X-Forwarded-For token),
+ * not the leftmost client-supplied value. Fail-closed: an unresolvable peer returns the non-local
+ * `'unknown'` sentinel.
+ *
+ * OPERATOR CONTRACT: a trusted proxy MUST overwrite or strip every client-supplied forwarded header
+ * Praxrr reads (all of {@link IP_HEADERS}), not merely set one of them. `x-forwarded-for` is consulted
+ * FIRST, and Praxrr cannot tell a proxy-set value from a client-forged one that the proxy passed through
+ * untouched. nginx `$proxy_add_x_forwarded_for` (append) is safe because it appends the real client, so
+ * the rightmost hop wins; a proxy that sets only `X-Real-IP` while forwarding the client's raw
+ * `X-Forwarded-For` reopens the AUTH=local bypass (the forged XFF is returned before X-Real-IP is read).
+ *
+ * NOTE: this also relies on `event.getClientAddress()` returning the real socket peer. `sveltekit-adapter-deno`
+ * does so today; enabling any adapter XFF/address override — or fronting Praxrr with a PROXY-protocol
+ * terminator that rewrites the peer — would silently defeat `TRUSTED_PROXY`.
+ */
+export function getClientIp(
+  event: { getClientAddress: () => string; request: Request },
+  trustedProxy: TrustedProxyConfig = config.trustedProxy
+): string {
+  let directPeer: string;
+  try {
+    directPeer = event.getClientAddress();
+  } catch {
+    return UNKNOWN_PEER; // getClientAddress can throw during prerendering
+  }
+  if (!directPeer || directPeer === 'unknown') return UNKNOWN_PEER;
+
+  // Only an explicitly trusted proxy's forwarded headers are believed; everyone else is graded by the
+  // real socket peer.
+  if (!isTrustedProxyPeer(directPeer, trustedProxy)) return directPeer;
+
+  // Trusted peer: derive the client IP from the hop the proxy appended (rightmost). The single-value
+  // replace-semantics headers (x-real-ip, cf-connecting-ip, …) overwrite their value, so rightmost is a
+  // no-op for them; x-forwarded-for is checked first, so it is authoritative for the mainstream setup.
+  const headers = event.request.headers;
   for (const header of IP_HEADERS) {
     const value = headers.get(header);
-    if (value) {
-      // x-forwarded-for may contain multiple IPs: "client, proxy1, proxy2"
-      const ip = value.split(',')[0].trim();
-      if (ip) return ip;
-    }
+    if (!value) continue;
+    const ip = rightmostForwarded(value);
+    if (ip) return ip;
   }
-
-  // Fall back to SvelteKit's built-in
-  try {
-    const address = event.getClientAddress();
-    if (address && address !== 'unknown') {
-      return address;
-    }
-  } catch {
-    // Can throw during prerendering
-  }
-
-  // Default to loopback
-  return '127.0.0.1';
+  return directPeer;
 }

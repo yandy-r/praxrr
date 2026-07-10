@@ -4188,7 +4188,12 @@ export interface components {
     SecurityShieldBand: 'hardened' | 'guarded' | 'exposed' | 'unknown';
     /** @enum {string} */
     SecurityCheckId:
-      'control_plane_auth' | 'arr_transport' | 'app_key_at_rest' | 'credential_rotation' | 'log_redaction';
+      | 'control_plane_auth'
+      | 'arr_transport'
+      | 'app_key_at_rest'
+      | 'credential_rotation'
+      | 'log_redaction'
+      | 'proxy_trust';
     /** @enum {string} */
     SecurityArrType: 'radarr' | 'sonarr' | 'lidarr';
     /** @enum {string} */
