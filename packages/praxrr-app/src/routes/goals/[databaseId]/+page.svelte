@@ -15,7 +15,7 @@
   type GoalWeights = components['schemas']['GoalWeights'];
   type GoalPreviewResponse = components['schemas']['GoalPreviewResponse'];
   type GoalBinding = components['schemas']['GoalBinding'];
-  type ArrType = 'radarr' | 'sonarr';
+  type ArrType = 'radarr' | 'sonarr' | 'lidarr';
 
   export let data: PageData;
 
@@ -24,7 +24,9 @@
   let engineVersion = '';
 
   let arrType: ArrType = 'radarr';
-  let profileName = data.qualityProfiles[0]?.name ?? '';
+  // Seed the target to a profile the initial Arr app (radarr) can apply to, so a Lidarr-only profile is
+  // never the default target for a Radarr goal.
+  let profileName = data.qualityProfiles.find((profile) => profile.compatibleArrTypes.includes('radarr'))?.name ?? '';
   let presetId = 'balanced';
   let weights: GoalWeights = {
     qualityVsSize: 50,
@@ -44,10 +46,13 @@
   // Sequence guards: only the latest in-flight request may write shared state (out-of-order responses).
   let previewRequestId = 0;
   let bindingRequestId = 0;
+  let presetsRequestId = 0;
 
   $: databaseId = data.currentDatabase.id;
   $: changeCount = preview?.configDiff[0]?.changes.length ?? 0;
   $: bindingStale = binding !== null && binding.engineVersion !== engineVersion;
+  // Only profiles the selected Arr app can apply to (no sibling fallback) are offered as targets (#222).
+  $: compatibleProfiles = data.qualityProfiles.filter((profile) => profile.compatibleArrTypes.includes(arrType));
 
   function onDatabaseChange(event: Event): void {
     const targetId = (event.currentTarget as HTMLSelectElement).value;
@@ -82,9 +87,13 @@
   }
 
   async function loadPresets(): Promise<void> {
-    const response = await fetch('/api/v1/goals/presets');
+    // Sequence guard: rapid Arr switching can race preset fetches — only the latest may write the catalog.
+    const requestId = ++presetsRequestId;
+    const response = await fetch(`/api/v1/goals/presets?arrType=${arrType}`);
+    if (requestId !== presetsRequestId) return;
     if (!response.ok) return;
     const body = (await response.json()) as components['schemas']['GoalPresetsResponse'];
+    if (requestId !== presetsRequestId) return;
     presets = body.presets;
     axes = body.axes;
     engineVersion = body.engineVersion;
@@ -190,6 +199,18 @@
     await runPreview();
   }
 
+  async function onArrChange(): Promise<void> {
+    // Switching Arr app swaps the preset/axis catalog (audio vs video) and rescopes the profile list, so
+    // reselect a compatible profile before reloading presets, the binding, and the preview.
+    const compatible = data.qualityProfiles.filter((profile) => profile.compatibleArrTypes.includes(arrType));
+    if (!compatible.some((profile) => profile.name === profileName)) {
+      profileName = compatible[0]?.name ?? '';
+    }
+    await loadPresets();
+    await loadBinding();
+    await runPreview();
+  }
+
   function presetLabel(id: string): string {
     return presets.find((preset) => preset.id === id)?.label ?? id;
   }
@@ -246,21 +267,27 @@
             class="min-w-48 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             bind:value={profileName}
             on:change={onProfileOrArr}
+            disabled={compatibleProfiles.length === 0}
           >
-            {#each data.qualityProfiles as profile (profile.id)}
+            {#each compatibleProfiles as profile (profile.id)}
               <option value={profile.name}>{profile.name}</option>
             {/each}
           </select>
+          {#if compatibleProfiles.length === 0}
+            <span class="text-xs text-amber-600 dark:text-amber-400">No profiles are compatible with this Arr app.</span
+            >
+          {/if}
         </label>
         <label class="flex flex-col gap-1 text-sm text-neutral-600 dark:text-neutral-400">
           Arr app
           <select
             class="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
             bind:value={arrType}
-            on:change={onProfileOrArr}
+            on:change={onArrChange}
           >
             <option value="radarr">Radarr</option>
             <option value="sonarr">Sonarr</option>
+            <option value="lidarr">Lidarr</option>
           </select>
         </label>
         {#if binding}

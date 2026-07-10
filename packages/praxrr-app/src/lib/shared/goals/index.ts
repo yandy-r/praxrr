@@ -5,10 +5,17 @@
 
 export * from './types.ts';
 export * from './presets.ts';
-export { classifyCustomFormat, detectResolutionLevel, CATEGORY_RULES, FALLBACK_RULE_ID } from './classifier.ts';
+export {
+  classifyCustomFormat,
+  detectResolutionLevel,
+  CATEGORY_RULES,
+  FALLBACK_RULE_ID,
+  EXCLUDED_RULE_ID,
+} from './classifier.ts';
 export type { ResolutionLevel, CfClassification } from './classifier.ts';
 export {
   CATEGORY_POLICY,
+  LIDARR_AUDIO_POLICY,
   UNWANTED_SCORE,
   CEILING_ABOVE_PENALTY,
   CEILING_MATCH_BONUS,
@@ -18,7 +25,7 @@ export {
   computeThresholds,
   signedWeight,
   strictness,
-  ceilingLevel
+  ceilingLevel,
 } from './policy.ts';
 export { computeGoalPlan, diffGoalPlans } from './engine.ts';
 export { buildCeilingLadder, JUNK_QUALITIES, GoalLadderMappingError } from './ladder.ts';

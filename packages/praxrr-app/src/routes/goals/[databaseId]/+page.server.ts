@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
 import { pcdManager } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
+import { computeProfileCompatibility } from '$pcd/entities/qualityProfiles/compatibility.ts';
 
 /**
  * Editor load for `/goals/[databaseId]`. Goals apply to PCD quality profiles only (they generate
@@ -29,9 +30,18 @@ export const load: ServerLoad = async ({ params }) => {
 
   const pcdProfiles = await qualityProfileQueries.select(cache);
 
+  // Per-profile Arr compatibility (enabled-quality basis, no sibling fallback) so the editor can scope
+  // the target dropdown to profiles the selected Arr app can actually apply — including Lidarr (#222).
+  const compatibility = await computeProfileCompatibility(cache);
+  const compatibleArrTypesByName = new Map(compatibility.map((entry) => [entry.name, entry.compatibleArrTypes]));
+
   return {
     databases,
     currentDatabase,
-    qualityProfiles: pcdProfiles.map((profile) => ({ id: profile.id, name: profile.name })),
+    qualityProfiles: pcdProfiles.map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      compatibleArrTypes: compatibleArrTypesByName.get(profile.name) ?? [],
+    })),
   };
 };

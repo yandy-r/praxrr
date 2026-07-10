@@ -106,6 +106,9 @@ GoalPreset:
         - smallest-size
         - balanced
         - 4k-hdr-priority
+        - audio-lossless-priority
+        - audio-balanced
+        - audio-space-saver
     label:
       type: string
     description:
@@ -169,6 +172,7 @@ GoalCfDecision:
       enum:
         - radarr
         - sonarr
+        - lidarr
     category:
       $ref: '#/GoalCategory'
     score:
@@ -239,6 +243,7 @@ GoalPlan:
       enum:
         - radarr
         - sonarr
+        - lidarr
     decisions:
       type: array
       items:
@@ -371,6 +376,7 @@ GoalPreviewRequest:
       enum:
         - radarr
         - sonarr
+        - lidarr
     profileName:
       type: string
       description: Raw PCD quality-profile name (pcd:-stripped)
@@ -420,6 +426,7 @@ GoalApplyRequest:
       enum:
         - radarr
         - sonarr
+        - lidarr
     profileName:
       type: string
     preset:

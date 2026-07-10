@@ -23,11 +23,21 @@ import type { GoalQualityFact, GoalQualityLadder } from './ladder.ts';
  */
 export const GOALS_ENGINE_VERSION = '2';
 
-/** Arr apps the engine can APPLY to in this slice. Lidarr is classified but not applied. */
-export type GoalArrType = 'radarr' | 'sonarr';
+/**
+ * Arr apps the engine can APPLY to. Radarr/Sonarr use the video-domain policy; Lidarr (#222) uses the
+ * audio-domain policy (`LIDARR_AUDIO_POLICY`) reached only when `arrType === 'lidarr'`.
+ */
+export type GoalArrType = 'radarr' | 'sonarr' | 'lidarr';
 
-/** The 4 built-in presets. */
-export type GoalPresetId = 'best-quality' | 'smallest-size' | 'balanced' | '4k-hdr-priority';
+/** Built-in presets: 4 video (radarr/sonarr) + 3 audio (lidarr, #222). */
+export type GoalPresetId =
+  | 'best-quality'
+  | 'smallest-size'
+  | 'balanced'
+  | '4k-hdr-priority'
+  | 'audio-lossless-priority'
+  | 'audio-balanced'
+  | 'audio-space-saver';
 
 /**
  * Closed, versioned set of semantic categories a custom format can be classified into. Adding,
@@ -67,7 +77,7 @@ export const GOAL_CATEGORIES: readonly GoalCategory[] = [
   'streaming_service',
   'movie_version',
   'repack_proper',
-  'resolution'
+  'resolution',
 ] as const;
 
 /** Slider axes. Four are signed weights `[-1, 1]`; `unwantedStrictness` is one-directional `[0, 1]`. */
@@ -112,7 +122,7 @@ export const SLIDER_AXES: readonly GoalAxisMeta[] = [
     max: 100,
     step: 1,
     description:
-      'Favor small, efficient encodes (0) or maximum-fidelity remux/lossless (100). Scales remux, lossless audio, and release-group-tier rewards, and raises the upgrade-until ceiling.'
+      'Favor small, efficient encodes (0) or maximum-fidelity remux/lossless (100). Scales remux, lossless audio, and release-group-tier rewards, and raises the upgrade-until ceiling.',
   },
   {
     key: 'compatibility',
@@ -122,7 +132,7 @@ export const SLIDER_AXES: readonly GoalAxisMeta[] = [
     max: 100,
     step: 1,
     description:
-      'Penalize hardware-demanding formats (Dolby Vision, object-based audio) in favor of widely-playable releases. Higher values steer toward streaming-friendly, broadly-compatible sources.'
+      'Penalize hardware-demanding formats (Dolby Vision, object-based audio) in favor of widely-playable releases. Higher values steer toward streaming-friendly, broadly-compatible sources.',
   },
   {
     key: 'hdrPreference',
@@ -132,7 +142,7 @@ export const SLIDER_AXES: readonly GoalAxisMeta[] = [
     max: 100,
     step: 1,
     description:
-      'How strongly to reward HDR formats (Dolby Vision, HDR10+, HDR10). Has no effect on non-HDR custom formats.'
+      'How strongly to reward HDR formats (Dolby Vision, HDR10+, HDR10). Has no effect on non-HDR custom formats.',
   },
   {
     key: 'unwantedStrictness',
@@ -142,7 +152,7 @@ export const SLIDER_AXES: readonly GoalAxisMeta[] = [
     max: 100,
     step: 1,
     description:
-      'How aggressively to reject unwanted releases. Raises the minimum-score floor so releases that only match penalized (banned) formats are rejected outright.'
+      'How aggressively to reject unwanted releases. Raises the minimum-score floor so releases that only match penalized (banned) formats are rejected outright.',
   },
   {
     key: 'resolutionCeiling',
@@ -150,8 +160,8 @@ export const SLIDER_AXES: readonly GoalAxisMeta[] = [
     kind: 'ceiling',
     options: GOAL_RESOLUTION_CEILINGS,
     description:
-      'The highest resolution you want. Formats above the ceiling are demoted; at/below the ceiling are rewarded. It also reshapes the quality ladder: qualities at/below the ceiling are enabled, qualities above it are disabled, and the cutoff is set to the ceiling.'
-  }
+      'The highest resolution you want. Formats above the ceiling are demoted; at/below the ceiling are rewarded. It also reshapes the quality ladder: qualities at/below the ceiling are enabled, qualities above it are disabled, and the cutoff is set to the ceiling.',
+  },
 ] as const;
 
 /**

@@ -44,6 +44,10 @@
   }
 
   $: sortedDecisions = [...plan.decisions].sort((a, b) => b.score - a.score);
+  // Split the untouched CFs: Lidarr drops video-only formats via an explicit exclusion (a distinct reason
+  // code, #222) — surface that as intentional rather than an unmapped coverage gap.
+  $: videoOnlyExcluded = plan.uncategorized.filter((cf) => cf.reason === 'excluded.video-only-on-lidarr');
+  $: unmappedUncategorized = plan.uncategorized.filter((cf) => cf.reason !== 'excluded.video-only-on-lidarr');
 </script>
 
 <div class="space-y-4">
@@ -188,14 +192,27 @@
       <h3 class="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
         Not scored by this goal ({plan.uncategorized.length})
       </h3>
-      <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
-        These custom formats don't map to a goal category, so their existing scores are left untouched.
-      </p>
-      <div class="flex flex-wrap gap-1.5">
-        {#each plan.uncategorized as cf (cf.name)}
-          <Badge variant="neutral">{cf.name}</Badge>
-        {/each}
-      </div>
+      {#if unmappedUncategorized.length > 0}
+        <p class="mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          These custom formats don't map to a goal category, so their existing scores are left untouched.
+        </p>
+        <div class="flex flex-wrap gap-1.5">
+          {#each unmappedUncategorized as cf (cf.name)}
+            <Badge variant="neutral">{cf.name}</Badge>
+          {/each}
+        </div>
+      {/if}
+      {#if videoOnlyExcluded.length > 0}
+        <p class="mt-3 mb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          Video-only formats (HDR, Remux, resolution, editions) are intentionally excluded from audio goals, so their
+          existing scores are left untouched.
+        </p>
+        <div class="flex flex-wrap gap-1.5">
+          {#each videoOnlyExcluded as cf (cf.name)}
+            <Badge variant="neutral">{cf.name}</Badge>
+          {/each}
+        </div>
+      {/if}
     </Card>
   {/if}
 </div>

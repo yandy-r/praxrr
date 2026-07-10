@@ -79,6 +79,7 @@ import { migration as migration20260714ConfigHealth } from './migrations/2026071
 import { migration as migration20260715CreateCanaryTables } from './migrations/20260715_create_canary_tables.ts';
 import { migration as migration20260716CreateTimelineAnnotations } from './migrations/20260716_create_timeline_annotations.ts';
 import { migration as migration20260717CreateWebauthnTables } from './migrations/20260717_create_webauthn_tables.ts';
+import { migration as migration20260718WidenQualityGoalBindingsArrType } from './migrations/20260718_widen_quality_goal_bindings_arr_type.ts';
 
 export interface Migration {
   version: number;
@@ -387,6 +388,7 @@ export function loadMigrations(): Migration[] {
     migration20260715CreateCanaryTables,
     migration20260716CreateTimelineAnnotations,
     migration20260717CreateWebauthnTables,
+    migration20260718WidenQualityGoalBindingsArrType,
   ];
 
   // Sort by version number

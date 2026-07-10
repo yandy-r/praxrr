@@ -15,7 +15,7 @@ import { materializeQualityFacts } from './materializeQualityFacts.ts';
 import { isProfileCompatibleWithSiblingArr } from './siblingCompat.ts';
 
 function isGoalArrType(value: unknown): value is GoalArrType {
-  return value === 'radarr' || value === 'sonarr';
+  return value === 'radarr' || value === 'sonarr' || value === 'lidarr';
 }
 
 /** Validate and narrow a `GoalWeights` object, throwing a 400 on any bad field. */
@@ -72,7 +72,7 @@ export function parseGoalRequest(candidate: Record<string, unknown>): GoalReques
     throw error(400, 'databaseId must be an integer');
   }
   if (!isGoalArrType(candidate.arrType)) {
-    throw error(400, 'arrType must be one of: radarr, sonarr');
+    throw error(400, 'arrType must be one of: radarr, sonarr, lidarr');
   }
   if (typeof candidate.profileName !== 'string' || candidate.profileName.trim() === '') {
     throw error(400, 'profileName must be a non-empty string');

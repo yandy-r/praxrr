@@ -33,7 +33,7 @@ const DEFAULT_DEPENDENCIES: GoalApplyDependencies = {
  * value-guard conflict (nothing persisted); ambiguous mappings fail as 422 in `buildGoalPlan` before
  * any write. Echoes the persisted config diff (captured pre-persist, matching preview).
  */
-export async function handleGoalApplyRequest(
+export async function _handleGoalApplyRequest(
   request: Request,
   dependencies: GoalApplyDependencies = DEFAULT_DEPENDENCIES
 ): Promise<Response> {
@@ -103,4 +103,4 @@ export async function handleGoalApplyRequest(
   } satisfies GoalApplyResponse);
 }
 
-export const POST: RequestHandler = ({ request }) => handleGoalApplyRequest(request);
+export const POST: RequestHandler = ({ request }) => _handleGoalApplyRequest(request);

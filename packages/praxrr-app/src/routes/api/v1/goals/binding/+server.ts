@@ -21,8 +21,8 @@ export const GET: RequestHandler = ({ url }) => {
   if (profileName === null || profileName.trim() === '') {
     throw error(400, 'profileName query parameter is required');
   }
-  if (arrType !== 'radarr' && arrType !== 'sonarr') {
-    throw error(400, 'arrType query parameter must be one of: radarr, sonarr');
+  if (arrType !== 'radarr' && arrType !== 'sonarr' && arrType !== 'lidarr') {
+    throw error(400, 'arrType query parameter must be one of: radarr, sonarr, lidarr');
   }
 
   const row = qualityGoalBindingQueries.get(databaseId, profileName, arrType);
