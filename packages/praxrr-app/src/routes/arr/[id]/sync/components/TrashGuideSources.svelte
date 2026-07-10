@@ -391,8 +391,17 @@
         return;
       }
 
-      const payload = (await response.json()) as { message?: string };
-      alertStore.add('success', payload.message ?? 'TRaSH source sync queued');
+      const payload = (await response.json()) as {
+        message?: string;
+        view?: { sourceName?: string | null };
+      };
+      const label = payload.view?.sourceName ?? null;
+      alertStore.add(
+        'success',
+        label
+          ? `TRaSH sync queued for "${label}" — open the source to follow the run`
+          : (payload.message ?? 'TRaSH source sync queued')
+      );
       await invalidateAll().catch(() => undefined);
     } catch {
       alertStore.add('error', 'TRaSH sync failed');
@@ -531,8 +540,14 @@
                   {getStatusLabel(source.config)}
                 </Badge>
               </div>
-              <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                Last synced: {formatLastSynced(source.config?.lastSyncedAt ?? null)}
+              <div class="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
+                <span>Last synced: {formatLastSynced(source.config?.lastSyncedAt ?? null)}</span>
+                <a
+                  href={`/databases/trash/${source.sourceId}`}
+                  class="text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  View sync run
+                </a>
               </div>
             </div>
 
