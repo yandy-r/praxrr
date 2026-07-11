@@ -72,6 +72,98 @@ async function copyPathRecursive(sourcePath: string, targetPath: string): Promis
   }
 }
 
+const LOCAL_CLONE_TIMEOUT_MS = 30_000;
+
+async function isGitRepositoryRoot(path: string): Promise<boolean> {
+  const isBare = await execGitSafe(['rev-parse', '--is-bare-repository'], path);
+  if (isBare === 'true') {
+    return true;
+  }
+  if (isBare !== 'false') {
+    return false;
+  }
+
+  const topLevel = await execGitSafe(['rev-parse', '--show-toplevel'], path);
+  if (!topLevel) {
+    return false;
+  }
+
+  const [sourcePath, repositoryRoot] = await Promise.all([Deno.realPath(path), Deno.realPath(topLevel)]);
+  return sourcePath === repositoryRoot;
+}
+
+async function cloneLocalGitRepository(repositoryUrl: string, targetPath: string, branch?: string): Promise<void> {
+  const args = ['clone'];
+  if (branch) {
+    args.push('--branch', branch);
+  }
+  args.push(repositoryUrl, targetPath);
+
+  const child = new Deno.Command('git', {
+    args,
+    stdin: 'null',
+    stdout: 'piped',
+    stderr: 'piped',
+    env: {
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_ASKPASS: 'echo',
+      GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'credential.helper',
+      GIT_CONFIG_VALUE_0: '',
+    },
+  }).spawn();
+
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    try {
+      child.kill();
+    } catch {
+      // Process already exited.
+    }
+  }, LOCAL_CLONE_TIMEOUT_MS);
+
+  try {
+    const { code, stderr } = await child.output();
+    if (timedOut) {
+      throw new Error(`Local Git clone timed out after ${LOCAL_CLONE_TIMEOUT_MS}ms`);
+    }
+    if (code !== 0) {
+      const detail = new TextDecoder().decode(stderr).trim();
+      throw new Error(`Local Git clone failed${detail ? `: ${detail}` : ''}`);
+    }
+  } catch (error) {
+    await Deno.remove(targetPath, { recursive: true }).catch(() => {});
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function warnIgnoredLocalBranch(
+  repositoryUrl: string,
+  localRepositoryPath: string,
+  branch: string
+): Promise<void> {
+  await logger.warn('Ignoring branch selection for non-Git local repository path clone', {
+    source: 'Git',
+    meta: { repositoryUrl, localRepositoryPath, branch },
+  });
+}
+
+async function copyLocalDirectory(
+  repositoryUrl: string,
+  localRepositoryPath: string,
+  targetPath: string,
+  branch?: string
+): Promise<void> {
+  if (branch) {
+    await warnIgnoredLocalBranch(repositoryUrl, localRepositoryPath, branch);
+  }
+  await copyPathRecursive(localRepositoryPath, targetPath);
+}
+
 /**
  * Refresh an existing target directory with files from a local repository path.
  *
@@ -96,7 +188,11 @@ export async function refreshLocalRepositoryClone(repositoryUrl: string, targetP
     // Fresh install path.
   }
 
-  await copyPathRecursive(localRepositoryPath, targetPath);
+  if (await isGitRepositoryRoot(localRepositoryPath)) {
+    await cloneLocalGitRepository(repositoryUrl, targetPath);
+  } else {
+    await copyPathRecursive(localRepositoryPath, targetPath);
+  }
 }
 
 async function parseGitHubErrorResponse(response: Response): Promise<{
@@ -279,18 +375,11 @@ export async function clone(
       throw new Error(`Local repository path does not exist or is not a directory: ${localRepositoryPath}`);
     }
 
-    if (branch) {
-      await logger.warn('Ignoring branch selection for local repository path clone', {
-        source: 'Git',
-        meta: {
-          repositoryUrl,
-          localRepositoryPath,
-          branch,
-        },
-      });
+    if (await isGitRepositoryRoot(localRepositoryPath)) {
+      await cloneLocalGitRepository(repositoryUrl, targetPath, branch);
+    } else {
+      await copyLocalDirectory(repositoryUrl, localRepositoryPath, targetPath, branch);
     }
-
-    await copyPathRecursive(localRepositoryPath, targetPath);
 
     return false;
   }
