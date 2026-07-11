@@ -502,13 +502,11 @@ docs build.
 **Depends on:** P6-T02, P6-T03, P6-T04 and final PR review/fix plus green CI
 evidence.
 
-Replace deferred/low-priority language, record evidence-backed delivery for #2,
-
-# 3, #4, and #5, and check parent #1 only after all child issue checklists, final
-
-PR review findings, fixes, required CI, artifact gates, C# deletion, and
-live-documentation audits are complete. ROADMAP state must reflect evidence, not
-predict it.
+Replace deferred/low-priority language, record evidence-backed delivery for issues
+`#2`, `#3`, `#4`, and `#5`, and check parent `#1` only after all child issue
+checklists, final PR review findings, fixes, required CI, artifact gates, C#
+deletion, and live-documentation audits are complete. ROADMAP state must reflect
+evidence, not predict it.
 
 **Final gate:** active-source/docs/workflow searches show no shipped .NET parser
 dependency; all issue acceptance criteria and PR review findings are resolved;
