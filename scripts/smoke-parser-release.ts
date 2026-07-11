@@ -326,7 +326,14 @@ async function waitForExit(child: Deno.ChildProcess, timeoutMs: number): Promise
 
 async function terminateProcess(child: Deno.ChildProcess, includeTree: boolean): Promise<void> {
   if (Deno.build.os !== 'windows') {
-    child.kill('SIGTERM');
+    try {
+      child.kill('SIGTERM');
+    } catch (error: unknown) {
+      if (includeTree && error instanceof Error && error.message === 'Child process has already terminated') {
+        return;
+      }
+      throw error;
+    }
     return;
   }
   const args = ['/PID', String(child.pid), '/F'];
