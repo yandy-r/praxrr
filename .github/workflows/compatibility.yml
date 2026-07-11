@@ -31,7 +31,9 @@ on:
       - 'packages/praxrr-app/src/tests/**'
       - '.github/workflows/compatibility.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/publish-release.yml'
       - '.github/workflows/docker.yml'
+      - '.github/workflows/parser-container-smoke.yml'
       - 'release-please-config.json'
       - '.release-please-manifest.json'
 
@@ -111,6 +113,8 @@ jobs:
               - '.github/workflows/compatibility.yml'
               - '.github/workflows/docker.yml'
               - '.github/workflows/release.yml'
+              - '.github/workflows/publish-release.yml'
+              - '.github/workflows/parser-container-smoke.yml'
 
   compatibility-contracts:
     needs: detect-changes
@@ -222,6 +226,6 @@ jobs:
   parser-container-image:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.parser_paths == 'true' }}
-    uses: ./.github/workflows/docker.yml
+    uses: ./.github/workflows/parser-container-smoke.yml
     permissions:
       contents: read

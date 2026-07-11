@@ -1,7 +1,6 @@
 name: Docker
 
 on:
-  workflow_call:
   push:
     branches:
       - main
@@ -17,48 +16,15 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ghcr.io/yandy-r
-  DENO_VERSION: '2.5.6'
-  PARSER_BEHAVIOR_VERSION: '2.0.0-go.1'
 
 jobs:
   parser-image-smoke:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/parser-container-smoke.yml
     permissions:
       contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: ${{ env.DENO_VERSION }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build native parser image for smoke
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.parser
-          load: true
-          platforms: linux/amd64
-          tags: ${{ env.IMAGE_BASE }}/praxrr-parser:smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          build-args: |
-            PARSER_VERSION=${{ env.PARSER_BEHAVIOR_VERSION }}
-          cache-from: type=gha,scope=parser-image-smoke
-          cache-to: type=gha,scope=parser-image-smoke,mode=max
-
-      - name: Smoke parser image
-        run: |
-          deno run -A scripts/smoke-parser-container.ts \
-            --image "${IMAGE_BASE}/praxrr-parser:smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --expected-version "${PARSER_BEHAVIOR_VERSION}"
 
   build:
     needs: parser-image-smoke
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

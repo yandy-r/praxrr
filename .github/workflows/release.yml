@@ -8,9 +8,6 @@ on:
         required: false
         type: string
         default: 0.0.0-pr
-  push:
-    tags:
-      - 'app/v*'
 
 permissions:
   contents: read
@@ -269,48 +266,3 @@ jobs:
             dist/${{ steps.archive.outputs.name }}.sha256
             dist/${{ steps.archive.outputs.name }}.spdx.json
             dist/${{ steps.archive.outputs.name }}.provenance.json
-
-  release:
-    needs: [build, compatibility-gate]
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/app/v') }}
-    permissions:
-      contents: write
-      attestations: write
-      id-token: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Verify release checksums
-        shell: bash
-        run: |
-          cd artifacts
-          for checksum in *.sha256; do
-            sha256sum --check "${checksum}"
-          done
-
-      - name: Attest release provenance
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: artifacts/**
-
-      - name: Normalize release version
-        id: release-version
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#app/v}"
-          echo "value=${version}" >>"${GITHUB_OUTPUT}"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ steps.release-version.outputs.value }}
-          generate_release_notes: true
-          files: artifacts/*
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-beta') }}
