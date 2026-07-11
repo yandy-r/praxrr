@@ -43,13 +43,19 @@ function findParserBinary(): string | null {
   return null;
 }
 
-// — Port + health ————————————————————————————————————————————————
+// — Listener + health ————————————————————————————————————————————
 
-async function findFreePort(): Promise<number> {
-  const listener = Deno.listen({ hostname: '127.0.0.1', port: 0 });
-  const port = (listener.addr as Deno.NetAddr).port;
-  listener.close();
-  return port;
+function parserListenerPort(line: string): number | null {
+  try {
+    const entry = JSON.parse(line) as { msg?: unknown; addr?: unknown };
+    if (entry.msg !== 'parser server listening' || typeof entry.addr !== 'string') return null;
+    const match = entry.addr.match(/:(\d+)$/);
+    if (!match) return null;
+    const port = Number(match[1]);
+    return Number.isInteger(port) && port > 0 && port <= 65_535 ? port : null;
+  } catch {
+    return null;
+  }
 }
 
 async function waitForHealth(port: number, timeoutMs: number): Promise<void> {
@@ -59,7 +65,9 @@ async function waitForHealth(port: number, timeoutMs: number): Promise<void> {
       const resp = await fetch(`http://127.0.0.1:${port}/health`, {
         signal: AbortSignal.timeout(2000),
       });
-      if (resp.ok) return;
+      const healthy = resp.ok;
+      await resp.body?.cancel();
+      if (healthy) return;
     } catch {
       // Not ready yet
     }
@@ -70,20 +78,29 @@ async function waitForHealth(port: number, timeoutMs: number): Promise<void> {
 
 // — Output streaming —————————————————————————————————————————————
 
-async function streamOutput(reader: ReadableStreamDefaultReader<Uint8Array>) {
+async function streamOutput(reader: ReadableStreamDefaultReader<Uint8Array>, onLine?: (line: string) => void) {
   const decoder = new TextDecoder();
   const color = '\x1b[33m'; // yellow, same as dev.ts
   const reset = '\x1b[0m';
+  let buffer = '';
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const text = decoder.decode(value);
-      for (const line of text.split('\n')) {
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
         if (line.trim()) {
+          onLine?.(line);
           console.log(`${color}[parser]${reset} ${line}`);
         }
       }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      onLine?.(buffer);
+      console.log(`${color}[parser]${reset} ${buffer}`);
     }
   } catch {
     // Stream closed
@@ -97,11 +114,10 @@ const shouldSpawn = !isDocker() && !Deno.env.get('PARSER_HOST') && parserBinary 
 
 if (shouldSpawn) {
   const binaryPath = parserBinary;
-  const port = await findFreePort();
 
   const cmd = new Deno.Command(binaryPath, {
     env: {
-      PARSER_ADDR: `127.0.0.1:${port}`,
+      PARSER_ADDR: '127.0.0.1:0',
     },
     stdout: 'piped',
     stderr: 'piped',
@@ -120,16 +136,32 @@ if (shouldSpawn) {
     }
   };
 
-  // Stream output in background
-  void streamOutput(process.stdout.getReader());
-  void streamOutput(process.stderr.getReader());
+  let resolveListenerPort: (port: number) => void;
+  const listenerPort = new Promise<number>((resolve) => {
+    resolveListenerPort = resolve;
+  });
 
-  // Set env vars before Config reads them
-  Deno.env.set('PARSER_HOST', '127.0.0.1');
-  Deno.env.set('PARSER_PORT', String(port));
+  // Stream output in background and capture the kernel-assigned listener.
+  void streamOutput(process.stdout.getReader());
+  void streamOutput(process.stderr.getReader(), (line) => {
+    const port = parserListenerPort(line);
+    if (port !== null) resolveListenerPort(port);
+  });
 
   // Wait for parser to be ready
   try {
+    const port = await Promise.race([
+      listenerPort,
+      process.status.then((status) => {
+        throw new Error(`Parser exited before opening its listener (code ${status.code})`);
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Parser did not report its listener within 10000ms')), 10_000)
+      ),
+    ]);
+    // Set env vars before Config reads them.
+    Deno.env.set('PARSER_HOST', '127.0.0.1');
+    Deno.env.set('PARSER_PORT', String(port));
     await waitForHealth(port, 10_000);
     console.log(`\x1b[33m[parser]\x1b[0m Ready on port ${port}`);
   } catch (err) {

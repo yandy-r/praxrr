@@ -199,13 +199,6 @@ async function validateLayout(options: Options): Promise<{ app: string; parser: 
   return { app, parser, digest };
 }
 
-function reserveLoopbackPort(): number {
-  const listener = Deno.listen({ hostname: '127.0.0.1', port: 0 });
-  const port = (listener.addr as Deno.NetAddr).port;
-  listener.close();
-  return port;
-}
-
 async function fetchJSON(url: string, init: RequestInit, timeoutMs: number): Promise<Record<string, unknown>> {
   const response = await fetch(url, {
     ...init,
@@ -415,9 +408,10 @@ async function waitForParserStop(port: number, timeoutMs: number): Promise<void>
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      await fetch(`http://127.0.0.1:${port}/health`, {
+      const response = await fetch(`http://127.0.0.1:${port}/health`, {
         signal: AbortSignal.timeout(300),
       });
+      await response.body?.cancel();
     } catch {
       return;
     }
@@ -442,7 +436,7 @@ async function smokeAdjacentDiscovery(
       APP_BASE_PATH: dataDirectory,
       AUTH: 'off',
       HOST: '127.0.0.1',
-      PORT: String(reserveLoopbackPort()),
+      PORT: '0',
       PARSER_HOST: '',
       PARSER_PORT: '',
     },
