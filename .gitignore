@@ -49,13 +49,6 @@ vite.config.ts.timestamp-*
 .svelte-kit
 /**/$types.ts
 
-# .NET
-bin/
-obj/
-*.user
-*.suo
-.vs/
-
 # Bruno environments (contain API keys)
 bruno/environments/
 

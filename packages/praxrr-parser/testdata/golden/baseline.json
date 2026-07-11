@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "path": "sha256:9f150cfe1a0d14bcf5d0ed089b11dffca3015672736d95733014b13e6b2c4392",
+      "kind": "runtime-oracle",
+      "detail": "Pinned .NET legacy parser image measured with fresh containers."
+    }
+  ],
+  "environment": {
+    "capturedAt": "2026-07-11T00:48:30.749Z",
+    "sourceCommit": "a02b62eac1f69b28f98349f9c2814181be2e122c",
+    "host": {
+      "os": "Linux 6.8.0-134-generic",
+      "architecture": "x86_64",
+      "logicalCpuCount": 20,
+      "totalMemoryBytes": 67142057984
+    },
+    "oracle": {
+      "baseUrl": "http://172.19.0.6:5000",
+      "image": "sha256:9f150cfe1a0d14bcf5d0ed089b11dffca3015672736d95733014b13e6b2c4392",
+      "imageDigest": "sha256:9f150cfe1a0d14bcf5d0ed089b11dffca3015672736d95733014b13e6b2c4392",
+      "os": "linux",
+      "architecture": "amd64",
+      "dotnetRuntime": "8.0.28",
+      "parserVersion": "1.0.0"
+    }
+  },
+  "metrics": [
+    {
+      "id": "startup_health_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [463.408, 484.181],
+        "p50": 463.408,
+        "p95": 484.181,
+        "p99": 484.181
+      },
+      "acceptance": {
+        "relation": "Go startup-to-health p95 must be no slower than this legacy p95.",
+        "threshold": null,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "idle_rss_bytes",
+      "unit": "bytes",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [23792189, 23750246],
+        "p50": 23750246,
+        "p95": 23792189,
+        "p99": 23792189
+      },
+      "acceptance": {
+        "relation": "Go idle RSS must be lower than this legacy p50.",
+        "threshold": null,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "image_size_bytes",
+      "unit": "bytes",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 1,
+        "values": [48401734],
+        "p50": 48401734,
+        "p95": 48401734,
+        "p99": 48401734
+      },
+      "acceptance": {
+        "relation": "Go image size must be lower than this legacy image size.",
+        "threshold": null,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "binary_size_bytes",
+      "unit": "bytes",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 1,
+        "values": [74328],
+        "p50": 74328,
+        "p95": 74328,
+        "p99": 74328
+      },
+      "acceptance": {
+        "relation": "Go adjacent binary must be lower than this legacy launcher binary.",
+        "threshold": null,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "application_payload_bytes",
+      "unit": "bytes",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 1,
+        "values": [217747],
+        "p50": 217747,
+        "p95": 217747,
+        "p99": 217747
+      },
+      "acceptance": {
+        "relation": "Go application payload must be lower than this legacy /app payload.",
+        "threshold": null,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "cold_parse_1_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [376.346, 331.075],
+        "p50": 331.075,
+        "p95": 376.346,
+        "p99": 376.346
+      },
+      "acceptance": {
+        "relation": "Go cold p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "cold_parse_10_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [407.743, 373.712],
+        "p50": 373.712,
+        "p95": 407.743,
+        "p99": 407.743
+      },
+      "acceptance": {
+        "relation": "Go cold p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "cold_parse_50_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [416.091, 489.472],
+        "p50": 416.091,
+        "p95": 489.472,
+        "p99": 489.472
+      },
+      "acceptance": {
+        "relation": "Go cold-50 p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "warm_parse_1_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [1.633, 2.18],
+        "p50": 1.633,
+        "p95": 2.18,
+        "p99": 2.18
+      },
+      "acceptance": {
+        "relation": "Go warm p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "warm_parse_10_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [2.018, 2.326],
+        "p50": 2.018,
+        "p95": 2.326,
+        "p99": 2.326
+      },
+      "acceptance": {
+        "relation": "Go warm p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "warm_parse_50_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [7.1, 15.998],
+        "p50": 7.1,
+        "p95": 15.998,
+        "p99": 15.998
+      },
+      "acceptance": {
+        "relation": "Go warm p95 and p99 must be within 10% of legacy.",
+        "threshold": 1.1,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "health_under_load_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 20,
+        "values": [
+          0.622, 0.583, 0.72, 0.37, 0.272, 0.325, 0.347, 0.323, 0.401, 0.346, 0.65, 0.451, 0.226, 0.397, 0.501, 0.401,
+          0.527, 0.45, 0.569, 0.445
+        ],
+        "p50": 0.401,
+        "p95": 0.65,
+        "p99": 0.72
+      },
+      "acceptance": {
+        "relation": "Go health-under-load p95 must remain below 250ms.",
+        "threshold": 250,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    },
+    {
+      "id": "graceful_shutdown_ms",
+      "unit": "milliseconds",
+      "status": "measured",
+      "sources": [
+        {
+          "path": "praxrr-parser:latest",
+          "kind": "runtime-oracle",
+          "detail": "Pinned legacy Docker image"
+        }
+      ],
+      "samples": {
+        "count": 2,
+        "values": [222.148, 221.618],
+        "p50": 221.618,
+        "p95": 222.148,
+        "p99": 222.148
+      },
+      "acceptance": {
+        "relation": "Go graceful shutdown must complete within 10 seconds.",
+        "threshold": 10000,
+        "state": "legacy-baseline",
+        "reason": "This is the measured legacy comparator; pass/fail is evaluated when the Go candidate is captured."
+      },
+      "pendingReason": null
+    }
+  ]
+}

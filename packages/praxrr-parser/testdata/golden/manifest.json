@@ -1,0 +1,4525 @@
+{
+  "excludedResponseHeaders": [
+    "date",
+    "server",
+    "transfer-encoding"
+  ],
+  "fixtures": [
+    {
+      "category": "batch",
+      "id": "batch-basic-matrix",
+      "notes": "Two texts by three patterns establish the response matrix.",
+      "request": {
+        "body": "{\"texts\":[\"Alpha 1080p\",\"Beta 2160p\"],\"patterns\":[\"alpha\",\"beta\",\"2160p$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"Beta 2160p\":{\"alpha\":false,\"beta\":true,\"2160p$\":true},\"Alpha 1080p\":{\"alpha\":true,\"beta\":false,\"2160p$\":false}}}",
+        "decodedBody": {
+          "results": {
+            "Alpha 1080p": {
+              "2160p$": false,
+              "alpha": true,
+              "beta": false
+            },
+            "Beta 2160p": {
+              "2160p$": true,
+              "alpha": false,
+              "beta": true
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-dotnet-constructs",
+      "notes": "Batch precompilation accepts lookbehind, atomic grouping, and named backreferences.",
+      "request": {
+        "body": "{\"texts\":[\"abc-abc\",\"abc-def\"],\"patterns\":[\"^(?<word>abc)-\\\\k<word>$\",\"^(?>a|ab)c-abc$\",\"(?<=abc-)abc$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"abc-abc\":{\"^(?<word>abc)-\\\\k<word>$\":true,\"^(?>a|ab)c-abc$\":false,\"(?<=abc-)abc$\":true},\"abc-def\":{\"^(?<word>abc)-\\\\k<word>$\":false,\"^(?>a|ab)c-abc$\":false,\"(?<=abc-)abc$\":false}}}",
+        "decodedBody": {
+          "results": {
+            "abc-abc": {
+              "(?<=abc-)abc$": true,
+              "^(?<word>abc)-\\k<word>$": true,
+              "^(?>a|ab)c-abc$": false
+            },
+            "abc-def": {
+              "(?<=abc-)abc$": false,
+              "^(?<word>abc)-\\k<word>$": false,
+              "^(?>a|ab)c-abc$": false
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-duplicate-texts-patterns",
+      "notes": "Duplicate text and pattern strings collapse to unique object keys.",
+      "request": {
+        "body": "{\"texts\":[\"alpha\",\"beta\",\"alpha\"],\"patterns\":[\"^alpha$\",\"^beta$\",\"^alpha$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"alpha\":{\"^alpha$\":true,\"^beta$\":false},\"beta\":{\"^alpha$\":false,\"^beta$\":true}}}",
+        "decodedBody": {
+          "results": {
+            "alpha": {
+              "^alpha$": true,
+              "^beta$": false
+            },
+            "beta": {
+              "^alpha$": false,
+              "^beta$": true
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-empty-patterns",
+      "notes": "An empty pattern list is rejected by endpoint validation.",
+      "request": {
+        "body": "{\"texts\":[\"alpha\"],\"patterns\":[]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one pattern is required\"}",
+        "decodedBody": {
+          "error": "At least one pattern is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-empty-texts",
+      "notes": "An empty text list is rejected by endpoint validation.",
+      "request": {
+        "body": "{\"texts\":[],\"patterns\":[\"a\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one text is required\"}",
+        "decodedBody": {
+          "error": "At least one text is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-invalid-pattern-isolation",
+      "notes": "Invalid precompiled patterns map false for every text while a safe sibling remains live.",
+      "request": {
+        "body": "{\"texts\":[\"safe\",\"other\"],\"patterns\":[\"(\",\"[z-a]\",\"^safe$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"other\":{\"(\":false,\"[z-a]\":false,\"^safe$\":false},\"safe\":{\"(\":false,\"[z-a]\":false,\"^safe$\":true}}}",
+        "decodedBody": {
+          "results": {
+            "other": {
+              "(": false,
+              "[z-a]": false,
+              "^safe$": false
+            },
+            "safe": {
+              "(": false,
+              "[z-a]": false,
+              "^safe$": true
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-null-patterns",
+      "notes": "Null patterns are rejected by endpoint validation.",
+      "request": {
+        "body": "{\"texts\":[\"alpha\"],\"patterns\":null}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one pattern is required\"}",
+        "decodedBody": {
+          "error": "At least one pattern is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-null-texts",
+      "notes": "Null texts are rejected by endpoint validation.",
+      "request": {
+        "body": "{\"texts\":null,\"patterns\":[\"a\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one text is required\"}",
+        "decodedBody": {
+          "error": "At least one text is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "batch",
+      "id": "batch-timeout-cell-isolation",
+      "notes": "Catastrophic cells time out independently from safe pattern and text siblings.",
+      "request": {
+        "body": "{\"texts\":[\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab\",\"safe\"],\"patterns\":[\"^(a+)+$\",\"^a+b$\",\"^safe$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab\":{\"^(a+)+$\":false,\"^a+b$\":true,\"^safe$\":false},\"safe\":{\"^(a+)+$\":false,\"^a+b$\":false,\"^safe$\":true}}}",
+        "decodedBody": {
+          "results": {
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab": {
+              "^(a+)+$": false,
+              "^a+b$": true,
+              "^safe$": false
+            },
+            "safe": {
+              "^(a+)+$": false,
+              "^a+b$": false,
+              "^safe$": true
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-ambiguous-near-miss",
+      "notes": "Ambiguous 04.05.2018 syntax pins legacy rule precedence rather than assuming a culture-specific date.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 04.05.2018 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 04.05.2018 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":true,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": true
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 04.05.2018 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-before-epoch-rejected",
+      "notes": "One day below the lower date boundary is rejected.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 1969-12-31 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 1969-12-31 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 1969-12-31 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-compact-eight-digit",
+      "notes": "Compact yyyyMMdd daily syntax is accepted.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 20180428 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 20180428 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2018-04-28\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2018-04-28",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 20180428 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-day-after-tomorrow-rejected",
+      "notes": "Captured on 2026-07-11 UTC: two days ahead is rejected by the future-date boundary.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 2026-07-13 1080p HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 2026-07-13 1080p HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 2026-07-13 1080p HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-epoch-accepted",
+      "notes": "The inclusive lower date boundary accepts 1970-01-01.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 1970-01-01 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 1970-01-01 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"1970-01-01\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "1970-01-01",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 1970-01-01 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-invalid-calendar-rejected",
+      "notes": "Regex-shaped but invalid February 30 date fails closed during DateTime construction.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 2024-02-30 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 2024-02-30 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 2024-02-30 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-leap-day-accepted",
+      "notes": "Valid leap day is accepted and formatted as yyyy-MM-dd.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 2024-02-29 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 2024-02-29 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2024-02-29\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2024-02-29",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 2024-02-29 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-no-title",
+      "notes": "A date-only release preserves an empty, non-null seriesTitle.",
+      "request": {
+        "body": "{\"title\":\"2026-07-12\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"2026-07-12\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2026-07-12\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2026-07-12",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "2026-07-12",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-swapped-day-month",
+      "notes": "Month value above twelve is swapped with day, yielding 2018-04-13.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 13.04.2018 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 13.04.2018 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2018-04-13\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2018-04-13",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 13.04.2018 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-tomorrow-accepted",
+      "notes": "Captured on 2026-07-11 UTC: exactly tomorrow is accepted by the DateTime.Now plus one day boundary.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 2026-07-12 1080p HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 2026-07-12 1080p HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2026-07-12\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2026-07-12",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 2026-07-12 1080p HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-unambiguous-month-day",
+      "notes": "04.28.2018 is unambiguous and parsed as month-day-year.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 04.28.2018 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 04.28.2018 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2018-04-28\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2018-04-28",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 04.28.2018 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-year-boundary-1999",
+      "notes": "Last day of 1999 pins year-boundary formatting.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 1999-12-31 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 1999-12-31 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"1999-12-31\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "1999-12-31",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 1999-12-31 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "date",
+      "id": "date-year-boundary-2000",
+      "notes": "First day of 2000 pins year-boundary formatting.",
+      "request": {
+        "body": "{\"title\":\"Daily Show 2000-01-01 HDTV-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Daily Show 2000-01-01 HDTV-GROUP\",\"type\":\"series\",\"source\":\"TV\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Daily Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":\"2000-01-01\",\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": "2000-01-01",
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Daily Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "TV",
+          "title": "Daily Show 2000-01-01 HDTV-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-absolute",
+      "notes": "Anime absolute numbering emits one absolute episode and no season episodes.",
+      "request": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012 [1080p] [ABCDEF12].mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012 [1080p] [ABCDEF12].mkv\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"SubsPlease\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[12],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [
+              12
+            ],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 0,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "SubsPlease",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "[SubsPlease] Example Show - 012 [1080p] [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-absolute-decimal",
+      "notes": "Decimal absolute episode marks special and deliberately leaves both episode arrays empty.",
+      "request": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012.5 [1080p] [ABCDEF12].mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012.5 [1080p] [ABCDEF12].mkv\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"SubsPlease\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":true,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Example Show",
+            "special": true
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "SubsPlease",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "[SubsPlease] Example Show - 012.5 [1080p] [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-absolute-range",
+      "notes": "Repeated absolute captures expand inclusively from first to last.",
+      "request": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012 013 014 [1080p] [ABCDEF12].mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - 012 013 014 [1080p] [ABCDEF12].mkv\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"SubsPlease\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[12,13,14],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"MultiEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [
+              12,
+              13,
+              14
+            ],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "MultiEpisode",
+            "seasonNumber": 0,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "SubsPlease",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "[SubsPlease] Example Show - 012 013 014 [1080p] [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-compact-103",
+      "notes": "Compact 103 naming splits season one from episode three.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.103.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.103.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[3],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              3
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.103.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-descending-range-near-miss",
+      "notes": "Descending range rejects the range rule, then a later single-episode rule consumes the first endpoint.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E07-05.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E07-05.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[7],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              7
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E07-05.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-miniseries-word",
+      "notes": "Word-number Part syntax defaults to season one and marks miniseries.",
+      "request": {
+        "body": "{\"title\":\"Example Show Part One 1080p WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example Show Part One 1080p WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[1],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":true,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              1
+            ],
+            "fullSeason": false,
+            "isMiniSeries": true,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example Show Part One 1080p WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-miniseries-xofy",
+      "notes": "XofY miniseries syntax captures X as the episode and defaults to season one.",
+      "request": {
+        "body": "{\"title\":\"Example Show 2of6 1080p WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example Show 2of6 1080p WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[2],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":true,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              2
+            ],
+            "fullSeason": false,
+            "isMiniSeries": true,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example Show 2of6 1080p WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-multi-season",
+      "notes": "Multi-season capture sets first season, isMultiSeason, fullSeason, and SeasonPack.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01-S03.Complete.1080p.BluRay-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01-S03.Complete.1080p.BluRay-GROUP\",\"type\":\"series\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"BRDisk\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":true,\"isPartialSeason\":false,\"isMultiSeason\":true,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SeasonPack\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": true,
+            "isMiniSeries": false,
+            "isMultiSeason": true,
+            "isPartialSeason": false,
+            "releaseType": "SeasonPack",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "BRDisk",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Example.Show.S01-S03.Complete.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-no-title",
+      "notes": "Single SxxExx input without a series title emits an empty seriesTitle rather than null.",
+      "request": {
+        "body": "{\"title\":\"S01E05\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"S01E05\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"\",\"seasonNumber\":1,\"episodeNumbers\":[5],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "S01E05",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-ova",
+      "notes": "Anime OVA branch sets special with Unknown release type.",
+      "request": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - OVA [1080p] [ABCDEF12].mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"[SubsPlease] Example Show - OVA [1080p] [ABCDEF12].mkv\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"SubsPlease\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":true,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Example Show",
+            "special": true
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "SubsPlease",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "[SubsPlease] Example Show - OVA [1080p] [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-partial-season",
+      "notes": "Season part sets isPartialSeason without FullSeason or a public part number.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S03.Part2.1080p.BluRay-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S03.Part2.1080p.BluRay-GROUP\",\"type\":\"series\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":3,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":true,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": true,
+            "releaseType": "Unknown",
+            "seasonNumber": 3,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Example.Show.S03.Part2.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-password-yenc-rejected",
+      "notes": "Password plus yEnc obfuscation causes episode parsing to fail closed.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E01.password.yenc\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E01.password.yenc\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "Example.Show.S01E01.password.yenc",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-range",
+      "notes": "Hyphenated episode endpoints expand to every intervening episode.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05-07.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05-07.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5,6,7],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"MultiEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5,
+              6,
+              7
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "MultiEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05-07.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-repeated-captures",
+      "notes": "Repeated episode named captures expand the inclusive first-to-last range.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05E06E07.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05E06E07.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5,6,7],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"MultiEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5,
+              6,
+              7
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "MultiEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05E06E07.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-repeated-season",
+      "notes": "Repeated SxxExx groups collect episodes from multiple matches.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05.S01E06.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05.S01E06.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5,6],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"MultiEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5,
+              6
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "MultiEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05.S01E06.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-repeated-x",
+      "notes": "Repeated x-style season/episode groups collect multiple episodes.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.1x05.1x06.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.1x05.1x06.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5,6],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"MultiEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5,
+              6
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "MultiEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.1x05.1x06.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-rule-order-season-episode",
+      "notes": "Season 01 Episode 03 is consumed by the earlier season-pack rule, pinning legacy rule order.",
+      "request": {
+        "body": "{\"title\":\"Example Show Season 01 Episode 03 1080p WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example Show Season 01 Episode 03 1080p WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":true,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SeasonPack\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": true,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SeasonPack",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example Show Season 01 Episode 03 1080p WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-season-pack",
+      "notes": "Season-only release sets fullSeason and SeasonPack release type.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S03.1080p.BluRay-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S03.1080p.BluRay-GROUP\",\"type\":\"series\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":3,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":true,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SeasonPack\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": true,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SeasonPack",
+            "seasonNumber": 3,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Example.Show.S03.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-special-pack",
+      "notes": "A full-season match containing Special is rewritten to special and loses SeasonPack release type.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S00.Special.1080p.BluRay-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S00.Special.1080p.BluRay-GROUP\",\"type\":\"series\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":true,\"releaseType\":\"Unknown\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "Unknown",
+            "seasonNumber": 0,
+            "seriesTitle": "Example Show",
+            "special": true
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Example.Show.S00.Special.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-episode-split",
+      "notes": "Split-episode suffix is accepted while the public response exposes the single episode contract.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05a.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05a.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05a.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-language-german-dl",
+      "notes": "German-only DL adds Original after German.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.German.DL.1080p.BluRay-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.German.DL.1080p.BluRay-GROUP\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"German\",\"Original\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "German",
+            "Original"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Film.2020.German.DL.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-language-german-ml",
+      "notes": "German-only ML adds Original and English in legacy order.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.German.ML.1080p.BluRay-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.German.ML.1080p.BluRay-GROUP\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"German\",\"Original\",\"English\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "German",
+            "Original",
+            "English"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Film.2020.German.ML.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-language-order",
+      "notes": "Full-word, case-sensitive, case-insensitive, and Unicode language passes retain stable first-occurrence ordering.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.English.DE.ENG.FRENCH.JAP.KOR.简.1080p.WEB-DL-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.English.DE.ENG.FRENCH.JAP.KOR.简.1080p.WEB-DL-GROUP\",\"type\":\"movie\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"English\",\"German\",\"French\",\"Japanese\",\"Korean\",\"Chinese\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "English",
+            "German",
+            "French",
+            "Japanese",
+            "Korean",
+            "Chinese"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Film.2020.English.DE.ENG.FRENCH.JAP.KOR.简.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-movie-alternative-titles",
+      "notes": "AKA movie parsing preserves the combined and split title order.",
+      "request": {
+        "body": "{\"title\":\"Amelie AKA Le Fabuleux Destin d Amelie 2001 FRENCH 1080p BluRay-QxR\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Amelie AKA Le Fabuleux Destin d Amelie 2001 FRENCH 1080p BluRay-QxR\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"French\"],\"releaseGroup\":\"QxR\",\"movieTitles\":[\"Amelie AKA Le Fabuleux Destin d Amelie\",\"Amelie\",\"Le Fabuleux Destin d Amelie\"],\"year\":2001,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "French"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Amelie AKA Le Fabuleux Destin d Amelie",
+            "Amelie",
+            "Le Fabuleux Destin d Amelie"
+          ],
+          "releaseGroup": "QxR",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Amelie AKA Le Fabuleux Destin d Amelie 2001 FRENCH 1080p BluRay-QxR",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2001
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-movie-anime",
+      "notes": "Anime-bracketed movie branch with subgroup and trailing hash-shaped metadata.",
+      "request": {
+        "body": "{\"title\":\"[Group] Spirited Away 2001 1080p BluRay [ABCDEF12].mkv\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"[Group] Spirited Away 2001 1080p BluRay [ABCDEF12].mkv\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"Group\",\"movieTitles\":[\"Spirited Away\"],\"year\":2001,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Spirited Away"
+          ],
+          "releaseGroup": "Group",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "[Group] Spirited Away 2001 1080p BluRay [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2001
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-movie-hash-rejected",
+      "notes": "MD5-shaped obfuscated movie name is rejected by title parsing while the HTTP response remains successful.",
+      "request": {
+        "body": "{\"title\":\"0123456789abcdef0123456789abcdef.mkv\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"0123456789abcdef0123456789abcdef.mkv\",\"type\":\"movie\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "0123456789abcdef0123456789abcdef.mkv",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-movie-normal",
+      "notes": "Normal movie title, year, quality, and standard release-group branch.",
+      "request": {
+        "body": "{\"title\":\"The.Matrix.1999.1080p.BluRay.x264-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"The.Matrix.1999.1080p.BluRay.x264-GROUP\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"The Matrix\"],\"year\":1999,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "The Matrix"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "The.Matrix.1999.1080p.BluRay.x264-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 1999
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-cam",
+      "notes": "Camera source branch retains independently parsed resolution.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.720p.HDCAM-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.720p.HDCAM-GROUP\",\"type\":\"movie\",\"source\":\"Cam\",\"resolution\":720,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 720,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Cam",
+          "title": "Film.2020.720p.HDCAM-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-dvd",
+      "notes": "DVDRip branch forces DVD source and 480p resolution.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.DVDRip.XviD-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.DVDRip.XviD-GROUP\",\"type\":\"movie\",\"source\":\"DVD\",\"resolution\":480,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 480,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "DVD",
+          "title": "Film.2020.DVDRip.XviD-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-rawhd",
+      "notes": "RawHD early return preserves Unknown source with parsed resolution.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.1080p.HDTV.MPEG-2.RawHD-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.1080p.HDTV.MPEG-2.RawHD-GROUP\",\"type\":\"movie\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"RawHD\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "RawHD",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "Film.2020.1080p.HDTV.MPEG-2.RawHD-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-regional",
+      "notes": "Regional DVD branch forces resolution and modifier.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.R5-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.R5-GROUP\",\"type\":\"movie\",\"source\":\"DVD\",\"resolution\":480,\"modifier\":\"Regional\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "Regional",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 480,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "DVD",
+          "title": "Film.2020.R5-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-repack-proper-real",
+      "notes": "Repeated REAL captures plus REPACK2 and PROPER establish revision precedence and counts.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL.REPACK2.PROPER.REAL.REAL.ENG-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL.REPACK2.PROPER.REAL.REAL.ENG-GROUP\",\"type\":\"movie\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":4,\"real\":2,\"isRepack\":true},\"languages\":[\"English\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "English"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": true,
+            "real": 2,
+            "version": 4
+          },
+          "source": "WebDL",
+          "title": "Film.2020.1080p.WEB-DL.REPACK2.PROPER.REAL.REAL.ENG-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-screener",
+      "notes": "DVD screener branch forces source, resolution, and modifier.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.DVDSCR-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.DVDSCR-GROUP\",\"type\":\"movie\",\"source\":\"DVD\",\"resolution\":480,\"modifier\":\"Screener\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "Screener",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 480,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "DVD",
+          "title": "Film.2020.DVDSCR-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-telecine",
+      "notes": "Telecine source branch.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.720p.HDTC-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.720p.HDTC-GROUP\",\"type\":\"movie\",\"source\":\"Telecine\",\"resolution\":720,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 720,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Telecine",
+          "title": "Film.2020.720p.HDTC-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-telesync",
+      "notes": "Telesync source branch.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.720p.HDTS-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.720p.HDTS-GROUP\",\"type\":\"movie\",\"source\":\"Telesync\",\"resolution\":720,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 720,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Telesync",
+          "title": "Film.2020.720p.HDTS-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-quality-workprint",
+      "notes": "Workprint source branch.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.720p.WORKPRINT-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.720p.WORKPRINT-GROUP\",\"type\":\"movie\",\"source\":\"Workprint\",\"resolution\":720,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 720,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Workprint",
+          "title": "Film.2020.720p.WORKPRINT-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-release-group-episode-rejected",
+      "notes": "Episode-shaped group is rejected while episode parsing still succeeds.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05.1080p.WEB-DL-S01.mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05.1080p.WEB-DL-S01.mkv\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05.1080p.WEB-DL-S01.mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-release-group-exception",
+      "notes": "Known exception group is recognized without a standard dash suffix.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.1080p.BluRay.QxR\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.1080p.BluRay.QxR\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"QxR\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "QxR",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Film.2020.1080p.BluRay.QxR",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-release-group-numeric-rejected",
+      "notes": "Numeric-only standard group is rejected.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL-1234.mkv\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL-1234.mkv\",\"type\":\"movie\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Film.2020.1080p.WEB-DL-1234.mkv",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "domain",
+      "id": "domain-release-group-obfuscation-cleanup",
+      "notes": "Obfuscation suffix cleanup reveals the preceding real release group.",
+      "request": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL-REALGROUP-Obfuscated.mkv\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Film.2020.1080p.WEB-DL-REALGROUP-Obfuscated.mkv\",\"type\":\"movie\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"REALGROUP\",\"movieTitles\":[\"Film\"],\"year\":2020,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Film"
+          ],
+          "releaseGroup": "REALGROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Film.2020.1080p.WEB-DL-REALGROUP-Obfuscated.mkv",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2020
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-array-wrong-shape",
+      "notes": "A top-level array is the wrong request shape.",
+      "request": {
+        "body": "[]",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-batch-null-json",
+      "notes": "Batch route top-level null binding behavior is captured independently.",
+      "request": {
+        "body": "null",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-batch-success",
+      "notes": "POST batch route success establishes all four routes in the transport corpus.",
+      "request": {
+        "body": "{\"texts\":[\"alpha\"],\"patterns\":[\"^alpha$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "{\"results\":{\"alpha\":{\"^alpha$\":true}}}",
+        "decodedBody": {
+          "results": {
+            "alpha": {
+              "^alpha$": true
+            }
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-duplicate-json-properties",
+      "notes": "Duplicate request object properties capture System.Text.Json winner behavior.",
+      "request": {
+        "body": "{\"text\":\"first\",\"text\":\"second\",\"patterns\":[\"^first$\"],\"patterns\":[\"^second$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^second$\":true}}",
+        "decodedBody": {
+          "results": {
+            "^second$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-empty-body",
+      "notes": "Empty JSON request body returns the observed framework response.",
+      "request": {
+        "body": "",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-field-wrong-type",
+      "notes": "A numeric text field cannot bind to the string request property.",
+      "request": {
+        "body": "{\"text\":7,\"patterns\":[\"7\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-get-batch-method",
+      "notes": "Wrong method returns framework 405 and selected Allow header.",
+      "request": {
+        "body": "",
+        "headers": {},
+        "method": "GET",
+        "path": "/match/batch"
+      },
+      "response": {
+        "body": "",
+        "headers": {
+          "allow": "POST"
+        },
+        "status": 405
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-get-match-method",
+      "notes": "Wrong method returns framework 405 and selected Allow header.",
+      "request": {
+        "body": "",
+        "headers": {},
+        "method": "GET",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {
+          "allow": "POST"
+        },
+        "status": 405
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-get-parse-method",
+      "notes": "Wrong method returns framework 405 and selected Allow header.",
+      "request": {
+        "body": "",
+        "headers": {},
+        "method": "GET",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "",
+        "headers": {
+          "allow": "POST"
+        },
+        "status": 405
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-get-unknown-path",
+      "notes": "Unknown GET path returns framework 404.",
+      "request": {
+        "body": "",
+        "headers": {},
+        "method": "GET",
+        "path": "/not-a-parser-route"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 404
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-health-success",
+      "notes": "GET health route and selected content-type header.",
+      "request": {
+        "body": "",
+        "headers": {
+          "accept": "application/json"
+        },
+        "method": "GET",
+        "path": "/health"
+      },
+      "response": {
+        "body": "{\"status\":\"healthy\",\"version\":\"1.0.0\"}",
+        "decodedBody": {
+          "status": "healthy",
+          "version": "1.0.0"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-json-charset-content-type",
+      "notes": "application/json with UTF-8 charset remains accepted.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"alpha\"]}",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"alpha\":true}}",
+        "decodedBody": {
+          "results": {
+            "alpha": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-malformed-json",
+      "notes": "Malformed JSON returns the observed framework response.",
+      "request": {
+        "body": "{\"text\":",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-match-success",
+      "notes": "POST match route with selected request and response headers.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"^alpha$\"]}",
+        "headers": {
+          "accept": "text/plain",
+          "content-type": "application/json",
+          "x-oracle-probe": "selected-headers"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^alpha$\":true}}",
+        "decodedBody": {
+          "results": {
+            "^alpha$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-no-content-type",
+      "notes": "A body without Content-Type returns the observed media-type response.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"alpha\"]}",
+        "headers": {},
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 415
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-null-json",
+      "notes": "A top-level JSON null cannot bind the required request parameter.",
+      "request": {
+        "body": "null",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-parse-malformed-json",
+      "notes": "Parse route malformed-body behavior is captured independently.",
+      "request": {
+        "body": "{",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-parse-success",
+      "notes": "POST parse route success establishes all four routes in the transport corpus.",
+      "request": {
+        "body": "{\"title\":\"Example.Movie.2024.1080p.WEB-DL-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Movie.2024.1080p.WEB-DL-GROUP\",\"type\":\"movie\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Example Movie\"],\"year\":2024,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Example Movie"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Movie.2024.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2024
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-pattern-element-wrong-type",
+      "notes": "A numeric pattern element cannot bind to a string list.",
+      "request": {
+        "body": "{\"text\":\"7\",\"patterns\":[7]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-post-health-method",
+      "notes": "Wrong method returns framework 405 and selected Allow header.",
+      "request": {
+        "body": "{}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/health"
+      },
+      "response": {
+        "body": "",
+        "headers": {
+          "allow": "GET"
+        },
+        "status": 405
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-post-near-miss-path",
+      "notes": "Near-miss POST path returns framework 404 rather than prefix routing.",
+      "request": {
+        "body": "{}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match/extra"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 404
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-text-plain-content-type",
+      "notes": "A JSON body labeled text/plain returns the observed media-type response.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"alpha\"]}",
+        "headers": {
+          "content-type": "text/plain"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 415
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-trailing-json",
+      "notes": "A second top-level JSON value is rejected as trailing JSON.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"alpha\"]} {}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "",
+        "headers": {},
+        "status": 400
+      }
+    },
+    {
+      "category": "http",
+      "id": "http-vendor-json-content-type",
+      "notes": "Structured +json media type acceptance is captured from ASP.NET.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"alpha\"]}",
+        "headers": {
+          "content-type": "application/vnd.praxrr+json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"alpha\":true}}",
+        "decodedBody": {
+          "results": {
+            "alpha": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-basic-ignore-case",
+      "notes": "Case-insensitive true/false baseline and result keys.",
+      "request": {
+        "body": "{\"text\":\"AbC-123\",\"patterns\":[\"abc\",\"^abc$\",\"\\\\d{3}$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"abc\":true,\"^abc$\":false,\"\\\\d{3}$\":true}}",
+        "decodedBody": {
+          "results": {
+            "\\d{3}$": true,
+            "^abc$": false,
+            "abc": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-dotnet-atomic-group",
+      "notes": "Atomic grouping prevents fallback while the non-atomic sibling matches.",
+      "request": {
+        "body": "{\"text\":\"abc\",\"patterns\":[\"^(?>a|ab)c$\",\"^(?:a|ab)c$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^(?>a|ab)c$\":false,\"^(?:a|ab)c$\":true}}",
+        "decodedBody": {
+          "results": {
+            "^(?:a|ab)c$": true,
+            "^(?>a|ab)c$": false
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-dotnet-balancing-group",
+      "notes": "Balancing groups and conditionals are required .NET-only constructs.",
+      "request": {
+        "body": "{\"text\":\"oocc\",\"patterns\":[\"^(?<open>o)+(?<-open>c)+(?(open)(?!))$\",\"^(?<open>o)+(?<-open>c)$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^(?<open>o)+(?<-open>c)+(?(open)(?!))$\":true,\"^(?<open>o)+(?<-open>c)$\":false}}",
+        "decodedBody": {
+          "results": {
+            "^(?<open>o)+(?<-open>c)$": false,
+            "^(?<open>o)+(?<-open>c)+(?(open)(?!))$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-dotnet-lookbehind",
+      "notes": "Positive and negative lookbehind are required .NET constructs unsupported by Go regexp.",
+      "request": {
+        "body": "{\"text\":\"prefix-123 suffix-456\",\"patterns\":[\"(?<=prefix-)\\\\d+\",\"(?<!prefix-)456\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"(?<=prefix-)\\\\d+\":true,\"(?<!prefix-)456\":true}}",
+        "decodedBody": {
+          "results": {
+            "(?<!prefix-)456": true,
+            "(?<=prefix-)\\d+": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-dotnet-named-backreference",
+      "notes": "Named capture and named backreference preserve .NET syntax.",
+      "request": {
+        "body": "{\"text\":\"abc-abc\",\"patterns\":[\"^(?<word>abc)-\\\\k<word>$\",\"^(?<word>abc)-def$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^(?<word>abc)-\\\\k<word>$\":true,\"^(?<word>abc)-def$\":false}}",
+        "decodedBody": {
+          "results": {
+            "^(?<word>abc)-\\k<word>$": true,
+            "^(?<word>abc)-def$": false
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-duplicate-patterns",
+      "notes": "Duplicate pattern strings collapse to one response object key.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[\"^alpha$\",\"^alpha$\",\"alpha\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^alpha$\":true,\"alpha\":true}}",
+        "decodedBody": {
+          "results": {
+            "^alpha$": true,
+            "alpha": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-empty-patterns",
+      "notes": "An empty pattern list is rejected by endpoint validation.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":[]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one pattern is required\"}",
+        "decodedBody": {
+          "error": "At least one pattern is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-empty-text",
+      "notes": "Empty text is rejected by endpoint validation.",
+      "request": {
+        "body": "{\"text\":\"\",\"patterns\":[\"a\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"error\":\"Text is required\"}",
+        "decodedBody": {
+          "error": "Text is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-inline-options",
+      "notes": "Inline ignore-case and multiline option behavior.",
+      "request": {
+        "body": "{\"text\":\"first\\nSECOND\",\"patterns\":[\"(?im)^second$\",\"(?-i:SECOND)$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"(?im)^second$\":true,\"(?-i:SECOND)$\":true}}",
+        "decodedBody": {
+          "results": {
+            "(?-i:SECOND)$": true,
+            "(?im)^second$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-invalid-pattern-isolation",
+      "notes": "Multiple compile failures return false without preventing a safe sibling.",
+      "request": {
+        "body": "{\"text\":\"safe\",\"patterns\":[\"(\",\"[z-a]\",\"*\",\"^safe$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"(\":false,\"[z-a]\":false,\"*\":false,\"^safe$\":true}}",
+        "decodedBody": {
+          "results": {
+            "(": false,
+            "*": false,
+            "[z-a]": false,
+            "^safe$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-null-patterns",
+      "notes": "Null patterns are rejected by endpoint validation.",
+      "request": {
+        "body": "{\"text\":\"alpha\",\"patterns\":null}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"error\":\"At least one pattern is required\"}",
+        "decodedBody": {
+          "error": "At least one pattern is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-timeout-first-isolation",
+      "notes": "Catastrophic first pattern times out at 100 ms while later siblings are evaluated.",
+      "request": {
+        "body": "{\"text\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab\",\"patterns\":[\"^(a+)+$\",\"^a+b$\",\"^never$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^(a+)+$\":false,\"^a+b$\":true,\"^never$\":false}}",
+        "decodedBody": {
+          "results": {
+            "^(a+)+$": false,
+            "^a+b$": true,
+            "^never$": false
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-timeout-middle-isolation",
+      "notes": "Catastrophic middle pattern does not overwrite successful siblings.",
+      "request": {
+        "body": "{\"text\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab\",\"patterns\":[\"^a+b$\",\"^(a+)+$\",\"b$\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"results\":{\"^a+b$\":true,\"^(a+)+$\":false,\"b$\":true}}",
+        "decodedBody": {
+          "results": {
+            "^(a+)+$": false,
+            "^a+b$": true,
+            "b$": true
+          }
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "match",
+      "id": "match-whitespace-text",
+      "notes": "Whitespace-only text is rejected by string.IsNullOrWhiteSpace.",
+      "request": {
+        "body": "{\"text\":\" \\t\\r\\n\",\"patterns\":[\"a\"]}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/match"
+      },
+      "response": {
+        "body": "{\"error\":\"Text is required\"}",
+        "decodedBody": {
+          "error": "Text is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-movie-all-fields",
+      "notes": "Movie success populates source, resolution, revision, languages, group, title, year, edition, identifiers, hardcoded subs, and movie-only defaults.",
+      "request": {
+        "body": "{\"title\":\"Blade.Runner.1982.Final.Cut.Remastered.2160p.UHD.BluRay.REMUX.HC.ENG.FRA.tt0083658.tmdbid-78-GROUP.mkv\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Blade.Runner.1982.Final.Cut.Remastered.2160p.UHD.BluRay.REMUX.HC.ENG.FRA.tt0083658.tmdbid-78-GROUP.mkv\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":2160,\"modifier\":\"Remux\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"English\",\"French\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Blade Runner\"],\"year\":1982,\"edition\":\"Final Cut Remastered\",\"imdbId\":\"tt0083658\",\"tmdbId\":78,\"hardcodedSubs\":\"Generic Hardcoded Subs\",\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": "Final Cut Remastered",
+          "episode": null,
+          "hardcodedSubs": "Generic Hardcoded Subs",
+          "imdbId": "tt0083658",
+          "languages": [
+            "English",
+            "French"
+          ],
+          "modifier": "Remux",
+          "movieTitles": [
+            "Blade Runner"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 2160,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Blade.Runner.1982.Final.Cut.Remastered.2160p.UHD.BluRay.REMUX.HC.ENG.FRA.tt0083658.tmdbid-78-GROUP.mkv",
+          "tmdbId": 78,
+          "type": "movie",
+          "year": 1982
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-movie-defaults",
+      "notes": "Movie domain miss emits every outer response field with zero, empty, and null defaults.",
+      "request": {
+        "body": "{\"title\":\"Unparseable Title\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Unparseable Title\",\"type\":\"movie\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "Unparseable Title",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-series-all-fields",
+      "notes": "Series success populates every episode response field and series-only outer defaults.",
+      "request": {
+        "body": "{\"title\":\"Example.Show.S01E05.1080p.WEB-DL.DDP5.1.H.264-GROUP.mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Example.Show.S01E05.1080p.WEB-DL.DDP5.1.H.264-GROUP.mkv\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"Example Show\",\"seasonNumber\":1,\"episodeNumbers\":[5],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "Example Show",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "Example.Show.S01E05.1080p.WEB-DL.DDP5.1.H.264-GROUP.mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-series-defaults",
+      "notes": "Series domain miss emits every outer response field and a null episode.",
+      "request": {
+        "body": "{\"title\":\"Unparseable Title\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Unparseable Title\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "Unparseable Title",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-validation-case-sensitive-type",
+      "notes": "Type matching is case-sensitive; capitalized Movie is a near miss.",
+      "request": {
+        "body": "{\"title\":\"Film.2020\",\"type\":\"Movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"error\":\"Type is required and must be 'movie' or 'series'\"}",
+        "decodedBody": {
+          "error": "Type is required and must be 'movie' or 'series'"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-validation-empty-title",
+      "notes": "Whitespace-only title is rejected before type validation.",
+      "request": {
+        "body": "{\"title\":\"   \",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"error\":\"Title is required\"}",
+        "decodedBody": {
+          "error": "Title is required"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-validation-invalid-type",
+      "notes": "Unsupported type is rejected without domain parsing.",
+      "request": {
+        "body": "{\"title\":\"Film.2020\",\"type\":\"music\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"error\":\"Type is required and must be 'movie' or 'series'\"}",
+        "decodedBody": {
+          "error": "Type is required and must be 'movie' or 'series'"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "parse",
+      "id": "parse-validation-missing-type",
+      "notes": "Null type uses the endpoint's exact validation error.",
+      "request": {
+        "body": "{\"title\":\"Film.2020\",\"type\":null}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"error\":\"Type is required and must be 'movie' or 'series'\"}",
+        "decodedBody": {
+          "error": "Type is required and must be 'movie' or 'series'"
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 400
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-accented-movie",
+      "notes": "Accented Latin movie title and French language marker survive invariant-culture parsing.",
+      "request": {
+        "body": "{\"title\":\"Amélie.2001.FRENCH.1080p.BluRay-GROUP\",\"type\":\"movie\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"Amélie.2001.FRENCH.1080p.BluRay-GROUP\",\"type\":\"movie\",\"source\":\"Bluray\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"French\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[\"Amélie\"],\"year\":2001,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "French"
+          ],
+          "modifier": "None",
+          "movieTitles": [
+            "Amélie"
+          ],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Bluray",
+          "title": "Amélie.2001.FRENCH.1080p.BluRay-GROUP",
+          "tmdbId": 0,
+          "type": "movie",
+          "year": 2001
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-cjk-series",
+      "notes": "CJK series title survives cleanup and parsing; non-ASCII suffix is not treated as an ASCII release group.",
+      "request": {
+        "body": "{\"title\":\"進撃の巨人.S01E05.1080p.WEB-DL-組\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"進撃の巨人.S01E05.1080p.WEB-DL-組\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"進撃の巨人\",\"seasonNumber\":1,\"episodeNumbers\":[5],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              5
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "進撃の巨人",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "進撃の巨人.S01E05.1080p.WEB-DL-組",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-fullwidth-brackets",
+      "notes": "Fullwidth CJK brackets normalize for absolute anime parsing and Chinese language detection.",
+      "request": {
+        "body": "{\"title\":\"【字幕組】 作品名 - 012 [1080p] [ABCDEF12].mkv\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"【字幕組】 作品名 - 012 [1080p] [ABCDEF12].mkv\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Chinese\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"作品名\",\"seasonNumber\":0,\"episodeNumbers\":[],\"absoluteEpisodeNumbers\":[12],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [
+              12
+            ],
+            "airDate": null,
+            "episodeNumbers": [],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 0,
+            "seriesTitle": "作品名",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Chinese"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "【字幕組】 作品名 - 012 [1080p] [ABCDEF12].mkv",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-supplementary-emoji-title",
+      "notes": "Supplementary-plane emoji before SxxExx pins the legacy UTF-16 cleanup outcome.",
+      "request": {
+        "body": "{\"title\":\"😀.S01E01.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"\\uD83D\\uDE00.S01E01.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"\\uFFFD\",\"seasonNumber\":1,\"episodeNumbers\":[1],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              1
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "�",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "😀.S01E01.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-symbols-only-rejected",
+      "notes": "A title containing only supplementary symbols has no letter or digit and episode parsing fails closed.",
+      "request": {
+        "body": "{\"title\":\"😀💥\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"\\uD83D\\uDE00\\uD83D\\uDCA5\",\"type\":\"series\",\"source\":\"Unknown\",\"resolution\":0,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":null,\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":null}",
+        "decodedBody": {
+          "edition": null,
+          "episode": null,
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": null,
+          "releaseHash": null,
+          "resolution": 0,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "Unknown",
+          "title": "😀💥",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    },
+    {
+      "category": "unicode",
+      "id": "unicode-turkish-i",
+      "notes": "Turkish dotted/dotless I variants are pinned under invariant globalization and C.UTF-8 culture.",
+      "request": {
+        "body": "{\"title\":\"İstanbul.IĞDIR.ışık.S01E01.1080p.WEB-DL-GROUP\",\"type\":\"series\"}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "method": "POST",
+        "path": "/parse"
+      },
+      "response": {
+        "body": "{\"title\":\"İstanbul.IĞDIR.ışık.S01E01.1080p.WEB-DL-GROUP\",\"type\":\"series\",\"source\":\"WebDL\",\"resolution\":1080,\"modifier\":\"None\",\"revision\":{\"version\":1,\"real\":0,\"isRepack\":false},\"languages\":[\"Unknown\"],\"releaseGroup\":\"GROUP\",\"movieTitles\":[],\"year\":0,\"edition\":null,\"imdbId\":null,\"tmdbId\":0,\"hardcodedSubs\":null,\"releaseHash\":null,\"episode\":{\"seriesTitle\":\"İstanbul IĞDIR ışık\",\"seasonNumber\":1,\"episodeNumbers\":[1],\"absoluteEpisodeNumbers\":[],\"airDate\":null,\"fullSeason\":false,\"isPartialSeason\":false,\"isMultiSeason\":false,\"isMiniSeries\":false,\"special\":false,\"releaseType\":\"SingleEpisode\"}}",
+        "decodedBody": {
+          "edition": null,
+          "episode": {
+            "absoluteEpisodeNumbers": [],
+            "airDate": null,
+            "episodeNumbers": [
+              1
+            ],
+            "fullSeason": false,
+            "isMiniSeries": false,
+            "isMultiSeason": false,
+            "isPartialSeason": false,
+            "releaseType": "SingleEpisode",
+            "seasonNumber": 1,
+            "seriesTitle": "İstanbul IĞDIR ışık",
+            "special": false
+          },
+          "hardcodedSubs": null,
+          "imdbId": null,
+          "languages": [
+            "Unknown"
+          ],
+          "modifier": "None",
+          "movieTitles": [],
+          "releaseGroup": "GROUP",
+          "releaseHash": null,
+          "resolution": 1080,
+          "revision": {
+            "isRepack": false,
+            "real": 0,
+            "version": 1
+          },
+          "source": "WebDL",
+          "title": "İstanbul.IĞDIR.ışık.S01E01.1080p.WEB-DL-GROUP",
+          "tmdbId": 0,
+          "type": "series",
+          "year": 0
+        },
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "oracle": {
+    "configuration": "Parser 1.0.0; ASPNETCORE_ENVIRONMENT=Production; ASPNETCORE_URLS=http://+:5000; DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true",
+    "container": "praxrr-parser@sha256:9f150cfe1a0d14bcf5d0ed089b11dffca3015672736d95733014b13e6b2c4392",
+    "culture": "C.UTF-8",
+    "dotnetRuntime": "Microsoft.AspNetCore.App 8.0.28; Microsoft.NETCore.App 8.0.28",
+    "globalizationMode": "invariant",
+    "invocation": "docker container parser-dev; entrypoint [\"dotnet\",\"Parser.dll\"]; ASPNETCORE_URLS=http://+:5000",
+    "os": "linux-musl-x64",
+    "sourceCommit": "a02b62eac1f69b28f98349f9c2814181be2e122c",
+    "timeZone": "UTC"
+  },
+  "schemaVersion": 1,
+  "selectedResponseHeaders": [
+    "allow",
+    "content-type"
+  ]
+}
