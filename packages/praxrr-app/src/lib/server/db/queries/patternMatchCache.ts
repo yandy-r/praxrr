@@ -1,5 +1,18 @@
 import { db } from '../db.ts';
 
+const PATTERN_MATCH_CACHE_NAMESPACE_VERSION = 'v1';
+
+/**
+ * Build the persisted namespace for a pattern set and parser behavior version.
+ *
+ * The table predates behavior-versioned parsers, so the namespace is stored in
+ * its existing patterns_hash key. Encoding the version keeps separators
+ * unambiguous while preserving the database schema and rollback compatibility.
+ */
+export function getPatternMatchCacheNamespace(parserVersion: string, patternsHash: string): string {
+  return `${PATTERN_MATCH_CACHE_NAMESPACE_VERSION}:${encodeURIComponent(parserVersion)}:${patternsHash}`;
+}
+
 /**
  * Types for pattern_match_cache table
  */

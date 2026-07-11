@@ -149,7 +149,7 @@ const DEFAULT_DEPENDENCIES: ConfigHealthTrendServiceDependencies = {
     configHealthSnapshotsQueries.listTrendProfileNames(instanceId, arrType, options),
   hasArrTypeMismatch: (instanceId, arrType) =>
     configHealthSnapshotsQueries.hasTrendArrTypeMismatch(instanceId, arrType),
-  now: Date.now,
+  now: () => Date.now(),
   currentEngineVersion: CONFIG_HEALTH_ENGINE_VERSION,
 };
 

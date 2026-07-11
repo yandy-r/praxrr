@@ -9,6 +9,7 @@ export {
   parseQuality,
   isParserHealthy,
   getParserVersion,
+  refreshParserVersion,
   clearParserVersionCache,
   parseWithCache,
   parseWithCacheBatch,

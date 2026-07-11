@@ -22,7 +22,7 @@ exported when publishing.
 - **DB:** SQLite (app DB) + in‑memory cache for compiled PCD state
 - **Query layer:** Kysely
 - **UI:** Tailwind CSS
-- **Parser:** C# microservice (optional for CF/profile testing)
+- **Parser:** Go microservice (optional for CF/profile testing)
 - **SCM:** Git (PCD repos + export flow)
 
 ## 2) Glossary
@@ -46,8 +46,8 @@ exported when publishing.
 - **Compile** — Building an in‑memory cache by replaying all ops in order.
 - **Exporter** — Process that materializes base ops into repo files and pushes to
   Git.
-- **Parser service** — C# microservice that parses release titles for CF/
-  profile testing.
+- **Parser service** — Go microservice that parses release titles and evaluates
+  .NET-compatible regex patterns for CF/profile testing.
 - **Entity testing** — Quality profile evaluation against test entities and
   releases (TMDB + parsed titles).
 
@@ -84,7 +84,7 @@ Top‑level layout and where each subsystem lives.
 
 **Services**
 
-- `packages/praxrr-parser/` — C# parser microservice
+- `packages/praxrr-parser/` — Go parser microservice, wire contract, and parity corpus
 
 **Docs**
 
@@ -118,8 +118,9 @@ order. This cache powers reads and validation. It is rebuilt after each write.
 ### Parser Cache
 
 Parser/evaluation results are cached in SQLite to avoid re‑parsing release
-titles and re‑evaluating conditions. Cache keys include parser version and
-pattern hash.
+titles and re‑evaluating conditions. The `/health` behavior version namespaces
+parsed-release entries and combines with the pattern hash to namespace pattern
+matches, preventing incompatible reuse across upgrades and rollbacks.
 
 ### Arr Credential Storage (Encrypted at Rest)
 
@@ -399,29 +400,44 @@ isolated from non-Lidarr Arr runtime paths:
 
 ## 8) Parser Service
 
-Praxrr uses a C# parser microservice to extract structured metadata from
-release titles (resolution, source, flags, languages, release group, etc.). This
-powers custom format matching and quality profile testing.
+Praxrr uses a Go parser microservice to extract structured metadata from release
+titles (resolution, source, flags, languages, release group, etc.) and evaluate
+caller-supplied patterns. This powers custom format matching and quality profile
+testing while preserving the previous wire and parsing behavior.
 
 **Location:** `packages/praxrr-parser/`
 
 **Key pieces:**
 
-- Parsers and models in `packages/praxrr-parser/Parsers` and `Models`
-- API endpoints in `packages/praxrr-parser/Endpoints`
+- Process entry point and graceful lifecycle in `packages/praxrr-parser/cmd/praxrr-parser/`
+- Four-route HTTP adapter in `packages/praxrr-parser/internal/httpserver/`
+- Exact JSON DTOs and enum values in `packages/praxrr-parser/internal/contract/`
+- Domain parsing, finite limits, bounded workers, and regex boundary in
+  `packages/praxrr-parser/internal/parser/`
+- Captured legacy-oracle requests/responses and measured limits in
+  `packages/praxrr-parser/testdata/golden/`
+- Corpus loading, differential, adversarial, and performance gates in
+  `packages/praxrr-parser/internal/parity/`
 
 **Client & cache:**
 
 - Client lives under `packages/praxrr-app/src/lib/server/utils/arr/parser/`
-- Results are cached in SQLite with keys that include parser version
+- Parsed-release and pattern-match results are cached in SQLite under the last
+  successfully observed `/health` behavior version
+- A failed health refresh may read the last proven cache namespace, but it does
+  not write misses under a potentially stale version
 
 **Why separate service?**
 
 - Keeps heavy parsing logic out of the web server
-- Mirrors Arr parsing behavior more closely (via .NET regex)
+- Keeps the public regex promise: caller patterns use .NET-compatible syntax via
+  `regexp2`, with finite time, stack, request, and work limits
 
-This service is optional in dev; features depending on parsing will show
-warnings when it’s offline.
+This service is optional. Development starts it when Go is available unless an
+external `PARSER_HOST` is configured; standalone builds can auto-spawn the
+adjacent parser binary. If it is absent or unhealthy, the main app continues to
+serve and parser-dependent entity testing returns `parserAvailable: false` and
+skips matching.
 
 ## 9) Entity Testing (Quality Profiles)
 
@@ -1175,7 +1191,7 @@ Arr integration is an object‑oriented stack:
 - `createArrClient()` selects a client by type.
 - `utils/arr/defaults.ts` provides default delay profiles.
 - `utils/arr/releaseImport.ts` normalizes + groups releases for entity testing.
-- `utils/arr/parser/*` wraps the C# parser service (see Parser Service).
+- `utils/arr/parser/*` wraps the Go parser service and its behavior-versioned caches (see Parser Service).
 
 ### 21.5 Git & GitHub Helpers
 
@@ -1210,8 +1226,10 @@ Project scripts live under `scripts/` and are run via `deno task` or directly.
 
 ### 22.1 Dev Workflow
 
-- `scripts/dev.ts` runs the **parser + server** concurrently with colored logs.
-  It sets dev env vars (APP_BASE_PATH, PARSER_HOST, VITE_CHANNEL, etc.).
+- `scripts/dev.ts` runs the **Go parser + server** concurrently with colored
+  logs when Go is available, or runs the server alone with graceful parser
+  degradation. It sets dev env vars (APP_BASE_PATH, PARSER_HOST, VITE_CHANNEL,
+  etc.).
 
 ### 22.2 Schema / Type Generation
 

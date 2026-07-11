@@ -1,6 +1,6 @@
 ---
 title: Development Setup
-description: Contributor guide for Deno 2.x, optional parser service, dev tasks, environment variables, Docker workflows, and monorepo layout in Praxrr.
+description: Contributor guide for Deno 2.x, Go 1.26.5, the optional parser service, dev tasks, environment variables, Docker workflows, and monorepo layout in Praxrr.
 ---
 
 This page covers how to run Praxrr locally for development. For end-user installation,
@@ -12,8 +12,9 @@ files are documented there, not duplicated here.
 | Requirement       | Notes                                                                        |
 | ----------------- | ---------------------------------------------------------------------------- |
 | **Deno 2.x**      | Primary runtime; invoke tooling through `deno task …`, not npm for app code. |
+| **Go 1.26.5**     | Pinned parser toolchain; install it with `mise install`.                     |
+| **mise**          | Installs the repository-pinned Go toolchain.                                 |
 | **Node.js + npm** | Required for the docs site (`docs/site`) and Svelte client type-check.       |
-| **.NET 8+**       | Optional; needed only when running the parser microservice locally.          |
 | **Git**           | PCD repositories and export flows depend on Git.                             |
 
 ## Monorepo Layout
@@ -21,7 +22,7 @@ files are documented there, not duplicated here.
 | Path                      | Purpose                       |
 | ------------------------- | ----------------------------- |
 | `packages/praxrr-app/`    | SvelteKit application runtime |
-| `packages/praxrr-parser/` | C# parser microservice        |
+| `packages/praxrr-parser/` | Go parser microservice        |
 | `packages/praxrr-api/`    | API bundle artifact           |
 | `packages/praxrr-db/`     | PCD database mirror           |
 | `packages/praxrr-schema/` | PCD schema mirror             |
@@ -35,15 +36,15 @@ explicitly — for example `dist/dev` during development.
 
 From the repository root:
 
-| Task                   | Purpose                                         |
-| ---------------------- | ----------------------------------------------- |
-| `deno task dev`        | Parser + Vite dev server (port 6969)            |
-| `deno task dev:noauth` | Dev server with `AUTH=off`                      |
-| `deno task dev:server` | Vite dev server only (no parser)                |
-| `deno task dev:parser` | Parser service only (`dotnet watch`, port 5000) |
-| `deno task preview`    | Run compiled binary                             |
-| `deno task docs:dev`   | Starlight dev server                            |
-| `deno task docs:build` | Build static docs to `docs/site/dist`           |
+| Task                   | Purpose                                     |
+| ---------------------- | ------------------------------------------- |
+| `deno task dev`        | Go parser + Vite dev server (app port 6969) |
+| `deno task dev:noauth` | Dev server with `AUTH=off`                  |
+| `deno task dev:server` | Vite dev server only (no parser)            |
+| `deno task dev:parser` | Go parser service only (loopback port 5000) |
+| `deno task preview`    | Run compiled binary                         |
+| `deno task docs:dev`   | Starlight dev server                        |
+| `deno task docs:build` | Build static docs to `docs/site/dist`       |
 
 > **Warning:** `AUTH=off` and `AUTH=local` are for local development only. Never expose
 > an instance with authentication disabled on the public internet.
@@ -63,6 +64,38 @@ Common variables for local development:
 | `PRAXRR_DEFAULT_DB_NAME`      | Display name for auto-linked database (`Praxrr-DB`)                                 |
 | `PRAXRR_DEFAULT_DB_TOKEN`     | Optional PAT for private default repo — store as `REDACTED` in docs/examples        |
 | `PRAXRR_SCHEMA_REF`           | Optional override for schema dependency resolution                                  |
+
+`PARSER_HOST` and `PARSER_PORT` configure the app client. The parser process uses a
+complete `PARSER_ADDR` value such as `127.0.0.1:5001`; its secure default is
+`127.0.0.1:5000`. Keep the parser private. The container uses `:5000` only on its
+internal Compose network.
+
+## Parser Development
+
+Install the exact toolchain and start the service:
+
+```bash
+mise install
+deno task dev:parser
+```
+
+The parser keeps the public **.NET-compatible regex** syntax promise through Go's
+`regexp2` engine; this wording describes pattern compatibility, not a live .NET
+runtime dependency. Its private `GET /health` response reports a behavior version used
+to namespace parser caches. It is separate from the app's public
+`GET /api/v1/health` endpoint and must not be exposed as an application health API.
+
+For parser or parser-consumer changes, run the complete compatibility and retirement
+gates from the repository root:
+
+```bash
+./scripts/check-parser-go.sh
+./scripts/check-parser-retirement.sh
+```
+
+See the parser source guide at `packages/praxrr-parser/README.md` for the measured
+request limits, finite regex deadlines, golden corpus, behavior-version rules, and
+safe logging contract.
 
 Secret values (API keys, PATs, `ARR_CREDENTIAL_MASTER_KEY`) must never be committed.
 Use environment files excluded from Git and rotate any exposed credentials.

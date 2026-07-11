@@ -12,7 +12,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 - **Web framework:** SvelteKit (Vite + sveltekit-adapter-deno), Svelte 5
 - **Database:** SQLite (app DB via Kysely) + in-memory SQLite (PCD cache)
 - **UI:** Tailwind CSS v4
-- **Parser:** C# microservice (.NET 8+, optional for CF/profile testing)
+- **Parser:** Go microservice (Go 1.26.5 toolchain, optional for CF/profile testing)
 - **SCM:** Git (PCD repos + export flow)
 
 ## Commands
@@ -77,7 +77,11 @@ Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 ### Services
 
-- `packages/praxrr-parser/` - C# parser microservice (release title parsing)
+- `packages/praxrr-parser/cmd/praxrr-parser/` - Go parser process entry point and lifecycle
+- `packages/praxrr-parser/internal/httpserver/` - four-route HTTP adapter (`/health`, `/parse`, `/match`, `/match/batch`)
+- `packages/praxrr-parser/internal/contract/` - JSON request/response wire contract
+- `packages/praxrr-parser/internal/parser/` - release parsing, .NET-compatible regex matching, limits, and bounded workers
+- `packages/praxrr-parser/testdata/golden/` - captured legacy-oracle parity corpus and measured limits
 
 ## Key Concepts
 
@@ -114,6 +118,10 @@ SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema ch
 - **Conventional commits.** `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`.
 - **Formatting.** Tabs, single quotes, no trailing commas, 100 char print width (Prettier + prettier-plugin-svelte + prettier-plugin-tailwindcss).
 - **Entity names.** Case-insensitive uniqueness enforced on create/rename for all PCD entities.
+- **Parser contract fidelity.** Preserve the four parser routes and their exact JSON/status behavior. User-supplied patterns continue to use .NET-compatible regex syntax through `regexp2`; do not replace them with Go `regexp` or silently narrow accepted syntax.
+- **Parser cache safety.** Treat the `/health` version as a behavior version. Parsed-release and pattern-match caches must stay namespaced by it so upgrades and rollbacks cannot reuse incompatible results.
+- **Parser parity evidence.** Parser behavior changes require the golden corpus and differential/parity tests under `packages/praxrr-parser/internal/parity/`; keep request, regex, worker, and timeout limits finite.
+- **Optional parser degradation.** The main app must remain available when the parser is absent or unhealthy. Parser-dependent entity testing reports `parserAvailable: false` and skips matching rather than failing app startup.
 - **Template-required issue/PR creation.** Every `gh issue create` must use a template from `.github/ISSUE_TEMPLATE/`, and every `gh pr create` must use the repository PR template once it exists (or a `--body-file` derived from it). Do not create freeform issues or PR bodies.
 - **Missing template handling.** If a matching issue or PR template is missing or unclear, stop and ask for direction before creating it.
 - **PR body updates.** Use `gh pr create/edit --body-file <file>` rather than inline `--body`; if `gh pr edit` fails with GraphQL `projectCards` deprecation errors, patch the PR via `gh api -X PATCH repos/<owner>/<repo>/pulls/<number> -f body=...`.

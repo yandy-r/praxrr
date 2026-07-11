@@ -18,7 +18,13 @@ env:
   IMAGE_BASE: ghcr.io/yandy-r
 
 jobs:
+  parser-image-smoke:
+    uses: ./.github/workflows/parser-container-smoke.yml
+    permissions:
+      contents: read
+
   build:
+    needs: parser-image-smoke
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,8 +37,10 @@ jobs:
         include:
           - image: praxrr
             dockerfile: Dockerfile
+            platforms: linux/amd64
           - image: praxrr-parser
             dockerfile: Dockerfile.parser
+            platforms: linux/amd64,linux/arm64
 
     steps:
       - name: Checkout
@@ -41,13 +49,13 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/app/v* ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/app/v* ]]; then
             VERSION="${GITHUB_REF_NAME#app/v}"
-            echo "value=$VERSION" >> $GITHUB_OUTPUT
-            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "value=${VERSION}" >>"${GITHUB_OUTPUT}"
+            echo "is_release=true" >>"${GITHUB_OUTPUT}"
           else
-            echo "value=" >> $GITHUB_OUTPUT
-            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "value=" >>"${GITHUB_OUTPUT}"
+            echo "is_release=false" >>"${GITHUB_OUTPUT}"
           fi
 
       - name: Set up QEMU
@@ -66,16 +74,16 @@ jobs:
       - name: Determine channel
         id: channel
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "value=develop" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "value=testing" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/tags/app/v*-beta* ]]; then
-            echo "value=beta" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/tags/app/v* ]]; then
-            echo "value=stable" >> $GITHUB_OUTPUT
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "value=develop" >>"${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == "refs/heads/dev" ]]; then
+            echo "value=testing" >>"${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == refs/tags/app/v*-beta* ]]; then
+            echo "value=beta" >>"${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == refs/tags/app/v* ]]; then
+            echo "value=stable" >>"${GITHUB_OUTPUT}"
           else
-            echo "value=develop" >> $GITHUB_OUTPUT
+            echo "value=develop" >>"${GITHUB_OUTPUT}"
           fi
 
       - name: Extract metadata
@@ -105,8 +113,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          # FOR NOW: ARM disabled for faster debugging - re-enable linux/arm64 when stable
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -114,6 +121,8 @@ jobs:
             VITE_CHANNEL=${{ steps.channel.outputs.value }}
           cache-from: type=registry,ref=${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_BASE }}/${{ matrix.image }}:buildcache,mode=max
+          sbom: true
+          provenance: mode=max
 
       - name: Generate attestation
         if: ${{ !github.event.repository.private }}

@@ -1,7 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <!-- Output to root dist/parser/ -->
-    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\..\dist\parser\</BaseOutputPath>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\..\dist\parser\obj\</BaseIntermediateOutputPath>
-  </PropertyGroup>
-</Project>

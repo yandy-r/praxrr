@@ -34,10 +34,10 @@ async function streamOutput(reader: ReadableStreamDefaultReader<Uint8Array>, lab
   }
 }
 
-async function isDotnetAvailable(): Promise<boolean> {
+async function isGoAvailable(): Promise<boolean> {
   try {
-    const { success } = await new Deno.Command('dotnet', {
-      args: ['--version'],
+    const { success } = await new Deno.Command('go', {
+      args: ['version'],
       stdout: 'null',
       stderr: 'null',
     }).output();
@@ -71,25 +71,31 @@ async function startArr(): Promise<void> {
   }
 }
 
-async function runParser() {
-  const cmd = new Deno.Command('dotnet', {
-    args: ['watch', 'run', '--urls', 'http://localhost:5000'],
+function runParser(): Deno.ChildProcess {
+  const cmd = new Deno.Command('go', {
+    args: ['run', './cmd/praxrr-parser'],
     cwd: PARSER_PROJECT_DIR,
+    env: {
+      ...Deno.env.toObject(),
+      PARSER_ADDR: '127.0.0.1:5000',
+    },
     stdout: 'piped',
     stderr: 'piped',
   });
 
   const process = cmd.spawn();
 
-  await Promise.all([
+  void Promise.all([
     streamOutput(process.stdout.getReader(), 'parser', colors.parser),
     streamOutput(process.stderr.getReader(), 'parser', colors.parser),
-  ]);
+  ]).catch((error: unknown) => {
+    console.error(`${colors.parser}[parser]${colors.reset} Output stream failed: ${String(error)}`);
+  });
 
-  return process.status;
+  return process;
 }
 
-async function runServer() {
+function runServer(): Deno.ChildProcess {
   const cmd = new Deno.Command('deno', {
     args: ['run', '-A', 'npm:vite', 'dev'],
     cwd: 'packages/praxrr-app',
@@ -99,8 +105,8 @@ async function runServer() {
       PORT: '6969',
       HOST: '0.0.0.0',
       APP_BASE_PATH,
-      PARSER_HOST: 'localhost',
-      PARSER_PORT: '5000',
+      PARSER_HOST: Deno.env.get('PARSER_HOST') || 'localhost',
+      PARSER_PORT: Deno.env.get('PARSER_PORT') || '5000',
       VITE_PLATFORM: getPlatform(),
       VITE_CHANNEL: 'dev',
     },
@@ -110,12 +116,51 @@ async function runServer() {
 
   const process = cmd.spawn();
 
-  await Promise.all([
+  void Promise.all([
     streamOutput(process.stdout.getReader(), 'server', colors.server),
     streamOutput(process.stderr.getReader(), 'server', colors.server),
-  ]);
+  ]).catch((error: unknown) => {
+    console.error(`${colors.server}[server]${colors.reset} Output stream failed: ${String(error)}`);
+  });
 
-  return process.status;
+  return process;
+}
+
+function terminateProcess(process: Deno.ChildProcess): void {
+  try {
+    process.kill('SIGTERM');
+  } catch {
+    // Already stopped
+  }
+}
+
+async function runUntilExit(processes: Deno.ChildProcess[]): Promise<void> {
+  let stopping = false;
+
+  const stopChildren = async (): Promise<void> => {
+    if (stopping) return;
+    stopping = true;
+    for (const process of processes) terminateProcess(process);
+    await Promise.all(processes.map((process) => process.status));
+  };
+
+  const removeSignalListeners = () => {
+    Deno.removeSignalListener('SIGINT', onSignal);
+    if (Deno.build.os !== 'windows') Deno.removeSignalListener('SIGTERM', onSignal);
+  };
+  const onSignal = () => {
+    removeSignalListeners();
+    void stopChildren().finally(() => Deno.exit(0));
+  };
+  Deno.addSignalListener('SIGINT', onSignal);
+  if (Deno.build.os !== 'windows') Deno.addSignalListener('SIGTERM', onSignal);
+
+  try {
+    await Promise.race(processes.map((process) => process.status));
+    await stopChildren();
+  } finally {
+    removeSignalListeners();
+  }
 }
 
 if (Deno.env.get('WITH_ARR') === '1') {
@@ -123,15 +168,20 @@ if (Deno.env.get('WITH_ARR') === '1') {
   console.log('');
 }
 
-const hasDotnet = await isDotnetAvailable();
-if (hasDotnet) {
-  console.log(`${colors.parser}[parser]${colors.reset} Starting .NET parser service...`);
+const usesExternalParser = Boolean(Deno.env.get('PARSER_HOST'));
+if (usesExternalParser) {
+  console.log(`${colors.parser}[parser]${colors.reset} Using external parser service.`);
   console.log(`${colors.server}[server]${colors.reset} Starting Vite dev server...`);
   console.log('');
-  await Promise.all([runParser(), runServer()]);
+  await runUntilExit([runServer()]);
+} else if (await isGoAvailable()) {
+  console.log(`${colors.parser}[parser]${colors.reset} Starting Go parser service...`);
+  console.log(`${colors.server}[server]${colors.reset} Starting Vite dev server...`);
+  console.log('');
+  await runUntilExit([runParser(), runServer()]);
 } else {
-  console.log(`${colors.parser}[parser]${colors.reset} Skipped (dotnet not found). Server only.`);
+  console.log(`${colors.parser}[parser]${colors.reset} Skipped (Go not found). Server only.`);
   console.log(`${colors.server}[server]${colors.reset} Starting Vite dev server...`);
   console.log('');
-  await runServer();
+  await runUntilExit([runServer()]);
 }

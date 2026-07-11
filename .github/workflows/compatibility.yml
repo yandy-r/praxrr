@@ -7,18 +7,33 @@ on:
       - 'packages/praxrr-schema/**'
       - 'packages/praxrr-db/**'
       - 'packages/praxrr-parser/**'
+      - 'mise.toml'
       - 'package.json'
       - 'Dockerfile'
       - 'Dockerfile.parser'
+      - '.dockerignore'
+      - 'compose.yml'
+      - 'compose.dev.yml'
       - 'deno.json'
       - 'scripts/compat-check.ts'
+      - 'scripts/check-parser-go.sh'
+      - 'scripts/check-parser-retirement.sh'
+      - 'scripts/check-dist-paths.sh'
+      - 'scripts/capture-parser-goldens.ts'
+      - 'scripts/measure-parser-baseline.ts'
+      - 'scripts/smoke-parser-artifact.ts'
+      - 'scripts/smoke-parser-container.ts'
+      - 'scripts/smoke-parser-release.ts'
       - 'scripts/dev.ts'
       - 'scripts/e2e.ts'
       - 'scripts/test.ts'
       - 'scripts/stats.sh'
       - 'packages/praxrr-app/src/tests/**'
+      - '.github/workflows/compatibility.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/publish-release.yml'
       - '.github/workflows/docker.yml'
+      - '.github/workflows/parser-container-smoke.yml'
       - 'release-please-config.json'
       - '.release-please-manifest.json'
 
@@ -28,6 +43,7 @@ permissions:
 
 env:
   DENO_VERSION: '2.5.6'
+  GO_VERSION: '1.26.5'
 
 jobs:
   detect-changes:
@@ -35,6 +51,7 @@ jobs:
     outputs:
       contracts_paths: ${{ steps.path-changes.outputs.contracts_paths }}
       app_paths: ${{ steps.path-changes.outputs.app_paths }}
+      parser_paths: ${{ steps.path-changes.outputs.parser_paths }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +77,44 @@ jobs:
               - 'scripts/stats.sh'
               - 'scripts/generate-pcd-types.ts'
               - 'deno.json'
+            parser_paths:
+              - 'packages/praxrr-parser/**'
+              - 'packages/praxrr-app/src/lib/server/utils/arr/parser/**'
+              - 'packages/praxrr-app/src/lib/server/utils/parser/**'
+              - 'packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts'
+              - 'packages/praxrr-app/src/lib/server/utils/config/config.ts'
+              - 'packages/praxrr-app/src/tests/routes/entityTestingEvaluateRoute.test.ts'
+              - 'packages/praxrr-app/src/tests/routes/simulateScoreRoute.test.ts'
+              - 'packages/praxrr-app/src/tests/routes/impactSimulatorRoute.test.ts'
+              - 'packages/praxrr-app/src/tests/server/parserCacheCutover.test.ts'
+              - 'packages/praxrr-app/src/tests/server/utils/config/parserUrl.test.ts'
+              - 'packages/praxrr-app/src/tests/e2e/specs/4.4-score-simulator-ux-basics.spec.ts'
+              - 'packages/praxrr-app/src/tests/e2e/specs/4.5-parser-dependent-surfaces.spec.ts'
+              - 'packages/praxrr-app/src/routes/custom-formats/**/testing/**'
+              - 'packages/praxrr-app/src/routes/quality-profiles/entity-testing/**'
+              - 'packages/praxrr-app/src/routes/score-simulator/**'
+              - 'packages/praxrr-app/src/routes/impact-simulator/**'
+              - 'packages/praxrr-app/src/routes/api/regex101/**'
+              - 'Dockerfile.parser'
+              - '.dockerignore'
+              - 'compose.yml'
+              - 'compose.dev.yml'
+              - 'deno.json'
+              - 'mise.toml'
+              - 'scripts/check-parser-go.sh'
+              - 'scripts/check-parser-retirement.sh'
+              - 'scripts/capture-parser-goldens.ts'
+              - 'scripts/measure-parser-baseline.ts'
+              - 'scripts/smoke-parser-artifact.ts'
+              - 'scripts/smoke-parser-container.ts'
+              - 'scripts/smoke-parser-release.ts'
+              - 'scripts/dev.ts'
+              - 'scripts/check-dist-paths.sh'
+              - '.github/workflows/compatibility.yml'
+              - '.github/workflows/docker.yml'
+              - '.github/workflows/release.yml'
+              - '.github/workflows/publish-release.yml'
+              - '.github/workflows/parser-container-smoke.yml'
 
   compatibility-contracts:
     needs: detect-changes
@@ -101,9 +156,10 @@ jobs:
         run: |
           set -euo pipefail
           npm install -g node-gyp
-          export npm_config_python="$(command -v python3)"
-          export NODE_GYP_FORCE_PYTHON="$(command -v python3)"
-          export npm_config_node_gyp="$(npm root -g)/node_modules/node-gyp/bin/node-gyp.js"
+          npm_config_python="$(command -v python3)"
+          NODE_GYP_FORCE_PYTHON="$(command -v python3)"
+          npm_config_node_gyp="$(npm root -g)/node_modules/node-gyp/bin/node-gyp.js"
+          export npm_config_python NODE_GYP_FORCE_PYTHON npm_config_node_gyp
           echo "Using python for node-gyp: ${npm_config_python}"
           echo "Using npm-config node-gyp: ${npm_config_node_gyp}"
           node-gyp --version
@@ -123,3 +179,53 @@ jobs:
         run: |
           cd packages/praxrr-app
           APP_BASE_PATH="$GITHUB_WORKSPACE/dist/build" VITE_CHANNEL=develop deno run -A npm:vite build
+
+  compatibility-parser-go:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    name: parser-go
+    if: ${{ needs.detect-changes.outputs.parser_paths == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache-dependency-path: packages/praxrr-parser/go.sum
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      - name: Install Deno dependencies
+        run: |
+          if ! deno install --frozen --node-modules-dir --allow-scripts=npm:better-sqlite3; then
+            echo "::warning::Deno install with restricted scripts failed; retrying without script allowlist."
+            deno install --frozen --node-modules-dir
+          fi
+
+      - name: Verify parser retirement boundary
+        run: bash scripts/check-parser-retirement.sh
+
+      - name: Run parser Go compatibility gates
+        run: bash scripts/check-parser-go.sh
+
+  parser-release-artifacts:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.parser_paths == 'true' }}
+    uses: ./.github/workflows/release.yml
+    with:
+      release_version: 0.0.0-pr-${{ github.event.pull_request.number }}
+    permissions:
+      contents: read
+
+  parser-container-image:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.parser_paths == 'true' }}
+    uses: ./.github/workflows/parser-container-smoke.yml
+    permissions:
+      contents: read

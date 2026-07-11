@@ -1,13 +1,13 @@
 /**
  * Parser Service Client
- * Calls the C# parser microservice with optional caching
+ * Calls the parser microservice with optional caching
  */
 
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 import { BaseHttpClient } from '../../http/client.ts';
 import { parsedReleaseCacheQueries } from '$db/queries/parsedReleaseCache.ts';
-import { patternMatchCacheQueries } from '$db/queries/patternMatchCache.ts';
+import { patternMatchCacheQueries, getPatternMatchCacheNamespace } from '$db/queries/patternMatchCache.ts';
 import {
   QualitySource,
   QualityModifier,
@@ -19,7 +19,9 @@ import {
   type MediaType,
 } from './types.ts';
 
-// Cached parser version (fetched once per session)
+// Last successfully observed parser behavior version. Match-cache callers
+// refresh it so parser restarts and runtime rollbacks cannot reuse another
+// implementation's entries.
 let cachedParserVersion: string | null = null;
 
 interface EpisodeResponse {
@@ -200,15 +202,32 @@ export async function getParserVersion(): Promise<string | null> {
     return cachedParserVersion;
   }
 
+  return await refreshParserVersion();
+}
+
+/**
+ * Refresh the parser behavior version from health.
+ *
+ * On a transient outage, the last successfully observed version remains in
+ * memory so match-cache callers may return entries already proven for that
+ * behavior, but the refresh itself returns null. That prevents misses from
+ * being written under a potentially stale namespace.
+ */
+export async function refreshParserVersion(): Promise<string | null> {
   try {
     const data = await getClient().health();
+    if (typeof data.version !== 'string' || data.version.length === 0) {
+      throw new Error('Parser health response omitted behavior version');
+    }
     cachedParserVersion = data.version;
-    await logger.debug(`Parser version: ${data.version}`, { source: 'ParserClient' });
+    await logger.debug(`Parser version: ${data.version}`, {
+      source: 'ParserClient',
+    });
     return cachedParserVersion;
-  } catch (err) {
+  } catch {
     await logger.warn('Failed to connect to parser service', {
       source: 'ParserClient',
-      meta: { error: err instanceof Error ? err.message : 'Unknown error' },
+      meta: { errorClass: 'ParserUnavailable' },
     });
     return null;
   }
@@ -227,6 +246,10 @@ export function clearParserVersionCache(): void {
  */
 function getCacheKey(title: string, type: MediaType): string {
   return `${title}:${type}`;
+}
+
+function parserRequestFailureMeta(titleLength: number, type: MediaType) {
+  return { titleLength, type, errorClass: 'ParserRequestFailed' };
 }
 
 /**
@@ -261,17 +284,36 @@ export async function parseWithCache(title: string, type: MediaType): Promise<Pa
     parsedReleaseCacheQueries.set(cacheKey, parserVersion, JSON.stringify(result));
 
     return result;
-  } catch (err) {
+  } catch {
     await logger.warn('Failed to parse release title for parser cache', {
       source: 'ParserCache',
-      meta: {
-        title,
-        type,
-        error: err instanceof Error ? err.message : 'Unknown error',
-      },
+      meta: parserRequestFailureMeta(title.length, type),
     });
     // Parser error
     return null;
+  }
+}
+
+interface UncachedParseItem {
+  title: string;
+  type: MediaType;
+  cacheKey: string;
+}
+
+async function parseAndCacheUncachedItem(
+  item: UncachedParseItem,
+  parserVersion: string
+): Promise<{ cacheKey: string; result: ParseResult | null }> {
+  try {
+    const result = await parse(item.title, item.type);
+    parsedReleaseCacheQueries.set(item.cacheKey, parserVersion, JSON.stringify(result));
+    return { cacheKey: item.cacheKey, result };
+  } catch {
+    await logger.warn('Failed to parse release title in batch parser cache', {
+      source: 'ParserCache',
+      meta: parserRequestFailureMeta(item.title.length, item.type),
+    });
+    return { cacheKey: item.cacheKey, result: null };
   }
 }
 
@@ -300,7 +342,7 @@ export async function parseWithCacheBatch(
   }
 
   // Separate cached vs uncached
-  const uncached: Array<{ title: string; type: MediaType; cacheKey: string }> = [];
+  const uncached: UncachedParseItem[] = [];
 
   for (const item of items) {
     const cacheKey = getCacheKey(item.title, item.type);
@@ -317,24 +359,7 @@ export async function parseWithCacheBatch(
 
   // Parse uncached items in parallel
   if (uncached.length > 0) {
-    const parsePromises = uncached.map(async (item) => {
-      try {
-        const result = await parse(item.title, item.type);
-        // Store in cache
-        parsedReleaseCacheQueries.set(item.cacheKey, parserVersion, JSON.stringify(result));
-        return { cacheKey: item.cacheKey, result };
-      } catch (err) {
-        await logger.warn('Failed to parse release title in batch parser cache', {
-          source: 'ParserCache',
-          meta: {
-            title: item.title,
-            type: item.type,
-            error: err instanceof Error ? err.message : 'Unknown error',
-          },
-        });
-        return { cacheKey: item.cacheKey, result: null };
-      }
-    });
+    const parsePromises = uncached.map((item) => parseAndCacheUncachedItem(item, parserVersion));
 
     const parsed = await Promise.all(parsePromises);
     for (const { cacheKey, result } of parsed) {
@@ -386,10 +411,10 @@ export async function matchPatterns(text: string, patterns: string[]): Promise<M
   try {
     const data = await getClient().match(text, patterns);
     return new Map(Object.entries(data.results));
-  } catch (err) {
+  } catch {
     await logger.warn('Failed to connect to parser for pattern matching', {
       source: 'ParserClient',
-      meta: { error: err instanceof Error ? err.message : 'Unknown error' },
+      meta: { errorClass: 'ParserRequestFailed' },
     });
     return null;
   }
@@ -425,10 +450,10 @@ async function fetchPatternMatches(
       result.set(text, new Map(Object.entries(patternResults)));
     }
     return result;
-  } catch (err) {
+  } catch {
     await logger.warn('Failed to connect to parser for batch pattern matching', {
       source: 'ParserClient',
-      meta: { error: err instanceof Error ? err.message : 'Unknown error' },
+      meta: { errorClass: 'ParserRequestFailed' },
     });
     return null;
   }
@@ -451,11 +476,20 @@ export async function matchPatternsBatch(
     return new Map();
   }
 
+  // Refresh before selecting a namespace so a restart, upgrade, or rollback
+  // cannot consume results produced by another parser behavior version.
+  const refreshedParserVersion = await refreshParserVersion();
+  const parserVersion = refreshedParserVersion ?? cachedParserVersion;
+  if (!parserVersion) {
+    return null;
+  }
+
   // Compute hash of patterns for cache key
   const patternsHash = await hashPatterns(patterns);
+  const cacheNamespace = getPatternMatchCacheNamespace(parserVersion, patternsHash);
 
   // Check cache for existing results
-  const cachedResults = patternMatchCacheQueries.getBatch(texts, patternsHash);
+  const cachedResults = patternMatchCacheQueries.getBatch(texts, cacheNamespace);
   const results = new Map<string, Map<string, boolean>>();
   const uncachedTexts: string[] = [];
 
@@ -476,9 +510,16 @@ export async function matchPatternsBatch(
   if (uncachedTexts.length === 0) {
     await logger.debug(`Pattern match: ${texts.length} cache hits, 0 computed`, {
       source: 'PatternMatchCache',
-      meta: { total: texts.length, cacheHits, patternsHash },
+      meta: { total: texts.length, cacheHits, cacheNamespace },
     });
     return results;
+  }
+
+  // A failed health refresh may read entries from the last proven namespace,
+  // but it must never compute or write misses there: the service could have
+  // restarted with a different behavior version while health was unavailable.
+  if (!refreshedParserVersion) {
+    return cacheHits > 0 ? results : null;
   }
 
   // Fetch uncached results from parser
@@ -509,12 +550,12 @@ export async function matchPatternsBatch(
 
   // Batch insert into cache
   if (toCache.length > 0) {
-    patternMatchCacheQueries.setBatch(toCache, patternsHash);
+    patternMatchCacheQueries.setBatch(toCache, cacheNamespace);
   }
 
   await logger.debug(`Pattern match: ${cacheHits} cache hits, ${uncachedTexts.length} computed`, {
     source: 'PatternMatchCache',
-    meta: { total: texts.length, cacheHits, computed: uncachedTexts.length, patternsHash },
+    meta: { total: texts.length, cacheHits, computed: uncachedTexts.length, cacheNamespace },
   });
 
   return results;

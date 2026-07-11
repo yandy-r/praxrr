@@ -26,7 +26,7 @@ flowchart TB
   Jobs["Job queue + dispatcher"]
   Sync["Sync pipeline"]
   Arr["Arr APIs"]
-  Parser["Parser service (.NET)"]
+  Parser["Go parser service"]
 
   UI --> AppDB
   UI --> PCD
@@ -50,7 +50,33 @@ The parser is optional for custom-format testing.
 | **PCD cache**      | Replays append-only base and user ops into in-memory SQLite for validated reads and writes.          |
 | **Job queue**      | Persists scheduled work in `job_queue`; the dispatcher claims due jobs and runs registered handlers. |
 | **Sync pipeline**  | Resolves compiled PCD state into explicit, per-`arr_type` Arr API operations.                        |
-| **Parser service** | Optional .NET microservice for release-title parsing during CF/profile testing.                      |
+| **Parser service** | Optional private Go service for release parsing and .NET-compatible pattern matching.                |
+
+## Parser Boundary
+
+The parser is an independently bounded Go process under `packages/praxrr-parser/`.
+It exposes exactly four private routes: `GET /health`, `POST /parse`, `POST /match`,
+and `POST /match/batch`. The app client under `$arr/parser/` is the only normal
+consumer. `GET /health` reports the parser behavior version; it is not the app's
+public `GET /api/v1/health` route and should not be published through a reverse
+proxy.
+
+The parser preserves the historical **.NET-compatible regex** contract with
+`regexp2`, while all engine access stays behind one Go boundary. Execution is finite:
+request size, title/text and pattern length, list cardinality, unique keys, work
+product, active requests, workers, regex time, stack size, headers, and server
+lifecycle all have measured limits. Oversized supported-envelope requests return
+`413`; admission or matcher saturation returns retryable `503` with
+`Retry-After: 1`; malformed/invalid input returns `400`; unexpected internal failures
+return `500`. Logs contain stable classes and counts, never submitted titles, texts,
+patterns, bodies, or engine errors.
+
+Parsed-release and pattern-match caches are namespaced by the last successfully
+observed parser behavior version. During an outage, the app may read proven entries
+for that version but does not fill misses. Standalone releases place the parser next
+to the app and auto-spawn it on loopback. Container deployments keep it on the private
+Compose network. In either shape, an unavailable parser degrades only parser-dependent
+custom-format and quality-profile testing; linking, editing, and syncing continue.
 
 ## Module Map
 
@@ -110,6 +136,7 @@ Contributor deep dives, in recommended order:
 - Sync: `packages/praxrr-app/src/lib/server/sync/`
 - Jobs: `packages/praxrr-app/src/lib/server/jobs/`
 - API spec: `docs/api/v1/openapi.yaml`
+- Parser service: `packages/praxrr-parser/README.md`
 
 ## Related
 

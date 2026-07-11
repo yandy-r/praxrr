@@ -6,14 +6,18 @@
 sequenceDiagram
     participant Runtime as Deno Runtime
     participant Hooks as hooks.server.ts
-    participant Parser as parser/spawn.ts
+    participant ParserSpawn as parser/spawn.ts
+    participant Parser as Go cmd/praxrr-parser
     participant DB as db.ts
     participant Mig as migrations.ts
     participant PCD as pcdManager
     participant Jobs as job init/dispatcher
 
     Runtime->>Hooks: load server hooks
-    Hooks->>Parser: optional parser auto-spawn
+    Hooks->>ParserSpawn: inspect external host / adjacent binary
+    opt standalone parser binary is available
+  ParserSpawn->>Parser: spawn and wait for /health
+    end
     Hooks->>DB: initialize SQLite + pragmas
     Hooks->>Mig: run pending migrations
     Hooks->>PCD: initialize linked DB caches
@@ -24,6 +28,8 @@ sequenceDiagram
 Key references:
 
 - `packages/praxrr-app/src/hooks.server.ts`
+- `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`
+- `packages/praxrr-parser/cmd/praxrr-parser/main.go`
 - `packages/praxrr-app/src/lib/server/db/db.ts`
 - `packages/praxrr-app/src/lib/server/db/migrations.ts`
 - `packages/praxrr-app/src/lib/server/pcd/core/manager.ts`
@@ -95,8 +101,12 @@ sequenceDiagram
     participant UI as Entity testing UI/API consumer
     participant Eval as evaluate endpoint
     participant ParserHealth as parser health check
-    participant Parser as parser client
-    participant Cache as PCD cache
+    participant Client as parser client
+    participant ParserCache as behavior-versioned SQLite caches
+    participant HTTP as Go HTTP adapter
+    participant Contract as JSON contract
+    participant Parser as domain parser/matcher
+    participant PCDCache as PCD cache
     participant CF as custom format evaluator
 
     UI->>Eval: POST /api/v1/entity-testing/evaluate
@@ -104,8 +114,14 @@ sequenceDiagram
     alt parser unavailable
         Eval-->>UI: parserAvailable=false
     else parser available
-        Eval->>Parser: parseWithCacheBatch + matchPatternsBatch
-        Eval->>Cache: load custom format conditions
+  Eval->>Client: parseWithCacheBatch + matchPatternsBatch
+  Client->>HTTP: /health, /parse, /match/batch
+  HTTP->>Contract: decode and validate exact wire DTOs
+  HTTP->>Parser: parse title / run .NET-compatible patterns
+  Parser-->>HTTP: structured result within finite limits
+  HTTP-->>Client: versioned health or JSON result
+  Client->>ParserCache: read/write behavior-versioned results
+  Eval->>PCDCache: load custom format conditions
         Eval->>CF: evaluate conditions per release
         Eval-->>UI: parsed metadata + cfMatches
     end
@@ -116,8 +132,18 @@ Key references:
 - `packages/praxrr-app/src/routes/api/v1/entity-testing/evaluate/+server.ts`
 - `packages/praxrr-app/src/lib/server/utils/arr/parser/index.ts`
 - `packages/praxrr-app/src/lib/server/utils/parser/spawn.ts`
-- `packages/praxrr-parser/Program.cs`
-- `packages/praxrr-parser/Endpoints/MatchEndpoints.cs`
+- `packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts`
+- `packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts`
+- `packages/praxrr-parser/cmd/praxrr-parser/main.go`
+- `packages/praxrr-parser/internal/httpserver/handler.go`
+- `packages/praxrr-parser/internal/contract/`
+- `packages/praxrr-parser/internal/parser/`
+- `packages/praxrr-parser/testdata/golden/`
+
+The parser is an optional capability: startup and the main health surface do not
+depend on it. The entity-testing flow probes the parser directly and degrades to
+`parserAvailable: false` without invoking parse, match, or cache writes when the
+service is unavailable.
 
 ## 5) Contract Flow Between Packages
 

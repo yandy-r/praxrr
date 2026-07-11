@@ -284,6 +284,7 @@ async function createParserStub(port: number): Promise<{
   setParseResponse: (title: string, payload: ParseStubResponse) => void;
   setMatchResponse: (text: string, matches: Record<string, boolean>) => void;
   clearResponses: () => void;
+  setForwardBaseUrl: (baseUrl: string | null) => void;
   close: () => Promise<void>;
 }> {
   const parseResponses = new Map<string, ParseStubResponse>();
@@ -291,6 +292,7 @@ async function createParserStub(port: number): Promise<{
 
   let healthAvailable = true;
   let version = 'local-parser-v1';
+  let forwardBaseUrl: string | null = null;
 
   const response = (data: unknown, init?: ResponseInit): Response =>
     new Response(JSON.stringify(data), {
@@ -311,6 +313,19 @@ async function createParserStub(port: number): Promise<{
 
       const url = new URL(request.url);
       const payloadText = await request.text();
+
+      if (forwardBaseUrl) {
+        try {
+          return await fetch(`${forwardBaseUrl}${url.pathname}`, {
+            method: request.method,
+            headers: request.headers,
+            body: request.method === 'GET' || request.method === 'HEAD' ? undefined : payloadText,
+          });
+        } catch {
+          return new Response('upstream unavailable', { status: 503 });
+        }
+      }
+
       const payload = payloadText.length > 0 ? JSON.parse(payloadText) : {};
 
       if (url.pathname === '/health') {
@@ -373,10 +388,59 @@ async function createParserStub(port: number): Promise<{
       parseResponses.clear();
       matchResponses.clear();
     },
+    setForwardBaseUrl: (baseUrl) => {
+      forwardBaseUrl = baseUrl;
+    },
     close: async () => {
       await server.shutdown();
     },
   };
+}
+
+async function withRealGoParser(version: string, port: number, run: (baseUrl: string) => Promise<void>): Promise<void> {
+  const directory = await Deno.makeTempDir({ prefix: 'praxrr-parser-score-' });
+  const binaryPath = `${directory}/praxrr-parser`;
+  const build = await new Deno.Command('go', {
+    cwd: new URL('../../../../praxrr-parser/', import.meta.url),
+    args: ['build', '-ldflags', `-X main.version=${version}`, '-o', binaryPath, './cmd/praxrr-parser'],
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+  if (!build.success) {
+    await Deno.remove(directory, { recursive: true });
+    throw new Error(`Go parser build failed: ${new TextDecoder().decode(build.stderr)}`);
+  }
+
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const process = new Deno.Command(binaryPath, {
+    env: { PARSER_ADDR: `127.0.0.1:${port}` },
+    stdout: 'null',
+    stderr: 'null',
+  }).spawn();
+
+  try {
+    const deadline = Date.now() + 10_000;
+    let healthy = false;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`${baseUrl}/health`);
+        healthy = response.ok;
+        await response.body?.cancel();
+      } catch {
+        healthy = false;
+      }
+      if (healthy) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    if (!healthy) {
+      throw new Error(`Go parser did not become healthy at ${baseUrl}`);
+    }
+    await run(baseUrl);
+  } finally {
+    process.kill('SIGTERM');
+    await process.status;
+    await Deno.remove(directory, { recursive: true });
+  }
 }
 
 Deno.test('simulate score: returns unavailable when parser is down', async () => {
@@ -2373,4 +2437,101 @@ Deno.test('simulate score: sonarr anime TRaSH profiles infer WEB source from mat
     parserParserState.setVersion('local-parser-v1');
     restore.restore();
   }
+});
+
+Deno.test('simulate score: real Go service isolates bad patterns at the maximum release batch', async () => {
+  const databaseId = 6020;
+  const originalListSources = trashGuideManager.listSources;
+  const restore = installParserCacheStubs();
+  restore.reset();
+  trashGuideManager.listSources = (() => []) as typeof trashGuideManager.listSources;
+
+  const fixture = createPcdCacheFixture(`
+    INSERT INTO quality_profiles (id, name, minimum_custom_format_score, upgrade_until_score)
+    VALUES (1, 'Go Profile', 0, 100);
+    INSERT INTO custom_formats (name) VALUES ('CF-Go-Valid');
+    INSERT INTO custom_formats (name) VALUES ('CF-Go-Invalid');
+    INSERT INTO custom_formats (name) VALUES ('CF-Go-Timeout');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('go-valid', 'BONUS');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('go-invalid', '(?<unterminated');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('go-timeout', '^(a+)+$');
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type)
+    VALUES ('CF-Go-Valid', 'valid-title', 'release_title', 'all');
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type)
+    VALUES ('CF-Go-Invalid', 'invalid-title', 'release_title', 'all');
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type)
+    VALUES ('CF-Go-Timeout', 'timeout-title', 'release_title', 'all');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Go-Valid', 'valid-title', 'go-valid');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Go-Invalid', 'invalid-title', 'go-invalid');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Go-Timeout', 'timeout-title', 'go-timeout');
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Go Profile', 'CF-Go-Valid', 'radarr', 7);
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Go Profile', 'CF-Go-Invalid', 'radarr', 11);
+    INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score)
+    VALUES ('Go Profile', 'CF-Go-Timeout', 'radarr', 13);
+  `);
+  setCache(databaseId, fixture.cache);
+
+  const releases = Array.from({ length: 50 }, (_, index) => ({
+    id: `go-release-${index}`,
+    title:
+      index === 49
+        ? `${'a'.repeat(999)}!`
+        : index === 48
+          ? 'Meaningless.BONUS'
+          : `Movie.${String(index).padStart(2, '0')}.2024.1080p.WEB-DL.BONUS-GROUP`,
+    type: 'movie' as const,
+  }));
+
+  try {
+    await withRealGoParser('route-score-v1', 58129, async (baseUrl) => {
+      parserParserState.setForwardBaseUrl(baseUrl);
+      parserClientModule.clearParserVersionCache();
+
+      const response = await scoreRouteModule.POST(
+        buildEvent({
+          databaseId,
+          arrType: 'radarr',
+          profileNames: ['pcd:Go Profile'],
+          releases,
+        })
+      );
+      const body = (await response.json()) as SimulatedScoreResponse;
+
+      assertEquals(response.status, 200);
+      assertEquals(body.parserAvailable, true);
+      assertEquals(body.results.length, 50);
+      assertEquals(
+        body.results.map(({ id, title }) => ({ id, title })),
+        releases.map(({ id, title }) => ({ id, title }))
+      );
+
+      for (const result of body.results.slice(0, 49)) {
+        assertEquals(result.cfMatches.find((row) => row.name === 'CF-Go-Valid')?.matches, true);
+        assertEquals(result.cfMatches.find((row) => row.name === 'CF-Go-Invalid')?.matches, false);
+        assertEquals(result.cfMatches.find((row) => row.name === 'CF-Go-Timeout')?.matches, false);
+        assertEquals(result.profileScores[0].totalScore, 7);
+      }
+
+      const timeoutResult = body.results[49];
+      assertEquals(timeoutResult.id, 'go-release-49');
+      assertEquals(timeoutResult.cfMatches.find((row) => row.name === 'CF-Go-Timeout')?.matches, false);
+      assertEquals(timeoutResult.profileScores[0].totalScore, 0);
+    });
+  } finally {
+    parserParserState.setForwardBaseUrl(null);
+    parserClientModule.clearParserVersionCache();
+    trashGuideManager.listSources = originalListSources;
+    deleteCache(databaseId);
+    await fixture.destroy();
+    restore.restore();
+  }
+});
+
+Deno.test.afterAll(async () => {
+  await parserParserState.close();
 });

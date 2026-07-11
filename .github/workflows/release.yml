@@ -1,22 +1,28 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'app/v*'
+  workflow_call:
+    inputs:
+      release_version:
+        description: Version embedded in validation archives
+        required: false
+        type: string
+        default: 0.0.0-pr
+
+permissions:
+  contents: read
 
 env:
   DENO_VERSION: '2.5.6'
-  DOTNET_VERSION: '8.0.x'
+  GO_VERSION: '1.26.5'
+  PARSER_BEHAVIOR_VERSION: '2.0.0-go.1'
   PARSER_PROJECT_DIR: 'packages/praxrr-parser'
+  LEGACY_PARSER_ROLLBACK_IMAGE: 'ghcr.io/yandy-r/praxrr-parser@sha256:59edc5953cf89b237461f5df1d44d0f9b6887baaee9f096626ffb99a2d67802c'
 
 jobs:
   compatibility-gate:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/app/v')
-    permissions:
-      contents: read
-
+    name: release-compatibility
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,51 +33,71 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
 
       - name: Install dependencies
-        run: deno install --node-modules-dir
+        run: deno install --frozen --node-modules-dir
 
       - name: Run compatibility check
         run: deno task compat:check
 
   build:
     needs: compatibility-gate
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/app/v')
+    name: archive-${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
-
     strategy:
+      fail-fast: false
       matrix:
         include:
           - platform: linux-x64
+            runner: ubuntu-latest
             deno_target: x86_64-unknown-linux-gnu
-            dotnet_rid: linux-x64
+            goos: linux
+            goarch: amd64
             vite_platform: linux-amd64
             archive_ext: tar.gz
             binary_ext: ''
+            native: true
+            adjacent: true
           - platform: linux-arm64
+            runner: ubuntu-latest
             deno_target: aarch64-unknown-linux-gnu
-            dotnet_rid: linux-arm64
+            goos: linux
+            goarch: arm64
             vite_platform: linux-arm64
             archive_ext: tar.gz
             binary_ext: ''
+            native: false
+            adjacent: false
           - platform: macos-x64
+            runner: macos-15-intel
             deno_target: x86_64-apple-darwin
-            dotnet_rid: osx-x64
+            goos: darwin
+            goarch: amd64
             vite_platform: macos-amd64
             archive_ext: tar.gz
             binary_ext: ''
+            native: true
+            adjacent: false
           - platform: macos-arm64
+            runner: macos-15
             deno_target: aarch64-apple-darwin
-            dotnet_rid: osx-arm64
+            goos: darwin
+            goarch: arm64
             vite_platform: macos-arm64
             archive_ext: tar.gz
             binary_ext: ''
+            native: true
+            adjacent: false
           - platform: windows-x64
+            runner: windows-latest
             deno_target: x86_64-pc-windows-msvc
-            dotnet_rid: win-x64
+            goos: windows
+            goarch: amd64
             vite_platform: windows-amd64
             archive_ext: zip
             binary_ext: '.exe'
+            native: true
+            adjacent: false
 
     steps:
       - name: Checkout
@@ -82,98 +108,168 @@ jobs:
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+          cache-dependency-path: packages/praxrr-parser/go.sum
 
-      - name: Extract version
+      - name: Resolve release version
         id: version
+        shell: bash
+        env:
+          CALL_VERSION: ${{ inputs.release_version }}
         run: |
-          VERSION="${GITHUB_REF_NAME#app/v}"
-          echo "value=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "${GITHUB_REF}" == refs/tags/app/v* ]]; then
+            version="${GITHUB_REF_NAME#app/v}"
+          else
+            version="${CALL_VERSION}"
+          fi
+          test -n "${version}"
+          echo "value=${version}" >>"${GITHUB_OUTPUT}"
 
       - name: Install dependencies
-        run: deno install --node-modules-dir
+        shell: bash
+        run: deno install --frozen --node-modules-dir
 
       - name: Build SvelteKit
-        run: cd packages/praxrr-app && deno run -A npm:vite build
+        shell: bash
         env:
           APP_BASE_PATH: ${{ github.workspace }}/dist/build
           VITE_PLATFORM: ${{ matrix.vite_platform }}
           VITE_CHANNEL: stable
+        run: |
+          cd packages/praxrr-app
+          deno run -A npm:vite build
 
-      - name: Compile Deno binary
+      - name: Compile application binary
+        shell: bash
         run: |
           mkdir -p dist/staging
           deno compile \
             --no-check \
             --allow-net --allow-read --allow-write \
             --allow-env --allow-ffi --allow-run --allow-sys \
-            --target ${{ matrix.deno_target }} \
-            --output dist/staging/praxrr${{ matrix.binary_ext }} \
+            --target "${{ matrix.deno_target }}" \
+            --output "dist/staging/praxrr${{ matrix.binary_ext }}" \
             dist/build/mod.ts
           cp dist/build/server.js dist/staging/server.js
-          cp -r dist/build/static dist/staging/static
+          cp -R dist/build/static dist/staging/static
 
-      - name: Build parser
+      - name: Build pinned static Go parser
+        shell: bash
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
-          rm -f "${PARSER_PROJECT_DIR}/Directory.Build.props"
-          dotnet publish "${PARSER_PROJECT_DIR}/Parser.csproj" \
-            -c Release \
-            -r ${{ matrix.dotnet_rid }} \
-            --self-contained \
-            -p:PublishSingleFile=true \
-            -p:IncludeNativeLibrariesForSelfExtract=true \
-            -o dist/parser-out
-
-      - name: Stage parser binary
-        run: |
-          cp dist/parser-out/Parser${{ matrix.binary_ext }} \
-             dist/staging/praxrr-parser${{ matrix.binary_ext }}
+          cd "${PARSER_PROJECT_DIR}"
+          go mod verify
+          go build -trimpath \
+            -ldflags="-s -w -X main.version=${PARSER_BEHAVIOR_VERSION}" \
+            -o "${GITHUB_WORKSPACE}/dist/staging/praxrr-parser${{ matrix.binary_ext }}" \
+            ./cmd/praxrr-parser
 
       - name: Create archive
+        id: archive
+        shell: bash
         run: |
-          cd dist/staging
-          ARCHIVE_NAME="praxrr-${{ steps.version.outputs.value }}-${{ matrix.platform }}"
-          if [ "${{ matrix.archive_ext }}" = "tar.gz" ]; then
-            tar -czf "../${ARCHIVE_NAME}.tar.gz" *
+          archive="praxrr-${{ steps.version.outputs.value }}-${{ matrix.platform }}.${{ matrix.archive_ext }}"
+          if [[ "${{ matrix.archive_ext }}" == "tar.gz" ]]; then
+            tar -C dist/staging -czf "dist/${archive}" .
           else
-            zip "../${ARCHIVE_NAME}.zip" *
+            powershell.exe -NoLogo -NoProfile -Command \
+              "Compress-Archive -Path 'dist/staging/*' -DestinationPath 'dist/${archive}' -Force"
+          fi
+          echo "name=${archive}" >>"${GITHUB_OUTPUT}"
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: dist/staging
+          format: spdx-json
+          output-file: dist/${{ steps.archive.outputs.name }}.spdx.json
+          upload-artifact: false
+
+      - name: Record build provenance and rollback identifiers
+        shell: bash
+        env:
+          ARCHIVE: dist/${{ steps.archive.outputs.name }}
+          SBOM: dist/${{ steps.archive.outputs.name }}.spdx.json
+          PROVENANCE: dist/${{ steps.archive.outputs.name }}.provenance.json
+          PLATFORM: ${{ matrix.platform }}
+          GOOS_VALUE: ${{ matrix.goos }}
+          GOARCH_VALUE: ${{ matrix.goarch }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          # shellcheck disable=SC2016
+          deno eval '
+            const hex = async (path) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await Deno.readFile(path))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+            const manifest = JSON.parse(await Deno.readTextFile("packages/praxrr-parser/testdata/golden/manifest.json"));
+            const value = {
+              schemaVersion: 1,
+              sourceRepository: Deno.env.get("GITHUB_REPOSITORY"),
+              sourceCommit: Deno.env.get("GITHUB_SHA"),
+              sourceRef: Deno.env.get("GITHUB_REF"),
+              releaseVersion: Deno.env.get("RELEASE_VERSION"),
+              parserBehaviorVersion: Deno.env.get("PARSER_BEHAVIOR_VERSION"),
+              toolchain: { go: Deno.env.get("GO_VERSION"), cgoEnabled: false },
+              target: { platform: Deno.env.get("PLATFORM"), goos: Deno.env.get("GOOS_VALUE"), goarch: Deno.env.get("GOARCH_VALUE") },
+              subjects: [
+                { name: Deno.env.get("ARCHIVE").replace(/^.*[\\/]/, ""), sha256: await hex(Deno.env.get("ARCHIVE")) },
+                { name: Deno.env.get("SBOM").replace(/^.*[\\/]/, ""), sha256: await hex(Deno.env.get("SBOM")) },
+              ],
+              rollback: {
+                legacyCSharpImage: Deno.env.get("LEGACY_PARSER_ROLLBACK_IMAGE"),
+                legacyCSharpOracleContainer: manifest.oracle.container,
+                legacyCSharpRevision: manifest.oracle.sourceCommit,
+                legacyCSharpRuntime: manifest.oracle.dotnetRuntime,
+              },
+            };
+            await Deno.writeTextFile(Deno.env.get("PROVENANCE"), `${JSON.stringify(value, null, 2)}\n`);
+          '
+
+      - name: Record checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum \
+            "${{ steps.archive.outputs.name }}" \
+            "${{ steps.archive.outputs.name }}.spdx.json" \
+            "${{ steps.archive.outputs.name }}.provenance.json" \
+            >"${{ steps.archive.outputs.name }}.sha256"
+
+      - name: Extract archive for smoke
+        shell: bash
+        run: |
+          mkdir -p dist/smoke
+          if [[ "${{ matrix.archive_ext }}" == "tar.gz" ]]; then
+            tar -C dist/smoke -xzf "dist/${{ steps.archive.outputs.name }}"
+          else
+            powershell.exe -NoLogo -NoProfile -Command \
+              "Expand-Archive -LiteralPath 'dist/${{ steps.archive.outputs.name }}' -DestinationPath 'dist/smoke' -Force"
           fi
 
-      - name: Upload artifact
+      - name: Smoke archive layout and native runtime
+        shell: bash
+        run: |
+          deno run -A scripts/smoke-parser-release.ts \
+            --directory dist/smoke \
+            --archive "dist/${{ steps.archive.outputs.name }}" \
+            --checksum-file "dist/${{ steps.archive.outputs.name }}.sha256" \
+            --platform "${{ matrix.platform }}" \
+            --expected-version "${PARSER_BEHAVIOR_VERSION}" \
+            --native "${{ matrix.native }}" \
+            --adjacent "${{ matrix.adjacent }}"
+
+      - name: Upload archive evidence
         uses: actions/upload-artifact@v4
         with:
           name: praxrr-${{ matrix.platform }}
-          path: dist/praxrr-*.${{ matrix.archive_ext }}
-
-  release:
-    needs: [build, compatibility-gate]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/app/v')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Normalize release version
-        id: release-version
-        run: |
-          VERSION="${GITHUB_REF_NAME#app/v}"
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ steps.release-version.outputs.value }}
-          generate_release_notes: true
-          files: artifacts/*
-          draft: false
-          prerelease: false
+          if-no-files-found: error
+          path: |
+            dist/${{ steps.archive.outputs.name }}
+            dist/${{ steps.archive.outputs.name }}.sha256
+            dist/${{ steps.archive.outputs.name }}.spdx.json
+            dist/${{ steps.archive.outputs.name }}.provenance.json

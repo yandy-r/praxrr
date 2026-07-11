@@ -155,11 +155,11 @@ function buildRemoteUrl(repositoryUrl: string, personalAccessToken?: string | nu
   return repositoryUrl.replace('https://github.com', `https://${personalAccessToken}@github.com`);
 }
 
-async function fetchRemoteBranch(repoPath: string, remoteUrl: string, branch: string): Promise<void> {
-  await execGit(['fetch', '--quiet', remoteUrl, `${branch}:refs/remotes/origin/${branch}`], repoPath);
+export async function fetchRemoteBranch(repoPath: string, remoteUrl: string, branch: string): Promise<void> {
+  await execGit(['fetch', '--quiet', remoteUrl, `refs/heads/${branch}:refs/remotes/origin/${branch}`], repoPath);
 }
 
-async function getAheadBehind(repoPath: string, branch: string): Promise<{ ahead: number; behind: number }> {
+export async function getAheadBehind(repoPath: string, branch: string): Promise<{ ahead: number; behind: number }> {
   const output = await execGit(['rev-list', '--left-right', '--count', `origin/${branch}...HEAD`], repoPath);
   const parts = output.split('\t').map((value) => parseInt(value, 10) || 0);
   return {

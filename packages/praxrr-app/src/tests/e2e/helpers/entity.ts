@@ -30,8 +30,13 @@ export async function goToCustomFormat(page: Page, databaseId: number, name: str
   await page.getByPlaceholder(/search/i).fill(name);
   await page.waitForTimeout(500); // debounce
 
-  // Click the table row containing the name (rows are <tr> with onRowClick, not links)
-  await page.locator('table tbody tr', { hasText: name }).first().click();
+  const cardLink = page.locator(`a[href^="/custom-formats/${databaseId}/"]`).filter({ hasText: name }).first();
+  if ((await cardLink.count()) > 0) {
+    await cardLink.click();
+  } else {
+    // Table view remains supported for users who persisted that preference.
+    await page.locator('table tbody tr', { hasText: name }).first().click();
+  }
   await page.waitForURL(/\/custom-formats\/\d+\/\d+/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
 }
