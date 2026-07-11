@@ -18,10 +18,12 @@ dist/
 .svelte-kit/
 
 # -----------------------------------------------------------------------------
-# .NET build artifacts
+# Go parser development and test artifacts
 # -----------------------------------------------------------------------------
-packages/praxrr-parser/bin/
-packages/praxrr-parser/obj/
+packages/praxrr-parser/*.test
+packages/praxrr-parser/coverage*.out
+packages/praxrr-parser/testdata/
+packages/praxrr-parser/tools/
 
 # -----------------------------------------------------------------------------
 # Git (not needed in image)

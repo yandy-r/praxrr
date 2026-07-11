@@ -161,17 +161,13 @@ services:
     develop:
       watch:
         - action: rebuild
-          path: ./packages/praxrr-parser
-          ignore:
-            - node_modules
-            - dist
-            - ./**/*.md
-            - .github/**
-            - .vscode/**
-            - .dockerignore
-            - .gitignore
-            - .prettierignore
-            - .eslintignore
+          path: ./packages/praxrr-parser/go.mod
+        - action: rebuild
+          path: ./packages/praxrr-parser/go.sum
+        - action: rebuild
+          path: ./packages/praxrr-parser/cmd
+        - action: rebuild
+          path: ./packages/praxrr-parser/internal
         - action: rebuild
           path: ./Dockerfile.parser
 

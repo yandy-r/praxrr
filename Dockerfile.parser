@@ -1,63 +1,59 @@
 # =============================================================================
 # Praxrr Parser Dockerfile
 # =============================================================================
-# .NET 8.0 microservice for parsing release titles
-# This service is OPTIONAL - only needed for custom format/quality profile testing
+# Go microservice for parsing release titles.
+# This service is OPTIONAL - only needed for custom format/quality profile testing.
 #
 # Build:  docker build -f Dockerfile.parser -t praxrr-parser .
-# Run:    docker run -p 5000:5000 praxrr-parser
+# Run:    docker run --network <private-network> praxrr-parser
 
 # -----------------------------------------------------------------------------
 # Stage 1: Build
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS builder
+FROM golang:1.26.5-alpine3.23@sha256:622e56dbc11a8cfe87cafa2331e9a201877271cbff918af53d3be315f3da88cc AS builder
 
 WORKDIR /build
-# Keep parser source path explicit for the migration state.
+
 ARG PARSER_PROJECT_DIR=packages/praxrr-parser
+ARG PARSER_VERSION=2.0.0-go.1
+ARG TARGETOS=linux
+ARG TARGETARCH
 
-# Copy project file first for better layer caching
-COPY ${PARSER_PROJECT_DIR}/Parser.csproj ./
-RUN dotnet restore
+# Copy module metadata first so dependency downloads remain cacheable when only
+# parser source changes.
+COPY ${PARSER_PROJECT_DIR}/go.mod ${PARSER_PROJECT_DIR}/go.sum ./
+RUN go mod download && go mod verify
 
-# Copy source and build
 COPY ${PARSER_PROJECT_DIR}/ ./
-# Remove local build config (uses paths that don't exist in container)
-RUN rm -f Directory.Build.props && dotnet publish -c Release -o /app --no-restore
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+	go build -trimpath -ldflags="-s -w -X main.version=${PARSER_VERSION}" \
+	-o /out/praxrr-parser ./cmd/praxrr-parser
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
+FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 
-# Labels for container metadata
 LABEL org.opencontainers.image.title="Praxrr Parser"
 LABEL org.opencontainers.image.description="Release title parser for Praxrr (optional)"
 LABEL org.opencontainers.image.source="https://github.com/yandy-r/praxrr"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
+RUN apk add --no-cache ca-certificates tzdata wget && \
+	addgroup -g 1000 parser && \
+	adduser -u 1000 -G parser -D -h /app parser
+
 WORKDIR /app
+COPY --from=builder --chown=root:root --chmod=0555 /out/praxrr-parser ./praxrr-parser
 
-# Copy built application
-COPY --from=builder /app ./
-
-# Create non-root user
-RUN addgroup -g 1000 parser && \
-    adduser -u 1000 -G parser -D -h /app parser
-
-# Switch to non-root user
 USER parser
 
-# Environment variables
-ENV ASPNETCORE_URLS=http://+:5000
-ENV ASPNETCORE_ENVIRONMENT=Production
+ENV PARSER_ADDR=:5000
+ENV TZ=Etc/UTC
 
-# Expose port
 EXPOSE 5000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget -qO- http://localhost:5000/health || exit 1
+	CMD wget -qO- http://127.0.0.1:5000/health >/dev/null || exit 1
 
-# Run the application
-ENTRYPOINT ["dotnet", "Parser.dll"]
+ENTRYPOINT ["/app/praxrr-parser"]
