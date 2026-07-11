@@ -37,13 +37,13 @@ The Go parser cutover is strongly covered by immutable parity, boundary, lifecyc
 
 ## Validation Results
 
-| Check | Result |
-| --- | --- |
-| Type check | Pass — `deno task check` (0 errors, 0 warnings) |
-| Lint | Fail — full repo reports pre-existing clean-main failures; scoped branch check identifies F002 and F003 |
-| Tests | Pass — `scripts/check-parser-go.sh` and `deno task test` (2,353 passed, 0 failed) |
-| Build | Pass — `deno task build` |
-| Parser compatibility | Pass — 114 fixtures, race/adversarial gates, five cross-builds, and Deno consumers |
+| Check                | Result                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| Type check           | Pass — `deno task check` (0 errors, 0 warnings)                                                         |
+| Lint                 | Fail — full repo reports pre-existing clean-main failures; scoped branch check identifies F002 and F003 |
+| Tests                | Pass — `scripts/check-parser-go.sh` and `deno task test` (2,353 passed, 0 failed)                       |
+| Build                | Pass — `deno task build`                                                                                |
+| Parser compatibility | Pass — 114 fixtures, race/adversarial gates, five cross-builds, and Deno consumers                      |
 
 ## Files Reviewed
 
