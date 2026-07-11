@@ -114,8 +114,7 @@ worker-level Deno permissions are not an extra sandbox layer.
    upstream README warns that RCs may break. Do not use an unbounded `^` range
    for a security boundary.
 3. Praxrr has `nodeModulesDir: "manual"` behavior in this checkout. A standalone
-   `deno info
-npm:@extism/extism` asked for `--node-modules-dir=auto`; adding
+   `deno info npm:@extism/extism` asked for `--node-modules-dir=auto`; adding
    the dependency to the root import map and fully regenerating
    `deno.lock`/install state must be tested in the repository's real build.
 4. The npm ESM build chooses its Node compatibility bundle under Deno. Its

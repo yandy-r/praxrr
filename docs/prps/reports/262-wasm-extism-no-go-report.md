@@ -29,19 +29,19 @@ source, API, database, SDK, or UI change was introduced.
 
 ## Validation Results
 
-| Level                  | Status | Notes                                               |
-| ---------------------- | ------ | --------------------------------------------------- |
-| Research structure     | Pass   | 0 errors, 0 warnings                                |
-| Feature-spec structure | Pass   | 0 errors                                            |
-| PRP-plan structure     | Pass   | 0 errors, 0 warnings                                |
-| Formatting             | Pass   | Prettier check passed for every changed document    |
-| Whitespace             | Pass   | `git diff --check` produced no output               |
-| Static analysis        | Pass   | Server check and Svelte check; 0 errors/warnings    |
-| Plugin tests           | Pass   | 61 passed, 0 failed                                 |
-| Full test suite        | Pass   | 2,421 passed (51 steps), 0 failed                   |
-| Production build       | Pass   | Vite build and Deno compile completed               |
-| Scope audit            | Pass   | No plugin source, startup, manifest, or lock change |
-| Manual security review | Pass   | Every mandatory control is treated conjunctively    |
+| Level                  | Status  | Notes                                                                     |
+| ---------------------- | ------- | ------------------------------------------------------------------------- |
+| Research structure     | Pass    | 0 errors, 0 warnings                                                      |
+| Feature-spec structure | Warning | 0 structural errors; validator counts the valid closing fence as untagged |
+| PRP-plan structure     | Pass    | 0 errors, 0 warnings                                                      |
+| Formatting             | Pass    | Prettier check passed for every changed document                          |
+| Whitespace             | Pass    | `git diff --check` produced no output                                     |
+| Static analysis        | Pass    | Server check and Svelte check; 0 errors/warnings                          |
+| Plugin tests           | Pass    | 61 passed, 0 failed                                                       |
+| Full test suite        | Pass    | 2,421 passed (51 steps), 0 failed                                         |
+| Production build       | Pass    | Vite build and Deno compile completed                                     |
+| Scope audit            | Pass    | No plugin source, startup, manifest, or lock change                       |
+| Manual security review | Pass    | Every mandatory control is treated conjunctively                          |
 
 ## Files Changed
 
