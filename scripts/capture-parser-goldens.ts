@@ -1,3 +1,7 @@
+import babelPlugin from 'npm:prettier@3.9.5/plugins/babel';
+import estreePlugin from 'npm:prettier@3.9.5/plugins/estree';
+import { format } from 'npm:prettier@3.9.5/standalone';
+
 type JsonValue =
   | null
   | boolean
@@ -279,14 +283,20 @@ function canonicalize(value: unknown): unknown {
   );
 }
 
-function canonicalText(manifest: GoldenManifest): string {
+async function canonicalText(manifest: GoldenManifest): Promise<string> {
   const stable = {
     ...manifest,
     selectedResponseHeaders: [...manifest.selectedResponseHeaders].sort(),
     excludedResponseHeaders: [...manifest.excludedResponseHeaders].sort(),
     fixtures: [...manifest.fixtures].sort((left, right) => left.id.localeCompare(right.id)),
   };
-  return `${JSON.stringify(canonicalize(stable), null, 2)}\n`;
+  return await format(JSON.stringify(canonicalize(stable), null, 2), {
+    parser: 'json',
+    plugins: [babelPlugin, estreePlugin],
+    printWidth: 120,
+    tabWidth: 2,
+    useTabs: false,
+  });
 }
 
 function selectFixtures(manifest: GoldenManifest, categories?: Set<string>): GoldenFixture[] {
@@ -366,7 +376,7 @@ async function main(): Promise<void> {
 
   const manifest = validateManifest(parsed, !options.validate);
   if (options.validate) {
-    if (raw !== canonicalText(manifest)) {
+    if (raw !== (await canonicalText(manifest))) {
       fail(`${options.manifestPath} is not canonical; run capture`);
     }
     console.log(`Validated ${manifest.fixtures.length} golden fixture(s).`);
@@ -402,7 +412,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  await Deno.writeTextFile(options.manifestPath, canonicalText(recaptured));
+  await Deno.writeTextFile(options.manifestPath, await canonicalText(recaptured));
   console.log(`Captured ${selected.length} fixture(s) from ${options.baseUrl}.`);
 }
 

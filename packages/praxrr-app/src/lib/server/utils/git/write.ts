@@ -182,6 +182,8 @@ export async function refreshLocalRepositoryClone(repositoryUrl: string, targetP
     throw new Error(`Local repository path does not exist or is not a directory: ${localRepositoryPath}`);
   }
 
+  const branch = await execGitSafe(['branch', '--show-current'], targetPath);
+
   try {
     await Deno.remove(targetPath, { recursive: true });
   } catch {
@@ -189,7 +191,7 @@ export async function refreshLocalRepositoryClone(repositoryUrl: string, targetP
   }
 
   if (await isGitRepositoryRoot(localRepositoryPath)) {
-    await cloneLocalGitRepository(repositoryUrl, targetPath);
+    await cloneLocalGitRepository(repositoryUrl, targetPath, branch || undefined);
   } else {
     await copyPathRecursive(localRepositoryPath, targetPath);
   }

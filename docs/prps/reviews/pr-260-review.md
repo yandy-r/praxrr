@@ -17,19 +17,19 @@ The Go parser cutover is strongly covered by immutable parity, boundary, lifecyc
 ### HIGH
 
 - **[F001]** `packages/praxrr-app/src/lib/server/utils/git/write.ts:174` — Refreshing a local Git source deletes the existing clone and reclones without preserving its checked-out branch. When the configured source branch differs from the source repository's default HEAD, a sync silently switches the target to the wrong branch.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Correctness
   - **Suggested fix**: Capture the target clone's current branch before removal and pass it to `cloneLocalGitRepository`; add a regression test using a non-default branch.
 
 ### MEDIUM
 
 - **[F002]** `packages/praxrr-app/src/tests/e2e/helpers/entity.ts:1` — The branch-owned helper is not Prettier-clean, so scoped formatting validation fails.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Pattern Compliance
   - **Suggested fix**: Format this file with the repository Prettier configuration.
 
 - **[F003]** `packages/praxrr-parser/testdata/golden/manifest.json:1` — The generated golden manifest is not Prettier-clean, so scoped formatting validation fails.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Pattern Compliance
   - **Suggested fix**: Format the manifest deterministically and ensure the capture workflow preserves that formatting.
 

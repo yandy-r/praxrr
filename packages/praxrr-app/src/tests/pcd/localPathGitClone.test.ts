@@ -239,3 +239,33 @@ Deno.test('local repository refresh re-copies source changes into target clone',
     await Deno.remove(root, { recursive: true }).catch(() => {});
   }
 });
+
+Deno.test('local Git repository refresh preserves the target clone branch', async () => {
+  const root = tempPath('local-git-clone-branch-refresh');
+  const source = `${root}/source`;
+  const target = `${root}/target`;
+
+  try {
+    await createWorkingRepository(source);
+    await git(['switch', '-c', 'develop'], source);
+    await Deno.writeTextFile(`${source}/pcd.json`, '{"name":"develop-before"}\n');
+    await git(['add', 'pcd.json'], source);
+    await git(['commit', '-m', 'test: seed develop branch'], source);
+    await git(['switch', 'main'], source);
+
+    await clone(source, target, 'develop');
+
+    await git(['switch', 'develop'], source);
+    await Deno.writeTextFile(`${source}/pcd.json`, '{"name":"develop-after"}\n');
+    await git(['add', 'pcd.json'], source);
+    await git(['commit', '-m', 'test: advance develop branch'], source);
+    await git(['switch', 'main'], source);
+
+    await refreshLocalRepositoryClone(source, target);
+
+    assertEquals(await git(['branch', '--show-current'], target), 'develop');
+    assertEquals(await Deno.readTextFile(`${target}/pcd.json`), '{"name":"develop-after"}\n');
+  } finally {
+    await Deno.remove(root, { recursive: true }).catch(() => {});
+  }
+});

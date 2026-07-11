@@ -1,9 +1,5 @@
 {
-  "excludedResponseHeaders": [
-    "date",
-    "server",
-    "transfer-encoding"
-  ],
+  "excludedResponseHeaders": ["date", "server", "transfer-encoding"],
   "fixtures": [
     {
       "category": "batch",
@@ -296,9 +292,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -340,9 +334,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -396,9 +388,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -440,9 +430,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -496,9 +484,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -540,9 +526,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -596,9 +580,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -652,9 +634,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -708,9 +688,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -764,9 +742,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -820,9 +796,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -876,9 +850,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -932,9 +904,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -974,9 +944,7 @@
         "decodedBody": {
           "edition": null,
           "episode": {
-            "absoluteEpisodeNumbers": [
-              12
-            ],
+            "absoluteEpisodeNumbers": [12],
             "airDate": null,
             "episodeNumbers": [],
             "fullSeason": false,
@@ -990,9 +958,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "SubsPlease",
@@ -1046,9 +1012,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "SubsPlease",
@@ -1088,11 +1052,7 @@
         "decodedBody": {
           "edition": null,
           "episode": {
-            "absoluteEpisodeNumbers": [
-              12,
-              13,
-              14
-            ],
+            "absoluteEpisodeNumbers": [12, 13, 14],
             "airDate": null,
             "episodeNumbers": [],
             "fullSeason": false,
@@ -1106,9 +1066,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "SubsPlease",
@@ -1150,9 +1108,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              3
-            ],
+            "episodeNumbers": [3],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1164,9 +1120,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1208,9 +1162,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              7
-            ],
+            "episodeNumbers": [7],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1222,9 +1174,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1266,9 +1216,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              1
-            ],
+            "episodeNumbers": [1],
             "fullSeason": false,
             "isMiniSeries": true,
             "isMultiSeason": false,
@@ -1280,9 +1228,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1324,9 +1270,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              2
-            ],
+            "episodeNumbers": [2],
             "fullSeason": false,
             "isMiniSeries": true,
             "isMultiSeason": false,
@@ -1338,9 +1282,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1394,9 +1336,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "BRDisk",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1438,9 +1378,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5
-            ],
+            "episodeNumbers": [5],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1452,9 +1390,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -1508,9 +1444,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "SubsPlease",
@@ -1564,9 +1498,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1608,9 +1540,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -1652,11 +1582,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5,
-              6,
-              7
-            ],
+            "episodeNumbers": [5, 6, 7],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1668,9 +1594,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1712,11 +1636,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5,
-              6,
-              7
-            ],
+            "episodeNumbers": [5, 6, 7],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1728,9 +1648,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1772,10 +1690,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5,
-              6
-            ],
+            "episodeNumbers": [5, 6],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1787,9 +1702,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1831,10 +1744,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5,
-              6
-            ],
+            "episodeNumbers": [5, 6],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -1846,9 +1756,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1902,9 +1810,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -1958,9 +1864,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -2014,9 +1918,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -2058,9 +1960,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5
-            ],
+            "episodeNumbers": [5],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -2072,9 +1972,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -2116,14 +2014,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "German",
-            "Original"
-          ],
+          "languages": ["German", "Original"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2163,15 +2056,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "German",
-            "Original",
-            "English"
-          ],
+          "languages": ["German", "Original", "English"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2211,18 +2098,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "English",
-            "German",
-            "French",
-            "Japanese",
-            "Korean",
-            "Chinese"
-          ],
+          "languages": ["English", "German", "French", "Japanese", "Korean", "Chinese"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2262,15 +2140,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "French"
-          ],
+          "languages": ["French"],
           "modifier": "None",
-          "movieTitles": [
-            "Amelie AKA Le Fabuleux Destin d Amelie",
-            "Amelie",
-            "Le Fabuleux Destin d Amelie"
-          ],
+          "movieTitles": ["Amelie AKA Le Fabuleux Destin d Amelie", "Amelie", "Le Fabuleux Destin d Amelie"],
           "releaseGroup": "QxR",
           "releaseHash": null,
           "resolution": 1080,
@@ -2310,13 +2182,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Spirited Away"
-          ],
+          "movieTitles": ["Spirited Away"],
           "releaseGroup": "Group",
           "releaseHash": null,
           "resolution": 1080,
@@ -2356,9 +2224,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -2400,13 +2266,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "The Matrix"
-          ],
+          "movieTitles": ["The Matrix"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2446,13 +2308,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 720,
@@ -2492,13 +2350,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 480,
@@ -2538,13 +2392,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "RawHD",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2584,13 +2434,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "Regional",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 480,
@@ -2630,13 +2476,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "English"
-          ],
+          "languages": ["English"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -2676,13 +2518,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "Screener",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 480,
@@ -2722,13 +2560,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 720,
@@ -2768,13 +2602,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 720,
@@ -2814,13 +2644,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 720,
@@ -2860,9 +2686,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5
-            ],
+            "episodeNumbers": [5],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -2874,9 +2698,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -2918,13 +2740,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "QxR",
           "releaseHash": null,
           "resolution": 1080,
@@ -2964,13 +2782,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": null,
           "releaseHash": null,
           "resolution": 1080,
@@ -3010,13 +2824,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Film"
-          ],
+          "movieTitles": ["Film"],
           "releaseGroup": "REALGROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -3397,13 +3207,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
-          "movieTitles": [
-            "Example Movie"
-          ],
+          "movieTitles": ["Example Movie"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -3917,14 +3723,9 @@
           "episode": null,
           "hardcodedSubs": "Generic Hardcoded Subs",
           "imdbId": "tt0083658",
-          "languages": [
-            "English",
-            "French"
-          ],
+          "languages": ["English", "French"],
           "modifier": "Remux",
-          "movieTitles": [
-            "Blade Runner"
-          ],
+          "movieTitles": ["Blade Runner"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 2160,
@@ -3964,9 +3765,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -4008,9 +3807,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5
-            ],
+            "episodeNumbers": [5],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -4022,9 +3819,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -4066,9 +3861,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -4202,13 +3995,9 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "French"
-          ],
+          "languages": ["French"],
           "modifier": "None",
-          "movieTitles": [
-            "Amélie"
-          ],
+          "movieTitles": ["Amélie"],
           "releaseGroup": "GROUP",
           "releaseHash": null,
           "resolution": 1080,
@@ -4248,9 +4037,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              5
-            ],
+            "episodeNumbers": [5],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -4262,9 +4049,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -4304,9 +4089,7 @@
         "decodedBody": {
           "edition": null,
           "episode": {
-            "absoluteEpisodeNumbers": [
-              12
-            ],
+            "absoluteEpisodeNumbers": [12],
             "airDate": null,
             "episodeNumbers": [],
             "fullSeason": false,
@@ -4320,9 +4103,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Chinese"
-          ],
+          "languages": ["Chinese"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -4364,9 +4145,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              1
-            ],
+            "episodeNumbers": [1],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -4378,9 +4157,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -4422,9 +4199,7 @@
           "episode": null,
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": null,
@@ -4466,9 +4241,7 @@
           "episode": {
             "absoluteEpisodeNumbers": [],
             "airDate": null,
-            "episodeNumbers": [
-              1
-            ],
+            "episodeNumbers": [1],
             "fullSeason": false,
             "isMiniSeries": false,
             "isMultiSeason": false,
@@ -4480,9 +4253,7 @@
           },
           "hardcodedSubs": null,
           "imdbId": null,
-          "languages": [
-            "Unknown"
-          ],
+          "languages": ["Unknown"],
           "modifier": "None",
           "movieTitles": [],
           "releaseGroup": "GROUP",
@@ -4518,8 +4289,5 @@
     "timeZone": "UTC"
   },
   "schemaVersion": 1,
-  "selectedResponseHeaders": [
-    "allow",
-    "content-type"
-  ]
+  "selectedResponseHeaders": ["allow", "content-type"]
 }
