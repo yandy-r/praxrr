@@ -26,6 +26,7 @@ class Config {
   public readonly validateInstances: boolean;
   public readonly pullOnStart: boolean;
   public readonly mcpEnabled: boolean;
+  public readonly pluginsEnabled: boolean;
   public readonly pullOnStartMaxConcurrency: number | null;
   public readonly pullOnStartTimeoutMs: number | null;
   public readonly oidc: {
@@ -81,6 +82,8 @@ class Config {
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
     // MCP server endpoint (/api/v1/mcp). Enabled by default; set MCP_ENABLED=0|false|no|off to disable.
     this.mcpEnabled = Config.parseBooleanEnvWithDefault(Deno.env.get('MCP_ENABLED'), true);
+    // Plugin host (issue #35). Feature-flagged foundation; default OFF (non-throwing).
+    this.pluginsEnabled = Config.parseBooleanEnv(Deno.env.get('PLUGINS_ENABLED'));
     this.pullOnStartMaxConcurrency = Config.parsePositiveIntEnv('PULL_ON_START_MAX_CONCURRENCY');
     this.pullOnStartTimeoutMs = Config.parsePositiveIntEnv('PULL_ON_START_TIMEOUT_MS');
 
@@ -211,6 +214,9 @@ class Config {
     },
     get backups(): string {
       return `${config.basePath}/backups`;
+    },
+    get plugins(): string {
+      return Deno.env.get('PLUGINS_DIR')?.trim() || `${config.basePath}/plugins`;
     },
   };
 }

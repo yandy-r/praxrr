@@ -15,6 +15,7 @@ import { initializeJobs } from '$jobs/init.ts';
 import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { trashGuideManager } from '$trashguide/index.ts';
+import { pluginHost } from '$server/plugins/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
@@ -56,6 +57,23 @@ await logContainerConfig();
 // Initialize PCD caches (must be after migrations and log settings)
 await pcdManager.initialize();
 await trashGuideManager.initialize();
+
+// Initialize the plugin system (feature-flagged, default OFF; never aborts boot)
+if (config.pluginsEnabled) {
+  try {
+    await pluginHost.initialize();
+  } catch (error) {
+    await logger.warn('Failed to initialize plugin host; continuing startup', {
+      source: 'Startup',
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    });
+  }
+} else {
+  await logger.info('Plugin system disabled via PLUGINS_ENABLED', {
+    source: 'Startup',
+    meta: { enabled: false },
+  });
+}
 
 // Auto-link default database on first startup (only once)
 if (!setupStateQueries.isDefaultDatabaseLinked()) {
