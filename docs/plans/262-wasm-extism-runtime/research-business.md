@@ -81,7 +81,9 @@ dependency ordering, and explicit issue non-goals.
   fuel, and forbidden I/O rather than a host crash or indefinite hang.
 
 An authoring guide and distributable example are not user stories delivered by
-#262; they belong to #265. The `.wasm` module in this issue is a test fixture
+
+# 262; they belong to #265. The `.wasm` module in this issue is a test fixture
+
 proving runtime execution, not an SDK promise.
 
 ## Business Rules and Invariants

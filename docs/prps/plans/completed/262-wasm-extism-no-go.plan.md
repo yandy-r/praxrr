@@ -339,12 +339,12 @@ Files that MUST be read before implementing:
 
 ## External Documentation
 
-| Topic              | Source                                                                     | Key Takeaway                                                       |
-| ------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| JS SDK interfaces  | https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/interfaces.ts        | No fuel or active cancellation API                                 |
-| JS SDK memory      | https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/call-context.ts      | `maxPages` bounds host exchange blocks, not every guest memory     |
-| Worker timeout     | https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/background-plugin.ts | Timeout terminates/restarts a worker; it is not deterministic fuel |
-| Native runtime API | https://extism.org/docs/concepts/runtime-apis/                             | Fuel/cancel support belongs to a materially different FFI backend  |
+| Topic              | Source                                                                       | Key Takeaway                                                       |
+| ------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| JS SDK interfaces  | <https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/interfaces.ts>        | No fuel or active cancellation API                                 |
+| JS SDK memory      | <https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/call-context.ts>      | `maxPages` bounds host exchange blocks, not every guest memory     |
+| Worker timeout     | <https://github.com/extism/js-sdk/blob/v2.0.0-rc13/src/background-plugin.ts> | Timeout terminates/restarts a worker; it is not deterministic fuel |
+| Native runtime API | <https://extism.org/docs/concepts/runtime-apis/>                             | Fuel/cancel support belongs to a materially different FFI backend  |
 
 ---
 

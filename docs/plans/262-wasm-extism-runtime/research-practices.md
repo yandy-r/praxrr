@@ -502,7 +502,9 @@ harder to determine whether the runtime itself is safe.
 
 Accept the current spike as a **NO-GO for `@extism/extism`**, preserve the
 Phase-1 unavailable executor, and land only the design/roadmap decision for
-#262. If real execution remains desired, create or approve a separate native
+
+# 262. If real execution remains desired, create or approve a separate native
+
 Extism/Wasmtime FFI design with platform packaging and lifecycle work explicitly
 in scope. Do not weaken the issue's finite fuel and total-memory requirements
 and do not land a partial JS-SDK executor under the same security claim.
