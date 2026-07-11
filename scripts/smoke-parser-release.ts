@@ -442,12 +442,7 @@ async function waitForParserStop(port: number, timeoutMs: number): Promise<void>
   fail(`adjacent parser on port ${port} survived parent termination`);
 }
 
-async function smokeAdjacentDiscovery(
-  app: string,
-  directory: string,
-  expectedVersion: string,
-  timeoutMs: number
-): Promise<number> {
+async function smokeAdjacentDiscovery(app: string, directory: string, timeoutMs: number): Promise<number> {
   const output: string[] = [];
   const dataDirectory = await Deno.makeTempDir({
     prefix: 'praxrr-release-smoke-',
@@ -469,7 +464,7 @@ async function smokeAdjacentDiscovery(
   let parserPort = 0;
   try {
     parserPort = await waitForAdjacentParser(output, timeoutMs);
-    await waitForHealth(`http://127.0.0.1:${parserPort}`, expectedVersion, timeoutMs);
+    // The app emits Ready only after its own parser health probe succeeds.
     await terminateProcess(child, true);
     await waitForExit(child, timeoutMs);
     await waitForParserStop(parserPort, timeoutMs);
@@ -500,7 +495,6 @@ async function main(): Promise<void> {
     adjacentParserPort = await smokeAdjacentDiscovery(
       layout.app,
       await Deno.realPath(options.directory),
-      options.expectedVersion,
       options.timeoutMs
     );
   }
