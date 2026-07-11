@@ -110,3 +110,20 @@ Deno.test('scanPluginDir rethrows an unexpected manifest read error', async () =
 
   await assertRejects(() => scanPluginDir('/any/dir', deps), Deno.errors.PermissionDenied, 'manifest read blocked');
 });
+
+Deno.test('scanPluginDir truncates at the finite MAX_PLUGIN_DIRS limit and never throws', async () => {
+  // More candidate directories than the internal MAX_PLUGIN_DIRS (256): the scan must cap the read
+  // (finite-limit DoS guard) and resolve rather than throw or run unbounded.
+  const total = 300;
+  const deps: ScanDeps = {
+    readDir: async function* (): AsyncGenerator<Deno.DirEntry> {
+      for (let i = 0; i < total; i += 1) {
+        yield { name: `plugin-${i}`, isFile: false, isDirectory: true, isSymlink: false };
+      }
+    },
+    readTextFile: () => Promise.resolve(JSON.stringify({ id: 'com.example.bulk' })),
+  };
+
+  const entries = await scanPluginDir('/any/dir', deps);
+  assertEquals(entries.length, 256);
+});

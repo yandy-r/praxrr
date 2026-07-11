@@ -35,7 +35,7 @@ import {
 import { scanPluginDir, type RawManifestEntry } from './scan.ts';
 import { pluginRegistry, type RegisteredPlugin } from './registry.ts';
 import { UnavailablePluginExecutor, type PluginExecutionRequest, type PluginExecutor } from './executor.ts';
-import { PluginPointNotWiredError, PluginRuntimeUnavailableError } from './errors.ts';
+import { PluginExecutionError, PluginPointNotWiredError, PluginRuntimeUnavailableError } from './errors.ts';
 import { scrubPluginBoundary } from './hostContext.ts';
 
 /** Finite per-plugin dispatch budget. A hung observer is aborted so it can never stall a caller. */
@@ -46,6 +46,27 @@ const LOG_SOURCE = 'Plugins';
 
 /** The disposition of one scanned manifest entry after validation + registration. */
 type EntryOutcome = 'registered' | 'rejected';
+
+/**
+ * A promise that rejects with a {@link PluginExecutionError} when `signal` aborts. Lets the host bound
+ * an executor that ignores its `signal` and never settles, so a hung plugin can never stall the caller.
+ * It never resolves; the caller clears the backing timer once `execute` settles, so it can only reject
+ * on a real timeout.
+ */
+function rejectOnAbort(signal: AbortSignal, pluginId: string): Promise<never> {
+  return new Promise<never>((_, reject) => {
+    signal.addEventListener(
+      'abort',
+      () =>
+        reject(
+          new PluginExecutionError(
+            `Observe dispatch for plugin '${pluginId}' exceeded ${OBSERVE_DISPATCH_TIMEOUT_MS}ms`
+          )
+        ),
+      { once: true }
+    );
+  });
+}
 
 /**
  * Optional-subsystem plugin manager. Constructed with an executor (default
@@ -198,15 +219,18 @@ export class PluginHost {
    * the EXPECTED Phase-1 outcome (logged at debug); any other throw is logged at warn. Never propagates.
    */
   private async dispatchOne(plugin: RegisteredPlugin, point: ExtensionPointId, input: PluginJsonValue): Promise<void> {
-    const request: PluginExecutionRequest = {
-      plugin,
-      point,
-      input,
-      signal: AbortSignal.timeout(OBSERVE_DISPATCH_TIMEOUT_MS),
-    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OBSERVE_DISPATCH_TIMEOUT_MS);
+    const request: PluginExecutionRequest = { plugin, point, input, signal: controller.signal };
 
     try {
-      await this.executor.execute(request);
+      const executed = this.executor.execute(request);
+      // Prevent a late rejection (arriving after a timeout already won the race) from surfacing as an
+      // unhandled rejection; the race below still observes the original settlement.
+      void executed.catch(() => {});
+      // Enforce the finite budget at the HOST even if the executor ignores `signal` and never settles,
+      // so a non-cooperative or hung plugin can never stall notifyObservers (or the caller).
+      await Promise.race([executed, rejectOnAbort(controller.signal, plugin.manifest.id)]);
     } catch (error) {
       if (error instanceof PluginRuntimeUnavailableError) {
         await logger.debug('Plugin runtime unavailable; observe dispatch skipped', {
@@ -219,6 +243,8 @@ export class PluginHost {
         source: LOG_SOURCE,
         meta: { pluginId: plugin.manifest.id, point, error: String(error) },
       });
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

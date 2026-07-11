@@ -227,3 +227,55 @@ Deno.test('notifyObservers throws PluginPointNotWiredError for a declared-but-un
   const host = new PluginHost();
   await assertRejects(() => host.notifyObservers('sync.beforeApply.observe', () => null), PluginPointNotWiredError);
 });
+
+Deno.test('notifyObservers isolates a generic executor throw and still dispatches the next plugin', async () => {
+  pluginRegistry.clear();
+  const first: PluginManifest = { ...wiredManifest, id: 'com.example.first' };
+  const second: PluginManifest = { ...wiredManifest, id: 'com.example.second' };
+  pluginRegistry.register('/tmp/first', first);
+  pluginRegistry.register('/tmp/second', second);
+
+  const calls: string[] = [];
+  const flakyExecutor: PluginExecutor = {
+    execute(request: PluginExecutionRequest): Promise<PluginJsonValue> {
+      calls.push(request.plugin.manifest.id);
+      if (request.plugin.manifest.id === 'com.example.first') {
+        return Promise.reject(new Error('boom'));
+      }
+      return Promise.resolve(null);
+    },
+  };
+
+  try {
+    const host = new PluginHost(flakyExecutor);
+    // The first plugin's generic throw must be isolated (never propagated) and must not block the second.
+    await host.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'preview' }));
+    assertEquals(calls, ['com.example.first', 'com.example.second']);
+  } finally {
+    pluginRegistry.clear();
+  }
+});
+
+Deno.test(
+  'initialize() never aborts boot when two manifests share an id (duplicate registration is skipped)',
+  async () => {
+    const tmp = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-' });
+    try {
+      // Both subdirs carry the same id, so the second registration throws a duplicate-id error the host
+      // must isolate — initialize() still resolves and exactly one plugin is registered.
+      await writeManifest(tmp, 'a', VALID_MANIFEST);
+      await writeManifest(tmp, 'b', VALID_MANIFEST);
+
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(tmp, async () => {
+          pluginRegistry.clear();
+          await pluginHost.initialize();
+          assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 1);
+        });
+      });
+    } finally {
+      await Deno.remove(tmp, { recursive: true });
+      pluginRegistry.clear();
+    }
+  }
+);

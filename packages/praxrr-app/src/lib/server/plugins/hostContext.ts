@@ -29,9 +29,17 @@ const CAPABILITY_FIELD_ALLOWLIST: Record<CapabilityId, readonly string[]> = {
   'read:config-validation': ['valid', 'issues', 'entity'],
 };
 
-/** Narrow to a plain (non-array, non-null) object whose entries can be recursed. */
+/**
+ * Narrow to a PLAIN object (`{}` / `Object.create(null)`) whose entries can be recursed. Class
+ * instances such as `Date`/`Map`/`Set`/`RegExp` are rejected so they drop to `undefined` in
+ * {@link toJsonSafe} (matching the doc-comment / `JSON.stringify` intent) instead of serializing to `{}`.
+ */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /**

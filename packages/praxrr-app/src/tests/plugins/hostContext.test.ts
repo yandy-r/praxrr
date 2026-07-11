@@ -117,3 +117,22 @@ Deno.test('buildCapabilityInput coerces non-JSON values in allow-listed fields t
   assertEquals(JSON.parse(JSON.stringify(projected)), projected);
   assertEquals(structuredClone(projected), projected);
 });
+
+Deno.test('buildCapabilityInput drops class instances (Date/Map/Set) instead of emitting {}', () => {
+  const source = {
+    profileId: 'p',
+    name: 'n',
+    // A plain object holding non-JSON class instances: each instance is dropped, plain fields survive.
+    qualities: { when: new Date(0), lookup: new Map([['a', 1]]), tags: new Set([1, 2]), keep: 'ok' },
+    // A bare class instance in an allow-listed field must be dropped entirely (not serialized to {}).
+    customFormatScores: new Date(0),
+  };
+
+  const projected = buildCapabilityInput('read:resolved-profile', source);
+  assert(isJsonRecord(projected));
+
+  assert(!('customFormatScores' in projected));
+  assert(isJsonRecord(projected.qualities));
+  assertEquals(projected.qualities, { keep: 'ok' });
+  assertEquals(JSON.parse(JSON.stringify(projected)), projected);
+});
