@@ -170,6 +170,8 @@ Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `P
 
 `PRAXRR_COOKIE_SECURE` controls the session cookie `Secure` flag: `auto` (default) marks it `Secure` only when the observed request transport is direct HTTPS or a proxy reporting `X-Forwarded-Proto: https`; `on` always marks it `Secure` (HTTPS-only deployments, including a TLS-terminating proxy that omits `X-Forwarded-Proto`); `off` never marks it `Secure` (plain-http LAN / dev escape hatch). Invalid or empty values fall back to `auto`.
 
+`PLUGINS_ENABLED` (`1`|`true`|`yes`|`on` to enable; default **off**) gates the Phase-1 WASM plugin-system foundation (issue #35). When off, the plugin host is a hard no-op. Parsed non-throwing so an invalid value cannot brick boot. `PLUGINS_DIR` (default `<APP_BASE_PATH>/plugins`) is the directory scanned for `praxrr.plugin.json` manifests when plugins are enabled; it is never auto-created. The foundation ships the stable plugin contract, capability model, and registry only — no WASM runtime executes yet (the executor seam throws `wasm runtime not yet available`).
+
 ### Monorepo and PCD Contract Notes
 
 Praxrr now runs as a monorepo workspace with app runtime in `packages/praxrr-app/` plus package members:
