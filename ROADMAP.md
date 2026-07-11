@@ -295,14 +295,25 @@ the no-active-.NET retirement guard. The repository-wide lint result retains a
 
 Do not start these until the promotion criteria are met.
 
-| Issue                                                                                    | Why Deferred                                                                  | Promote When                                                                                     |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [#31](https://github.com/yandy-r/praxrr/issues/31) Community Config Sharing / PCD Hub    | Large trust and moderation burden.                                            | PCD content, provenance, signing/trust, and support workflows are mature.                        |
-| [#32](https://github.com/yandy-r/praxrr/issues/32) RBAC / Multi-User Permissions         | Adds enterprise-style complexity to a mostly homelab product.                 | Multiple real deployments need distinct operators/viewers/admins and auth boundaries are stable. |
-| [#33](https://github.com/yandy-r/praxrr/issues/33) AI / NL Configuration Builder         | Premature until domain validation, simulator, and quality goals are proven.   | Quality Goals works reliably and generated changes can be explained and validated.               |
-| [#34](https://github.com/yandy-r/praxrr/issues/34) Ecosystem Expansion: Readarr/Whisparr | Scope expansion risks shallow support.                                        | Radarr, Sonarr, and Lidarr are stable and cross-Arr semantics are explicitly mapped.             |
-| [#35](https://github.com/yandy-r/praxrr/issues/35) WASM Plugin System                    | Plugin APIs, sandboxing, and support cost are too high before core stability. | Public extension points are stable and there is clear third-party demand.                        |
-| [#36](https://github.com/yandy-r/praxrr/issues/36) Federated Configuration Network       | Depends on trust infrastructure and community sharing maturity.               | PCD Hub/trust model exists and users need peer-to-peer configuration distribution.               |
+WASM Plugin System status: Phase-1 foundation #35 shipped in
+[#261](https://github.com/yandy-r/praxrr/pull/261). The #262 Deno-WASM spike evaluated
+`@extism/extism@2.0.0-rc13` on Deno 2.9.1 and is **NO-GO** under the unchanged sandbox contract:
+worker timeout and denied Extism HTTP/WASI paths worked, but the JavaScript SDK has no active
+cancel/fuel API and its `maxPages` setting does not cap guest-owned linear memory. No executor or
+runtime dependency was added; `UnavailablePluginExecutor` remains the only production executor and
+`PLUGINS_ENABLED` remains default OFF. Runtime delivery is blocked on a separately approved backend
+that proves cancellation, deterministic fuel, total guest-memory bounds, denied I/O, cleanup, and
+the supported compiled-artifact matrix. Dependency-ordered sibling phases #263-#266 under #267 stay
+blocked until that runtime ships.
+
+| Issue                                                                                    | Why Deferred                                                                                                                                                           | Promote When                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#31](https://github.com/yandy-r/praxrr/issues/31) Community Config Sharing / PCD Hub    | Large trust and moderation burden.                                                                                                                                     | PCD content, provenance, signing/trust, and support workflows are mature.                                                                                       |
+| [#32](https://github.com/yandy-r/praxrr/issues/32) RBAC / Multi-User Permissions         | Adds enterprise-style complexity to a mostly homelab product.                                                                                                          | Multiple real deployments need distinct operators/viewers/admins and auth boundaries are stable.                                                                |
+| [#33](https://github.com/yandy-r/praxrr/issues/33) AI / NL Configuration Builder         | Premature until domain validation, simulator, and quality goals are proven.                                                                                            | Quality Goals works reliably and generated changes can be explained and validated.                                                                              |
+| [#34](https://github.com/yandy-r/praxrr/issues/34) Ecosystem Expansion: Readarr/Whisparr | Scope expansion risks shallow support.                                                                                                                                 | Radarr, Sonarr, and Lidarr are stable and cross-Arr semantics are explicitly mapped.                                                                            |
+| [#35](https://github.com/yandy-r/praxrr/issues/35) WASM Plugin System                    | Phase 1 shipped, but #262's JavaScript SDK spike is NO-GO on mandatory cancellation/fuel/total-memory gates; runtime, wiring, API, docs, and UI phases remain blocked. | A supported backend passes the full sandbox + compiled-artifact matrix, public extension points stay stable, and third-party demand justifies the support cost. |
+| [#36](https://github.com/yandy-r/praxrr/issues/36) Federated Configuration Network       | Depends on trust infrastructure and community sharing maturity.                                                                                                        | PCD Hub/trust model exists and users need peer-to-peer configuration distribution.                                                                              |
 
 ## Tracking Checklist
 
@@ -405,7 +416,7 @@ the timeline lands as the visual layer over audit, rollback, canary, and health 
 - [ ] #32 - RBAC / Multi-User Permissions
 - [ ] #33 - AI / NL Configuration Builder
 - [ ] #34 - Readarr/Whisparr ecosystem expansion
-- [ ] #35 - WASM Plugin System — Phase-1 feature-flagged foundation shipped ([#261](https://github.com/yandy-r/praxrr/pull/261)); Phase-2 WASM runtime still deferred
+- [ ] #35 - WASM Plugin System — Phase-1 feature-flagged foundation shipped ([#261](https://github.com/yandy-r/praxrr/pull/261)); #262 JavaScript SDK spike completed as NO-GO; compliant Phase-2 runtime and sibling phases #263-#266 under #267 remain deferred/blocked
 - [ ] #36 - Federated Configuration Network
 - [x] #78 - Versioned documentation ([#259](https://github.com/yandy-r/praxrr/pull/259))
 

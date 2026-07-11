@@ -269,15 +269,24 @@ All execution routes through the `PluginExecutor` interface (`execute(req): Prom
 The shipped default `UnavailablePluginExecutor` rejects with
 `PluginRuntimeUnavailableError('wasm runtime not yet available')`. The host takes the executor by
 constructor injection (default `new UnavailablePluginExecutor()`) plus a `setExecutor()` seam, so
-tests supply a resolving fake and **Phase 2 drops in an `ExtismPluginExecutor` implementing the
-identical interface with zero changes to host / registry / validator / contract**.
+tests supply a resolving fake and a future compliant backend can implement the identical interface
+with zero changes to host / registry / validator / contract.
 
-Extism is the recommended Phase-2 runtime (its default-deny `Manifest` capability model maps 1:1 to
-this deny-by-construction design; language-agnostic PDKs fit community parsers/evaluators) but is
-**not added in Phase 1**. It is gated behind a Deno-WASM go/no-go spike validating that
-`@extism/extism` loads under Deno's permission model, that Web-Worker-backed timeout/cancellation
-works under Deno, and that host functions + memory/fuel limits behave. A negative spike costs only
-the `ExtismPluginExecutor`, never the foundation.
+The issue #262 Deno-WASM spike is **NO-GO for `@extism/extism@2.0.0-rc13`** under the unchanged
+sandbox contract. On Deno 2.9.1 the JavaScript SDK executed a compatible trivial guest and its
+worker timeout stopped a non-terminating call after the Deno-specific `execArgv: []` override.
+However, `Plugin.call` exposes no active cancellation API, `memory.maxPages` accounts for Extism
+host-context blocks rather than every guest-owned linear memory, and the JavaScript SDK exposes no
+fuel/instruction limit. The native Extism C/Rust runtime has fuel and cancellation facilities, but
+those are not JavaScript SDK manifest options and adopting them would require a separately approved
+FFI, native-artifact, ABI, permission, and platform design.
+
+Therefore the runtime seam remains intentionally inert: no Extism dependency, executor, selector,
+lockfile change, or production trigger is present; `UnavailablePluginExecutor` remains the only
+production executor; and `PLUGINS_ENABLED` remains default OFF. Timeout is not treated as fuel, and
+exchange-memory accounting is not described as a total guest-memory limit. See the validated
+[issue #262 feature spec](../plans/262-wasm-extism-runtime/feature-spec.md) and its sibling
+`research-*.md` files for the reproducible spike, threat model, and gates a future backend must pass.
 
 ## Configuration
 

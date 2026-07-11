@@ -332,9 +332,9 @@ class UnavailablePluginExecutor implements PluginExecutor {
 
 **Injection:** `PluginHost` receives the executor via constructor injection
 (`constructor(executor: PluginExecutor = new UnavailablePluginExecutor())`) plus a
-`setExecutor(executor: PluginExecutor): void` seam, so tests can supply a resolving fake and Phase 2 can drop
-in an `ExtismPluginExecutor` implementing the **identical** interface with **zero** changes to
-host/registry/validator/contract.
+`setExecutor(executor: PluginExecutor): void` seam, so tests can supply a resolving fake and a future
+compliant backend can implement the **identical** interface with **zero** changes to
+host/registry/validator/contract. The evaluated JavaScript Extism candidate did not pass that gate.
 
 **Isolation:** the host wraps every executor call in a per-plugin `try/catch` + finite `AbortSignal` timeout
 (fire-and-forget isolation) so a throw, hang, or missing runtime can never destabilize the caller — the same
@@ -354,16 +354,19 @@ never be conflated with an execution-seam **throw**):
 
 ## 9. Extism Evaluation + Phase-2 Deno-WASM Go/No-Go Spike
 
-**Extism is the recommended future (Phase-2) runtime but is intentionally not added in Phase 1**, honoring the
-"no heavy new runtime dependency" guardrail and the unvalidated Deno-WASM path.
+Extism was the recommended Phase-2 candidate and was intentionally omitted from Phase 1, honoring the
+"no heavy new runtime dependency" guardrail until the Deno-WASM path was validated. Issue #262 has now run
+that gate against the universal JavaScript SDK; the result is **NO-GO** under the unchanged sandbox
+requirements. The runtime-neutral seam and inert default remain the production state.
 
 ### Why Extism fits
 
-- Its `Manifest` capability model is **default-deny** and maps 1:1 to our deny-by-construction model:
-  - `with_allowed_host` is an explicit HTTP allow-list (empty = no network),
-  - `with_allowed_path` makes filesystem opt-in (none = no fs),
-  - `with_memory_max` / `with_timeout` / `with_fuel_limit` bound resource use (finite limits, matching the
-    parser "keep limits finite" convention).
+- Its manifest capability model is **default-deny** and maps conceptually to our deny-by-construction model:
+  - an empty allowed-host list denies Extism HTTP,
+  - no allowed paths plus disabled WASI denies guest filesystem imports, and
+  - native Extism/Wasmtime APIs expose timeout, memory, fuel, and cancellation controls.
+- Those native controls are not all present in `@extism/extism`: the JavaScript SDK uses the host
+  WebAssembly implementation and must be evaluated by its own public API and observed behavior.
 - It is **language-agnostic** (Rust/Go/JS/Python/Ruby/.NET PDKs), which fits community-contributed
   release-title parsers and custom-format evaluators.
 
@@ -385,11 +388,54 @@ Before committing, validate on Deno that:
 
 A **negative result costs only the `ExtismPluginExecutor` implementation, never the foundation.**
 
+### Spike result — NO-GO (2026-07-11, issue #262)
+
+The spike ran on Linux x86_64 with Deno 2.9.1 (V8 14.9.207.2, TypeScript 6.0.3) and exact npm package
+`@extism/extism@2.0.0-rc13`. The advertised `jsr:@extism/extism` package had no resolvable published
+version, so npm was the only usable Deno import. The SDK's default Node worker argument was rejected by
+Deno; worker execution required the explicit compatibility override `nodeWorkerArgs: { execArgv: [] }`.
+
+| Gate                                   | Observed result             | Decision impact                                                                                                                                              |
+| -------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Deno import + compatible trivial guest | **Pass with workaround**    | `count_vowels.wasm` returned valid JSON after the worker-argument override.                                                                                  |
+| Finite worker timeout                  | **Pass**                    | A non-terminating guest was stopped by the SDK's worker timeout. This is wall-clock containment, not fuel.                                                   |
+| Active `AbortSignal` cancellation      | **Fail**                    | `Plugin.call` has no signal/cancel parameter; closing during an active call did not promptly settle that call.                                               |
+| Total guest-memory ceiling             | **Fail**                    | A guest grew its own linear memory from 1 to 11 pages with `memory.maxPages: 2`; the option accounts for Extism host-context blocks, not every guest memory. |
+| Finite fuel/instruction limit          | **Fail**                    | The JS SDK exposes no fuel option. `with_fuel_limit` belongs to native Extism/Wasmtime, not its JavaScript manifest/options.                                 |
+| No guest network                       | **Pass for Extism HTTP**    | An explicit empty allowed-host array denied the guest HTTP import.                                                                                           |
+| No guest filesystem                    | **Pass with WASI disabled** | `useWasi: false` and no allowed paths left a WASI filesystem guest unable to instantiate.                                                                    |
+
+The result is a partial technical go but a product/acceptance **NO-GO**. Timeout cannot substitute for
+deterministic fuel, and exchange-memory accounting cannot be described as a total guest-memory limit.
+Accordingly:
+
+- no `ExtismPluginExecutor`, alternate executor, runtime selector, runtime dependency, lockfile change, or
+  production call-site is added;
+- `UnavailablePluginExecutor` remains the default and only production executor;
+- `PLUGINS_ENABLED` remains default OFF and the app retains Phase-1 optional-subsystem degradation; and
+- issues #263-#266 remain blocked under tracking issue #267 until a compliant backend ships.
+
+The full command transcript, official source links, counterexamples, threat model, and seven-perspective
+design are in [`../262-wasm-extism-runtime/feature-spec.md`](../262-wasm-extism-runtime/feature-spec.md) and
+its sibling `research-*.md` files.
+
+### Required prerequisite before runtime implementation resumes
+
+A new or explicitly rescoped backend-selection phase must prove every original gate without weakening the
+threat model. Native `libextism` is technically credible because its C/Rust APIs expose fuel-limited
+construction and cancellation handles, but adopting it requires a separately reviewed Deno FFI binding,
+pinned/checksummed shared libraries, ABI and lifetime analysis, scoped FFI permissions, native-crash policy,
+and runtime evidence for every supported Linux/Windows release artifact. A Deno Worker, QuickJS, Wasm
+instrumentation, or other fallback is not presumed compliant; each must independently prove active
+cancellation, deterministic fuel, total guest-memory bounds, denied I/O, cleanup, and healthy execution
+after every failure.
+
 ### Phase-2 sequencing
 
-1. Land `ExtismPluginExecutor` behind the spike + finite per-call timeouts.
-2. Wire the remaining observe points, **starting with `sync.previewComputed`'s real pipeline call-site**.
-3. Only later — after sandbox hardening — consider the mutating parser/custom-format transform points.
+1. Select and prove a compliant backend across the supported release matrix.
+2. Land a real executor behind the unchanged seam only after every timeout/cancel/memory/fuel/I/O gate passes.
+3. Then wire the observe points in #263 and proceed through the dependency-ordered #264-#266 phases.
+4. Only later — after sandbox hardening — consider the mutating parser/custom-format transform points.
 
 Explicitly out of scope indefinitely until runtime + demand are proven: plugin marketplace, remote/auto fetch,
 signing/trust, and any community hub (Buildarr/Kodi over-scope cautionary tales).
@@ -433,8 +479,8 @@ Concretely:
 | R5  | **`apiVersion` cache-reuse** — an upgrade/rollback could reuse a plugin validated under an incompatible contract.                                                                                                         | Registry (and any future result cache) namespaced by `apiVersion` / `(apiVersion, version)`; strict-support rejection; pinning test. See §10.                                                                                                  |
 | R6  | **"Wired-but-seam-throws" reviewer ambiguity** — the two `wired:true` points have no production call-site and reach only the throwing executor, which can read as "half-done."                                            | This doc + the architecture note state it explicitly: "wired" means _dispatchable at the host seam and exercised in tests_, not _triggered from the pipeline_. No production trigger is intentional.                                           |
 | R7  | **Contract drift between declared and wired points** — declaring the full enum but wiring a subset invites accidental activation of unimplemented points.                                                                 | Explicit per-point `wired:boolean` typing; `notifyObservers` throws `PluginPointNotWiredError` for unwired points; tests pin the exact wired set (`config.profileCompiled.observe` + `sync.previewComputed.observe`).                          |
-| R8  | **Premature heavy dependency** — adding Extism/WASM now couples the foundation to an unvalidated Deno-WASM path.                                                                                                          | Executor is an interface with a throwing default; **no** `@extism/extism` import in Phase 1. A negative Deno-WASM spike costs only the `ExtismPluginExecutor`.                                                                                 |
-| R9  | **Deno-WASM viability unproven** — Extism's timeout/cancellation depends on Web Worker execution + specific Deno permissions/flags.                                                                                       | Treated as a Phase-2 **go/no-go spike gate** (§9), not an assumption.                                                                                                                                                                          |
+| R8  | **Premature heavy dependency** — adding Extism/WASM after a failed mandatory gate would couple the foundation to an unusable or weaker runtime path.                                                                      | Executor remains an interface with a throwing default; the #262 NO-GO adds no `@extism/extism` import or lockfile entry, so the negative result costs only the executor.                                                                       |
+| R9  | **Deno-WASM backend viability failed** — the JS SDK worker timeout works, but active cancellation, total guest-memory limiting, and deterministic fuel do not meet the contract.                                          | Recorded as a #262 **NO-GO** (§9). Runtime delivery stays blocked until a separately approved backend passes the complete adversarial/platform matrix without weakening the requirements.                                                      |
 | R10 | **WASM "existential identity" / runtime fragmentation** (RedMonk) — committing hard to one runtime is risky.                                                                                                              | Swappable executor seam; no Extism type leaks past the seam into host/registry/validator.                                                                                                                                                      |
 | R11 | **Supply-chain / trust attack surface** — community plugins are untrusted code.                                                                                                                                           | Local `PLUGINS_DIR` scan + fail-fast validation only. No remote/auto-load, no signing/trust/hub in Phase 1 (Kodi-addon / n8n-supply-chain lessons).                                                                                            |
 | R12 | **Maintainer over-scope** — Buildarr died from overambitious plugin/IaC scope; ~60% of OSS maintainers burn out.                                                                                                          | Minimal, single-responsibility, DRY contract within the ~500-line file cap; resist expanding beyond the declared observe-only subset. No `PLUGINS_MAX_MANIFESTS` in Phase 1.                                                                   |
@@ -532,7 +578,7 @@ logger.info('Plugins disabled via PLUGINS_ENABLED') }` — graceful degradation 
 | File             | Responsibility                                                                                                                                                                                                                                            |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `errors.ts`      | Typed error taxonomy (mirrors `mcp/errors.ts`); each sets `this.name`.                                                                                                                                                                                    |
-| `executor.ts`    | `PluginExecutor` seam + `UnavailablePluginExecutor` (throwing default). **No** Extism import; the Phase-2 `ExtismPluginExecutor` lands here.                                                                                                              |
+| `executor.ts`    | `PluginExecutor` seam + `UnavailablePluginExecutor` (throwing default). **No** Extism import; a future compliant backend remains isolated behind this interface.                                                                                          |
 | `registry.ts`    | `RegisteredPlugin`, `PluginRegistry` over nested `Map<apiVersion, Map<lowercased id, RegisteredPlugin>>`, singleton `pluginRegistry`. Adds `unregister` + `apiVersion` namespacing + per-namespace case-insensitive id uniqueness. No DB.                 |
 | `hostContext.ts` | `buildCapabilityInput` (least-privilege projection) + `scrubPluginBoundary` (reuses `redactSecrets`). Sole place domain data is projected for plugins.                                                                                                    |
 | `scan.ts`        | Isolated I/O boundary — the **only** file touching `Deno.readDir`/`readTextFile`. Reads each subdir's `praxrr.plugin.json`, JSON-parses, returns raw entries (collects parse errors; rethrows only unexpected fs errors).                                 |
