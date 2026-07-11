@@ -10,9 +10,9 @@
 
 The evidence-only NO-GO is technically sound, security-conservative, and scoped
 correctly: it preserves the inert runtime because the evaluated JavaScript SDK
-cannot meet the mandatory cancellation, fuel, and guest-memory gates. Two
-documentation-fidelity findings should be fixed; neither changes the decision
-or runtime scope.
+cannot meet the mandatory cancellation, fuel, and guest-memory gates. Five
+documentation-fidelity findings were fixed; none changes the decision or runtime
+scope.
 
 ## Findings
 
@@ -37,6 +37,21 @@ None.
   - **Status**: Fixed
   - **Category**: Maintainability
   - **Suggested fix**: Keep the complete command in one inline-code span and wrap the surrounding prose normally.
+
+- **[F003]** `docs/plans/262-wasm-extism-runtime/research-business.md:85` — The lint-autofix workflow converted an inline `#262` issue reference into a standalone `# 262` heading and split its sentence across paragraphs.
+  - **Status**: Fixed
+  - **Category**: Pattern Compliance
+  - **Suggested fix**: Rephrase the sentence so the issue reference remains inline and no wrapped line begins with `#262`.
+
+- **[F004]** `docs/plans/262-wasm-extism-runtime/research-practices.md:506` — The lint-autofix workflow converted an inline `#262` issue reference into a standalone `# 262` heading and split its sentence across paragraphs.
+  - **Status**: Fixed
+  - **Category**: Pattern Compliance
+  - **Suggested fix**: Rephrase the sentence so the issue reference remains inline and no wrapped line begins with `#262`.
+
+- **[F005]** `docs/plans/262-wasm-extism-runtime/research-recommendations.md:70` — The lint-autofix workflow converted an inline `#262` issue reference into a standalone `# 262` heading and split its sentence across paragraphs.
+  - **Status**: Fixed
+  - **Category**: Pattern Compliance
+  - **Suggested fix**: Rephrase the sentence so the issue reference remains inline and no wrapped line begins with `#262`.
 
 ## Validation Results
 

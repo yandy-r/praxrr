@@ -65,9 +65,8 @@ Option 1 preserves every valuable Phase-1 invariant:
 - later phases remain blocked instead of building persistence, API, SDK, or UI
   around a runtime that does not satisfy its sandbox contract.
 
-The evidence-only result is still substantive completion of the spike portion of
-
-# 262. It is not evidence that the executor acceptance criteria are complete. The
+The evidence-only result is still substantive completion of the spike portion of issue #262. It
+is not evidence that the executor acceptance criteria are complete. The
 
 PR, issue status, and roadmap must say exactly that. If project policy requires
 every acceptance checkbox to pass before closing an issue, revise #262 into a
