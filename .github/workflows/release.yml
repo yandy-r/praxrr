@@ -57,6 +57,7 @@ jobs:
             archive_ext: tar.gz
             binary_ext: ''
             native: true
+            adjacent: true
           - platform: linux-arm64
             runner: ubuntu-latest
             deno_target: aarch64-unknown-linux-gnu
@@ -66,6 +67,7 @@ jobs:
             archive_ext: tar.gz
             binary_ext: ''
             native: false
+            adjacent: false
           - platform: macos-x64
             runner: macos-15-intel
             deno_target: x86_64-apple-darwin
@@ -75,6 +77,7 @@ jobs:
             archive_ext: tar.gz
             binary_ext: ''
             native: true
+            adjacent: false
           - platform: macos-arm64
             runner: macos-15
             deno_target: aarch64-apple-darwin
@@ -84,6 +87,7 @@ jobs:
             archive_ext: tar.gz
             binary_ext: ''
             native: true
+            adjacent: false
           - platform: windows-x64
             runner: windows-latest
             deno_target: x86_64-pc-windows-msvc
@@ -93,6 +97,7 @@ jobs:
             archive_ext: zip
             binary_ext: '.exe'
             native: true
+            adjacent: false
 
     steps:
       - name: Checkout
@@ -255,7 +260,8 @@ jobs:
             --checksum-file "dist/${{ steps.archive.outputs.name }}.sha256" \
             --platform "${{ matrix.platform }}" \
             --expected-version "${PARSER_BEHAVIOR_VERSION}" \
-            --native "${{ matrix.native }}"
+            --native "${{ matrix.native }}" \
+            --adjacent "${{ matrix.adjacent }}"
 
       - name: Upload archive evidence
         uses: actions/upload-artifact@v4

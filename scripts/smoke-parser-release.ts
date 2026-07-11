@@ -22,6 +22,7 @@ interface Options {
   platform: Platform;
   expectedVersion: string;
   native: boolean;
+  adjacent: boolean;
   timeoutMs: number;
 }
 
@@ -38,6 +39,7 @@ Options:
   --platform VALUE         linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64
   --expected-version VALUE Parser behavior version (default: ${DEFAULT_VERSION})
   --native VALUE           Run binaries on this host: true or false (default: true)
+  --adjacent VALUE         Run the full adjacent app lifecycle: true or false (default: true)
   --timeout-ms VALUE       Per-phase deadline (default: ${DEFAULT_TIMEOUT_MS})
   --help                   Show this help
 `;
@@ -71,6 +73,7 @@ function parseOptions(args: readonly string[]): Options {
   let platform: Platform | undefined;
   let expectedVersion = Deno.env.get('PARSER_BEHAVIOR_VERSION') ?? DEFAULT_VERSION;
   let native = true;
+  let adjacent = true;
   let timeoutMs = DEFAULT_TIMEOUT_MS;
 
   for (let index = 0; index < args.length; index++) {
@@ -88,6 +91,7 @@ function parseOptions(args: readonly string[]): Options {
         '--platform',
         '--expected-version',
         '--native',
+        '--adjacent',
         '--timeout-ms',
       ].includes(name)
     ) {
@@ -104,6 +108,7 @@ function parseOptions(args: readonly string[]): Options {
     }
     if (name === '--expected-version') expectedVersion = value;
     if (name === '--native') native = parseBoolean(value, name);
+    if (name === '--adjacent') adjacent = parseBoolean(value, name);
     if (name === '--timeout-ms') {
       timeoutMs = Number(value);
       if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000) {
@@ -123,6 +128,7 @@ function parseOptions(args: readonly string[]): Options {
     platform,
     expectedVersion,
     native,
+    adjacent,
     timeoutMs,
   };
 }
@@ -489,6 +495,8 @@ async function main(): Promise<void> {
   let adjacentParserPort: number | undefined;
   if (options.native) {
     await smokeParser(layout.parser, options.expectedVersion, options.timeoutMs);
+  }
+  if (options.adjacent) {
     adjacentParserPort = await smokeAdjacentDiscovery(
       layout.app,
       await Deno.realPath(options.directory),
@@ -502,11 +510,12 @@ async function main(): Promise<void> {
       platform: options.platform,
       archive: basename(options.archive),
       sha256: layout.digest,
-      layout: 'adjacent',
+      layout: options.adjacent ? 'adjacent' : 'archive',
       nativeSmoke: options.native,
+      adjacentSmoke: options.adjacent,
       version: options.expectedVersion,
       adjacentParserPort,
-      parentChildTermination: options.native,
+      parentChildTermination: options.adjacent,
     })
   );
 }
