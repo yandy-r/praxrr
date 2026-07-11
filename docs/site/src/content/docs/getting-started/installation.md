@@ -13,8 +13,9 @@ remote PCD, outbound Git or HTTPS access to the configuration repository.
 
 - **Docker:** Docker Engine with Compose v2
 - **From source:** [Git](https://git-scm.com/), [Deno](https://deno.com/) 2.x
-- **Parser (optional):** [.NET SDK](https://dotnet.microsoft.com/) 8.0+ for
-  custom format and quality profile testing only
+- **Toolchain manager:** [mise](https://mise.jdx.dev/) for repository-pinned tools
+- **Parser development (optional):** [Go](https://go.dev/) 1.26.5, pinned in
+  `mise.toml`
 
 ## Docker (recommended)
 
@@ -49,19 +50,26 @@ services:
 ```
 
 The UI listens on port **6868** inside the container. Map host ports as needed.
+The parser image runs as a non-root user and is reachable only on the private
+Compose network. Do not add a host `ports` mapping for port 5000. Its container
+health check calls the private `GET /health` route; application health is reported
+separately by Praxrr at `GET /api/v1/health`.
 
 > **Note:** The parser service is optional. Linking, syncing, and most features
 > work without it. Remove the `parser` service and `PARSER_*` variables when you
 > do not need CF or quality profile testing.
 
-See [Docker deployment](./docker/) for compose files, volumes, and networking
+See [Docker deployment](/getting-started/docker/) for compose files, volumes, and networking
 details.
 
-## Prebuilt binary
+## Standalone archive
 
-Stable releases publish to `ghcr.io/yandy-r/praxrr:latest`. Beta and develop
-channels use `:beta` and `:develop` tags. See
-[Upgrading](../guides/upgrading/) for channel semantics.
+Release archives contain the `praxrr` application, its `server.js` and `static/`
+assets, and an adjacent `praxrr-parser` binary (`.exe` on Windows). Run `praxrr`
+from the extracted archive; when no explicit `PARSER_HOST` is set, it starts the
+adjacent parser on loopback, waits for parser health, and stops the child process
+with the app. If the parser is absent or unhealthy, Praxrr still starts and only
+parser-dependent testing and simulation features are unavailable.
 
 Set `APP_BASE_PATH` to the directory that holds Praxrr data (default `/config`
 in Docker):
@@ -75,7 +83,12 @@ export ARR_CREDENTIAL_MASTER_KEY_VERSION=v1
 ```
 
 Praxrr stores the SQLite app database, PCD clones, logs, and backups under
-`APP_BASE_PATH`.
+`APP_BASE_PATH`. Set `PARSER_HOST` and `PARSER_PORT` only when using an externally
+managed parser instead of the adjacent binary.
+
+Stable container releases publish to `ghcr.io/yandy-r/praxrr:latest`. Beta and
+develop channels use `:beta` and `:develop` tags. See
+[Upgrading](/guides/upgrading/) for channel semantics.
 
 ## From source
 
@@ -84,10 +97,12 @@ Clone the monorepo and start the development launcher:
 ```bash
 git clone https://github.com/yandy-r/praxrr.git
 cd praxrr
+mise install
 deno task dev
 ```
 
-This runs the parser service and Vite dev server on port **6969**. Use
+This installs the pinned Go 1.26.5 toolchain and runs the Go parser plus Vite dev
+server on port **6969**. Use
 `deno task dev:noauth` when you want authentication disabled for local testing.
 
 > **Warning:** `AUTH=off` and `deno task dev:noauth` disable login. Never expose
@@ -114,7 +129,7 @@ generate a key in settings.
 
 ## Next steps
 
-- Follow the [Quick Start](./quick-start/) to link a PCD and sync your first
+- Follow the [Quick Start](/getting-started/quick-start/) to link a PCD and sync your first
   profile.
-- Read [Configuration](../guides/configuration/) for environment variables and
+- Read [Configuration](/guides/configuration/) for environment variables and
   auth modes.

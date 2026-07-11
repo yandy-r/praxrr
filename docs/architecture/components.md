@@ -7,12 +7,17 @@ flowchart TB
     Startup[Startup / Hooks] --> DB[Database + Migrations]
     Startup --> PCD[PCD Manager]
     Startup --> Jobs[Job Queue]
-    Startup --> ParserSpawn[Parser Auto-Spawn]
+    Startup --> ParserSpawn[Optional Parser Auto-Spawn]
 
     API[API Route Handlers] --> PCD
     API --> Sync[Sync Processor + Section Registry]
     API --> Jobs
     API --> ParserClient[Parser Client]
+    ParserClient --> ParserCache[Behavior-Versioned SQLite Caches]
+    ParserClient --> ParserHTTP[Go HTTP Adapter]
+    ParserHTTP --> ParserContract[JSON Contract]
+    ParserHTTP --> ParserCore[Domain Parser + Matcher]
+    ParserCore --> ParserCorpus[Golden Corpus + Parity Gates]
 
     PCD --> PCDOps[PCD Ops Loader + Writer]
     PCD --> PCDCompiler[PCD Compiler + Cache]
@@ -33,6 +38,8 @@ Responsibilities:
 - Initialize config, DB, migrations, cache, auth/session middleware, and job scheduling.
 - Validate encryption key material before services needing Arr credentials.
 - Optionally auto-spawn parser service in standalone runtime mode.
+- Continue serving when the optional parser cannot start; parser-dependent
+  routes expose an unavailable state instead of failing app startup.
 
 Key references:
 
@@ -110,14 +117,23 @@ Key references:
 Responsibilities:
 
 - Build Arr clients by decrypting credentials at runtime.
-- Parse and pattern-match release titles through parser client APIs.
+- Parse and pattern-match release titles through the app parser client.
+- Namespace SQLite parse/match caches by the parser behavior version.
+- Serve the exact four-route contract through the Go HTTP adapter and domain
+  parser while retaining .NET-compatible regex syntax with finite limits.
+- Prove compatibility through the captured golden corpus and parity gates.
 
 Key references:
 
 - `packages/praxrr-app/src/lib/server/utils/arr/arrInstanceClients.ts`
 - `packages/praxrr-app/src/lib/server/utils/arr/parser/index.ts`
-- `packages/praxrr-parser/Program.cs`
-- `packages/praxrr-parser/Endpoints/ParseEndpoints.cs`
+- `packages/praxrr-app/src/lib/server/db/queries/parsedReleaseCache.ts`
+- `packages/praxrr-app/src/lib/server/db/queries/patternMatchCache.ts`
+- `packages/praxrr-parser/cmd/praxrr-parser/main.go`
+- `packages/praxrr-parser/internal/httpserver/handler.go`
+- `packages/praxrr-parser/internal/contract/`
+- `packages/praxrr-parser/internal/parser/`
+- `packages/praxrr-parser/testdata/golden/`
 
 ## 7) Supporting Packages
 

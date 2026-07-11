@@ -92,11 +92,57 @@ after tightening deployment:
 
 **Checks:**
 
-1. Parser container running and healthy.
-2. `PARSER_HOST` matches the service name on your Docker network.
-3. `PARSER_PORT=5000` unless you customized the parser image.
+1. Confirm the Praxrr app itself is healthy at `GET /api/v1/health`.
+2. From inside the same private network namespace as Praxrr, call the parser's
+   `GET /health`. A healthy response includes `status: "healthy"` and a behavior
+   version. Do not expose this private route through your public proxy.
+3. For Docker, confirm the parser container is healthy, `PARSER_HOST` matches its
+   Compose service name, and `PARSER_PORT=5000`.
+4. For a standalone archive, confirm `praxrr-parser` (`praxrr-parser.exe` on
+   Windows) is adjacent to the app binary and executable. Remove an accidental
+   `PARSER_HOST` override to restore automatic child-process startup.
+5. For a source checkout, run `mise install` and `deno task dev:parser`; the
+   repository pins Go 1.26.5.
 
 Sync and editing still work without the parser.
+
+### Parser response classes
+
+Use HTTP status and sanitized log fields such as `outcome` and `error_class`; do
+not log or share raw release titles, patterns, request bodies, or regex engine
+errors.
+
+| Status | Meaning                                                                          | Recovery                                                            |
+| ------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `400`  | Malformed JSON or missing/invalid required fields                                | Correct the request.                                                |
+| `413`  | A measured request, text, pattern, count, unique-key, or work limit was exceeded | Reduce the input; do not repeatedly retry the same payload.         |
+| `415`  | The request is not JSON                                                          | Send `application/json` or `application/*+json`.                    |
+| `503`  | Active-request or matcher capacity is temporarily full                           | Honor `Retry-After: 1` and retry with backoff.                      |
+| `500`  | Unexpected internal parser failure                                               | Capture sanitized logs, restart once, then roll back if it repeats. |
+
+Regex timeouts are finite and fail closed for the affected pattern; they do not
+make the parser process unhealthy. Rework catastrophic patterns instead of
+raising limits. The compatibility contract remains .NET-compatible regex syntax,
+even though the current service is implemented in Go.
+
+### Parser recovery and rollback
+
+1. Record the current app release, parser image or archive checksum, and parser
+   behavior version from private `/health`.
+2. Restart the parser without deleting parser caches. Same-version entries remain
+   usable; misses are not filled until health succeeds.
+3. If a new parser version is faulty, deploy the previous immutable image digest
+   or restore the matching previous standalone archive. Do not roll back with a
+   moving tag.
+4. Verify private parser `/health`, then exercise one parse and one match through
+   the Praxrr UI. Cache namespaces change with behavior versions, so old and new
+   results cannot mix.
+5. If recovery still fails, omit the parser and keep Praxrr online while collecting
+   sanitized diagnostics; linking, editing, and syncing are unaffected.
+
+Release provenance contains the exact artifact checksums, SBOM, behavior version,
+and immutable rollback identifiers. Use those records rather than reconstructing
+an old runtime from source.
 
 ## Encrypted credential errors after upgrade
 
@@ -127,7 +173,7 @@ Sync and editing still work without the parser.
 - [Sync Pipeline](/app/sync-pipeline/) — preview vs execution internals
 - [PCD System](/app/pcd-system/) — ops compiler and value guards
 - [Job System](/app/jobs/) — background queue and dispatcher
-- [Configuration](./configuration/) — environment reference
+- [Configuration](/guides/configuration/) — environment reference
 - [GitHub issues](https://github.com/yandy-r/praxrr/issues) — bug reports
 
 Include Praxrr version, `arr_type`, sanitized logs, and steps to reproduce when

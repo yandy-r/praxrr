@@ -8,7 +8,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 - **Web framework:** SvelteKit (Vite + sveltekit-adapter-deno), Svelte 5
 - **Database:** SQLite (app DB via Kysely) + in-memory SQLite (PCD cache)
 - **UI:** Tailwind CSS v4
-- **Parser:** C# microservice (.NET 8+, optional for CF/profile testing)
+- **Parser:** Go microservice (Go 1.26.5 toolchain, optional for CF/profile testing)
 - **SCM:** Git (PCD repos + export flow)
 
 ## Commands
@@ -19,7 +19,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 deno task dev              # Run parser + Vite dev server (port 6969)
 deno task dev:noauth       # Dev server with AUTH=off
 deno task dev:server       # Vite dev server only (no parser)
-deno task dev:parser       # Parser service only (dotnet watch, port 5000)
+deno task dev:parser       # Go parser service only (port 5000)
 ```
 
 ### Build
@@ -135,7 +135,11 @@ Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 ### Services
 
-- `packages/praxrr-parser/` - C# parser microservice (release title parsing)
+- `packages/praxrr-parser/cmd/praxrr-parser/` - Go parser command and process lifecycle
+- `packages/praxrr-parser/internal/httpserver/` - `/health`, `/parse`, `/match`, and `/match/batch` adapter
+- `packages/praxrr-parser/internal/contract/` - exact JSON wire DTOs
+- `packages/praxrr-parser/internal/parser/` - domain parsers, .NET-compatible regex matching, limits, and bounded workers
+- `packages/praxrr-parser/testdata/golden/` - captured parity corpus and measured limits
 
 ## Key Concepts
 
@@ -162,6 +166,11 @@ SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema ch
 `packages/praxrr-app/src/hooks.server.ts`: config.init() -> db.initialize() -> runMigrations() -> logSettings.load() -> pcdManager.initialize() -> initializeJobs() -> auth middleware.
 
 ## Conventions
+
+- Preserve the parser's four-route wire contract and .NET-compatible regex syntax through `regexp2`; do not substitute Go `regexp` for caller-supplied patterns.
+- Treat the parser `/health` version as a behavior/cache namespace and keep parser limits finite.
+- Keep parser-dependent features optional: an unavailable parser must not prevent the app from starting, and entity testing reports `parserAvailable: false` instead of failing the whole app.
+- Validate parser changes against the golden corpus and parity tests under `packages/praxrr-parser/internal/parity/`.
 
 - **Svelte 5, no runes.** Use `onclick` handlers, not `$state`/`$derived`.
 - **Alerts for user feedback.** Use `alertStore.add(type, message)`.

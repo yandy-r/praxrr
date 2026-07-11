@@ -1,6 +1,6 @@
 # Praxrr Roadmap
 
-Reviewed: 2026-07-10 (updated for Security Posture DNS-aware transport grading #229/[#252](https://github.com/yandy-r/praxrr/pull/252) delivered, after session hardening #227/#248 and explicit proxy trust #228/#249 shipped; Config Health notification #223/#244, on-demand recompute #224/#246, and TRaSH alignment #225/#245 shipped, with trends/export #226 implemented in #247 pending merge; Quality Goals Lidarr apply #222/#242 and quality-ladder gating #221/#243 shipped; after Transparent Automation completion #21/#240, MCP Server Interface foundation #23/#233, Passkey / WebAuthn Auth #18/#230, Ecosystem Security Posture / Shield Check foundation #28/#220, Sync Archaeology Timeline #27/#219, Canary Sync / Blast Radius Safety #19/#218, and Config Health Scoring foundation #22/#217 shipped; Safety Triad complete — Sync Preview + Drift #15/#212 + Rollback #16/#216. Prior wave: Quality Goals foundation #20/#215, Sync History #17/#214, Transparent Automation foundation #21/#213, Resilient Arr Adapter #24/#211, Onboarding & Transparency #12/#14/#25/#26/#30/#75)
+Reviewed: 2026-07-11 (updated for Go parser migration #1-#5 implemented in PR, pending review/CI/merge; native macOS/Windows artifact evidence remains pending; Security Posture DNS-aware transport grading #229/[#252](https://github.com/yandy-r/praxrr/pull/252) delivered, after session hardening #227/#248 and explicit proxy trust #228/#249 shipped; Config Health notification #223/#244, on-demand recompute #224/#246, and TRaSH alignment #225/#245 shipped, with trends/export #226 implemented in #247 pending merge; Quality Goals Lidarr apply #222/#242 and quality-ladder gating #221/#243 shipped; after Transparent Automation completion #21/#240, MCP Server Interface foundation #23/#233, Passkey / WebAuthn Auth #18/#230, Ecosystem Security Posture / Shield Check foundation #28/#220, Sync Archaeology Timeline #27/#219, Canary Sync / Blast Radius Safety #19/#218, and Config Health Scoring foundation #22/#217 shipped; Safety Triad complete — Sync Preview + Drift #15/#212 + Rollback #16/#216. Prior wave: Quality Goals foundation #20/#215, Sync History #17/#214, Transparent Automation foundation #21/#213, Resilient Arr Adapter #24/#211, Onboarding & Transparency #12/#14/#25/#26/#30/#75)
 
 Source: open GitHub issues in `yandy-r/praxrr` as of this review.
 
@@ -51,8 +51,10 @@ The best next order is:
    [#258](https://github.com/yandy-r/praxrr/pull/258), pending merge, with durable explicit availability
    and fail-closed promotion. Exact field lineage (#231) is implemented in
    [#251](https://github.com/yandy-r/praxrr/pull/251) (pending merge).
-3. Handle parser migration and deferred ecosystem expansion only when they become release or
-   maintenance blockers.
+3. Complete review, CI, and squash merge for the Go parser migration (#1-#5). The implementation,
+   parity/security/cache gates, Linux container/archive evidence, docs, and C# retirement are in the
+   PR; native macOS/Windows artifact runtime evidence remains a required CI gate.
+4. Handle deferred ecosystem expansion only when it becomes a release or maintenance priority.
 
 Phase 1 safety work from the research backlog is complete: Sync Preview/Dry-Run, API Key Masking,
 Encrypted API Key Storage, PCD State Snapshots, Progressive Disclosure rollout, Progressive Complexity
@@ -261,13 +263,20 @@ Goal: reduce operational complexity without distracting from the v2 user journey
 
 ### Go Parser Migration
 
-| Order | Issue                                                                         | Priority | Decision                                                                                 | Done When                                                                                               |
-| ----- | ----------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 1     | [#1](https://github.com/yandy-r/praxrr/issues/1) Go parser migration tracking | Low      | Keep as parent tracking only. Do not treat as a standalone implementation ticket.        | Children #2-#5 are complete and the parent checklist is closed.                                         |
-| 2     | [#2](https://github.com/yandy-r/praxrr/issues/2) Parser foundation and parity | Low      | Start only when parser resource usage or .NET dependency becomes a real release concern. | Go module, fixtures, golden outputs, parity harness, shared utilities, and regex helpers exist.         |
-| 3     | [#3](https://github.com/yandy-r/praxrr/issues/3) Domain parsers               | Low      | Depends on #2.                                                                           | Quality, language, title, episode, movie, and release-group parsers match existing behavior.            |
-| 4     | [#4](https://github.com/yandy-r/praxrr/issues/4) HTTP orchestration           | Low      | Depends on #2 and #3.                                                                    | `/parse`, `/match`, and related responses match the existing .NET parser contract.                      |
-| 5     | [#5](https://github.com/yandy-r/praxrr/issues/5) Integration and cutover      | Low      | Last parser step.                                                                        | Docker, CI, release artifacts, docs, and legacy parser retirement are complete without breaking setups. |
+| Order | Issue                                                                         | Priority | Decision                                                                                                                                            | Done When                                                                                                                                                       |
+| ----- | ----------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | [#1](https://github.com/yandy-r/praxrr/issues/1) Go parser migration tracking | Low      | Implemented in PR, pending review/CI/merge. Keep the parent open until children #2-#5, the native artifact matrix, and the merge are authoritative. | Children #2-#5 are merged, the parent checklist is reconciled, and issue closure is verified after merge.                                                       |
+| 2     | [#2](https://github.com/yandy-r/praxrr/issues/2) Parser foundation and parity | Low      | Implemented in PR, pending review/CI/merge.                                                                                                         | The 114-fixture corpus, module, contract models, strict parity harness, shared utilities, and bounded regexp2 layer pass.                                       |
+| 3     | [#3](https://github.com/yandy-r/praxrr/issues/3) Domain parsers               | Low      | Implemented in PR, pending review/CI/merge.                                                                                                         | Quality, language, release-group, title, episode, and common domain rules pass golden, focused, and race gates.                                                 |
+| 4     | [#4](https://github.com/yandy-r/praxrr/issues/4) HTTP orchestration           | Low      | Implemented in PR, pending review/CI/merge.                                                                                                         | `/health`, `/parse`, `/match`, and `/match/batch` preserve recorded JSON, validation, status, header, and version behavior.                                     |
+| 5     | [#5](https://github.com/yandy-r/praxrr/issues/5) Integration and cutover      | Low      | Implemented in PR, pending review/CI/merge; native macOS/Windows runtime evidence remains pending.                                                  | Go Docker and release artifacts, adjacent spawn, cache cutover, docs, and C# retirement pass, followed by native artifact CI and an authoritative squash merge. |
+
+Local evidence includes zero differences across 114 oracle fixtures, bounded
+regex/request and safe-logging gates, version-namespaced cache rollback, a
+non-root Go container, five release archives, 2,349/0 Deno tests, 11/11 parser
+E2E scenarios, the accepted representative Git workflow, synchronized docs, and
+the no-active-.NET retirement guard. The repository-wide lint result retains a
+57-file untouched baseline exception; issue-owned paths are Prettier-clean.
 
 ### Administrative Tracking
 
@@ -380,11 +389,13 @@ the timeline lands as the visual layer over audit, rollback, canary, and health 
 
 ### Maintenance
 
-- [ ] #1 - Go parser migration tracking
-- [ ] #2 - Go parser foundation and parity
-- [ ] #3 - Go domain parsers
-- [ ] #4 - Go HTTP orchestration
-- [ ] #5 - Go parser integration and cutover
+- [ ] #1 - Go parser migration tracking — implemented in PR, pending review/CI/merge; close only
+      after children #2-#5 and merge are authoritative
+- [ ] #2 - Go parser foundation and parity — implemented in PR, pending review/CI/merge
+- [ ] #3 - Go domain parsers — implemented in PR, pending review/CI/merge
+- [ ] #4 - Go HTTP orchestration — implemented in PR, pending review/CI/merge
+- [ ] #5 - Go parser integration and cutover — implemented in PR, pending review/CI/merge;
+      native macOS/Windows artifact runtime evidence remains pending
 - [ ] #6 - Research feature tracking cleanup
 
 ### Deferred Watchlist
@@ -416,7 +427,10 @@ P2 lifecycle safety is complete — Safety Triad (#15/#212 + #16/#216), Canary S
    generated-config rule shipped in [#215](https://github.com/yandy-r/praxrr/pull/215). Security Posture
    follow-ups #227/#248 and #228/#249 shipped, and #229/[#252](https://github.com/yandy-r/praxrr/pull/252)
    delivers bounded DNS-aware grading as a report-only, non-blocking signal.
-3. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
+3. Complete review, CI, and squash merge for Go parser migration #1-#5. Require the native macOS and
+   Windows artifact runtime jobs before merge; retain the repository-wide 57-file lint baseline
+   exception without treating it as a branch regression.
+4. Update #6 so the parent research checklist points to this roadmap and no longer implies closed
    Phase 1 items are still active.
 
 Shipped foundations to build on: P0 docs (#38, #73–#77), P1 Onboarding & Transparency

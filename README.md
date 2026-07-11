@@ -88,6 +88,7 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 
 - [Architecture Guide](docs/ARCHITECTURE.md)
 - [Contributing Guide](docs/CONTRIBUTING.md)
+- [Parser Service](packages/praxrr-parser/README.md)
 - [Development and Release Guide](docs/DEVELOPMENT.md)
 - [API v1 OpenAPI Spec](docs/api/v1/openapi.yaml)
 - [Documentation Strategy Plan](docs/plans/documentation-strategy.md)
@@ -133,7 +134,7 @@ services:
 
 - [Git](https://git-scm.com/) (for PCD operations)
 - [Deno](https://deno.com/) 2.x
-- [.NET SDK](https://dotnet.microsoft.com/) 8.0+ (optional, for parser)
+- [Go](https://go.dev/) 1.26.5 (optional, for parser development)
 
 ```bash
 git clone https://github.com/yandy-r/praxrr.git
@@ -141,8 +142,10 @@ cd praxrr
 deno task dev
 ```
 
-This runs the parser service and Vite dev server concurrently. See
-[CONTRIBUTING.md](docs/CONTRIBUTING.md) for architecture documentation.
+This runs the Go parser service and Vite dev server concurrently. See the
+[parser service guide](packages/praxrr-parser/README.md) for its private four-route contract,
+.NET-compatible regex behavior, and standalone/container operation, or
+[CONTRIBUTING.md](docs/CONTRIBUTING.md) for the complete development workflow.
 
 ## Usage
 
