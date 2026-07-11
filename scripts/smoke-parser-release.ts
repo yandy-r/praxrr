@@ -200,10 +200,18 @@ async function validateLayout(options: Options): Promise<{ app: string; parser: 
 }
 
 function reserveLoopbackPort(): number {
-  const listener = Deno.listen({ hostname: '127.0.0.1', port: 0 });
-  const port = (listener.addr as Deno.NetAddr).port;
-  listener.close();
-  return port;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const random = crypto.getRandomValues(new Uint16Array(1))[0];
+    const port = 20_000 + (random % 10_000);
+    try {
+      const listener = Deno.listen({ hostname: '127.0.0.1', port });
+      listener.close();
+      return port;
+    } catch (error: unknown) {
+      if (!(error instanceof Deno.errors.AddrInUse)) throw error;
+    }
+  }
+  fail('could not reserve a parent application port below the OS ephemeral range');
 }
 
 async function fetchJSON(url: string, init: RequestInit, timeoutMs: number): Promise<Record<string, unknown>> {
