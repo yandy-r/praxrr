@@ -329,15 +329,29 @@ async function terminateProcess(child: Deno.ChildProcess, includeTree: boolean):
 }
 
 async function smokeParser(binary: string, expectedVersion: string, timeoutMs: number): Promise<void> {
-  const port = reserveLoopbackPort();
-  const baseURL = `http://127.0.0.1:${port}`;
+  const output: string[] = [];
   const child = new Deno.Command(binary, {
-    env: { PARSER_ADDR: `127.0.0.1:${port}` },
+    env: { PARSER_ADDR: '127.0.0.1:0' },
     stdout: 'null',
-    stderr: 'null',
+    stderr: 'piped',
   }).spawn();
+  const stderrPump = pump(child.stderr.getReader(), output);
   try {
-    await waitForHealth(baseURL, expectedVersion, timeoutMs);
+    const port = await Promise.race([
+      waitForParserListener(output, timeoutMs),
+      child.status.then(async (status) => {
+        await stderrPump;
+        fail(`parser exited before opening its listener with code ${status.code}: ${output.join('').slice(-4_000)}`);
+      }),
+    ]);
+    const baseURL = `http://127.0.0.1:${port}`;
+    try {
+      await waitForHealth(baseURL, expectedVersion, timeoutMs);
+    } catch (error: unknown) {
+      fail(
+        `${error instanceof Error ? error.message : String(error)}; parser output: ${output.join('').slice(-4_000)}`
+      );
+    }
     await verifyParserAPI(baseURL, timeoutMs);
     await terminateProcess(child, false);
     const status = await waitForExit(child, timeoutMs);
@@ -351,6 +365,7 @@ async function smokeParser(binary: string, expectedVersion: string, timeoutMs: n
       // The expected graceful path has already reaped the process.
     }
     await child.status.catch(() => undefined);
+    await Promise.race([stderrPump, new Promise<void>((resolve) => setTimeout(resolve, Math.min(timeoutMs, 2_000)))]);
   }
 }
 
@@ -366,6 +381,24 @@ async function pump(reader: ReadableStreamDefaultReader<Uint8Array>, output: str
     output.push(decoder.decode());
     reader.releaseLock();
   }
+}
+
+async function waitForParserListener(output: readonly string[], timeoutMs: number): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const line of output.join('').split(/\r?\n/)) {
+      try {
+        const entry = JSON.parse(line) as { msg?: unknown; addr?: unknown };
+        if (entry.msg !== 'parser server listening' || typeof entry.addr !== 'string') continue;
+        const match = entry.addr.match(/:(\d+)$/);
+        if (match) return Number(match[1]);
+      } catch {
+        // The final log line may still be arriving in another stream chunk.
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  fail(`parser did not report its listener address: ${output.join('').slice(-4_000)}`);
 }
 
 async function waitForAdjacentParser(output: readonly string[], timeoutMs: number): Promise<number> {

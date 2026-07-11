@@ -242,7 +242,8 @@ jobs:
           if [[ "${{ matrix.archive_ext }}" == "tar.gz" ]]; then
             tar -C dist/smoke -xzf "dist/${{ steps.archive.outputs.name }}"
           else
-            tar -C dist/smoke -xf "dist/${{ steps.archive.outputs.name }}"
+            powershell.exe -NoLogo -NoProfile -Command \
+              "Expand-Archive -LiteralPath 'dist/${{ steps.archive.outputs.name }}' -DestinationPath 'dist/smoke' -Force"
           fi
 
       - name: Smoke archive layout and native runtime
