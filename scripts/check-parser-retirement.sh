@@ -19,7 +19,18 @@ require_command() {
 
 require_command deno
 require_command find
-require_command rg
+require_command grep
+
+search_file() {
+	local pattern="$1"
+	local path="$2"
+
+	if command -v rg >/dev/null 2>&1; then
+		rg -n -i "${pattern}" "${path}"
+	else
+		grep -Eni -- "${pattern}" "${path}"
+	fi
+}
 
 [[ -f "${PARSER_DIR}/go.mod" ]] || fail "Go parser module is missing"
 [[ -f "${PARSER_DIR}/testdata/golden/manifest.json" ]] || fail "golden manifest is missing"
@@ -52,14 +63,21 @@ active_inputs=(
 
 for input in "${active_inputs[@]}"; do
 	[[ -e "${input}" ]] || continue
-	if rg -n -i '(setup-dotnet|(^|[^[:alnum:]_.-])dotnet([^[:alnum:]_.-]|$)|DOTNET_|ASPNETCORE_|RuntimeIdentifiers?|dotnet_rid|Parser\.csproj|Directory\.Build\.props|Program\.cs|Endpoints/[^[:space:]]*\.cs|Models/[^[:space:]]*\.cs|Parsers/[^[:space:]]*\.cs|Logging/[^[:space:]]*\.cs)' "${input}"; then
+	if search_file '(setup-dotnet|(^|[^[:alnum:]_.-])dotnet([^[:alnum:]_.-]|$)|DOTNET_|ASPNETCORE_|RuntimeIdentifiers?|dotnet_rid|Parser\.csproj|Directory\.Build\.props|Program\.cs|Endpoints/[^[:space:]]*\.cs|Models/[^[:space:]]*\.cs|Parsers/[^[:space:]]*\.cs|Logging/[^[:space:]]*\.cs)' "${input}"; then
 		fail "active legacy parser input remains in ${input#"${REPO_ROOT}/"}"
 	fi
 done
 
-if rg -n -i --glob '*.go' --glob '!internal/parity/**' --glob '!internal/parser/*_test.go' \
-	'(DOTNET_|ASPNETCORE_|Parser\.csproj|Directory\.Build\.props|Program\.cs|Endpoints/[^[:space:]]*\.cs|Models/[^[:space:]]*\.cs|Parsers/[^[:space:]]*\.cs|Logging/[^[:space:]]*\.cs)' \
-	"${PARSER_DIR}"; then
+legacy_go_matches="$(
+	while IFS= read -r file; do
+		case "${file}" in
+		*/internal/parity/* | */internal/parser/*_test.go) continue ;;
+		esac
+		search_file '(DOTNET_|ASPNETCORE_|Parser\.csproj|Directory\.Build\.props|Program\.cs|Endpoints/[^[:space:]]*\.cs|Models/[^[:space:]]*\.cs|Parsers/[^[:space:]]*\.cs|Logging/[^[:space:]]*\.cs)' "${file}" || true
+	done < <(find "${PARSER_DIR}" -type f -name '*.go' -print)
+)"
+if [[ -n "${legacy_go_matches}" ]]; then
+	printf '%s\n' "${legacy_go_matches}"
 	fail 'active Go parser source retains a legacy runtime or deleted-source reference'
 fi
 
