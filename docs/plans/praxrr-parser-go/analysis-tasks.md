@@ -503,7 +503,9 @@ docs build.
 evidence.
 
 Replace deferred/low-priority language, record evidence-backed delivery for #2,
-#3, #4, and #5, and check parent #1 only after all child issue checklists, final
+
+# 3, #4, and #5, and check parent #1 only after all child issue checklists, final
+
 PR review findings, fixes, required CI, artifact gates, C# deletion, and
 live-documentation audits are complete. ROADMAP state must reflect evidence, not
 predict it.

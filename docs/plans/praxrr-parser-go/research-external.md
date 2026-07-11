@@ -78,15 +78,15 @@ start.
 
 ### Standard library APIs
 
-| Package             | Purpose                                        | Official URL                               |
-| ------------------- | ---------------------------------------------- | ------------------------------------------ |
-| `net/http`          | exact routes, server limits/timeouts, shutdown | https://pkg.go.dev/net/http                |
-| `encoding/json`     | request/response contract                      | https://pkg.go.dev/encoding/json           |
-| `os/signal`         | SIGINT/SIGTERM lifecycle                       | https://pkg.go.dev/os/signal#NotifyContext |
-| `net/http/httptest` | handler and real-listener tests                | https://pkg.go.dev/net/http/httptest       |
-| `testing`           | unit, golden, fuzz, benchmarks                 | https://pkg.go.dev/testing                 |
-| `errors`            | classify regexp2 sentinel errors               | https://pkg.go.dev/errors#Is               |
-| `log/slog`          | optional dependency-free structured logs       | https://pkg.go.dev/log/slog                |
+| Package             | Purpose                                        | Official URL                                 |
+| ------------------- | ---------------------------------------------- | -------------------------------------------- |
+| `net/http`          | exact routes, server limits/timeouts, shutdown | <https://pkg.go.dev/net/http>                |
+| `encoding/json`     | request/response contract                      | <https://pkg.go.dev/encoding/json>           |
+| `os/signal`         | SIGINT/SIGTERM lifecycle                       | <https://pkg.go.dev/os/signal#NotifyContext> |
+| `net/http/httptest` | handler and real-listener tests                | <https://pkg.go.dev/net/http/httptest>       |
+| `testing`           | unit, golden, fuzz, benchmarks                 | <https://pkg.go.dev/testing>                 |
+| `errors`            | classify regexp2 sentinel errors               | <https://pkg.go.dev/errors#Is>               |
+| `log/slog`          | optional dependency-free structured logs       | <https://pkg.go.dev/log/slog>                |
 
 ## Libraries and SDKs
 
@@ -120,28 +120,28 @@ may fail fast; dynamic patterns compile to `false` on invalid input.
 
 ```go
 func compileStatic(pattern string, options regexp2.RegexOptions) *regexp2.Regexp {
-	return regexp2.MustCompile(pattern, options, regexp2.OptionMaxBacktrackingStackSize(-1))
+ return regexp2.MustCompile(pattern, options, regexp2.OptionMaxBacktrackingStackSize(-1))
 }
 
 func compileUser(pattern string) (*regexp2.Regexp, error) {
-	re, err := regexp2.Compile(
-		pattern,
-		regexp2.IgnoreCase,
-		regexp2.OptionMaxBacktrackingStackSize(-1),
-	)
-	if err != nil {
-		return nil, err
-	}
-	re.MatchTimeout = 100 * time.Millisecond
-	return re, nil
+ re, err := regexp2.Compile(
+  pattern,
+  regexp2.IgnoreCase,
+  regexp2.OptionMaxBacktrackingStackSize(-1),
+ )
+ if err != nil {
+  return nil, err
+ }
+ re.MatchTimeout = 100 * time.Millisecond
+ return re, nil
 }
 
 func isMatch(re *regexp2.Regexp, text string) bool {
-	ok, err := re.MatchString(text)
-	if err != nil { // invalid is caught at compile; timeout/stack/engine error => current false contract
-		return false
-	}
-	return ok
+ ok, err := re.MatchString(text)
+ if err != nil { // invalid is caught at compile; timeout/stack/engine error => current false contract
+  return false
+ }
+ return ok
 }
 ```
 
@@ -159,19 +159,19 @@ must consume every `Group.Captures` entry. Implement `.NET Regex.Matches` with
 ```go
 m, err := re.FindStringMatch(title)
 for m != nil && err == nil {
-	if group := m.GroupByName("episode"); group != nil {
-		for _, capture := range group.Captures {
-			episodes = append(episodes, capture.String())
-		}
-	}
-	m, err = re.FindNextMatch(m)
+ if group := m.GroupByName("episode"); group != nil {
+  for _, capture := range group.Captures {
+   episodes = append(episodes, capture.String())
+  }
+ }
+ m, err = re.FindNextMatch(m)
 }
 
 renamed, err := re.Replace(input, "$1 AKA $2", 0, -1)
 cleaned, err := extensionRE.ReplaceFunc(input, func(m regexp2.Match) string {
-	ext := strings.ToLower(m.String())
-	if videoExtensions[ext] || usenetExtensions[ext] { return "" }
-	return m.String()
+ ext := strings.ToLower(m.String())
+ if videoExtensions[ext] || usenetExtensions[ext] { return "" }
+ return m.String()
 }, 0, -1)
 ```
 
@@ -187,26 +187,26 @@ and trailing JSON before freezing Go errors.
 
 ```go
 type parseRequest struct {
-	Title string  `json:"title"`
-	Type  *string `json:"type"`
+ Title string  `json:"title"`
+ Type  *string `json:"type"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+ w.Header().Set("Content-Type", "application/json; charset=utf-8")
+ w.WriteHeader(status)
+ _ = json.NewEncoder(w).Encode(value)
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	dec := json.NewDecoder(r.Body)
-	// Do not DisallowUnknownFields unless the ASP.NET reference does.
-	if err := dec.Decode(dst); err != nil { return err }
-	var trailing any
-	if err := dec.Decode(&trailing); err != io.EOF {
-		return errors.New("body must contain one JSON value")
-	}
-	return nil
+ r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+ dec := json.NewDecoder(r.Body)
+ // Do not DisallowUnknownFields unless the ASP.NET reference does.
+ if err := dec.Decode(dst); err != nil { return err }
+ var trailing any
+ if err := dec.Decode(&trailing); err != io.EOF {
+  return errors.New("body must contain one JSON value")
+ }
+ return nil
 }
 ```
 
@@ -248,19 +248,19 @@ custom server when timeouts and limits matter.
 
 ```go
 srv := &http.Server{
-	Addr: net.JoinHostPort(host, port), Handler: mux,
-	ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
-	WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second,
-	MaxHeaderBytes: 1 << 20,
+ Addr: net.JoinHostPort(host, port), Handler: mux,
+ ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
+ WriteTimeout: 35 * time.Second, IdleTimeout: 60 * time.Second,
+ MaxHeaderBytes: 1 << 20,
 }
 
 ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 defer stop()
 go func() {
-	<-ctx.Done()
-	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_ = srv.Shutdown(shutdown)
+ <-ctx.Done()
+ shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+ defer cancel()
+ _ = srv.Shutdown(shutdown)
 }()
 ```
 
@@ -294,9 +294,9 @@ Pure-Go release builds:
 
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
-	-o ../../dist/parser-out/praxrr-parser ./cmd/parser
+ -o ../../dist/parser-out/praxrr-parser ./cmd/parser
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' \
-	-o ../../dist/parser-out-win/praxrr-parser.exe ./cmd/parser
+ -o ../../dist/parser-out-win/praxrr-parser.exe ./cmd/parser
 ```
 
 Use a pinned Go builder image and a non-root minimal runtime. If Docker health

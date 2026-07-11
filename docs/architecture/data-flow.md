@@ -16,7 +16,7 @@ sequenceDiagram
     Runtime->>Hooks: load server hooks
     Hooks->>ParserSpawn: inspect external host / adjacent binary
     opt standalone parser binary is available
-		ParserSpawn->>Parser: spawn and wait for /health
+  ParserSpawn->>Parser: spawn and wait for /health
     end
     Hooks->>DB: initialize SQLite + pragmas
     Hooks->>Mig: run pending migrations
@@ -114,14 +114,14 @@ sequenceDiagram
     alt parser unavailable
         Eval-->>UI: parserAvailable=false
     else parser available
-		Eval->>Client: parseWithCacheBatch + matchPatternsBatch
-		Client->>HTTP: /health, /parse, /match/batch
-		HTTP->>Contract: decode and validate exact wire DTOs
-		HTTP->>Parser: parse title / run .NET-compatible patterns
-		Parser-->>HTTP: structured result within finite limits
-		HTTP-->>Client: versioned health or JSON result
-		Client->>ParserCache: read/write behavior-versioned results
-		Eval->>PCDCache: load custom format conditions
+  Eval->>Client: parseWithCacheBatch + matchPatternsBatch
+  Client->>HTTP: /health, /parse, /match/batch
+  HTTP->>Contract: decode and validate exact wire DTOs
+  HTTP->>Parser: parse title / run .NET-compatible patterns
+  Parser-->>HTTP: structured result within finite limits
+  HTTP-->>Client: versioned health or JSON result
+  Client->>ParserCache: read/write behavior-versioned results
+  Eval->>PCDCache: load custom format conditions
         Eval->>CF: evaluate conditions per release
         Eval-->>UI: parsed metadata + cfMatches
     end
