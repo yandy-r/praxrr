@@ -199,6 +199,13 @@ async function validateLayout(options: Options): Promise<{ app: string; parser: 
   return { app, parser, digest };
 }
 
+function reserveLoopbackPort(): number {
+  const listener = Deno.listen({ hostname: '127.0.0.1', port: 0 });
+  const port = (listener.addr as Deno.NetAddr).port;
+  listener.close();
+  return port;
+}
+
 async function fetchJSON(url: string, init: RequestInit, timeoutMs: number): Promise<Record<string, unknown>> {
   const response = await fetch(url, {
     ...init,
@@ -317,6 +324,7 @@ async function terminateProcess(child: Deno.ChildProcess, includeTree: boolean):
   }).output();
   if (!output.success) {
     const message = new TextDecoder().decode(output.stderr).trim();
+    if (/process .* not found/i.test(message)) return;
     fail(`taskkill failed for process ${child.pid}: ${message || `exit ${output.code}`}`);
   }
 }
@@ -436,7 +444,7 @@ async function smokeAdjacentDiscovery(
       APP_BASE_PATH: dataDirectory,
       AUTH: 'off',
       HOST: '127.0.0.1',
-      PORT: '0',
+      PORT: String(reserveLoopbackPort()),
       PARSER_HOST: '',
       PARSER_PORT: '',
     },
