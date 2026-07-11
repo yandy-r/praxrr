@@ -243,7 +243,10 @@ async function startGoParser(
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     try {
-      if ((await fetch(`${baseUrl}/health`)).ok) {
+      const response = await fetch(`${baseUrl}/health`);
+      const healthy = response.ok;
+      await response.body?.cancel();
+      if (healthy) {
         return {
           baseUrl,
           stop: async () => {

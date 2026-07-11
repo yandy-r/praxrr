@@ -423,7 +423,9 @@ async function withRealGoParser(version: string, port: number, run: (baseUrl: st
     let healthy = false;
     while (Date.now() < deadline) {
       try {
-        healthy = (await fetch(`${baseUrl}/health`)).ok;
+        const response = await fetch(`${baseUrl}/health`);
+        healthy = response.ok;
+        await response.body?.cancel();
       } catch {
         healthy = false;
       }
