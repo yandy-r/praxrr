@@ -117,7 +117,7 @@ async function ensureAuthenticated(page: Page): Promise<void> {
 
   if (page.url().includes('/auth/setup')) {
     if (!E2E_USERNAME || !E2E_PASSWORD) {
-      test.skip('AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
+      test.skip(true, 'AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
     }
 
     await page.getByRole('textbox', { name: 'Username' }).fill(E2E_USERNAME!);
@@ -129,7 +129,7 @@ async function ensureAuthenticated(page: Page): Promise<void> {
 
   if (page.url().includes('/auth/login')) {
     if (!E2E_USERNAME || !E2E_PASSWORD) {
-      test.skip('AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
+      test.skip(true, 'AUTH is required. Set E2E_USERNAME and E2E_PASSWORD to run auth-gated UI e2e tests.');
     }
 
     await page.getByRole('textbox', { name: 'Username' }).fill(E2E_USERNAME!);
@@ -140,20 +140,27 @@ async function ensureAuthenticated(page: Page): Promise<void> {
 }
 
 async function findQualityProfileContext(page: Page): Promise<ProfileContext | null> {
-  await page.goto('/quality-profiles');
+  await page.goto('/score-simulator');
   await page.waitForLoadState('networkidle');
+  await page.waitForURL(/\/score-simulator\/\d+/, { timeout: 15_000 }).catch(() => undefined);
 
-  const dbMatch = page.url().match(/\/quality-profiles\/(\d+)/);
+  const dbMatch = page.url().match(/\/score-simulator\/(\d+)/);
   if (!dbMatch) {
     return null;
   }
 
-  const firstRow = page.locator('table tbody tr').first();
-  if ((await firstRow.count()) === 0) {
+  const profileTrigger = page
+    .getByRole('button', {
+      name: 'Select quality profile...',
+    })
+    .first();
+  if ((await profileTrigger.count()) === 0) {
     return null;
   }
+  await profileTrigger.click();
 
-  const profileName = (await firstRow.locator('td').first().innerText()).trim();
+  const firstProfile = profileTrigger.locator('..').locator('div.z-50 button').nth(1);
+  const profileName = (await firstProfile.innerText()).trim();
   if (!profileName) {
     return null;
   }
@@ -176,7 +183,7 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('first-run quick-start shows 3 steps and Try example release primes simulation input', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for quick-start UX checks.');
+      test.skip(true, 'No quality profile context found for quick-start UX checks.');
     }
 
     await page.goto(`/score-simulator/${context!.databaseId}`);
@@ -190,11 +197,15 @@ test.describe('4.4 Score Simulator UX basics', () => {
 
     await page.getByRole('button', { name: 'Try example release' }).click();
     await expect(page.locator('#score-simulator-title')).not.toHaveValue('');
-    await expect(page.getByRole('heading', { name: 'Start in 3 steps' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Start in 3 steps' })).toHaveCount(0);
 
     const releaseInputCard = page
       .locator('div.rounded-lg')
-      .filter({ has: page.getByRole('heading', { name: 'Single Release Score Simulation' }) })
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'Single Release Score Simulation',
+        }),
+      })
       .first();
     await releaseInputCard
       .getByRole('button', {
@@ -211,7 +222,7 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('single and batch controls expose anime as a visible media type', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for media type UX checks.');
+      test.skip(true, 'No quality profile context found for media type UX checks.');
     }
 
     await page.goto(`/score-simulator/${context!.databaseId}`);
@@ -219,9 +230,13 @@ test.describe('4.4 Score Simulator UX basics', () => {
 
     const releaseInputCard = page
       .locator('div.rounded-lg')
-      .filter({ has: page.getByRole('heading', { name: 'Single Release Score Simulation' }) })
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'Single Release Score Simulation',
+        }),
+      })
       .first();
-    await expect(releaseInputCard.getByText('Media Type')).toBeVisible();
+    await expect(releaseInputCard.getByText('Media Type', { exact: true })).toBeVisible();
     await expect(releaseInputCard.getByRole('button', { name: 'Movie' })).toBeVisible();
     await expect(releaseInputCard.getByRole('button', { name: 'Series' })).toBeVisible();
     await expect(releaseInputCard.getByRole('button', { name: 'Anime' })).toBeVisible();
@@ -229,14 +244,17 @@ test.describe('4.4 Score Simulator UX basics', () => {
     await page.getByRole('button', { name: 'Show Advanced' }).click();
 
     const batchMediaTypeCard = page
-      .locator('div')
-      .filter({ has: page.getByText('Batch Media Type') })
-      .first();
+      .getByText('Batch Media Type', {
+        exact: true,
+      })
+      .locator('..');
     await expect(batchMediaTypeCard.getByRole('button', { name: 'Movie' })).toBeVisible();
     await expect(batchMediaTypeCard.getByRole('button', { name: 'Series' })).toBeVisible();
     await expect(batchMediaTypeCard.getByRole('button', { name: 'Anime' })).toBeVisible();
 
-    const animeButton = batchMediaTypeCard.getByRole('button', { name: 'Anime' });
+    const animeButton = batchMediaTypeCard.getByRole('button', {
+      name: 'Anime',
+    });
     await animeButton.click();
     await expect(animeButton).toHaveClass(/border-accent-500/);
   });
@@ -244,7 +262,7 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('auto-run after selecting a profile includes profileNames in the request', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for auto-run request validation.');
+      test.skip(true, 'No quality profile context found for auto-run request validation.');
     }
 
     const observedRequests: SimulateRequestBody[] = [];
@@ -257,7 +275,9 @@ test.describe('4.4 Score Simulator UX basics', () => {
         await route.fulfill({
           status: 400,
           contentType: 'application/json',
-          body: JSON.stringify({ error: 'Missing or empty profileNames array' }),
+          body: JSON.stringify({
+            error: 'Missing or empty profileNames array',
+          }),
         });
         return;
       }
@@ -274,7 +294,11 @@ test.describe('4.4 Score Simulator UX basics', () => {
 
     const releaseInputCard = page
       .locator('div.rounded-lg')
-      .filter({ has: page.getByRole('heading', { name: 'Single Release Score Simulation' }) })
+      .filter({
+        has: page.getByRole('heading', {
+          name: 'Single Release Score Simulation',
+        }),
+      })
       .first();
 
     await page.locator('#score-simulator-title').fill(SINGLE_RELEASE_TITLE);
@@ -282,7 +306,11 @@ test.describe('4.4 Score Simulator UX basics', () => {
       (request) => request.url().includes('/api/v1/simulate/score') && request.method() === 'POST'
     );
 
-    await releaseInputCard.getByRole('button', { name: 'Select quality profile...' }).click();
+    await releaseInputCard
+      .getByRole('button', {
+        name: 'Select quality profile...',
+      })
+      .click();
     await page.getByRole('button', { name: context!.profileName, exact: true }).click();
 
     const request = await simulateRequest;
@@ -303,11 +331,11 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('decision summary appears after simulation and updates when overrides change total', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for decision summary checks.');
+      test.skip(true, 'No quality profile context found for decision summary checks.');
     }
 
     const simulatorUrl = `/score-simulator/${context!.databaseId}?profile=${encodeURIComponent(
-      `pcd:${context!.profileName}`
+      `pcd:${encodeURIComponent(context!.profileName)}`
     )}&arrType=radarr`;
     await page.goto(simulatorUrl);
     await page.waitForLoadState('networkidle');
@@ -328,7 +356,6 @@ test.describe('4.4 Score Simulator UX basics', () => {
     await alphaRow.locator('button').first().click();
     const alphaInput = alphaRow.locator('input[type="number"]');
     await alphaInput.fill('40');
-    await alphaInput.blur();
 
     await expect(alphaRow).toHaveClass(/bg-amber-50/);
     await expect(scoreBreakdown.getByText('This release would not be grabbed.')).toBeVisible();
@@ -339,11 +366,11 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('share safety: full link keeps title/batch while safe link excludes title/batch', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for share safety checks.');
+      test.skip(true, 'No quality profile context found for share safety checks.');
     }
 
     const simulatorUrl = `/score-simulator/${context!.databaseId}?profile=${encodeURIComponent(
-      `pcd:${context!.profileName}`
+      `pcd:${encodeURIComponent(context!.profileName)}`
     )}&arrType=radarr`;
     await page.goto(simulatorUrl);
     await page.waitForLoadState('networkidle');
@@ -358,7 +385,6 @@ test.describe('4.4 Score Simulator UX basics', () => {
     const alphaRow = scoreBreakdown.locator('li', { hasText: 'CF Alpha' }).first();
     await alphaRow.locator('button').first().click();
     await alphaRow.locator('input[type="number"]').fill('40');
-    await alphaRow.locator('input[type="number"]').blur();
 
     await page.getByRole('button', { name: 'Show Advanced' }).click();
     await page.locator('#batch-input-textarea').fill(`${BATCH_ALPHA_TITLE}\n${BATCH_BETA_TITLE}`);
@@ -404,12 +430,12 @@ test.describe('4.4 Score Simulator UX basics', () => {
   test('mobile 390x844 supports override edit/reset controls without horizontal scrolling', async ({ page }) => {
     const context = await findQualityProfileContext(page);
     if (!context) {
-      test.skip('No quality profile context found for mobile ergonomics checks.');
+      test.skip(true, 'No quality profile context found for mobile ergonomics checks.');
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
     const simulatorUrl = `/score-simulator/${context!.databaseId}?profile=${encodeURIComponent(
-      `pcd:${context!.profileName}`
+      `pcd:${encodeURIComponent(context!.profileName)}`
     )}&arrType=radarr`;
     await page.goto(simulatorUrl);
     await page.waitForLoadState('networkidle');
@@ -429,7 +455,6 @@ test.describe('4.4 Score Simulator UX basics', () => {
     await editControl.click();
     await expect(alphaRow.locator('input[type="number"]')).toBeVisible();
     await alphaRow.locator('input[type="number"]').fill('40');
-    await alphaRow.locator('input[type="number"]').blur();
 
     const resetControl = alphaRow.getByRole('button', {
       name: /Reset override for CF Alpha/,
@@ -444,5 +469,98 @@ test.describe('4.4 Score Simulator UX basics', () => {
       return Math.max(rootWidth, bodyWidth) > window.innerWidth + 1;
     });
     expect(hasHorizontalOverflow).toBe(false);
+  });
+
+  test('latest request wins without moving focus or replacing the current input', async ({ page }) => {
+    const context = await findQualityProfileContext(page);
+    if (!context) {
+      test.skip(true, 'No quality profile context found for request ordering checks.');
+    }
+
+    await page.route('**/api/v1/simulate/score', async (route) => {
+      const body = (route.request().postDataJSON() ?? {}) as SimulateRequestBody;
+      const title = body.releases?.[0]?.title ?? '';
+      if (title.includes('ALPHA')) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildSimulateResponse(body)),
+      });
+    });
+
+    await page.goto(
+      `/score-simulator/${context!.databaseId}?profile=${encodeURIComponent(
+        `pcd:${encodeURIComponent(context!.profileName)}`
+      )}`
+    );
+    await page.waitForLoadState('networkidle');
+
+    const titleInput = page.locator('#score-simulator-title');
+    const simulateButton = page.getByRole('button', { name: 'Simulate' }).last();
+    await titleInput.fill(SINGLE_RELEASE_TITLE);
+    await simulateButton.click();
+    await titleInput.fill(BATCH_BETA_TITLE);
+    await titleInput.focus();
+    await simulateButton.evaluate((button) => (button as HTMLButtonElement).click());
+
+    await expect(page.getByText('CF Beta').first()).toBeVisible();
+    await expect(page.getByText('CF Alpha')).toHaveCount(0);
+    await expect(titleInput).toHaveValue(BATCH_BETA_TITLE);
+    await expect(titleInput).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'Simulation complete.' })).toHaveCount(1);
+  });
+
+  test('invalid responses clear stale scores while preserving keyboard focus and input for recovery', async ({
+    page,
+  }) => {
+    const context = await findQualityProfileContext(page);
+    if (!context) {
+      test.skip(true, 'No quality profile context found for stale-result checks.');
+    }
+
+    let rejectRequests = false;
+    await page.route('**/api/v1/simulate/score', async (route) => {
+      const body = (route.request().postDataJSON() ?? {}) as SimulateRequestBody;
+      if (rejectRequests) {
+        await route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Invalid parser request' }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildSimulateResponse(body)),
+      });
+    });
+
+    await page.goto(
+      `/score-simulator/${context!.databaseId}?profile=${encodeURIComponent(
+        `pcd:${encodeURIComponent(context!.profileName)}`
+      )}`
+    );
+    await page.waitForLoadState('networkidle');
+
+    const titleInput = page.locator('#score-simulator-title');
+    const simulateButton = page.getByRole('button', { name: 'Simulate' }).last();
+    await titleInput.fill(SINGLE_RELEASE_TITLE);
+    await simulateButton.focus();
+    await simulateButton.press('Enter');
+    await expect(page.getByText('CF Alpha').first()).toBeVisible();
+
+    rejectRequests = true;
+    await titleInput.fill(BATCH_BETA_TITLE);
+    await titleInput.focus();
+    await simulateButton.evaluate((button) => (button as HTMLButtonElement).click());
+
+    await expect(page.getByText('Invalid parser request').first()).toBeVisible();
+    await expect(page.getByText('CF Alpha')).toHaveCount(0);
+    await expect(titleInput).toHaveValue(BATCH_BETA_TITLE);
+    await expect(titleInput).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'Invalid parser request' })).toHaveCount(1);
   });
 });

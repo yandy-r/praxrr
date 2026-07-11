@@ -96,17 +96,22 @@ async function createParserStub(port: number): Promise<{
   setParseResponse: (title: string, payload: ParseStubResponse) => void;
   setMatchResponse: (text: string, matches: Record<string, boolean>) => void;
   clearResponses: () => void;
+  setForwardBaseUrl: (baseUrl: string | null) => void;
   close: () => Promise<void>;
 }> {
   const parseResponses = new Map<string, ParseStubResponse>();
   const matchResponses = new Map<string, Record<string, boolean>>();
   let healthAvailable = true;
   let version = 'local-parser-v1';
+  let forwardBaseUrl: string | null = null;
 
   const response = (data: unknown, init?: ResponseInit): Response =>
     new Response(JSON.stringify(data), {
       status: init?.status ?? 200,
-      headers: { 'content-type': 'application/json', ...(init?.headers as Record<string, string>) },
+      headers: {
+        'content-type': 'application/json',
+        ...(init?.headers as Record<string, string>),
+      },
     });
 
   const server = Deno.serve({
@@ -119,6 +124,19 @@ async function createParserStub(port: number): Promise<{
 
       const url = new URL(request.url);
       const payloadText = await request.text();
+
+      if (forwardBaseUrl) {
+        try {
+          return await fetch(`${forwardBaseUrl}${url.pathname}`, {
+            method: request.method,
+            headers: request.headers,
+            body: request.method === 'GET' || request.method === 'HEAD' ? undefined : payloadText,
+          });
+        } catch {
+          return new Response('upstream unavailable', { status: 503 });
+        }
+      }
+
       const payload = payloadText.length > 0 ? JSON.parse(payloadText) : {};
 
       if (url.pathname === '/health') {
@@ -129,7 +147,12 @@ async function createParserStub(port: number): Promise<{
         const title = payload.title as string;
         const responsePayload = parseResponses.get(title);
         if (!responsePayload) {
-          return response({ error: `No parse response for ${title}` }, { status: 404 });
+          return response(
+            { error: `No parse response for ${title}` },
+            {
+              status: 404,
+            }
+          );
         }
         return response(responsePayload);
       }
@@ -170,10 +193,78 @@ async function createParserStub(port: number): Promise<{
       parseResponses.clear();
       matchResponses.clear();
     },
+    setForwardBaseUrl: (baseUrl) => {
+      forwardBaseUrl = baseUrl;
+    },
     close: async () => {
       await server.shutdown();
     },
   };
+}
+
+interface BuiltGoParser {
+  binaryPath: string;
+  cleanup: () => Promise<void>;
+}
+
+async function buildGoParser(version: string): Promise<BuiltGoParser> {
+  const directory = await Deno.makeTempDir({ prefix: 'praxrr-parser-impact-' });
+  const binaryPath = `${directory}/praxrr-parser`;
+  const output = await new Deno.Command('go', {
+    cwd: new URL('../../../../praxrr-parser/', import.meta.url),
+    args: ['build', '-ldflags', `-X main.version=${version}`, '-o', binaryPath, './cmd/praxrr-parser'],
+    stdout: 'piped',
+    stderr: 'piped',
+  }).output();
+  if (!output.success) {
+    await Deno.remove(directory, { recursive: true });
+    throw new Error(`Go parser build failed: ${new TextDecoder().decode(output.stderr)}`);
+  }
+  return {
+    binaryPath,
+    cleanup: () => Deno.remove(directory, { recursive: true }),
+  };
+}
+
+async function startGoParser(
+  binaryPath: string,
+  port: number
+): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const process = new Deno.Command(binaryPath, {
+    env: { PARSER_ADDR: `127.0.0.1:${port}` },
+    stdout: 'null',
+    stderr: 'null',
+  }).spawn();
+
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      if ((await fetch(`${baseUrl}/health`)).ok) {
+        return {
+          baseUrl,
+          stop: async () => {
+            try {
+              process.kill('SIGTERM');
+            } catch (error: unknown) {
+              if (!(error instanceof Deno.errors.NotFound)) throw error;
+            }
+            await process.status;
+          },
+        };
+      }
+    } catch {
+      // Listener is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  process.kill('SIGKILL');
+  await process.status;
+  throw new Error(`Go parser did not become healthy at ${baseUrl}`);
 }
 
 function installParserCacheStubs(): RestoreFunction {
@@ -320,7 +411,9 @@ interface CurrentFixture {
 
 function createCurrentCache(): CurrentFixture {
   const sqlite = new Database(':memory:', { int64: true });
-  const kb = new Kysely<PCDDatabase>({ dialect: new DenoSqlite3Dialect({ database: sqlite }) });
+  const kb = new Kysely<PCDDatabase>({
+    dialect: new DenoSqlite3Dialect({ database: sqlite }),
+  });
   sqlite.exec(PCD_SCHEMA_SQL);
   sqlite.exec(SEED_SQL);
   return {
@@ -384,7 +477,11 @@ async function withImpactFixture(fn: (databaseId: number) => Promise<void>): Pro
     PCDCacheClass.prototype,
     'buildReadOnly',
     async function (this: PCDCache) {
-      const self = this as unknown as { bootstrap(): void; db: Database | null; built: boolean };
+      const self = this as unknown as {
+        bootstrap(): void;
+        db: Database | null;
+        built: boolean;
+      };
       self.bootstrap();
       self.db!.exec(PCD_SCHEMA_SQL);
       self.db!.exec(SEED_SQL);
@@ -414,7 +511,11 @@ async function withImpactFixture(fn: (databaseId: number) => Promise<void>): Pro
 }
 
 function seedMovie(title: string, matches: Record<string, boolean>): void {
-  parserState.setParseResponse(title, { ...BASE_PARSE_RESPONSE, title, type: 'movie' });
+  parserState.setParseResponse(title, {
+    ...BASE_PARSE_RESPONSE,
+    title,
+    type: 'movie',
+  });
   parserState.setMatchResponse(title, matches);
 }
 
@@ -684,7 +785,12 @@ Deno.test('impact: empty proposedChanges yields zero deltas and empty config/cas
 
 Deno.test('impact: request validation and missing-cache errors', async (t) => {
   const validRelease = { id: 'r1', title: 'Movie.BOOST', type: 'movie' };
-  const validChange = { kind: 'set_cf_score', profileName: 'Primary', customFormatName: 'Boost', score: 1 };
+  const validChange = {
+    kind: 'set_cf_score',
+    profileName: 'Primary',
+    customFormatName: 'Boost',
+    score: 1,
+  };
 
   await t.step('malformed JSON body -> 400', async () => {
     const error = await assertRejects(async () => impactRouteModule.POST(buildRawEvent('{not json')));
@@ -785,4 +891,77 @@ Deno.test('impact: request validation and missing-cache errors', async (t) => {
     );
     assertEquals(getErrorStatus(error), 404);
   });
+});
+
+Deno.test('impact: real Go outage and recovery preserve configuration analysis', async () => {
+  const built = await buildGoParser('route-impact-v1');
+  let running = await startGoParser(built.binaryPath, 58131);
+  parserState.setForwardBaseUrl(running.baseUrl);
+
+  try {
+    await withImpactFixture(async (databaseId) => {
+      const change: ProposedChange = {
+        kind: 'set_cf_score',
+        profileName: 'Primary',
+        customFormatName: 'Boost',
+        score: 50,
+      };
+      const releases = [
+        {
+          id: 'real-go-impact',
+          title: 'Movie.2024.1080p.WEB-DL.BOOST-GROUP',
+          type: 'movie',
+        },
+      ];
+      const invoke = async (): Promise<SimulateImpactResponse> => {
+        const response = await impactRouteModule.POST(
+          buildEvent({
+            databaseId,
+            arrType: 'radarr',
+            profileNames: ['pcd:Primary'],
+            releases,
+            proposedChanges: [change],
+          })
+        );
+        assertEquals(response.status, 200);
+        return (await response.json()) as SimulateImpactResponse;
+      };
+
+      parserClientModule.clearParserVersionCache();
+      const healthy = await invoke();
+      assertEquals(healthy.parserAvailable, true);
+      assertEquals(healthy.releaseImpacts.length, 1);
+      assertEquals(healthy.releaseImpacts[0].id, 'real-go-impact');
+      assertEquals(healthy.releaseImpacts[0].title, releases[0].title);
+      assertEquals(healthy.configDiff.length, 1);
+      assertEquals(healthy.cascade[0].name, 'Boost');
+
+      await running.stop();
+      parserClientModule.clearParserVersionCache();
+      const unavailable = await invoke();
+      assertEquals(unavailable.parserAvailable, false);
+      assertEquals(unavailable.releaseImpacts, []);
+      assertEquals(unavailable.appliedChanges, [change]);
+      assertEquals(unavailable.configDiff.length, 1);
+      assertEquals(unavailable.cascade[0].name, 'Boost');
+
+      running = await startGoParser(built.binaryPath, 58131);
+      parserClientModule.clearParserVersionCache();
+      const recovered = await invoke();
+      assertEquals(recovered.parserAvailable, true);
+      assertEquals(recovered.releaseImpacts.length, 1);
+      assertEquals(recovered.releaseImpacts[0].id, 'real-go-impact');
+      assertEquals(recovered.configDiff.length, 1);
+      assertEquals(recovered.cascade[0].name, 'Boost');
+    });
+  } finally {
+    await running.stop();
+    parserState.setForwardBaseUrl(null);
+    parserClientModule.clearParserVersionCache();
+    await built.cleanup();
+  }
+});
+
+Deno.test.afterAll(async () => {
+  await parserState.close();
 });

@@ -36,6 +36,7 @@
   let selectedProfileValues: string[] = [];
   let result: SimulateImpactResponse | null = null;
   let isSimulating = false;
+  let simulationStatus = '';
   let simulationRequestToken = 0;
   let activeAbortController: AbortController | null = null;
   let parserAvailable = data.parserAvailable;
@@ -170,6 +171,8 @@
     }
 
     const { requestToken, abortController, timeout } = createSimulationRequestContext();
+    result = null;
+    simulationStatus = 'Impact simulation running…';
 
     try {
       const response = await fetch('/api/v1/simulate/impact', {
@@ -198,17 +201,21 @@
 
       parserAvailable = payload.parserAvailable;
       result = payload;
+      simulationStatus = 'Impact simulation complete.';
     } catch (err) {
       if (requestToken !== simulationRequestToken) {
         return;
       }
 
       if (err instanceof DOMException && err.name === 'AbortError') {
+        simulationStatus = 'Impact simulation timed out. Your input was preserved.';
+        alertStore.add('error', simulationStatus);
         return;
       }
 
       console.error('Impact simulation failed:', err);
-      alertStore.add('error', err instanceof Error ? err.message : 'Failed to run impact simulation.');
+      simulationStatus = err instanceof Error ? err.message : 'Failed to run impact simulation.';
+      alertStore.add('error', simulationStatus);
     } finally {
       finalizeSimulationRequest(requestToken, abortController, timeout);
     }
@@ -300,6 +307,7 @@
     selectedProfileValues = [];
     result = null;
     isSimulating = false;
+    simulationStatus = '';
     update('proposedChanges', []);
   }
 </script>
@@ -427,6 +435,7 @@
         />
         <Button text="Clear" variant="ghost" size="sm" icon={Eraser} on:click={clearAll} />
       </div>
+      <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{simulationStatus}</p>
     </div>
 
     <div class="min-w-0 space-y-4">

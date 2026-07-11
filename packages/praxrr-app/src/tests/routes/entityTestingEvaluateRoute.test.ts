@@ -30,6 +30,7 @@ interface InMemoryResponseCacheFixture {
 interface RestoreFunction {
   restore: () => void;
   reset: () => void;
+  patternNamespaces: () => string[];
 }
 
 interface ParseStubResponse {
@@ -61,12 +62,14 @@ async function createParserStub(port: number): Promise<{
   setParseResponse: (title: string, payload: ParseStubResponse) => void;
   setMatchResponse: (text: string, matches: Record<string, boolean>) => void;
   clearResponses: () => void;
+  setForwardBaseUrl: (baseUrl: string | null) => void;
   close: () => Promise<void>;
 }> {
   const parseResponses = new Map<string, ParseStubResponse>();
   const matchResponses = new Map<string, Record<string, boolean>>();
   let healthAvailable = true;
   let version = 'local-parser-v1';
+  let forwardBaseUrl: string | null = null;
 
   const response = (data: unknown, init?: ResponseInit): Response =>
     new Response(JSON.stringify(data), {
@@ -86,6 +89,19 @@ async function createParserStub(port: number): Promise<{
 
       const url = new URL(request.url);
       const payloadText = await request.text();
+
+      if (forwardBaseUrl) {
+        try {
+          return await fetch(`${forwardBaseUrl}${url.pathname}`, {
+            method: request.method,
+            headers: request.headers,
+            body: request.method === 'GET' || request.method === 'HEAD' ? undefined : payloadText,
+          });
+        } catch {
+          return new Response('upstream unavailable', { status: 503 });
+        }
+      }
+
       const payload = payloadText.length > 0 ? JSON.parse(payloadText) : {};
 
       if (url.pathname === '/health') {
@@ -145,6 +161,9 @@ async function createParserStub(port: number): Promise<{
       parseResponses.clear();
       matchResponses.clear();
     },
+    setForwardBaseUrl: (baseUrl) => {
+      forwardBaseUrl = baseUrl;
+    },
     close: async () => {
       await server.shutdown();
     },
@@ -174,6 +193,7 @@ function createPcdCacheFixture(seedSql: string): InMemoryResponseCacheFixture {
 function installParserCacheStubs(): RestoreFunction {
   const parsedCache = new Map<string, string>();
   const patternCache = new Map<string, string>();
+  const patternNamespaces = new Set<string>();
 
   const originalParsedGet = parsedReleaseCacheQueries.get;
   const originalParsedSet = parsedReleaseCacheQueries.set;
@@ -205,6 +225,7 @@ function installParserCacheStubs(): RestoreFunction {
   parsedReleaseCacheQueries.delete = () => true;
 
   patternMatchCacheQueries.getBatch = (titles, patternsHash) => {
+    patternNamespaces.add(patternsHash);
     const results = new Map<string, string>();
     for (const title of titles) {
       const value = patternCache.get(`${patternsHash}:${title}`);
@@ -216,10 +237,12 @@ function installParserCacheStubs(): RestoreFunction {
   };
 
   patternMatchCacheQueries.set = (title, patternsHash, matchResults) => {
+    patternNamespaces.add(patternsHash);
     patternCache.set(`${patternsHash}:${title}`, matchResults);
   };
 
   patternMatchCacheQueries.setBatch = (entries, patternsHash) => {
+    patternNamespaces.add(patternsHash);
     for (const entry of entries) {
       patternCache.set(`${patternsHash}:${entry.title}`, entry.matchResults);
     }
@@ -237,8 +260,77 @@ function installParserCacheStubs(): RestoreFunction {
     reset: () => {
       parsedCache.clear();
       patternCache.clear();
+      patternNamespaces.clear();
     },
+    patternNamespaces: () => [...patternNamespaces].sort(),
   };
+}
+
+interface BuiltGoParser {
+  binaryPath: string;
+  cleanup: () => Promise<void>;
+}
+
+async function buildGoParser(version: string): Promise<BuiltGoParser> {
+  const directory = await Deno.makeTempDir({ prefix: 'praxrr-parser-route-' });
+  const binaryPath = `${directory}/praxrr-parser`;
+  const command = new Deno.Command('go', {
+    cwd: new URL('../../../../praxrr-parser/', import.meta.url),
+    args: ['build', '-ldflags', `-X main.version=${version}`, '-o', binaryPath, './cmd/praxrr-parser'],
+    stdout: 'piped',
+    stderr: 'piped',
+  });
+  const output = await command.output();
+  if (!output.success) {
+    await Deno.remove(directory, { recursive: true });
+    throw new Error(`Go parser build failed: ${new TextDecoder().decode(output.stderr)}`);
+  }
+  return {
+    binaryPath,
+    cleanup: () => Deno.remove(directory, { recursive: true }),
+  };
+}
+
+async function startGoParser(
+  binaryPath: string,
+  port: number
+): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const process = new Deno.Command(binaryPath, {
+    env: { PARSER_ADDR: `127.0.0.1:${port}` },
+    stdout: 'null',
+    stderr: 'null',
+  }).spawn();
+
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${baseUrl}/health`);
+      if (response.ok) {
+        return {
+          baseUrl,
+          stop: async () => {
+            try {
+              process.kill('SIGTERM');
+            } catch (error: unknown) {
+              if (!(error instanceof Deno.errors.NotFound)) throw error;
+            }
+            await process.status;
+          },
+        };
+      }
+    } catch {
+      // Listener is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  process.kill('SIGKILL');
+  await process.status;
+  throw new Error(`Go parser did not become healthy at ${baseUrl}`);
 }
 
 const parserState = await createParserStub(PARSER_PORT);
@@ -324,6 +416,120 @@ Deno.test('entity-testing evaluate: parser-missing titles still match pattern-ba
     parserState.clearResponses();
     parserState.setVersion('local-parser-v1');
     restore.restore();
+  }
+});
+
+Deno.test('entity-testing evaluate: real Go lifecycle preserves releases and isolates match failures', async () => {
+  const databaseId = 7002;
+  const proxyUpstreamPort = 58130;
+  const restore = installParserCacheStubs();
+  const parserV1 = await buildGoParser('route-entity-v1');
+  const parserV2 = await buildGoParser('route-entity-v2');
+  let running = await startGoParser(parserV1.binaryPath, proxyUpstreamPort);
+  parserState.setForwardBaseUrl(running.baseUrl);
+  parserClientModule.clearParserVersionCache();
+
+  const fixture = createPcdCacheFixture(`
+    INSERT INTO custom_formats (name) VALUES ('CF-Valid');
+    INSERT INTO custom_formats (name) VALUES ('CF-Invalid');
+    INSERT INTO custom_formats (name) VALUES ('CF-Timeout');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('valid-regex', 'BONUS');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('invalid-regex', '(?<unterminated');
+    INSERT INTO regular_expressions (name, pattern) VALUES ('timeout-regex', '^(a+)+$');
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-Valid', 'valid-title', 'release_title', 'all', 0, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-Invalid', 'invalid-title', 'release_title', 'all', 0, 1);
+    INSERT INTO custom_format_conditions (custom_format_name, name, type, arr_type, negate, required)
+    VALUES ('CF-Timeout', 'timeout-title', 'release_title', 'all', 0, 1);
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Valid', 'valid-title', 'valid-regex');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Invalid', 'invalid-title', 'invalid-regex');
+    INSERT INTO condition_patterns (custom_format_name, condition_name, regular_expression_name)
+    VALUES ('CF-Timeout', 'timeout-title', 'timeout-regex');
+  `);
+  setCache(databaseId, fixture.cache);
+
+  const releases = [
+    {
+      id: 'known',
+      title: 'Movie.2024.1080p.WEB-DL.BONUS-GROUP',
+      type: 'movie' as const,
+    },
+    { id: 'domain-miss', title: 'Meaningless.BONUS', type: 'movie' as const },
+    { id: 'timeout', title: `${'a'.repeat(999)}!`, type: 'movie' as const },
+  ];
+  const evaluate = async () => {
+    const response = await evaluateRouteModule.POST({
+      request: new Request('http://localhost/api/v1/entity-testing/evaluate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ databaseId, releases }),
+      }),
+    } as Parameters<typeof evaluateRouteModule.POST>[0]);
+    return (await response.json()) as {
+      parserAvailable: boolean;
+      evaluations: Array<{
+        releaseId: string;
+        title: string;
+        parsed?: { source: string; year: number };
+        cfMatches: Record<string, boolean>;
+      }>;
+    };
+  };
+
+  try {
+    const healthy = await evaluate();
+    assertEquals(healthy.parserAvailable, true);
+    assertEquals(
+      healthy.evaluations.map(({ releaseId, title }) => ({ releaseId, title })),
+      releases.map(({ id, title }) => ({ releaseId: id, title }))
+    );
+    assertEquals(healthy.evaluations[0].cfMatches, {
+      'CF-Valid': true,
+      'CF-Invalid': false,
+      'CF-Timeout': false,
+    });
+    assertEquals(healthy.evaluations[1].parsed?.source, 'unknown');
+    assertEquals(healthy.evaluations[1].cfMatches['CF-Valid'], true);
+    assertEquals(healthy.evaluations[2].cfMatches['CF-Timeout'], false);
+    assertEquals(
+      restore.patternNamespaces().some((value) => value.startsWith('v1:route-entity-v1:')),
+      true
+    );
+
+    await running.stop();
+    parserClientModule.clearParserVersionCache();
+    const unavailable = await evaluate();
+    assertEquals(unavailable.parserAvailable, false);
+    assertEquals(
+      unavailable.evaluations,
+      releases.map(({ id, title }) => ({
+        releaseId: id,
+        title,
+        cfMatches: {},
+      }))
+    );
+
+    running = await startGoParser(parserV2.binaryPath, proxyUpstreamPort);
+    parserClientModule.clearParserVersionCache();
+    const recovered = await evaluate();
+    assertEquals(recovered.parserAvailable, true);
+    assertEquals(recovered.evaluations[0].cfMatches['CF-Valid'], true);
+    assertEquals(
+      restore.patternNamespaces().some((value) => value.startsWith('v1:route-entity-v2:')),
+      true
+    );
+  } finally {
+    await running.stop();
+    parserState.setForwardBaseUrl(null);
+    parserClientModule.clearParserVersionCache();
+    deleteCache(databaseId);
+    await fixture.destroy();
+    restore.restore();
+    await parserV1.cleanup();
+    await parserV2.cleanup();
   }
 });
 

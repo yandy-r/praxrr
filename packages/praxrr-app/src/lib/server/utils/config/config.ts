@@ -19,7 +19,6 @@ export function parseCookieSecureMode(raw: string | undefined): CookieSecureMode
 class Config {
   private basePath: string;
   public readonly timezone: string;
-  public readonly parserUrl: string;
   public readonly port: number;
   public readonly host: string;
   public readonly authMode: AuthMode;
@@ -65,11 +64,6 @@ class Config {
     // 1. Check TZ environment variable
     // 2. Fall back to system timezone
     this.timezone = Deno.env.get('TZ') || Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Parser service configuration
-    const parserHost = Deno.env.get('PARSER_HOST') || 'localhost';
-    const parserPort = Deno.env.get('PARSER_PORT') || '5000';
-    this.parserUrl = `http://${parserHost}:${parserPort}`;
 
     // Server bind configuration
     this.port = parseInt(Deno.env.get('PORT') || '6868', 10);
@@ -118,6 +112,16 @@ class Config {
   /** Parse the TRUSTED_PROXY env var into a structured allowlist. Never throws (malformed => deny trust). */
   private static parseTrustedProxyEnv(): TrustedProxyConfig {
     return parseTrustedProxy(Deno.env.get('TRUSTED_PROXY') ?? null);
+  }
+
+  /**
+   * Parser service URL. Read lazily because the standalone launcher selects a
+   * free port after this singleton's module may already have been evaluated.
+   */
+  get parserUrl(): string {
+    const parserHost = Deno.env.get('PARSER_HOST') || 'localhost';
+    const parserPort = Deno.env.get('PARSER_PORT') || '5000';
+    return `http://${parserHost}:${parserPort}`;
   }
 
   /**

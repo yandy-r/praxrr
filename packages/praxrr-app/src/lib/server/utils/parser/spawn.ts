@@ -46,7 +46,7 @@ function findParserBinary(): string | null {
 // — Port + health ————————————————————————————————————————————————
 
 async function findFreePort(): Promise<number> {
-  const listener = Deno.listen({ port: 0 });
+  const listener = Deno.listen({ hostname: '127.0.0.1', port: 0 });
   const port = (listener.addr as Deno.NetAddr).port;
   listener.close();
   return port;
@@ -56,7 +56,7 @@ async function waitForHealth(port: number, timeoutMs: number): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const resp = await fetch(`http://localhost:${port}/health`, {
+      const resp = await fetch(`http://127.0.0.1:${port}/health`, {
         signal: AbortSignal.timeout(2000),
       });
       if (resp.ok) return;
@@ -92,29 +92,40 @@ async function streamOutput(reader: ReadableStreamDefaultReader<Uint8Array>) {
 
 // — Main ————————————————————————————————————————————————————————
 
-const shouldSpawn = !isDocker() && !Deno.env.get('PARSER_HOST') && findParserBinary() !== null;
+const parserBinary = findParserBinary();
+const shouldSpawn = !isDocker() && !Deno.env.get('PARSER_HOST') && parserBinary !== null;
 
 if (shouldSpawn) {
-  const binaryPath = findParserBinary()!;
+  const binaryPath = parserBinary;
   const port = await findFreePort();
 
   const cmd = new Deno.Command(binaryPath, {
     env: {
-      ASPNETCORE_URLS: `http://localhost:${port}`,
-      ASPNETCORE_ENVIRONMENT: 'Production',
+      PARSER_ADDR: `127.0.0.1:${port}`,
     },
     stdout: 'piped',
     stderr: 'piped',
   });
 
   const process = cmd.spawn();
+  let stopping = false;
+
+  const terminate = () => {
+    if (stopping) return;
+    stopping = true;
+    try {
+      process.kill('SIGTERM');
+    } catch {
+      // Already dead
+    }
+  };
 
   // Stream output in background
-  streamOutput(process.stdout.getReader());
-  streamOutput(process.stderr.getReader());
+  void streamOutput(process.stdout.getReader());
+  void streamOutput(process.stderr.getReader());
 
   // Set env vars before Config reads them
-  Deno.env.set('PARSER_HOST', 'localhost');
+  Deno.env.set('PARSER_HOST', '127.0.0.1');
   Deno.env.set('PARSER_PORT', String(port));
 
   // Wait for parser to be ready
@@ -123,34 +134,29 @@ if (shouldSpawn) {
     console.log(`\x1b[33m[parser]\x1b[0m Ready on port ${port}`);
   } catch (err) {
     console.error(`\x1b[31m[parser]\x1b[0m Failed to start: ${err}`);
+    terminate();
     // Continue anyway — the app degrades gracefully without the parser
   }
 
   // Shutdown handlers
-  const cleanup = () => {
-    try {
-      process.kill('SIGTERM');
-    } catch {
-      // Already dead
-    }
-  };
+  globalThis.addEventListener('unload', terminate, { once: true });
 
   Deno.addSignalListener('SIGINT', () => {
-    cleanup();
-    Deno.exit(0);
+    terminate();
+    void process.status.finally(() => Deno.exit(0));
   });
 
   // SIGTERM is not supported on Windows
   if (Deno.build.os !== 'windows') {
     Deno.addSignalListener('SIGTERM', () => {
-      cleanup();
-      Deno.exit(0);
+      terminate();
+      void process.status.finally(() => Deno.exit(0));
     });
   }
 
   // Watch for unexpected death
-  process.status.then((status) => {
-    if (status.code !== 0) {
+  void process.status.then((status) => {
+    if (!stopping && status.code !== 0) {
       console.error(`\x1b[31m[parser]\x1b[0m Process exited unexpectedly (code ${status.code})`);
     }
   });

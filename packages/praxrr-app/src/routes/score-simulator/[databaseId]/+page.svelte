@@ -51,6 +51,8 @@
   let batchSimulationResult: SimulateScoreResponse | null = null;
   let isSimulatingSingle = false;
   let isSimulatingBatch = false;
+  let singleSimulationStatus = '';
+  let batchSimulationStatus = '';
   let singleSimulationRequestToken = 0;
   let batchSimulationRequestToken = 0;
   let activeSingleSimulationAbortController: AbortController | null = null;
@@ -236,10 +238,13 @@
       cancelSingleSimulationRequest();
       isSimulatingSingle = false;
       singleSimulationResult = null;
+      singleSimulationStatus = '';
       return;
     }
 
     const { requestToken, abortController, timeout } = createSingleSimulationRequestContext();
+    singleSimulationResult = null;
+    singleSimulationStatus = 'Simulation running…';
     const releaseType = resolveReleaseTypeForPresetCategory(singleSampleCategory);
     const arrType: ArrType = singleSampleCategory === 'movie' ? 'radarr' : 'sonarr';
 
@@ -269,17 +274,21 @@
 
       parserAvailable = result.parserAvailable;
       singleSimulationResult = result;
+      singleSimulationStatus = 'Simulation complete.';
     } catch (err) {
       if (requestToken !== singleSimulationRequestToken) {
         return;
       }
 
       if (err instanceof DOMException && err.name === 'AbortError') {
+        singleSimulationStatus = 'Simulation timed out. Your input was preserved.';
+        alertStore.add('error', singleSimulationStatus);
         return;
       }
 
       console.error('Score simulation failed:', err);
-      alertStore.add('error', err instanceof Error ? err.message : 'Failed to run score simulation.');
+      singleSimulationStatus = err instanceof Error ? err.message : 'Failed to run score simulation.';
+      alertStore.add('error', singleSimulationStatus);
     } finally {
       finalizeSingleSimulationRequest(requestToken, abortController, timeout);
     }
@@ -294,10 +303,13 @@
       cancelBatchSimulationRequest();
       isSimulatingBatch = false;
       batchSimulationResult = null;
+      batchSimulationStatus = '';
       return;
     }
 
     const { requestToken, abortController, timeout } = createBatchSimulationRequestContext();
+    batchSimulationResult = null;
+    batchSimulationStatus = 'Batch simulation running…';
     selectedReleaseId = null;
     const arrType: ArrType = effectiveMediaType === 'movie' ? 'radarr' : 'sonarr';
 
@@ -327,17 +339,21 @@
 
       parserAvailable = result.parserAvailable;
       batchSimulationResult = result;
+      batchSimulationStatus = 'Batch simulation complete.';
     } catch (err) {
       if (requestToken !== batchSimulationRequestToken) {
         return;
       }
 
       if (err instanceof DOMException && err.name === 'AbortError') {
+        batchSimulationStatus = 'Batch simulation timed out. Your input was preserved.';
+        alertStore.add('error', batchSimulationStatus);
         return;
       }
 
       console.error('Batch simulation failed:', err);
-      alertStore.add('error', err instanceof Error ? err.message : 'Failed to run batch simulation.');
+      batchSimulationStatus = err instanceof Error ? err.message : 'Failed to run batch simulation.';
+      alertStore.add('error', batchSimulationStatus);
     } finally {
       finalizeBatchSimulationRequest(requestToken, abortController, timeout);
     }
@@ -601,6 +617,7 @@
     singleSimulationResult = null;
     selectedReleaseId = null;
     isSimulatingSingle = false;
+    singleSimulationStatus = '';
   }
 
   function clearAdvancedSection() {
@@ -612,6 +629,7 @@
     batchSimulationResult = null;
     selectedReleaseId = null;
     isSimulatingBatch = false;
+    batchSimulationStatus = '';
   }
 </script>
 
@@ -658,6 +676,7 @@
           on:tryExampleRelease={handleTryExampleRelease}
           on:clear={clearMainSection}
         />
+        <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{singleSimulationStatus}</p>
 
         {#if hasActiveOverrides}
           <div
@@ -708,6 +727,7 @@
             on:batchSimulate={handleBatchSimulate}
             on:clear={clearAdvancedSection}
           />
+          <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">{batchSimulationStatus}</p>
 
           <div class="space-y-4">
             <div class="space-y-1.5">
