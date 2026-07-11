@@ -18,17 +18,15 @@ export async function selectDropdownOption(scope: Locator, optionLabel: string):
   await trigger.waitFor({ state: 'visible', timeout: 10_000 });
   await trigger.click();
 
-  const menu = scope.locator('div.absolute').first();
-  await menu.waitFor({ state: 'visible', timeout: 10_000 });
-
-  const exactOption = menu.getByRole('button', { name: optionLabel, exact: true });
+  const exactOption = scope.getByRole('button', { name: optionLabel, exact: true });
   if ((await exactOption.count()) > 0) {
+    await exactOption.first().waitFor({ state: 'visible', timeout: 10_000 });
     await exactOption.first().click();
     return;
   }
 
   const escaped = escapeRegExp(optionLabel);
-  const fuzzyOption = menu.getByRole('button', { name: new RegExp(`^\\s*${escaped}\\s*$`) });
+  const fuzzyOption = scope.getByRole('button', { name: new RegExp(`^\\s*${escaped}\\s*$`) });
   await fuzzyOption.first().waitFor({ state: 'visible', timeout: 10_000 });
   await fuzzyOption.first().click();
 }

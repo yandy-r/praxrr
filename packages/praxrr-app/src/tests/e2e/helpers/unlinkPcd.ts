@@ -18,15 +18,12 @@ export async function unlinkPcd(page: Page, databaseId: number): Promise<void> {
   // Fast path: submit the hidden delete form directly (avoids brittle button selectors).
   const deleteForm = page.locator('form#delete-form');
   if ((await deleteForm.count()) > 0) {
-    await Promise.all([
-      page.waitForURL('**/databases', { timeout: 15_000 }),
-      page.evaluate(() => {
-        const form = document.getElementById('delete-form');
-        if (form instanceof HTMLFormElement) {
-          form.requestSubmit();
-        }
-      }),
-    ]);
+    const response = await page.request.post(`/databases/${databaseId}/settings?/delete`, {
+      form: {},
+    });
+    expect(response.ok()).toBe(true);
+    await page.goto('/databases');
+    await page.waitForLoadState('networkidle');
     return;
   }
 
