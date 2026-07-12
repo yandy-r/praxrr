@@ -133,6 +133,19 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Plugin SDK',
+          items: [
+            { label: 'Overview', link: '/plugins/' },
+            { label: 'Build & Install the Example', link: '/plugins/example-observer/' },
+            { label: 'Manifest Reference', link: '/plugins/manifest/' },
+            { label: 'Capabilities & Least Privilege', link: '/plugins/capabilities/' },
+            { label: 'Extension Points', link: '/plugins/extension-points/' },
+            { label: 'Observe Snapshots', link: '/plugins/observe-snapshot/' },
+            { label: 'Lifecycle & Registry', link: '/plugins/lifecycle/' },
+            { label: 'API Versioning & Stability', link: '/plugins/versioning/' },
+          ],
+        },
+        {
           label: 'PCD Schema',
           items: [
             { label: 'Overview', link: '/schema/' },

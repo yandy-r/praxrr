@@ -15,6 +15,16 @@ reconciliation and management API, extension-point versioning, lifecycle state, 
 projection/redaction, the sole-I/O-mediator invariant, and graceful degradation. Runtime execution
 remains inert; points and capabilities that are declared-but-inert are called out explicitly.
 
+## Published Developer Docs
+
+Third-party plugin authors should start with the published **Plugin SDK** guide
+at <https://docs.praxrr.dev/plugins/> (source under
+`docs/site/src/content/docs/plugins/`). It covers the manifest contract, the
+capability catalog, the extension-point catalog, lifecycle, observe snapshots,
+and API versioning for external developers, plus a buildable example under
+`examples/plugins/sync-preview-observer/`. This note remains the authoritative
+contract mirror — the published pages must not contradict it.
+
 ## Module Map
 
 The subsystem is split across two roots by a hard **purity boundary**. Contract code is pure and
@@ -105,16 +115,16 @@ fine but throws `PluginPointNotWiredError` if dispatched.
 | `config.profileCompiled.observe`  | observe   |     ✅     | `read:resolved-profile`  | Redacted snapshot of a freshly compiled profile. Dispatch path is exercised only at the host seam in tests; **no production call-site**. |
 | `sync.previewComputed.observe`    | observe   |     ✅     | `read:sync-preview`      | Redacted sync-preview diff, after preview, before apply. The single reference-wired live observe point; no pipeline call-site added.     |
 | `config.validation.observe`       | observe   |     ❌     | `read:config-validation` | Declared future observer; no host dispatch path yet.                                                                                     |
-| `sync.beforeApply.observe`        | observe   |     ❌     | —                        | Declared; unwired because it runs adjacent to the mutating sync path. Waits for the sandboxed executor + finite timeouts.                |
-| `sync.afterApply.observe`         | observe   |     ❌     | —                        | Declared future audit/notification hook. Unwired.                                                                                        |
+| `sync.beforeApply.observe`        | observe   |     ❌     | `read:sync-preview`      | Declared; unwired because it runs adjacent to the mutating sync path. Waits for the sandboxed executor + finite timeouts.                |
+| `sync.afterApply.observe`         | observe   |     ❌     | `read:sync-preview`      | Declared future audit/notification hook. Unwired.                                                                                        |
 | `parser.releaseTitle.transform`   | transform |     ❌     | — (none grantable)       | Declared future mutating point. Never wired until sandbox execution exists.                                                              |
-| `customFormat.condition.evaluate` | transform |     ❌     | — (none grantable)       | Declared future compute point; requires a timeout-bounded executor.                                                                      |
+| `customFormat.condition.evaluate` | provider  |     ❌     | `read:custom-format`     | Declared future compute point; requires a timeout-bounded executor.                                                                      |
 | `notification.dispatch.observe`   | provider  |     ❌     | — (none grantable)       | Declared; a provider needs a network capability that does not exist in Phase 1.                                                          |
-| `importExport.adapter`            | transform |     ❌     | — (none grantable)       | Declared; needs fs/network capabilities that are unrepresentable in Phase 1.                                                             |
+| `importExport.adapter`            | provider  |     ❌     | — (none grantable)       | Declared; needs fs/network capabilities that are unrepresentable in Phase 1.                                                             |
 
 **Invariant:** every wired point is `kind: 'observe'`. No transform or provider point is wired, and
-transform/provider points have **no grantable Phase-1 capability**, so they structurally cannot be
-granted what they would need to alter pipeline output.
+no capability lists a **mutating** point in its `compatiblePoints`, so a plugin structurally cannot be
+granted what it would need to alter pipeline output.
 
 ## `apiVersion` Semantics
 

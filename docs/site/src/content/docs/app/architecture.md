@@ -145,3 +145,6 @@ Contributor deep dives, in recommended order:
 - [Development Setup](/app/development/) — contributor environment
 - [Troubleshooting](/guides/troubleshooting/) — operational diagnostics
 - [API Reference](/api/) — `/api/v1` OpenAPI endpoints
+- [Plugin SDK](/plugins/) — author, build, and locally install an observe-only
+  plugin (Phase-1: discovered/validated/registered today; execution pending the
+  Phase-2 runtime)
