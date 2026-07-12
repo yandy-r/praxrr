@@ -80,6 +80,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/settings/backups',
     '/settings/notifications',
     '/settings/security',
+    '/settings/plugins',
     '/settings/about',
     '/auth/logout',
   ]);

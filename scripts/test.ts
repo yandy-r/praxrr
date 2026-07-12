@@ -33,7 +33,7 @@ const aliases: Record<string, string> = {
   phase3:
     'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts,packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   plugins:
-    'packages/praxrr-app/src/tests/shared/plugins,packages/praxrr-app/src/tests/plugins,packages/praxrr-app/src/tests/db/pluginRegistryQueries.test.ts,packages/praxrr-app/src/tests/routes/plugins.test.ts,packages/praxrr-app/src/tests/mcp/mcp.test.ts',
+    'packages/praxrr-app/src/tests/shared/plugins,packages/praxrr-app/src/tests/plugins,packages/praxrr-app/src/tests/db/pluginRegistryQueries.test.ts,packages/praxrr-app/src/tests/routes/plugins.test.ts,packages/praxrr-app/src/tests/routes/pluginManagementContract.test.ts,packages/praxrr-app/src/tests/routes/pluginManagementPresentation.test.ts,packages/praxrr-app/src/tests/mcp/mcp.test.ts',
   resolvedConfig:
     'packages/praxrr-app/src/tests/pcd/resolved,packages/praxrr-app/src/tests/routes/resolvedConfigApi.test.ts',
   'security-posture':

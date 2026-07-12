@@ -1,12 +1,12 @@
 # Plugin System Architecture
 
-> Phase-1 foundation for the WASM plugin system (issue #35), extended by the durable management
-> backend in issue #264. This note describes the **stable, versioned contract, durable discovery
-> state, and lifecycle scaffolding**. It is feature-flagged
+> Phase-1 foundation for the WASM plugin system (issue #35), extended by the production observe
+> call-sites in issue #263, durable management backend in issue #264, and operator UI in issue
+> #266. This note describes the **stable, versioned contract, durable discovery state, and lifecycle
+> scaffolding**. It is feature-flagged
 > **OFF by default** (`PLUGINS_ENABLED`), adds **no WASM/Extism runtime dependency**, executes
-> **no untrusted code**, and inserts **zero call-sites** into the sync / compile / parser /
-> notification pipelines. The default executor throws `PluginRuntimeUnavailableError('wasm runtime
-not yet available')`.
+> **no untrusted code**, and keeps every production dispatch behind the inert default executor. The
+> default executor throws `PluginRuntimeUnavailableError('wasm runtime not yet available')`.
 
 ## Scope
 
@@ -17,13 +17,13 @@ remains inert; points and capabilities that are declared-but-inert are called ou
 
 ## Published Developer Docs
 
-Third-party plugin authors should start with the published **Plugin SDK** guide
-at <https://docs.praxrr.dev/plugins/> (source under
-`docs/site/src/content/docs/plugins/`). It covers the manifest contract, the
-capability catalog, the extension-point catalog, lifecycle, observe snapshots,
-and API versioning for external developers, plus a buildable example under
-`examples/plugins/sync-preview-observer/`. This note remains the authoritative
-contract mirror — the published pages must not contradict it.
+Third-party plugin authors should start with the published **Plugin SDK** guide at
+<https://docs.praxrr.dev/plugins/> (source under `docs/site/src/content/docs/plugins/`). It covers
+the manifest contract, capability and extension-point catalogs, lifecycle, observe snapshots, and
+API versioning, plus a buildable example under `examples/plugins/sync-preview-observer/`. Authors
+can build, discover, validate, and register plugins today, but execution remains a no-op through the
+production `UnavailablePluginExecutor`. This note remains the authoritative contract mirror; the
+published pages must not contradict it.
 
 ## Module Map
 
@@ -110,21 +110,21 @@ host dispatch seam. Safety rests on the absence of a wired transform/provider ha
 flag. A wired point is dispatchable via `notifyObservers`; a declared-but-unwired point registers
 fine but throws `PluginPointNotWiredError` if dispatched.
 
-| Extension point                   | Kind      | Wired (P1) | Grantable capability     | Notes                                                                                                                                    |
-| --------------------------------- | --------- | :--------: | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.profileCompiled.observe`  | observe   |     ✅     | `read:resolved-profile`  | Redacted snapshot of a freshly compiled profile. Dispatch path is exercised only at the host seam in tests; **no production call-site**. |
-| `sync.previewComputed.observe`    | observe   |     ✅     | `read:sync-preview`      | Redacted sync-preview diff, after preview, before apply. The single reference-wired live observe point; no pipeline call-site added.     |
-| `config.validation.observe`       | observe   |     ❌     | `read:config-validation` | Declared future observer; no host dispatch path yet.                                                                                     |
-| `sync.beforeApply.observe`        | observe   |     ❌     | `read:sync-preview`      | Declared; unwired because it runs adjacent to the mutating sync path. Waits for the sandboxed executor + finite timeouts.                |
-| `sync.afterApply.observe`         | observe   |     ❌     | `read:sync-preview`      | Declared future audit/notification hook. Unwired.                                                                                        |
-| `parser.releaseTitle.transform`   | transform |     ❌     | — (none grantable)       | Declared future mutating point. Never wired until sandbox execution exists.                                                              |
-| `customFormat.condition.evaluate` | provider  |     ❌     | `read:custom-format`     | Declared future compute point; requires a timeout-bounded executor.                                                                      |
-| `notification.dispatch.observe`   | provider  |     ❌     | — (none grantable)       | Declared; a provider needs a network capability that does not exist in Phase 1.                                                          |
-| `importExport.adapter`            | provider  |     ❌     | — (none grantable)       | Declared; needs fs/network capabilities that are unrepresentable in Phase 1.                                                             |
+| Extension point                   | Kind      | Wired (P1) | Grantable capability     | Notes                                                                                                           |
+| --------------------------------- | --------- | :--------: | ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `config.profileCompiled.observe`  | observe   |     ✅     | `read:resolved-profile`  | Production quality-profile sync calls the host after compilation and before the Arr write.                      |
+| `sync.previewComputed.observe`    | observe   |     ✅     | `read:sync-preview`      | Production preview generation calls the host after computing the preview and before returning it.               |
+| `config.validation.observe`       | observe   |     ❌     | `read:config-validation` | Declared future observer; no host dispatch path yet.                                                            |
+| `sync.beforeApply.observe`        | observe   |     ❌     | `read:sync-preview`      | Declared; unwired because it runs adjacent to the mutating sync path. Waits for a compliant sandboxed executor. |
+| `sync.afterApply.observe`         | observe   |     ❌     | `read:sync-preview`      | Declared future audit observer. Unwired.                                                                        |
+| `parser.releaseTitle.transform`   | transform |     ❌     | — (none grantable)       | Declared future mutating point. Never wired until sandbox execution exists.                                     |
+| `customFormat.condition.evaluate` | provider  |     ❌     | `read:custom-format`     | Declared future compute provider; requires a compliant sandboxed executor.                                      |
+| `notification.dispatch.observe`   | provider  |     ❌     | — (none grantable)       | Declared; a provider needs a network capability that does not exist in Phase 1.                                 |
+| `importExport.adapter`            | provider  |     ❌     | — (none grantable)       | Declared; needs fs/network capabilities that are unrepresentable in Phase 1.                                    |
 
 **Invariant:** every wired point is `kind: 'observe'`. No transform or provider point is wired, and
-no capability lists a **mutating** point in its `compatiblePoints`, so a plugin structurally cannot be
-granted what it would need to alter pipeline output.
+no capability lists a **mutating** point in its `compatiblePoints`, so a plugin structurally cannot
+be granted what it would need to alter pipeline output.
 
 ## `apiVersion` Semantics
 
@@ -243,7 +243,7 @@ filesystem boundary.** These two rules keep the trust boundary auditable in a si
 
 ```mermaid
 sequenceDiagram
-    participant Caller as (future) pipeline caller
+    participant Caller as wired production caller
     participant Host as PluginHost
     participant Ctx as hostContext.ts
     participant Reg as PluginRegistry
@@ -310,6 +310,42 @@ Issue #264 adds durable management state without widening the runtime or capabil
 - With `PLUGINS_ENABLED` off, list returns `pluginsEnabled:false` with no active entries, reload is a
   successful no-I/O summary, and enable/disable is rejected without changing durable state.
 
+### Management UI and request flow
+
+Issue #266 adds `/settings/plugins` as an operator-facing view over the same redacted boundary. The
+route remains visible under Settings while the feature is off so deployment configuration is
+discoverable. It performs one list request, renders each durable record through the client-safe
+capability and extension-point catalogs, and keeps discovery, enablement intent, lifecycle state,
+wiring, and execution evidence as separate facts.
+
+```mermaid
+flowchart LR
+    settings[Settings → Plugins] --> page["/settings/plugins page state"]
+    page -->|GET| read[redacted plugin API]
+    page -->|POST enable / disable / reload| origin[scoped Origin guard]
+    origin --> host[serialized PluginHost mutation]
+    host --> db[(plugin_registry)]
+    read --> page
+    catalogs[client-safe point and grant catalogs] --> page
+```
+
+Enable and disable persist administrator intent; they do not claim activation. Reload returns only
+aggregate `discovered`, `registered`, `rejected`, and `missing` counters, after which the page
+refetches the authoritative list. Rejected identities and raw validation details are not exposed.
+Missing rows remain visible as `discovered:false`, with intent described as applying when the plugin
+is rediscovered.
+
+All plugin API routes remain auth-gated. The three body-less POST routes additionally reject a
+malformed, foreign, or explicit cross-site browser origin before identity validation, scanning, or
+durable mutation. Exact same-origin browser requests pass; authenticated non-browser clients may
+omit `Origin`. The guard returns an empty `403` with `Cache-Control: no-store`, adds no CORS policy,
+and does not alter list/detail reads.
+
+The management contract exposes lifecycle evidence but no runtime availability, invocation result,
+duration, or last-run timestamp. The UI therefore reports **Execution telemetry unavailable in this
+build** and never derives health from `enabled`, `discovered`, `registeredAt`, `state`, or
+`lastError`.
+
 ## Graceful-Degradation Contract
 
 The plugin subsystem must **never** destabilize boot or the core pipeline (the "optional parser
@@ -372,6 +408,8 @@ exchange-memory accounting is not described as a total guest-memory limit. See t
 - `packages/praxrr-app/src/lib/server/db/queries/pluginRegistry.ts` and migration `20260724` — durable
   reconciliation and namespace-qualified management state
 - `packages/praxrr-app/src/routes/api/v1/plugins/` — auth-gated list/get/enable/disable/reload handlers
+- `packages/praxrr-app/src/routes/settings/plugins/` — operator page, presentation helpers, and
+  plugin card
 - `packages/praxrr-app/src/lib/server/utils/config/config.ts` — `pluginsEnabled` flag +
   `paths.plugins` getter
 - `packages/praxrr-app/src/hooks.server.ts` — startup wiring (after `trashGuideManager.initialize()`)
@@ -379,3 +417,5 @@ exchange-memory accounting is not described as a total guest-memory limit. See t
   projection / redaction / error-taxonomy precedents this subsystem mirrors
 - `docs/plans/35-wasm-plugin-system/phase-1-foundation.md` — internal design doc (contract, risk
   register, Extism evaluation, Phase-2 spike gate)
+- [Plugin Management operator guide](../features/plugin-management.md) — deployment, UI state, and
+  reload guidance

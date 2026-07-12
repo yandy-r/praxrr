@@ -7,6 +7,7 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
 - [Architecture Overview](architecture/overview.md)
 - [API Reference](api/README.md)
 - [Feature Guides](features/README.md)
+- [Plugin Management](features/plugin-management.md)
 
 ## Documentation Map
 
@@ -22,12 +23,14 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
   - [Architecture Components](architecture/components.md)
   - [Architecture Data Flow](architecture/data-flow.md)
   - [Architecture Overview](architecture/overview.md)
+  - [Plugin System Architecture](architecture/plugins.md)
 - [Praxrr Architecture](ARCHITECTURE.md)
 - [Contributing to Praxrr](CONTRIBUTING.md)
 - [Development](DEVELOPMENT.md)
 - **features/**
   - [Entity Testing](features/entity-testing.md)
   - [Link, Bridge, Sync](features/link-bridge-sync.md)
+  - [Plugin Management](features/plugin-management.md)
   - [Portable Import/Export](features/portable-import-export.md)
   - [TRaSH Guide Sync](features/trash-guide-sync.md)
   - [Feature Guides](features/README.md)
@@ -261,6 +264,8 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
 
 ## Recently Updated
 
+- [Plugin Management](features/plugin-management.md) - _2026-07-12_
+- [Plugin System Architecture](architecture/plugins.md) - _2026-07-12_
 - [TRaSH Guide Sync](features/trash-guide-sync.md) - _2026-02-27_
 - [praxrr Documentation](README.md) - _2026-02-20_
 - [Portable Import/Export](features/portable-import-export.md) - _2026-02-20_

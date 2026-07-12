@@ -133,6 +133,26 @@ Deno.test('scope filtering respects Arr capability constraints', () => {
   assertEquals(supportsFeature('lidarr' as ArrAppType, 'metadata_profiles'), true);
 });
 
+Deno.test('Plugins is a globally compatible Settings child', () => {
+  const settings = NAV_REGISTRY.find((item) => item.id === 'settings.settings');
+  const plugins = settings?.children?.find((child) => child.id === 'settings.plugins');
+
+  assertEquals(
+    {
+      settingsId: settings?.id,
+      settingsScope: settings?.arrScope,
+      pluginId: plugins?.id,
+      pluginHref: plugins?.href,
+    },
+    {
+      settingsId: 'settings.settings',
+      settingsScope: 'all',
+      pluginId: 'settings.plugins',
+      pluginHref: '/settings/plugins',
+    }
+  );
+});
+
 Deno.test('unsupported child-ful nav items are disabled while unsupported leaves are hidden', () => {
   const restores: Restore[] = [];
   const originalRegistry = [...NAV_REGISTRY];

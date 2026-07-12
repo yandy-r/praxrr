@@ -89,29 +89,60 @@ async function withPluginsEnabled<T>(enabled: boolean, fn: () => Promise<T> | T)
   }
 }
 
-function listEvent(): ListEvent {
-  return {} as ListEvent;
+function requestContext(path: string, method: 'GET' | 'POST', headers: HeadersInit = {}) {
+  const url = new URL(path, 'http://localhost');
+  return {
+    request: new Request(url, { method, headers }),
+    url,
+  };
 }
 
-function detailEvent(apiVersion: string, id: string): DetailEvent {
-  return { params: { apiVersion, id } } as unknown as DetailEvent;
+function listEvent(headers: HeadersInit = {}): ListEvent {
+  return requestContext('/api/v1/plugins', 'GET', headers) as unknown as ListEvent;
 }
 
-function enableEvent(apiVersion: string, id: string): EnableEvent {
-  return { params: { apiVersion, id } } as unknown as EnableEvent;
+function detailEvent(apiVersion: string, id: string, headers: HeadersInit = {}): DetailEvent {
+  return {
+    ...requestContext(`/api/v1/plugins/${encodeURIComponent(apiVersion)}/${encodeURIComponent(id)}`, 'GET', headers),
+    params: { apiVersion, id },
+  } as unknown as DetailEvent;
 }
 
-function disableEvent(apiVersion: string, id: string): DisableEvent {
-  return { params: { apiVersion, id } } as unknown as DisableEvent;
+function enableEvent(apiVersion: string, id: string, headers: HeadersInit = {}): EnableEvent {
+  return {
+    ...requestContext(
+      `/api/v1/plugins/${encodeURIComponent(apiVersion)}/${encodeURIComponent(id)}/enable`,
+      'POST',
+      headers
+    ),
+    params: { apiVersion, id },
+  } as unknown as EnableEvent;
 }
 
-function reloadEvent(): ReloadEvent {
-  return {} as ReloadEvent;
+function disableEvent(apiVersion: string, id: string, headers: HeadersInit = {}): DisableEvent {
+  return {
+    ...requestContext(
+      `/api/v1/plugins/${encodeURIComponent(apiVersion)}/${encodeURIComponent(id)}/disable`,
+      'POST',
+      headers
+    ),
+    params: { apiVersion, id },
+  } as unknown as DisableEvent;
+}
+
+function reloadEvent(headers: HeadersInit = {}): ReloadEvent {
+  return requestContext('/api/v1/plugins/reload', 'POST', headers) as unknown as ReloadEvent;
 }
 
 async function jsonBody<T = Record<string, unknown>>(response: Response): Promise<T> {
   assertEquals(response.headers.get('cache-control'), 'no-store');
   return (await response.json()) as T;
+}
+
+async function assertOriginForbidden(response: Response): Promise<void> {
+  assertEquals(response.status, 403);
+  assertEquals(response.headers.get('cache-control'), 'no-store');
+  assertEquals(await response.text(), '');
 }
 
 function assertRfc3339Timestamp(value: string): void {
@@ -128,6 +159,120 @@ async function writePlugin(pluginsDir: string, manifest: PluginManifest = TEST_M
   await Deno.mkdir(dir, { recursive: true });
   await Deno.writeTextFile(`${dir}/praxrr.plugin.json`, JSON.stringify(manifest));
 }
+
+migratedTest('same-origin and absent-Origin clients can enable, disable, and reload plugins', async (pluginsDir) => {
+  await writePlugin(pluginsDir);
+
+  await withPluginsEnabled(true, async () => {
+    const absentReload = await POST_RELOAD(reloadEvent());
+    assertEquals(absentReload.status, 200);
+    await jsonBody(absentReload);
+
+    const sameOriginReload = await POST_RELOAD(reloadEvent({ origin: 'http://localhost' }));
+    assertEquals(sameOriginReload.status, 200);
+    await jsonBody(sameOriginReload);
+
+    const sameOriginDisable = await POST_DISABLE(disableEvent('1', TEST_MANIFEST.id, { origin: 'http://localhost' }));
+    assertEquals(sameOriginDisable.status, 200);
+    assertEquals((await jsonBody<{ plugin: { enabled: boolean } }>(sameOriginDisable)).plugin.enabled, false);
+
+    const absentEnable = await POST_ENABLE(enableEvent('1', TEST_MANIFEST.id));
+    assertEquals(absentEnable.status, 200);
+    assertEquals((await jsonBody<{ plugin: { enabled: boolean } }>(absentEnable)).plugin.enabled, true);
+
+    const absentDisable = await POST_DISABLE(disableEvent('1', TEST_MANIFEST.id));
+    assertEquals(absentDisable.status, 200);
+    assertEquals((await jsonBody<{ plugin: { enabled: boolean } }>(absentDisable)).plugin.enabled, false);
+
+    const sameOriginEnable = await POST_ENABLE(enableEvent('1', TEST_MANIFEST.id, { origin: 'http://localhost' }));
+    assertEquals(sameOriginEnable.status, 200);
+    assertEquals((await jsonBody<{ plugin: { enabled: boolean } }>(sameOriginEnable)).plugin.enabled, true);
+  });
+});
+
+migratedTest(
+  'foreign, malformed, and explicit cross-site mutations are empty 403s with no side effects',
+  async (pluginsDir) => {
+    await writePlugin(pluginsDir);
+    const executionCalls: string[] = [];
+    const executor: PluginExecutor = {
+      execute(request: PluginExecutionRequest): Promise<PluginJsonValue> {
+        executionCalls.push(request.plugin.manifest.id);
+        return Promise.resolve(null);
+      },
+    };
+
+    await withPluginsEnabled(true, async () => {
+      pluginHost.setExecutor(executor);
+      const initialReload = await POST_RELOAD(reloadEvent());
+      assertEquals(initialReload.status, 200);
+      await jsonBody(initialReload);
+      await Deno.remove(`${pluginsDir}/${TEST_MANIFEST.id}`, { recursive: true });
+
+      const mutableHost = pluginHost as unknown as { reload: typeof pluginHost.reload };
+      const originalReload = mutableHost.reload;
+      let reloadCalls = 0;
+      mutableHost.reload = () => {
+        reloadCalls += 1;
+        return originalReload.call(pluginHost);
+      };
+
+      const rejectedHeaders: Array<{ label: string; headers: HeadersInit }> = [
+        { label: 'foreign Origin', headers: { origin: 'https://evil.example' } },
+        { label: 'malformed Origin', headers: { origin: '://not-an-origin' } },
+        { label: 'same-host Origin with credentials', headers: { origin: 'http://user:pass@localhost' } },
+        { label: 'same-host Origin with path', headers: { origin: 'http://localhost/admin' } },
+        { label: 'same-host Origin with query', headers: { origin: 'http://localhost?source=browser' } },
+        { label: 'same-host Origin with fragment', headers: { origin: 'http://localhost#fragment' } },
+        {
+          label: 'explicit cross-site browser request',
+          headers: { origin: 'http://localhost', 'sec-fetch-site': 'cross-site' },
+        },
+      ];
+
+      try {
+        for (const { label, headers } of rejectedHeaders) {
+          pluginRegistryQueries.setEnabled('1', TEST_MANIFEST.id, true);
+          await assertOriginForbidden(await POST_DISABLE(disableEvent('1', TEST_MANIFEST.id, headers)));
+          assertEquals(pluginRegistryQueries.get('1', TEST_MANIFEST.id)?.enabled, true, label);
+
+          pluginRegistryQueries.setEnabled('1', TEST_MANIFEST.id, false);
+          await assertOriginForbidden(await POST_ENABLE(enableEvent('1', TEST_MANIFEST.id, headers)));
+          assertEquals(pluginRegistryQueries.get('1', TEST_MANIFEST.id)?.enabled, false, label);
+
+          await assertOriginForbidden(await POST_RELOAD(reloadEvent(headers)));
+          assertEquals(reloadCalls, 0, `${label} must not scan or reconcile`);
+          assertEquals(pluginRegistryQueries.get('1', TEST_MANIFEST.id)?.discovered, true, label);
+        }
+
+        pluginRegistryQueries.setEnabled('1', TEST_MANIFEST.id, true);
+        await pluginHost.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'after-rejection' }));
+        assertEquals(executionCalls, [TEST_MANIFEST.id]);
+      } finally {
+        mutableHost.reload = originalReload;
+        pluginHost.setExecutor(new UnavailablePluginExecutor());
+      }
+    });
+  }
+);
+
+migratedTest('foreign browser Origin does not change plugin list or detail reads', async () => {
+  await seedPlugin();
+  const foreignBrowserHeaders = { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' };
+
+  await withPluginsEnabled(true, async () => {
+    const list = await GET_LIST(listEvent(foreignBrowserHeaders));
+    assertEquals(list.status, 200);
+    assertEquals((await jsonBody<{ items: unknown[] }>(list)).items.length, 1);
+
+    const detail = await GET_DETAIL(detailEvent('1', TEST_MANIFEST.id, foreignBrowserHeaders));
+    assertEquals(detail.status, 200);
+    assertEquals(
+      (await jsonBody<{ plugin: { manifest: { id: string } } }>(detail)).plugin.manifest.id,
+      TEST_MANIFEST.id
+    );
+  });
+});
 
 migratedTest(
   'feature-off list/reload succeed while detail and mutations reject without changing durable state',

@@ -367,7 +367,7 @@
       "post": {
         "operationId": "reloadPlugins",
         "summary": "Rescan and atomically reconcile plugins",
-        "description": "Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one\ntransaction, then atomically publishes the new registry snapshot. Concurrent reload callers\nshare the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary\nwith `reloaded: false`, zero counters, and no filesystem or database mutation.\n",
+        "description": "Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one\ntransaction, then atomically publishes the new registry snapshot. Concurrent reload callers\nshare the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary\nwith `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests\nmust be same-origin; authenticated non-browser clients may omit the `Origin` header.\n",
         "tags": ["Plugins"],
         "responses": {
           "200": {
@@ -379,6 +379,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Cross-origin browser request rejected before scan or mutation"
           },
           "500": {
             "description": "Reload failed; the previous in-memory registry remains usable",
@@ -479,7 +482,7 @@
       "post": {
         "operationId": "enablePlugin",
         "summary": "Enable one durable plugin identity",
-        "description": "Persists administrator enablement intent for one API-version-qualified plugin. This does not\nassert runtime activation or successful execution. Disabled feature state rejects without\nmutating durable state.\n",
+        "description": "Persists administrator enablement intent for one API-version-qualified plugin. This does not\nassert runtime activation or successful execution. Disabled feature state rejects without\nmutating durable state. Browser requests must be same-origin; authenticated non-browser\nclients may omit the `Origin` header.\n",
         "tags": ["Plugins"],
         "parameters": [
           {
@@ -524,6 +527,9 @@
               }
             }
           },
+          "403": {
+            "description": "Cross-origin browser request rejected before mutation"
+          },
           "404": {
             "description": "Plugin not found in the requested API-version namespace",
             "content": {
@@ -561,7 +567,7 @@
       "post": {
         "operationId": "disablePlugin",
         "summary": "Disable one durable plugin identity",
-        "description": "Persists administrator disablement intent for one API-version-qualified plugin. Missing plugins\nretain this decision for a later reappearance. Disabled feature state rejects without mutation.\n",
+        "description": "Persists administrator disablement intent for one API-version-qualified plugin. Missing plugins\nretain this decision for a later reappearance. Disabled feature state rejects without mutation.\nBrowser requests must be same-origin; authenticated non-browser clients may omit the `Origin`\nheader.\n",
         "tags": ["Plugins"],
         "parameters": [
           {
@@ -605,6 +611,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Cross-origin browser request rejected before mutation"
           },
           "404": {
             "description": "Plugin not found in the requested API-version namespace",
