@@ -9,9 +9,11 @@ mcp:
       runtime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.
 
       Read-only: exposes Praxrr's configuration and observability surface (instances, drift, config
-      health, security posture, PCD databases and resolved entities, sync history) plus a
-      write-free `preview_sync`. Authenticate with the `X-Api-Key` header (required under AUTH=on);
-      there is no OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.
+      health, security posture, PCD databases and resolved entities, sync history, and the redacted
+      feature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no
+      plugin source directory, raw manifest, credential, or mutation handler. Authenticate with the
+      `X-Api-Key` header (required under AUTH=on); there is no OAuth/Bearer support. Disabled (404)
+      when `MCP_ENABLED` is off.
     tags:
       - MCP
     parameters:

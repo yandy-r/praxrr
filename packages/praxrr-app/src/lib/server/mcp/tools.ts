@@ -18,6 +18,7 @@ import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { syncHistoryQueries, type SyncHistoryFilters } from '$db/queries/syncHistory.ts';
 import { scoreFleet, scoreInstance } from '$lib/server/health/service.ts';
 import { toSummaryResponse as toHealthSummary } from '$lib/server/health/responses.ts';
+import { listPlugins } from '$lib/server/plugins/responses.ts';
 import { computeShield } from '$lib/server/security/service.ts';
 import { toSummaryResponse as toSecuritySummary } from '$lib/server/security/responses.ts';
 import { buildDriftSummary } from '$sync/drift/summary.ts';
@@ -150,6 +151,19 @@ export const TOOLS: readonly McpTool[] = [
         .filter((instance) => isSyncPreviewArrType(instance.type))
         .filter((instance) => !enabledOnly || instance.enabled === 1);
       return Promise.resolve(rows.map(toMcpInstance));
+    },
+  },
+  {
+    name: 'list_plugins',
+    description: 'List durable plugin discovery and enablement state (local paths and raw manifests omitted).',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    handler: () => {
+      const outcome = listPlugins();
+      if (outcome.kind === 'error') {
+        throw new McpDomainError('Unable to list plugins');
+      }
+      return Promise.resolve(outcome.response);
     },
   },
   {

@@ -27,6 +27,24 @@ type AppNamedProfileConfig = AppComponents['schemas']['SyncPreviewNamedProfileSe
 type PortableNamedProfileConfig = PortableComponents['schemas']['SyncPreviewNamedProfileSectionConfig'];
 type AppMediaManagementConfig = AppComponents['schemas']['SyncPreviewMediaManagementSectionConfig'];
 type PortableMediaManagementConfig = PortableComponents['schemas']['SyncPreviewMediaManagementSectionConfig'];
+type AppPluginManifest = AppComponents['schemas']['PluginManifestMetadata'];
+type PortablePluginManifest = PortableComponents['schemas']['PluginManifestMetadata'];
+type AppPluginRecord = AppComponents['schemas']['PluginRecord'];
+type PortablePluginRecord = PortableComponents['schemas']['PluginRecord'];
+type AppPluginListResponse = AppComponents['schemas']['PluginListResponse'];
+type PortablePluginListResponse = PortableComponents['schemas']['PluginListResponse'];
+type AppPluginReloadResponse = AppComponents['schemas']['PluginReloadResponse'];
+type PortablePluginReloadResponse = PortableComponents['schemas']['PluginReloadResponse'];
+type AppPluginErrorResponse = AppComponents['schemas']['PluginErrorResponse'];
+type PortablePluginErrorResponse = PortableComponents['schemas']['PluginErrorResponse'];
+type AppPluginExtensionPoint = AppComponents['schemas']['PluginExtensionPointId'];
+type PortablePluginExtensionPoint = PortableComponents['schemas']['PluginExtensionPointId'];
+type AppPluginCapability = AppComponents['schemas']['PluginCapabilityId'];
+type PortablePluginCapability = PortableComponents['schemas']['PluginCapabilityId'];
+type AppPluginLifecycle = AppComponents['schemas']['PluginLifecycleState'];
+type PortablePluginLifecycle = PortableComponents['schemas']['PluginLifecycleState'];
+type AppPluginErrorCode = AppComponents['schemas']['PluginErrorCode'];
+type PortablePluginErrorCode = PortableComponents['schemas']['PluginErrorCode'];
 
 const INVALIDATION_CODES = {
   pcd_drift: true,
@@ -48,6 +66,82 @@ const INVALIDATED_RESPONSE_REQUIRED = [
 ];
 const APPLY_RESPONSE_REQUIRED = ['success', 'results', 'staleWarning', 'outcomes', 'syncHistoryId'];
 const APPLY_ERROR_RESPONSE_REQUIRED = ['failure', 'staleWarning'];
+const PLUGIN_MANIFEST_REQUIRED = [
+  'apiVersion',
+  'id',
+  'name',
+  'version',
+  'runtime',
+  'entry',
+  'extensionPoints',
+  'capabilities',
+];
+const PLUGIN_RECORD_REQUIRED = [
+  'manifest',
+  'enabled',
+  'discovered',
+  'state',
+  'registeredAt',
+  'lastError',
+  'createdAt',
+  'updatedAt',
+];
+const PLUGIN_LIST_REQUIRED = ['pluginsEnabled', 'items'];
+const PLUGIN_RELOAD_REQUIRED = ['pluginsEnabled', 'reloaded', 'discovered', 'registered', 'rejected', 'missing'];
+const PLUGIN_ERROR_REQUIRED = ['code', 'error'];
+
+const PLUGIN_DETAIL_STATUSES = {
+  '200': 'PluginDetailResponse',
+  '400': 'PluginErrorResponse',
+  '404': 'PluginErrorResponse',
+  '409': 'PluginErrorResponse',
+  '500': 'PluginErrorResponse',
+} as const;
+
+const PLUGIN_MUTATION_STATUSES = {
+  '200': 'PluginMutationResponse',
+  '400': 'PluginErrorResponse',
+  '404': 'PluginErrorResponse',
+  '409': 'PluginErrorResponse',
+  '500': 'PluginErrorResponse',
+} as const;
+
+const PLUGIN_EXTENSION_POINTS = {
+  'config.profileCompiled.observe': true,
+  'sync.previewComputed.observe': true,
+  'config.validation.observe': true,
+  'sync.beforeApply.observe': true,
+  'sync.afterApply.observe': true,
+  'parser.releaseTitle.transform': true,
+  'customFormat.condition.evaluate': true,
+  'notification.dispatch.observe': true,
+  'importExport.adapter': true,
+} satisfies Record<AppPluginExtensionPoint, true> & Record<PortablePluginExtensionPoint, true>;
+
+const PLUGIN_CAPABILITIES = {
+  'read:resolved-profile': true,
+  'read:sync-preview': true,
+  'read:custom-format': true,
+  'read:config-validation': true,
+} satisfies Record<AppPluginCapability, true> & Record<PortablePluginCapability, true>;
+
+const PLUGIN_LIFECYCLE_STATES = {
+  discovered: true,
+  validated: true,
+  registered: true,
+  rejected: true,
+  activated: true,
+  failed: true,
+  unloaded: true,
+} satisfies Record<AppPluginLifecycle, true> & Record<PortablePluginLifecycle, true>;
+
+const PLUGIN_ERROR_CODES = {
+  invalid_identity: true,
+  plugins_disabled: true,
+  plugin_not_found: true,
+  registry_conflict: true,
+  internal_error: true,
+} satisfies Record<AppPluginErrorCode, true> & Record<PortablePluginErrorCode, true>;
 
 const GENERATED_INVALIDATED_RESPONSE_SAMPLE = {
   error: 'Live Arr configuration changed. Nothing was applied. Generate and review a new preview.',
@@ -107,6 +201,47 @@ const GENERATED_MEDIA_MANAGEMENT_CONFIG_SAMPLE = {
   mediaSettingsDatabaseId: null,
   mediaSettingsConfigName: null,
 } satisfies AppMediaManagementConfig & PortableMediaManagementConfig;
+
+const GENERATED_PLUGIN_MANIFEST_SAMPLE = {
+  apiVersion: '1',
+  id: 'com.example.contract',
+  name: 'Contract Plugin',
+  version: '1.0.0',
+  runtime: 'wasm',
+  entry: 'plugin.wasm',
+  extensionPoints: ['sync.previewComputed.observe'],
+  capabilities: ['read:sync-preview'],
+} satisfies AppPluginManifest & PortablePluginManifest;
+
+const GENERATED_PLUGIN_RECORD_SAMPLE = {
+  manifest: GENERATED_PLUGIN_MANIFEST_SAMPLE,
+  enabled: true,
+  discovered: true,
+  state: 'registered',
+  registeredAt: '2026-07-11T00:00:00.000Z',
+  lastError: null,
+  createdAt: '2026-07-11T00:00:00.000Z',
+  updatedAt: '2026-07-11T00:00:00.000Z',
+} satisfies AppPluginRecord & PortablePluginRecord;
+
+const GENERATED_PLUGIN_LIST_SAMPLE = {
+  pluginsEnabled: true,
+  items: [GENERATED_PLUGIN_RECORD_SAMPLE],
+} satisfies AppPluginListResponse & PortablePluginListResponse;
+
+const GENERATED_PLUGIN_RELOAD_SAMPLE = {
+  pluginsEnabled: true,
+  reloaded: true,
+  discovered: 1,
+  registered: 1,
+  rejected: 0,
+  missing: 0,
+} satisfies AppPluginReloadResponse & PortablePluginReloadResponse;
+
+const GENERATED_PLUGIN_ERROR_SAMPLE = {
+  code: 'plugin_not_found',
+  error: 'Plugin not found in the requested API-version namespace',
+} satisfies AppPluginErrorResponse & PortablePluginErrorResponse;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -178,6 +313,12 @@ function schemaRefs(value: unknown): string[] {
   return value.oneOf.flatMap((entry) => schemaRefs(entry));
 }
 
+function responseSchema(responses: unknown, status: string): unknown {
+  const response = getRecordProperty(responses, status);
+  const content = getRecordProperty(response, 'content');
+  return getRecordProperty(content, 'application/json').schema;
+}
+
 Deno.test('reviewed apply contract source, bundle, and generated declarations stay in lockstep', async () => {
   const sourceSchemas = parse(
     await Deno.readTextFile(new URL('../../../../../docs/api/v1/schemas/sync.yaml', import.meta.url))
@@ -246,6 +387,108 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
       expectedSchemas,
       `bundled response mapping drifted for ${status}`
     );
+  }
+});
+
+Deno.test('plugin management source, bundle, paths, and generated declarations stay in lockstep', async () => {
+  const sourceSchemas = parse(
+    await Deno.readTextFile(new URL('../../../../../docs/api/v1/schemas/plugins.yaml', import.meta.url))
+  );
+  const sourcePaths = parse(
+    await Deno.readTextFile(new URL('../../../../../docs/api/v1/paths/plugins.yaml', import.meta.url))
+  );
+  const bundled = JSON.parse(
+    await Deno.readTextFile(new URL('../../../../praxrr-api/openapi.json', import.meta.url))
+  ) as unknown;
+  const bundledSchemas = getRecordProperty(getRecordProperty(bundled, 'components'), 'schemas');
+
+  const schemaExpectations = [
+    ['PluginManifestMetadata', PLUGIN_MANIFEST_REQUIRED, Object.keys(GENERATED_PLUGIN_MANIFEST_SAMPLE)],
+    ['PluginRecord', PLUGIN_RECORD_REQUIRED, Object.keys(GENERATED_PLUGIN_RECORD_SAMPLE)],
+    ['PluginListResponse', PLUGIN_LIST_REQUIRED, Object.keys(GENERATED_PLUGIN_LIST_SAMPLE)],
+    ['PluginReloadResponse', PLUGIN_RELOAD_REQUIRED, Object.keys(GENERATED_PLUGIN_RELOAD_SAMPLE)],
+    ['PluginErrorResponse', PLUGIN_ERROR_REQUIRED, Object.keys(GENERATED_PLUGIN_ERROR_SAMPLE)],
+  ] as const;
+
+  for (const [schemaName, required, generatedKeys] of schemaExpectations) {
+    assertEquals(
+      getRecordProperty(sourceSchemas, schemaName).required,
+      required,
+      `${schemaName} source required drifted`
+    );
+    assertEquals(
+      getRecordProperty(bundledSchemas, schemaName).required,
+      required,
+      `${schemaName} bundled required drifted`
+    );
+    assertEquals(generatedKeys, required, `${schemaName} generated declaration sample drifted`);
+  }
+
+  const enumExpectations = [
+    ['PluginExtensionPointId', Object.keys(PLUGIN_EXTENSION_POINTS)],
+    ['PluginCapabilityId', Object.keys(PLUGIN_CAPABILITIES)],
+    ['PluginLifecycleState', Object.keys(PLUGIN_LIFECYCLE_STATES)],
+    ['PluginErrorCode', Object.keys(PLUGIN_ERROR_CODES)],
+  ] as const;
+
+  for (const [schemaName, expected] of enumExpectations) {
+    assertEquals(getRecordProperty(sourceSchemas, schemaName).enum, expected, `${schemaName} source enum drifted`);
+    assertEquals(getRecordProperty(bundledSchemas, schemaName).enum, expected, `${schemaName} bundled enum drifted`);
+  }
+
+  const operationExpectations = [
+    {
+      sourceKey: 'list',
+      method: 'get',
+      bundledPath: '/plugins',
+      statuses: { '200': 'PluginListResponse', '500': 'PluginErrorResponse' },
+    },
+    {
+      sourceKey: 'reload',
+      method: 'post',
+      bundledPath: '/plugins/reload',
+      statuses: { '200': 'PluginReloadResponse', '500': 'PluginErrorResponse' },
+    },
+    {
+      sourceKey: 'detail',
+      method: 'get',
+      bundledPath: '/plugins/{apiVersion}/{id}',
+      statuses: PLUGIN_DETAIL_STATUSES,
+    },
+    {
+      sourceKey: 'enable',
+      method: 'post',
+      bundledPath: '/plugins/{apiVersion}/{id}/enable',
+      statuses: PLUGIN_MUTATION_STATUSES,
+    },
+    {
+      sourceKey: 'disable',
+      method: 'post',
+      bundledPath: '/plugins/{apiVersion}/{id}/disable',
+      statuses: PLUGIN_MUTATION_STATUSES,
+    },
+  ] as const;
+  const bundledPaths = getRecordProperty(bundled, 'paths');
+
+  for (const operation of operationExpectations) {
+    const sourceResponses = getRecordProperty(
+      getRecordProperty(getRecordProperty(sourcePaths, operation.sourceKey), operation.method),
+      'responses'
+    );
+    const bundledResponses = getRecordProperty(
+      getRecordProperty(getRecordProperty(bundledPaths, operation.bundledPath), operation.method),
+      'responses'
+    );
+    const expectedStatuses = Object.keys(operation.statuses).sort();
+    assertEquals(Object.keys(sourceResponses).sort(), expectedStatuses);
+    assertEquals(Object.keys(bundledResponses).sort(), expectedStatuses);
+
+    for (const [status, schemaName] of Object.entries(operation.statuses)) {
+      const sourceRefs = schemaRefs(responseSchema(sourceResponses, status)).map((ref) => ref.split('/').at(-1));
+      const bundledRefs = schemaRefs(responseSchema(bundledResponses, status)).map((ref) => ref.split('/').at(-1));
+      assertEquals(sourceRefs, [schemaName]);
+      assertEquals(bundledRefs, [schemaName]);
+    }
   }
 });
 

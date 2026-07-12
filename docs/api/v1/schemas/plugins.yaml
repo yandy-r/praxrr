@@ -1,0 +1,235 @@
+PluginExtensionPointId:
+  type: string
+  description: Closed plugin extension-point identifier accepted by this API version.
+  enum:
+    - config.profileCompiled.observe
+    - sync.previewComputed.observe
+    - config.validation.observe
+    - sync.beforeApply.observe
+    - sync.afterApply.observe
+    - parser.releaseTitle.transform
+    - customFormat.condition.evaluate
+    - notification.dispatch.observe
+    - importExport.adapter
+
+PluginCapabilityId:
+  type: string
+  description: Closed, least-privilege capability identifier accepted by this API version.
+  enum:
+    - read:resolved-profile
+    - read:sync-preview
+    - read:custom-format
+    - read:config-validation
+
+PluginLifecycleState:
+  type: string
+  description: |
+    Last recorded lifecycle state. `enabled` is administrator intent and does not imply that a
+    plugin was activated or executed successfully.
+  enum:
+    - discovered
+    - validated
+    - registered
+    - rejected
+    - activated
+    - failed
+    - unloaded
+
+PluginEngines:
+  type: object
+  description: Advisory host-version constraints from the validated manifest.
+  properties:
+    praxrr:
+      type: string
+      minLength: 1
+  additionalProperties: false
+
+PluginManifestMetadata:
+  type: object
+  description: |
+    Validated manifest metadata. Authored identifiers and names are returned exactly as persisted;
+    local source directories and unvalidated raw manifest content are never exposed.
+  required:
+    - apiVersion
+    - id
+    - name
+    - version
+    - runtime
+    - entry
+    - extensionPoints
+    - capabilities
+  properties:
+    apiVersion:
+      type: string
+      minLength: 1
+    id:
+      type: string
+      minLength: 1
+    name:
+      type: string
+      minLength: 1
+    version:
+      type: string
+      minLength: 1
+    runtime:
+      type: string
+      enum:
+        - wasm
+    entry:
+      type: string
+      minLength: 1
+      description: Manifest-relative module entry; never an absolute source path.
+    extensionPoints:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/PluginExtensionPointId'
+    capabilities:
+      type: array
+      items:
+        $ref: '#/PluginCapabilityId'
+    description:
+      type: string
+    author:
+      type: string
+    engines:
+      $ref: '#/PluginEngines'
+  additionalProperties: false
+
+PluginRecord:
+  type: object
+  description: Durable, redacted plugin discovery and enablement state.
+  required:
+    - manifest
+    - enabled
+    - discovered
+    - state
+    - registeredAt
+    - lastError
+    - createdAt
+    - updatedAt
+  properties:
+    manifest:
+      $ref: '#/PluginManifestMetadata'
+    enabled:
+      type: boolean
+      description: Persisted administrator intent; does not assert runtime activation or execution.
+    discovered:
+      type: boolean
+      description: Whether the plugin was present in the latest successfully reconciled scan.
+    state:
+      $ref: '#/PluginLifecycleState'
+    registeredAt:
+      type: string
+      format: date-time
+    lastError:
+      description: Safe last lifecycle error, or null when none is recorded.
+      oneOf:
+        - type: string
+        - type: 'null'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+  additionalProperties: false
+
+PluginListResponse:
+  type: object
+  required:
+    - pluginsEnabled
+    - items
+  properties:
+    pluginsEnabled:
+      type: boolean
+    items:
+      type: array
+      description: Empty while `PLUGINS_ENABLED` is off; otherwise includes durable discovered and missing rows.
+      items:
+        $ref: '#/PluginRecord'
+  additionalProperties: false
+
+PluginDetailResponse:
+  type: object
+  required:
+    - pluginsEnabled
+    - plugin
+  properties:
+    pluginsEnabled:
+      type: boolean
+      const: true
+    plugin:
+      $ref: '#/PluginRecord'
+  additionalProperties: false
+
+PluginMutationResponse:
+  type: object
+  description: Updated durable enablement intent for one API-version-qualified plugin.
+  required:
+    - pluginsEnabled
+    - plugin
+  properties:
+    pluginsEnabled:
+      type: boolean
+      const: true
+    plugin:
+      $ref: '#/PluginRecord'
+  additionalProperties: false
+
+PluginReloadResponse:
+  type: object
+  description: |
+    Atomic reload summary. When plugins are disabled, `reloaded` is false and every counter is zero;
+    no filesystem scan or durable mutation occurs.
+  required:
+    - pluginsEnabled
+    - reloaded
+    - discovered
+    - registered
+    - rejected
+    - missing
+  properties:
+    pluginsEnabled:
+      type: boolean
+    reloaded:
+      type: boolean
+    discovered:
+      type: integer
+      minimum: 0
+      description: Manifest files found by the bounded scan.
+    registered:
+      type: integer
+      minimum: 0
+      description: Validated plugins published in the new registry snapshot.
+    rejected:
+      type: integer
+      minimum: 0
+      description: Malformed, invalid, duplicate, or otherwise rejected scan entries.
+    missing:
+      type: integer
+      minimum: 0
+      description: Persisted plugins marked undiscovered by this successful reconciliation.
+  additionalProperties: false
+
+PluginErrorCode:
+  type: string
+  description: Stable management failure code; raw filesystem/database diagnostics are never returned.
+  enum:
+    - invalid_identity
+    - plugins_disabled
+    - plugin_not_found
+    - registry_conflict
+    - internal_error
+
+PluginErrorResponse:
+  type: object
+  required:
+    - code
+    - error
+  properties:
+    code:
+      $ref: '#/PluginErrorCode'
+    error:
+      type: string
+  additionalProperties: false

@@ -1,7 +1,8 @@
 # Plugin System Architecture
 
-> Phase-1 foundation for the WASM plugin system (issue #35). This note describes the **stable,
-> versioned contract and lifecycle scaffolding** that ships in Phase 1. It is feature-flagged
+> Phase-1 foundation for the WASM plugin system (issue #35), extended by the durable management
+> backend in issue #264. This note describes the **stable, versioned contract, durable discovery
+> state, and lifecycle scaffolding**. It is feature-flagged
 > **OFF by default** (`PLUGINS_ENABLED`), adds **no WASM/Extism runtime dependency**, executes
 > **no untrusted code**, and inserts **zero call-sites** into the sync / compile / parser /
 > notification pipelines. The default executor throws `PluginRuntimeUnavailableError('wasm runtime
@@ -9,11 +10,10 @@ not yet available')`.
 
 ## Scope
 
-This page is the architectural map for the plugin subsystem: the module boundary, the
-extension-point catalog and its versioning semantics, the lifecycle states a plugin passes
-through, the capability projection/redaction boundary, the sole-I/O-mediator invariant, and the
-graceful-degradation contract. It documents the design as of Phase 1; points and capabilities
-that are declared-but-inert are called out explicitly.
+This page is the architectural map for the plugin subsystem: the module boundary, durable registry
+reconciliation and management API, extension-point versioning, lifecycle state, capability
+projection/redaction, the sole-I/O-mediator invariant, and graceful degradation. Runtime execution
+remains inert; points and capabilities that are declared-but-inert are called out explicitly.
 
 ## Module Map
 
@@ -37,8 +37,14 @@ flowchart TB
         executor["executor.ts<br/>PluginExecutor seam +<br/>UnavailablePluginExecutor"]
         scan["scan.ts<br/>(ONLY fs boundary)"]
         hostctx["hostContext.ts<br/>projection + redaction"]
+    responses["responses.ts<br/>redacted HTTP/MCP mapper"]
         errors["errors.ts<br/>typed error taxonomy"]
         vbarrel["index.ts (server barrel)"]
+    end
+
+    subgraph appdb["App SQLite — durable management state"]
+    queries["pluginRegistry.ts<br/>transactional reconciliation"]
+    table["plugin_registry<br/>(apiVersion, id COLLATE NOCASE)"]
     end
 
     validator --> types
@@ -49,6 +55,10 @@ flowchart TB
     host --> executor
     host --> scan
     host --> hostctx
+    host --> queries
+    queries --> table
+    responses --> queries
+    responses --> host
     hostctx --> caps
     host --> errors
 ```
@@ -71,15 +81,17 @@ single source of truth for the contract.
 Server-only. Owns discovery, validation orchestration, registration, dispatch, and the swappable
 executor.
 
-| File                            | Responsibility                                                                                                                                                                                                                                                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/plugins/host.ts`        | `PluginHost` singleton (`pluginHost`). The **sole I/O mediator**: `initialize()` discovers → validates → registers; `notifyObservers(point, buildInput)` projects+redacts input and dispatches wired observe points through the executor with per-plugin isolation. Constructor-injected executor + `setExecutor()`. |
-| `server/plugins/registry.ts`    | `PluginRegistry` singleton (`pluginRegistry`) over a nested `Map<apiVersion, Map<lowercased id, RegisteredPlugin>>`. Adds `unregister` + apiVersion namespacing + case-insensitive per-namespace id uniqueness over the `queueRegistry` pattern. In-memory only, rebuilt each boot.                                  |
-| `server/plugins/executor.ts`    | The swappable `PluginExecutor` seam over `PluginJsonValue`, and the shipped inert default `UnavailablePluginExecutor`. **No Extism/WASM import.**                                                                                                                                                                    |
-| `server/plugins/scan.ts`        | The **only** file that touches `Deno.readDir` / `Deno.readTextFile`. Reads each subdir's `praxrr.plugin.json`, JSON-parses, returns raw entries (collecting parse errors, never throwing on bad manifests; rethrows only unexpected fs errors).                                                                      |
-| `server/plugins/hostContext.ts` | The projection + redaction boundary: `buildCapabilityInput()` copies only allow-listed fields per granted capability, then `scrubPluginBoundary()` runs the secret scrubber (reuses `redactSecrets` from `$server/mcp/redact.ts`).                                                                                   |
-| `server/plugins/errors.ts`      | Typed error taxonomy (mirrors `mcp/errors.ts`): `PluginManifestError` / `PluginValidationError`, `PluginCapabilityDeniedError`, `PluginPointNotWiredError`, `PluginRuntimeUnavailableError`, `PluginExecutionError`. A rejected-manifest **skip** must never be conflated with an execution-seam **throw**.          |
-| `server/plugins/index.ts`       | Server barrel imported by `hooks.server.ts` as `$server/plugins/index.ts`.                                                                                                                                                                                                                                           |
+| File                                  | Responsibility                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/plugins/host.ts`              | `PluginHost` singleton (`pluginHost`). The **sole I/O mediator**: serialized `initialize()` / `reload()` scans and validates a complete candidate, commits durable reconciliation, then atomically replaces the in-memory snapshot. `notifyObservers()` projects+redacts input and isolates executor calls. |
+| `server/plugins/registry.ts`          | Pure in-memory dispatch snapshot over `Map<apiVersion, Map<lowercased id, RegisteredPlugin>>`. Full replacement rejects duplicate keys before mutation; point selection includes only enabled, currently discovered entries.                                                                                |
+| `server/plugins/executor.ts`          | The swappable `PluginExecutor` seam over `PluginJsonValue`, and the shipped inert default `UnavailablePluginExecutor`. **No Extism/WASM import.**                                                                                                                                                           |
+| `server/plugins/scan.ts`              | The **only** file that touches `Deno.readDir` / `Deno.readTextFile`. Reads each subdir's `praxrr.plugin.json`, JSON-parses, returns raw entries (collecting parse errors, never throwing on bad manifests; rethrows only unexpected fs errors).                                                             |
+| `server/plugins/hostContext.ts`       | The projection + redaction boundary: `buildCapabilityInput()` copies only allow-listed fields per granted capability, then `scrubPluginBoundary()` runs the secret scrubber (reuses `redactSecrets` from `$server/mcp/redact.ts`).                                                                          |
+| `server/plugins/responses.ts`         | Shared allow-list response/service boundary for HTTP and read-only MCP listing. It exposes validated portable fields and lifecycle facts, never `sourceDir` or raw manifest JSON.                                                                                                                           |
+| `server/plugins/errors.ts`            | Typed error taxonomy (mirrors `mcp/errors.ts`): `PluginManifestError` / `PluginValidationError`, `PluginCapabilityDeniedError`, `PluginPointNotWiredError`, `PluginRuntimeUnavailableError`, `PluginExecutionError`. A rejected-manifest **skip** must never be conflated with an execution-seam **throw**. |
+| `server/plugins/index.ts`             | Server barrel imported by `hooks.server.ts` as `$server/plugins/index.ts`.                                                                                                                                                                                                                                  |
+| `server/db/queries/pluginRegistry.ts` | App-database repository for namespace-qualified lookup, enablement intent, and transactional scan reconciliation. Missing plugins remain durable as `discovered:false`; reappearance preserves the prior enablement decision.                                                                               |
 
 ## Extension-Point Catalog
 
@@ -129,9 +141,9 @@ change that bumps the API version — never an ambient default.
 
 ## Lifecycle States
 
-`PluginLifecycleState` enumerates the states. Phase-1-reachable states are `discovered`,
-`validated`, `registered`, `rejected`; `activated`, `failed`, `unloaded` are **declared for the
-runtime phase but unreachable in Phase 1**.
+`PluginLifecycleState` enumerates the states. Discovery and management reach `discovered`,
+`validated`, `registered`, `rejected`, and `unloaded`; `activated` and `failed` remain reserved for a
+future runtime and are not evidence that code executed.
 
 ```mermaid
 stateDiagram-v2
@@ -144,7 +156,7 @@ stateDiagram-v2
     registered --> activated: (Phase 2) executor bound
     activated --> failed: (Phase 2) threw / timed out,<br/>isolated per-plugin
     activated --> unloaded: (Phase 2) host.reset() / re-scan
-    registered --> unloaded: (Phase 2) registry.clear()
+    registered --> unloaded: durable reconciliation<br/>plugin absent from successful scan
 ```
 
 - **discovered** — `scan.ts` lists each immediate subdir of `PLUGINS_DIR` and reads its
@@ -155,8 +167,9 @@ stateDiagram-v2
   duplicate id within a namespace is rejected.
 - **rejected** — terminal Phase-1 state for a bad/malformed manifest; recorded with its
   `PluginManifestIssue[]` and logged. Initialization continues with the remaining plugins.
-- **activated / failed / unloaded** — declared for the runtime phase; not reachable until a real
-  executor lands.
+- **unloaded** — the durable row remains queryable when a successful scan no longer finds the plugin;
+  enablement intent is preserved for a later reappearance.
+- **activated / failed** — reserved for a future runtime; neither is reached by management state.
 
 ## Capability Model: Projection & Redaction Boundary
 
@@ -227,8 +240,14 @@ Data-flow, in brief:
 PLUGINS_DIR (disk)
     │  scan.ts  ── ONLY fs boundary
     ▼
-raw manifest entries ──► validatePluginManifest() ──► PluginRegistry
-                                                       (keyed by apiVersion)
+raw manifest entries ──► validatePluginManifest() ──► transactional reconciliation
+    │
+    ▼
+plugin_registry (durable intent)
+    │ committed rows
+    ▼
+PluginRegistry atomic snapshot
+(enabled + discovered dispatch only)
                                                               │
 (source domain data) ─► hostContext: project → redact ─► PluginJsonValue snapshot
                                                               │
@@ -241,6 +260,27 @@ raw manifest entries ──► validatePluginManifest() ──► PluginRegistry
                                                       not yet available")
 ```
 
+## Durable Registry and Management
+
+Issue #264 adds durable management state without widening the runtime or capability surface:
+
+- `plugin_registry` is app-database state keyed by exact `api_version` plus case-insensitive
+  `plugin_id`. It stores the validated manifest JSON, administrator `enabled` intent, current
+  `discovered` state, lifecycle/error facts, and timestamps. It is not a PCD base-op table.
+- `PluginHost.initialize()` and `reload()` use one single-flight path. A successful bounded scan is
+  validated into a complete candidate, reconciled in one SQLite transaction, and only then published
+  through `PluginRegistry.replaceSnapshot()`. Snapshot duplicate keys are rejected before mutation;
+  unexpected scan/database failure cannot partially replace the previous in-memory snapshot.
+- A plugin missing from a successful scan is retained as `discovered:false`; a reappearing plugin
+  recovers its prior enablement decision. Dispatch requires both `enabled:true` and
+  `discovered:true`. Enablement records administrator intent only — it never claims activation or
+  successful execution.
+- Auth-gated `/api/v1/plugins*` endpoints list, read, enable, disable, and reload using the shared
+  allow-list mapper. Responses omit `sourceDir` and raw persisted JSON. The read-only MCP
+  `list_plugins` projection uses the same redacted list boundary and adds no mutation handler.
+- With `PLUGINS_ENABLED` off, list returns `pluginsEnabled:false` with no active entries, reload is a
+  successful no-I/O summary, and enable/disable is rejected without changing durable state.
+
 ## Graceful-Degradation Contract
 
 The plugin subsystem must **never** destabilize boot or the core pipeline (the "optional parser
@@ -248,14 +288,13 @@ degradation" convention). Three concrete guarantees:
 
 - **Disabled = hard no-op.** `PLUGINS_ENABLED` defaults **OFF**, parsed with the existing
   non-throwing `Config.parseBooleanEnv` (like `pullOnStart`, not the default-ON `mcpEnabled` helper)
-  so a typo cannot brick module-eval boot. When off, `PluginHost.initialize()` returns immediately —
-  it never stats `PLUGINS_DIR`, the registry stays empty, and any future plugin HTTP route returns
-  404 at the top of the handler. Startup logs `Plugins disabled via PLUGINS_ENABLED`.
-- **Enabled + missing dir = warn + empty.** When enabled, `initialize()` stats `config.paths.plugins`
-  and, on `Deno.errors.NotFound`, **warns and degrades to an empty registry** — it does not throw and
-  does not auto-create the directory. A disabled/absent feature never litters an empty dir. Only
-  genuinely unexpected fs errors rethrow. The startup call site is additionally wrapped in a
-  `try/catch` that warns and continues, so even an unexpected failure cannot abort boot.
+  so a typo cannot brick module-eval boot. When off, reload never stats `PLUGINS_DIR` or mutates the
+  database; management reads expose the contract-defined disabled view. Startup logs the disabled
+  state.
+- **Enabled + missing dir = successful empty reconciliation.** The host warns, reconciles a successful
+  empty scan, retains prior rows as `discovered:false`, and publishes a non-dispatchable snapshot. It
+  does not auto-create the directory. Unexpected filesystem/database errors rethrow before snapshot
+  replacement; the startup wrapper warns and continues with the prior in-memory state.
 - **Per-plugin isolation on dispatch.** `notifyObservers` runs each executor call inside its own
   `try/catch`, bounded by a finite `AbortSignal` timeout. The expected `PluginRuntimeUnavailableError`
   is logged at debug; any other throw is logged at warn. Neither propagates — one plugin's failure,
@@ -300,7 +339,10 @@ exchange-memory accounting is not described as a total guest-memory limit. See t
 - `packages/praxrr-app/src/lib/shared/plugins/` — pure contract (`types.ts`, `capabilities.ts`,
   `extensionPoints.ts`, `validator.ts`, `index.ts`)
 - `packages/praxrr-app/src/lib/server/plugins/` — host/runtime (`host.ts`, `registry.ts`,
-  `executor.ts`, `scan.ts`, `hostContext.ts`, `errors.ts`, `index.ts`)
+  `executor.ts`, `scan.ts`, `hostContext.ts`, `responses.ts`, `errors.ts`, `index.ts`)
+- `packages/praxrr-app/src/lib/server/db/queries/pluginRegistry.ts` and migration `20260724` — durable
+  reconciliation and namespace-qualified management state
+- `packages/praxrr-app/src/routes/api/v1/plugins/` — auth-gated list/get/enable/disable/reload handlers
 - `packages/praxrr-app/src/lib/server/utils/config/config.ts` — `pluginsEnabled` flag +
   `paths.plugins` getter
 - `packages/praxrr-app/src/hooks.server.ts` — startup wiring (after `trashGuideManager.initialize()`)

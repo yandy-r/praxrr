@@ -17,8 +17,11 @@
  * docs/plans/35-wasm-plugin-system/plan.md for the authoritative Phase-1 spec.
  */
 
-import { assert, assertEquals, assertExists, assertRejects } from '@std/assert';
+import { assert, assertEquals, assertExists, assertRejects, assertStrictEquals } from '@std/assert';
 import { config } from '$config';
+import { db } from '$db/db.ts';
+import { runMigrations } from '$db/migrations.ts';
+import { pluginRegistryQueries, type ReconcilePluginInput } from '$db/queries/pluginRegistry.ts';
 import {
   PluginHost,
   pluginHost,
@@ -55,6 +58,27 @@ async function withPluginsDir(dir: string, fn: () => Promise<void>): Promise<voi
     } else {
       Deno.env.set('PLUGINS_DIR', original);
     }
+  }
+}
+
+/** Run an initialize test against the complete app migration chain and restore the DB singleton. */
+async function withMigratedDb(fn: () => Promise<void>): Promise<void> {
+  const originalBasePath = config.paths.base;
+  const tempBasePath = `/tmp/praxrr-tests/plugin-host-${crypto.randomUUID()}`;
+  await Deno.mkdir(tempBasePath, { recursive: true });
+  db.close();
+  config.setBasePath(tempBasePath);
+  pluginRegistry.clear();
+
+  try {
+    await db.initialize();
+    await runMigrations();
+    await fn();
+  } finally {
+    pluginRegistry.clear();
+    db.close();
+    config.setBasePath(originalBasePath);
+    await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
   }
 }
 
@@ -101,6 +125,14 @@ const wiredManifest: PluginManifest = {
   capabilities: ['read:sync-preview'],
 };
 
+function makeManifest(id: string, overrides: Partial<PluginManifest> = {}): PluginManifest {
+  return { ...wiredManifest, id, name: id, ...overrides };
+}
+
+function manifestEntry(dir: string, manifest: PluginManifest): { readonly dir: string; readonly raw: PluginManifest } {
+  return { dir, raw: manifest };
+}
+
 Deno.test('initialize() is a hard NO-OP and never stats PLUGINS_DIR when PLUGINS_ENABLED is off', async () => {
   await withPluginsEnabled(false, async () => {
     pluginRegistry.clear();
@@ -128,12 +160,14 @@ Deno.test('initialize() warns and degrades to an empty registry when PLUGINS_DIR
   const tmp = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-' });
   const missing = `${tmp}/does-not-exist`;
   try {
-    await withPluginsEnabled(true, async () => {
-      await withPluginsDir(missing, async () => {
-        pluginRegistry.clear();
-        // Must resolve without throwing even though the directory is absent.
-        await pluginHost.initialize();
-        assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 0);
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(missing, async () => {
+          pluginRegistry.clear();
+          // Must resolve without throwing even though the directory is absent.
+          await pluginHost.initialize();
+          assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 0);
+        });
       });
     });
   } finally {
@@ -150,14 +184,16 @@ Deno.test('initialize() registers valid manifests and skips invalid ones', async
     await writeManifest(tmp, 'malformed', '{ not valid json');
     await Deno.mkdir(`${tmp}/no-manifest`, { recursive: true });
 
-    await withPluginsEnabled(true, async () => {
-      await withPluginsDir(tmp, async () => {
-        pluginRegistry.clear();
-        await pluginHost.initialize();
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(tmp, async () => {
+          pluginRegistry.clear();
+          await pluginHost.initialize();
 
-        const registered = pluginRegistry.listByApiVersion(PLUGIN_API_VERSION);
-        assertEquals(registered.length, 1);
-        assertEquals(registered[0].manifest.id, 'com.example.observer');
+          const registered = pluginRegistry.listByApiVersion(PLUGIN_API_VERSION);
+          assertEquals(registered.length, 1);
+          assertEquals(registered[0].manifest.id, 'com.example.observer');
+        });
       });
     });
   } finally {
@@ -266,11 +302,13 @@ Deno.test(
       await writeManifest(tmp, 'a', VALID_MANIFEST);
       await writeManifest(tmp, 'b', VALID_MANIFEST);
 
-      await withPluginsEnabled(true, async () => {
-        await withPluginsDir(tmp, async () => {
-          pluginRegistry.clear();
-          await pluginHost.initialize();
-          assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 1);
+      await withMigratedDb(async () => {
+        await withPluginsEnabled(true, async () => {
+          await withPluginsDir(tmp, async () => {
+            pluginRegistry.clear();
+            await pluginHost.initialize();
+            assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 1);
+          });
         });
       });
     } finally {
@@ -279,3 +317,313 @@ Deno.test(
     }
   }
 );
+
+Deno.test('restart reconciliation restores durable enablement into a new host snapshot', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-restart-' });
+  const manifest = makeManifest('com.example.restart');
+  try {
+    await writeManifest(pluginsDir, 'restart', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          const firstHost = new PluginHost();
+          await firstHost.initialize();
+          assertEquals(pluginRegistryQueries.setEnabled('1', manifest.id, false)?.enabled, false);
+
+          pluginRegistry.clear();
+          db.close();
+          await db.initialize();
+
+          const restartedHost = new PluginHost();
+          const summary = await restartedHost.initialize();
+          const restored = pluginRegistry.get('1', manifest.id);
+          assertExists(restored);
+          assertEquals(restored.enabled, false);
+          assertEquals(restored.sourceDir, `${pluginsDir}/restart`);
+          assertEquals(summary, {
+            pluginsEnabled: true,
+            reloaded: true,
+            discovered: 1,
+            registered: 1,
+            rejected: 0,
+            missing: 0,
+          });
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('only enabled and discovered durable plugins are dispatched after a new host reload', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-dispatch-' });
+  const enabledManifest = makeManifest('com.example.enabled');
+  const disabledManifest = makeManifest('com.example.disabled');
+  try {
+    await writeManifest(pluginsDir, 'enabled', JSON.stringify(enabledManifest));
+    await writeManifest(pluginsDir, 'disabled', JSON.stringify(disabledManifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+          pluginRegistryQueries.setEnabled('1', disabledManifest.id, false);
+
+          const calls: string[] = [];
+          const executor: PluginExecutor = {
+            execute(request: PluginExecutionRequest): Promise<PluginJsonValue> {
+              calls.push(request.plugin.manifest.id);
+              return Promise.resolve(null);
+            },
+          };
+          const restartedHost = new PluginHost(executor);
+          await restartedHost.reload();
+          await restartedHost.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'preview' }));
+
+          assertEquals(calls, [enabledManifest.id]);
+          assertEquals(pluginRegistry.get('1', disabledManifest.id)?.enabled, false);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('feature-off reload performs no filesystem scan or durable reconciliation', async () => {
+  await withMigratedDb(async () => {
+    const persisted = makeManifest('com.example.feature-off');
+    await pluginRegistryQueries.reconcile([{ manifest: persisted }]);
+    pluginRegistry.register('/tmp/feature-off', persisted);
+    const previousMemory = pluginRegistry.get('1', persisted.id);
+    const beforeRows = pluginRegistryQueries.list();
+    let scans = 0;
+    let reconciliations = 0;
+    const host = new PluginHost(undefined, {
+      scan: () => {
+        scans += 1;
+        return Promise.reject(new Error('scan must not run'));
+      },
+      reconcile: () => {
+        reconciliations += 1;
+        return Promise.reject(new Error('reconcile must not run'));
+      },
+    });
+
+    await withPluginsEnabled(false, async () => {
+      const summary = await host.reload();
+      assertEquals(summary, {
+        pluginsEnabled: false,
+        reloaded: false,
+        discovered: 0,
+        registered: 0,
+        rejected: 0,
+        missing: 0,
+      });
+    });
+
+    assertEquals(scans, 0);
+    assertEquals(reconciliations, 0);
+    assertEquals(pluginRegistryQueries.list(), beforeRows);
+    assertStrictEquals(pluginRegistry.get('1', persisted.id), previousMemory);
+  });
+});
+
+Deno.test('missing plugin directory commits an empty snapshot and reports durable missing rows', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-missing-' });
+  const manifest = makeManifest('com.example.missing');
+  const missingDir = `${pluginsDir}/removed`;
+  try {
+    await writeManifest(pluginsDir, 'present', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+        });
+        await withPluginsDir(missingDir, async () => {
+          const summary = await new PluginHost().reload();
+          assertEquals(summary, {
+            pluginsEnabled: true,
+            reloaded: true,
+            discovered: 0,
+            registered: 0,
+            rejected: 0,
+            missing: 1,
+          });
+        });
+      });
+
+      assertEquals(pluginRegistry.listByApiVersion('1'), []);
+      const durable = pluginRegistryQueries.get('1', manifest.id);
+      assertExists(durable);
+      assertEquals(durable.discovered, false);
+      assertEquals(durable.state, 'unloaded');
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('enable and disable decisions survive across distinct host instances', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-toggle-' });
+  const manifest = makeManifest('com.example.host-toggle');
+  try {
+    await writeManifest(pluginsDir, 'toggle', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+          pluginRegistryQueries.setEnabled('1', manifest.id, false);
+          await new PluginHost().reload();
+          assertEquals(pluginRegistry.get('1', manifest.id)?.enabled, false);
+
+          pluginRegistryQueries.setEnabled('1', manifest.id, true);
+          await new PluginHost().reload();
+          assertEquals(pluginRegistry.get('1', manifest.id)?.enabled, true);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('concurrent reload callers share one exact promise, scan, and reconciliation', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-concurrent-' });
+  const manifest = makeManifest('com.example.concurrent');
+  let releaseScan: (() => void) | undefined;
+  const scanGate = new Promise<void>((resolve) => {
+    releaseScan = resolve;
+  });
+  try {
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          let scans = 0;
+          let reconciliations = 0;
+          const host = new PluginHost(undefined, {
+            scan: async () => {
+              scans += 1;
+              await scanGate;
+              return [manifestEntry(`${pluginsDir}/concurrent`, manifest)];
+            },
+            reconcile: async (inputs: readonly ReconcilePluginInput[]) => {
+              reconciliations += 1;
+              return await pluginRegistryQueries.reconcile(inputs);
+            },
+          });
+
+          const first = host.reload();
+          const second = host.reload();
+          assertStrictEquals(second, first);
+          releaseScan?.();
+          const [firstSummary, secondSummary] = await Promise.all([first, second]);
+
+          assertStrictEquals(firstSummary, secondSummary);
+          assertEquals(scans, 1);
+          assertEquals(reconciliations, 1);
+          assertEquals(firstSummary.registered, 1);
+        });
+      });
+    });
+  } finally {
+    releaseScan?.();
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('reload counts invalid, malformed, and duplicate manifests without partial rejection', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-rejected-' });
+  const valid = makeManifest('com.example.counted');
+  try {
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          const host = new PluginHost(undefined, {
+            scan: () =>
+              Promise.resolve([
+                manifestEntry(`${pluginsDir}/valid`, valid),
+                { dir: `${pluginsDir}/invalid`, raw: JSON.parse(INVALID_MANIFEST) as unknown },
+                { dir: `${pluginsDir}/malformed`, parseError: 'invalid JSON' },
+                manifestEntry(`${pluginsDir}/duplicate`, valid),
+              ]),
+          });
+
+          const summary = await host.reload();
+          assertEquals(summary, {
+            pluginsEnabled: true,
+            reloaded: true,
+            discovered: 4,
+            registered: 1,
+            rejected: 3,
+            missing: 0,
+          });
+          assertEquals(
+            pluginRegistryQueries.list().map((record) => record.pluginId),
+            [valid.id]
+          );
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('unexpected scan failure preserves the previous in-memory and durable snapshots', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-scan-failure-' });
+  const manifest = makeManifest('com.example.scan-stable');
+  try {
+    await writeManifest(pluginsDir, 'stable', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+          const previousMemory = pluginRegistry.get('1', manifest.id);
+          const previousRows = pluginRegistryQueries.list();
+          const failingHost = new PluginHost(undefined, {
+            scan: () => Promise.reject(new Error('unexpected scan failure')),
+          });
+
+          await assertRejects(() => failingHost.reload(), Error, 'unexpected scan failure');
+          assertStrictEquals(pluginRegistry.get('1', manifest.id), previousMemory);
+          assertEquals(pluginRegistryQueries.list(), previousRows);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('unexpected reconcile failure rolls back durable changes and preserves the live snapshot', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-reconcile-failure-' });
+  const stable = makeManifest('com.example.reconcile-stable');
+  const candidate = makeManifest('com.example.reconcile-candidate');
+  try {
+    await writeManifest(pluginsDir, 'stable', JSON.stringify(stable));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+          const previousMemory = pluginRegistry.get('1', stable.id);
+          const previousRows = pluginRegistryQueries.list();
+          const failingHost = new PluginHost(undefined, {
+            scan: () => Promise.resolve([manifestEntry(`${pluginsDir}/candidate`, candidate)]),
+            reconcile: () =>
+              db.transaction(() => {
+                db.execute('UPDATE plugin_registry SET enabled = 0, discovered = 0');
+                throw new Error('unexpected reconcile failure');
+              }),
+          });
+
+          await assertRejects(() => failingHost.reload(), Error, 'unexpected reconcile failure');
+          assertStrictEquals(pluginRegistry.get('1', stable.id), previousMemory);
+          assertEquals(pluginRegistryQueries.list(), previousRows);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});

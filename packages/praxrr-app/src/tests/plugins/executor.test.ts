@@ -35,6 +35,8 @@ const manifest: PluginManifest = {
 const plugin: RegisteredPlugin = {
   manifest,
   sourceDir: '/tmp/plugins/com.example.observer',
+  enabled: true,
+  discovered: true,
   state: 'registered',
   registeredAt: new Date().toISOString(),
 };

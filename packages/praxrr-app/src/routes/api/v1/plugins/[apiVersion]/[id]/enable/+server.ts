@@ -1,0 +1,29 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
+import { setPluginEnabled, toPluginErrorResponse } from '$server/plugins/index.ts';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function isNonEmptyIdentity(value: string | undefined): value is string {
+  return value !== undefined && value.length > 0 && value.trim().length > 0;
+}
+
+/** POST enablement intent for one exact plugin identity. Authentication is enforced by the hook. */
+export const POST: RequestHandler = ({ params }) => {
+  const { apiVersion, id } = params;
+  if (!isNonEmptyIdentity(apiVersion) || !isNonEmptyIdentity(id)) {
+    return json(toPluginErrorResponse('invalid_identity'), { status: 400, headers: NO_STORE_HEADERS });
+  }
+
+  const outcome = setPluginEnabled(apiVersion, id, true);
+  if (outcome.kind === 'disabled') {
+    return json(toPluginErrorResponse('plugins_disabled'), { status: 409, headers: NO_STORE_HEADERS });
+  }
+  if (outcome.kind === 'not_found') {
+    return json(toPluginErrorResponse('plugin_not_found'), { status: 404, headers: NO_STORE_HEADERS });
+  }
+  if (outcome.kind === 'error') {
+    return json(toPluginErrorResponse('internal_error'), { status: 500, headers: NO_STORE_HEADERS });
+  }
+  return json(outcome.response, { headers: NO_STORE_HEADERS });
+};
