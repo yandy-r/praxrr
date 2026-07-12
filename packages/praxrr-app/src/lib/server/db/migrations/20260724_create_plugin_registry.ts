@@ -33,9 +33,12 @@ export const migration: Migration = {
 			ON plugin_registry(api_version, discovered, enabled);
 		CREATE INDEX idx_plugin_registry_lifecycle
 			ON plugin_registry(lifecycle_state);
+		CREATE INDEX idx_plugin_registry_tombstone_retention
+			ON plugin_registry(discovered, updated_at DESC, api_version, plugin_id COLLATE NOCASE);
 	`,
 
   down: `
+		DROP INDEX IF EXISTS idx_plugin_registry_tombstone_retention;
 		DROP INDEX IF EXISTS idx_plugin_registry_lifecycle;
 		DROP INDEX IF EXISTS idx_plugin_registry_availability;
 		DROP INDEX IF EXISTS idx_plugin_registry_identity;

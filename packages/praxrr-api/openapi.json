@@ -9860,7 +9860,8 @@
         "properties": {
           "praxrr": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 256
           }
         },
         "additionalProperties": false
@@ -9872,19 +9873,23 @@
         "properties": {
           "apiVersion": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 32
           },
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 253
           },
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 256
           },
           "version": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 128
           },
           "runtime": {
             "type": "string",
@@ -9893,26 +9898,31 @@
           "entry": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 1024,
             "description": "Manifest-relative module entry; never an absolute source path."
           },
           "extensionPoints": {
             "type": "array",
             "minItems": 1,
+            "maxItems": 9,
             "items": {
               "$ref": "#/components/schemas/PluginExtensionPointId"
             }
           },
           "capabilities": {
             "type": "array",
+            "maxItems": 4,
             "items": {
               "$ref": "#/components/schemas/PluginCapabilityId"
             }
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2048
           },
           "author": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           },
           "engines": {
             "$ref": "#/components/schemas/PluginEngines"
@@ -10057,7 +10067,7 @@
       "PluginErrorCode": {
         "type": "string",
         "description": "Stable management failure code; raw filesystem/database diagnostics are never returned.",
-        "enum": ["invalid_identity", "plugins_disabled", "plugin_not_found", "registry_conflict", "internal_error"]
+        "enum": ["invalid_identity", "plugins_disabled", "plugin_not_found", "internal_error"]
       },
       "PluginErrorResponse": {
         "type": "object",

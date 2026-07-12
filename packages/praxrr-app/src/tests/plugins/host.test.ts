@@ -202,6 +202,30 @@ Deno.test('initialize() registers valid manifests and skips invalid ones', async
   }
 });
 
+Deno.test('initialize() rejects an oversized manifest without aborting reload', async () => {
+  const tmp = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-oversized-' });
+  try {
+    await writeManifest(tmp, 'valid', VALID_MANIFEST);
+    await writeManifest(tmp, 'oversized', JSON.stringify({ value: 'x'.repeat(65_536) }));
+
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(tmp, async () => {
+          const summary = await new PluginHost().reload();
+
+          assertEquals(summary.discovered, 2);
+          assertEquals(summary.registered, 1);
+          assertEquals(summary.rejected, 1);
+          assertEquals(pluginRegistry.listByApiVersion(PLUGIN_API_VERSION).length, 1);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(tmp, { recursive: true }).catch(() => {});
+    pluginRegistry.clear();
+  }
+});
+
 Deno.test({
   name: 'notifyObservers swallows PluginRuntimeUnavailableError from the default executor',
   sanitizeOps: false,
@@ -390,6 +414,96 @@ Deno.test('only enabled and discovered durable plugins are dispatched after a ne
   }
 });
 
+Deno.test('disable commits durable state and immediately removes the plugin from live dispatch', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-immediate-disable-' });
+  const manifest = makeManifest('com.example.immediate-disable');
+  const calls: string[] = [];
+  const executor: PluginExecutor = {
+    execute(request: PluginExecutionRequest): Promise<PluginJsonValue> {
+      calls.push(request.plugin.manifest.id);
+      return Promise.resolve(null);
+    },
+  };
+
+  try {
+    await writeManifest(pluginsDir, 'immediate-disable', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          const host = new PluginHost(executor);
+          await host.reload();
+          await host.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'before' }));
+          assertEquals(calls, [manifest.id]);
+
+          const disabled = await host.setPluginEnabled('1', manifest.id.toUpperCase(), false);
+          assertExists(disabled);
+          assertEquals(disabled.enabled, false);
+          assertEquals(pluginRegistryQueries.get('1', manifest.id)?.enabled, false);
+          assertEquals(pluginRegistry.get('1', manifest.id)?.enabled, false);
+
+          await host.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'after' }));
+          assertEquals(calls, [manifest.id]);
+        });
+      });
+    });
+  } finally {
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('enablement mutation and reload are serialized into one durable and live decision', async () => {
+  const pluginsDir = await Deno.makeTempDir({ prefix: 'praxrr-plugins-host-mutation-reload-' });
+  const manifest = makeManifest('com.example.mutation-reload');
+  let releaseMutation: (() => void) | undefined;
+  const mutationGate = new Promise<void>((resolve) => {
+    releaseMutation = resolve;
+  });
+
+  try {
+    await writeManifest(pluginsDir, 'mutation-reload', JSON.stringify(manifest));
+    await withMigratedDb(async () => {
+      await withPluginsEnabled(true, async () => {
+        await withPluginsDir(pluginsDir, async () => {
+          await new PluginHost().reload();
+
+          let persistenceCalls = 0;
+          let scans = 0;
+          const host = new PluginHost(undefined, {
+            scan: () => {
+              scans += 1;
+              return Promise.resolve([manifestEntry(`${pluginsDir}/mutation-reload`, manifest)]);
+            },
+            setEnabled: async (apiVersion, pluginId, enabled) => {
+              persistenceCalls += 1;
+              await mutationGate;
+              return pluginRegistryQueries.setEnabled(apiVersion, pluginId, enabled);
+            },
+          });
+
+          const mutation = host.setPluginEnabled('1', manifest.id, false);
+          const reload = host.reload();
+          await Promise.resolve();
+          await Promise.resolve();
+          assertEquals(persistenceCalls, 1);
+          assertEquals(scans, 0);
+
+          releaseMutation?.();
+          const [mutated, summary] = await Promise.all([mutation, reload]);
+          assertExists(mutated);
+          assertEquals(mutated.enabled, false);
+          assertEquals(summary.registered, 1);
+          assertEquals(scans, 1);
+          assertEquals(pluginRegistryQueries.get('1', manifest.id)?.enabled, false);
+          assertEquals(pluginRegistry.get('1', manifest.id)?.enabled, false);
+        });
+      });
+    });
+  } finally {
+    releaseMutation?.();
+    await Deno.remove(pluginsDir, { recursive: true }).catch(() => {});
+  }
+});
+
 Deno.test('feature-off reload performs no filesystem scan or durable reconciliation', async () => {
   await withMigratedDb(async () => {
     const persisted = makeManifest('com.example.feature-off');
@@ -399,6 +513,7 @@ Deno.test('feature-off reload performs no filesystem scan or durable reconciliat
     const beforeRows = pluginRegistryQueries.list();
     let scans = 0;
     let reconciliations = 0;
+    let enablementMutations = 0;
     const host = new PluginHost(undefined, {
       scan: () => {
         scans += 1;
@@ -407,6 +522,10 @@ Deno.test('feature-off reload performs no filesystem scan or durable reconciliat
       reconcile: () => {
         reconciliations += 1;
         return Promise.reject(new Error('reconcile must not run'));
+      },
+      setEnabled: () => {
+        enablementMutations += 1;
+        throw new Error('enablement persistence must not run');
       },
     });
 
@@ -420,10 +539,12 @@ Deno.test('feature-off reload performs no filesystem scan or durable reconciliat
         rejected: 0,
         missing: 0,
       });
+      assertEquals(await host.setPluginEnabled('1', persisted.id, false), undefined);
     });
 
     assertEquals(scans, 0);
     assertEquals(reconciliations, 0);
+    assertEquals(enablementMutations, 0);
     assertEquals(pluginRegistryQueries.list(), beforeRows);
     assertStrictEquals(pluginRegistry.get('1', persisted.id), previousMemory);
   });

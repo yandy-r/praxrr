@@ -43,6 +43,18 @@ const SUPPORTED_API_VERSION_SET: readonly string[] = SUPPORTED_PLUGIN_API_VERSIO
 const CAPABILITY_ID_SET: readonly string[] = CAPABILITY_IDS;
 const EXTENSION_POINT_ID_SET: readonly string[] = EXTENSION_POINT_IDS;
 
+/** Finite validation budgets for already-parsed or directly injected manifests. */
+const MAX_API_VERSION_LENGTH = 32;
+const MAX_PLUGIN_ID_LENGTH = 253;
+const MAX_NAME_LENGTH = 256;
+const MAX_VERSION_LENGTH = 128;
+const MAX_ENTRY_LENGTH = 1024;
+const MAX_DESCRIPTION_LENGTH = 2048;
+const MAX_AUTHOR_LENGTH = 256;
+const MAX_ENGINE_RANGE_LENGTH = 256;
+const MAX_EXTENSION_POINTS = EXTENSION_POINT_IDS.length;
+const MAX_CAPABILITIES = CAPABILITY_IDS.length;
+
 /** Reverse-dns slug: dot-separated lowercase segments, each starting/ending alphanumeric. */
 const PLUGIN_ID_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 
@@ -70,6 +82,10 @@ function validateEntry(raw: unknown, errors: PluginManifestIssue[]): void {
   }
   if (typeof raw !== 'string' || raw.trim().length === 0) {
     errors.push(issue('entry', 'empty', 'entry must be a non-empty string'));
+    return;
+  }
+  if (raw.length > MAX_ENTRY_LENGTH) {
+    errors.push(issue('entry', 'too_long', `entry must be at most ${MAX_ENTRY_LENGTH} characters`));
     return;
   }
   if (!raw.endsWith('.wasm')) {
@@ -103,6 +119,12 @@ function validateEngines(raw: unknown, errors: PluginManifestIssue[]): PluginEng
     errors.push(issue('engines.praxrr', 'invalid_type', 'engines.praxrr must be a non-empty semver range string'));
     return undefined;
   }
+  if (typeof praxrr === 'string' && praxrr.length > MAX_ENGINE_RANGE_LENGTH) {
+    errors.push(
+      issue('engines.praxrr', 'too_long', `engines.praxrr must be at most ${MAX_ENGINE_RANGE_LENGTH} characters`)
+    );
+    return undefined;
+  }
   return typeof praxrr === 'string' ? { praxrr } : {};
 }
 
@@ -126,6 +148,8 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
   const apiVersion = raw.apiVersion;
   if (apiVersion === undefined) {
     errors.push(issue('apiVersion', 'missing', 'apiVersion is required'));
+  } else if (typeof apiVersion === 'string' && apiVersion.length > MAX_API_VERSION_LENGTH) {
+    errors.push(issue('apiVersion', 'too_long', `apiVersion must be at most ${MAX_API_VERSION_LENGTH} characters`));
   } else if (typeof apiVersion !== 'string' || !SUPPORTED_API_VERSION_SET.includes(apiVersion)) {
     errors.push(
       issue(
@@ -141,6 +165,8 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
     errors.push(issue('id', 'missing', 'id is required'));
   } else if (typeof id !== 'string' || id.trim().length === 0) {
     errors.push(issue('id', 'empty', 'id must be a non-empty string'));
+  } else if (id.length > MAX_PLUGIN_ID_LENGTH) {
+    errors.push(issue('id', 'too_long', `id must be at most ${MAX_PLUGIN_ID_LENGTH} characters`));
   } else if (!PLUGIN_ID_PATTERN.test(id)) {
     errors.push(issue('id', 'invalid_format', 'id must be a reverse-dns slug (lowercase, dot-separated)'));
   }
@@ -150,6 +176,8 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
     errors.push(issue('name', 'missing', 'name is required'));
   } else if (typeof name !== 'string' || name.trim().length === 0) {
     errors.push(issue('name', 'empty', 'name must be a non-empty string'));
+  } else if (name.length > MAX_NAME_LENGTH) {
+    errors.push(issue('name', 'too_long', `name must be at most ${MAX_NAME_LENGTH} characters`));
   }
 
   const version = raw.version;
@@ -157,6 +185,8 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
     errors.push(issue('version', 'missing', 'version is required'));
   } else if (typeof version !== 'string' || version.trim().length === 0) {
     errors.push(issue('version', 'empty', 'version must be a non-empty string'));
+  } else if (version.length > MAX_VERSION_LENGTH) {
+    errors.push(issue('version', 'too_long', `version must be at most ${MAX_VERSION_LENGTH} characters`));
   }
 
   const runtime = raw.runtime;
@@ -177,7 +207,12 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
   } else if (rawPoints.length === 0) {
     errors.push(issue('extensionPoints', 'empty', 'extensionPoints must be non-empty'));
   } else {
-    rawPoints.forEach((point, index) => {
+    if (rawPoints.length > MAX_EXTENSION_POINTS) {
+      errors.push(
+        issue('extensionPoints', 'too_many_items', `extensionPoints must contain at most ${MAX_EXTENSION_POINTS} items`)
+      );
+    }
+    rawPoints.slice(0, MAX_EXTENSION_POINTS).forEach((point, index) => {
       if (isExtensionPointId(point)) {
         declaredPoints.push(point);
       } else {
@@ -195,7 +230,12 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
   } else if (!Array.isArray(rawCapabilities)) {
     errors.push(issue('capabilities', 'invalid_type', 'capabilities must be an array'));
   } else {
-    rawCapabilities.forEach((capability, index) => {
+    if (rawCapabilities.length > MAX_CAPABILITIES) {
+      errors.push(
+        issue('capabilities', 'too_many_items', `capabilities must contain at most ${MAX_CAPABILITIES} items`)
+      );
+    }
+    rawCapabilities.slice(0, MAX_CAPABILITIES).forEach((capability, index) => {
       if (isCapabilityId(capability)) {
         declaredCapabilities.push(capability);
       } else {
@@ -221,11 +261,15 @@ export function validatePluginManifest(raw: unknown): ManifestValidationResult {
   const description = raw.description;
   if (description !== undefined && typeof description !== 'string') {
     errors.push(issue('description', 'invalid_type', 'description must be a string'));
+  } else if (typeof description === 'string' && description.length > MAX_DESCRIPTION_LENGTH) {
+    errors.push(issue('description', 'too_long', `description must be at most ${MAX_DESCRIPTION_LENGTH} characters`));
   }
 
   const author = raw.author;
   if (author !== undefined && typeof author !== 'string') {
     errors.push(issue('author', 'invalid_type', 'author must be a string'));
+  } else if (typeof author === 'string' && author.length > MAX_AUTHOR_LENGTH) {
+    errors.push(issue('author', 'too_long', `author must be at most ${MAX_AUTHOR_LENGTH} characters`));
   }
 
   const engines = validateEngines(raw.engines, errors);

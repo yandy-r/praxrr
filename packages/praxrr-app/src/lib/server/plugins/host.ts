@@ -67,6 +67,11 @@ interface PluginCandidate {
 export interface PluginHostDependencies {
   readonly scan?: (dir: string) => Promise<readonly RawManifestEntry[]>;
   readonly reconcile?: (inputs: readonly ReconcilePluginInput[]) => Promise<readonly PluginRegistryRecord[]>;
+  readonly setEnabled?: (
+    apiVersion: string,
+    pluginId: string,
+    enabled: boolean
+  ) => PluginRegistryRecord | undefined | Promise<PluginRegistryRecord | undefined>;
 }
 
 const DISABLED_RELOAD_SUMMARY: PluginReloadSummary = {
@@ -114,12 +119,17 @@ export class PluginHost {
   private readonly reconcilePlugins: (
     inputs: readonly ReconcilePluginInput[]
   ) => Promise<readonly PluginRegistryRecord[]>;
+  private readonly persistPluginEnabled: NonNullable<PluginHostDependencies['setEnabled']>;
+  private operationTail: Promise<void> = Promise.resolve();
   private reloadInFlight: Promise<PluginReloadSummary> | undefined;
 
   constructor(executor: PluginExecutor = new UnavailablePluginExecutor(), dependencies: PluginHostDependencies = {}) {
     this.executor = executor;
     this.scanPlugins = dependencies.scan ?? scanPluginDir;
     this.reconcilePlugins = dependencies.reconcile ?? ((inputs) => pluginRegistryQueries.reconcile(inputs));
+    this.persistPluginEnabled =
+      dependencies.setEnabled ??
+      ((apiVersion, pluginId, enabled) => pluginRegistryQueries.setEnabled(apiVersion, pluginId, enabled));
   }
 
   /** Swap the execution seam (Phase-2 runtime or a test fake). Takes effect on the next dispatch. */
@@ -141,7 +151,7 @@ export class PluginHost {
       return this.reloadInFlight;
     }
 
-    const work = this.performReload();
+    const work = this.enqueueOperation(() => this.performReload());
     const owned = work.finally(() => {
       if (this.reloadInFlight === owned) {
         this.reloadInFlight = undefined;
@@ -149,6 +159,39 @@ export class PluginHost {
     });
     this.reloadInFlight = owned;
     return owned;
+  }
+
+  /**
+   * Serialize a durable enablement mutation with reload, then publish the committed decision into
+   * the live snapshot before the caller can observe success. A retained-but-undiscovered durable
+   * row intentionally has no live entry to update.
+   */
+  async setPluginEnabled(
+    apiVersion: string,
+    pluginId: string,
+    enabled: boolean
+  ): Promise<PluginRegistryRecord | undefined> {
+    if (!config.pluginsEnabled) {
+      return undefined;
+    }
+
+    return await this.enqueueOperation(async () => {
+      const record = await this.persistPluginEnabled(apiVersion, pluginId, enabled);
+      if (record) {
+        pluginRegistry.setEnabled(record.apiVersion, record.pluginId, record.enabled);
+      }
+      return record;
+    });
+  }
+
+  /** Queue durable/live snapshot operations while allowing later work to continue after errors. */
+  private enqueueOperation<T>(operation: () => T | Promise<T>): Promise<T> {
+    const result = this.operationTail.then(operation);
+    this.operationTail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
   }
 
   private async performReload(): Promise<PluginReloadSummary> {

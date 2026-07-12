@@ -7,8 +7,13 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { pluginRegistryQueries, type PluginRegistryRecord } from '$db/queries/pluginRegistry.ts';
-import { pluginHost } from '$server/plugins/index.ts';
-import type { PluginManifest } from '$shared/plugins/index.ts';
+import {
+  pluginHost,
+  UnavailablePluginExecutor,
+  type PluginExecutionRequest,
+  type PluginExecutor,
+} from '$server/plugins/index.ts';
+import type { PluginJsonValue, PluginManifest } from '$shared/plugins/index.ts';
 import { GET as GET_LIST } from '../../routes/api/v1/plugins/+server.ts';
 import { GET as GET_DETAIL } from '../../routes/api/v1/plugins/[apiVersion]/[id]/+server.ts';
 import { POST as POST_ENABLE } from '../../routes/api/v1/plugins/[apiVersion]/[id]/enable/+server.ts';
@@ -107,6 +112,11 @@ function reloadEvent(): ReloadEvent {
 async function jsonBody<T = Record<string, unknown>>(response: Response): Promise<T> {
   assertEquals(response.headers.get('cache-control'), 'no-store');
   return (await response.json()) as T;
+}
+
+function assertRfc3339Timestamp(value: string): void {
+  assert(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value), value);
+  assertEquals(new Date(value).toISOString(), value);
 }
 
 async function seedPlugin(manifest: PluginManifest = TEST_MANIFEST): Promise<void> {
@@ -218,6 +228,9 @@ migratedTest('list/get expose the allow-listed nested manifest and preserve exac
       'runtime',
       'version',
     ]);
+    assertRfc3339Timestamp(listBody.items[0].registeredAt as string);
+    assertRfc3339Timestamp(listBody.items[0].createdAt as string);
+    assertRfc3339Timestamp(listBody.items[0].updatedAt as string);
     const serialized = JSON.stringify(listBody);
     assert(!serialized.includes('sourceDir'));
     assert(!serialized.includes('source_dir'));
@@ -278,6 +291,35 @@ migratedTest('not-found, enable, and disable outcomes remain namespace-qualified
   });
 });
 
+migratedTest('disable route updates live dispatch before returning success', async (pluginsDir) => {
+  await writePlugin(pluginsDir);
+  const calls: string[] = [];
+  const executor: PluginExecutor = {
+    execute(request: PluginExecutionRequest): Promise<PluginJsonValue> {
+      calls.push(request.plugin.manifest.id);
+      return Promise.resolve(null);
+    },
+  };
+
+  await withPluginsEnabled(true, async () => {
+    pluginHost.setExecutor(executor);
+    try {
+      const reload = await POST_RELOAD(reloadEvent());
+      assertEquals(reload.status, 200);
+      await jsonBody(reload);
+
+      const disable = await POST_DISABLE(disableEvent('1', TEST_MANIFEST.id));
+      assertEquals(disable.status, 200);
+      assertEquals((await jsonBody<{ plugin: { enabled: boolean } }>(disable)).plugin.enabled, false);
+
+      await pluginHost.notifyObservers('sync.previewComputed.observe', () => ({ summary: 'after-disable' }));
+      assertEquals(calls, []);
+    } finally {
+      pluginHost.setExecutor(new UnavailablePluginExecutor());
+    }
+  });
+});
+
 migratedTest(
   'reload discovers, removes, and restores a plugin without losing its enablement decision',
   async (pluginsDir) => {
@@ -317,6 +359,25 @@ migratedTest(
     });
   }
 );
+
+migratedTest('reload failures are logged server-side and return only the redacted contract error', async () => {
+  const mutableHost = pluginHost as unknown as { reload: typeof pluginHost.reload };
+  const originalReload = mutableHost.reload;
+  mutableHost.reload = () => Promise.reject(new Error('private reload diagnostic'));
+
+  try {
+    const response = await withPluginsEnabled(true, () => POST_RELOAD(reloadEvent()));
+    assertEquals(response.status, 500);
+    const body = await jsonBody<{ code: string; error: string }>(response);
+    assertEquals(body, {
+      code: 'internal_error',
+      error: 'Plugin management operation failed',
+    });
+    assert(!JSON.stringify(body).includes('private reload diagnostic'));
+  } finally {
+    mutableHost.reload = originalReload;
+  }
+});
 
 Deno.test('plugin management routes remain protected by the existing auth classification', () => {
   for (const path of [

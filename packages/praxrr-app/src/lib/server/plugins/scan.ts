@@ -24,6 +24,12 @@ const MANIFEST_FILENAME = 'praxrr.plugin.json';
  */
 const MAX_PLUGIN_DIRS = 256;
 
+/**
+ * Maximum UTF-8 size of one plugin manifest. The scanner checks this before `JSON.parse`; the
+ * initial code-unit check also avoids allocating an encoded copy for obviously oversized input.
+ */
+export const MAX_PLUGIN_MANIFEST_BYTES = 64 * 1024;
+
 /** One discovered plugin directory and the raw, unvalidated result of reading its manifest. */
 export interface RawManifestEntry {
   /** Path to the plugin subdirectory (used later as the registry `sourceDir`). */
@@ -63,6 +69,13 @@ async function readManifestEntry(subdir: string, deps: ScanDeps): Promise<RawMan
       return null;
     }
     throw error;
+  }
+
+  if (
+    text.length > MAX_PLUGIN_MANIFEST_BYTES ||
+    new TextEncoder().encode(text).byteLength > MAX_PLUGIN_MANIFEST_BYTES
+  ) {
+    return { dir: subdir, parseError: `manifest exceeds ${MAX_PLUGIN_MANIFEST_BYTES} UTF-8 bytes` };
   }
 
   try {

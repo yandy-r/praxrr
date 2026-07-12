@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { reloadPlugins, toPluginErrorResponse } from '$server/plugins/index.ts';
+import { reloadPlugins } from '$server/plugins/index.ts';
+import { pluginInternalError } from '../_errors.ts';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -8,7 +9,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export const POST: RequestHandler = async () => {
   const outcome = await reloadPlugins();
   if (outcome.kind === 'error') {
-    return json(toPluginErrorResponse('internal_error'), { status: 500, headers: NO_STORE_HEADERS });
+    return await pluginInternalError('reload', outcome.error);
   }
   return json(outcome.response, { headers: NO_STORE_HEADERS });
 };

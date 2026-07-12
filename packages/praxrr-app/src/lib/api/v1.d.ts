@@ -3119,8 +3119,7 @@ export interface components {
      * @description Stable management failure code; raw filesystem/database diagnostics are never returned.
      * @enum {string}
      */
-    PluginErrorCode:
-      'invalid_identity' | 'plugins_disabled' | 'plugin_not_found' | 'registry_conflict' | 'internal_error';
+    PluginErrorCode: 'invalid_identity' | 'plugins_disabled' | 'plugin_not_found' | 'internal_error';
     PluginErrorResponse: {
       code: components['schemas']['PluginErrorCode'];
       error: string;

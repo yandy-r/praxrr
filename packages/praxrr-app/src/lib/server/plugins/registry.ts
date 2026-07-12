@@ -95,6 +95,22 @@ export class PluginRegistry {
     return this.byApiVersion.get(apiVersion)?.get(id.toLowerCase());
   }
 
+  /**
+   * Publish a durable enablement decision into the current snapshot. Returns `false` when the
+   * identity is not currently discovered, which is valid for retained durable rows.
+   */
+  setEnabled(apiVersion: string, id: string, enabled: boolean): boolean {
+    const namespace = this.byApiVersion.get(apiVersion);
+    const key = id.toLowerCase();
+    const plugin = namespace?.get(key);
+    if (!namespace || !plugin) {
+      return false;
+    }
+
+    namespace.set(key, { ...plugin, enabled });
+    return true;
+  }
+
   /** Every plugin registered under an `apiVersion` namespace (empty when the namespace is unknown). */
   listByApiVersion(apiVersion: string): readonly RegisteredPlugin[] {
     const namespace = this.byApiVersion.get(apiVersion);

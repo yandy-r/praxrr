@@ -9,7 +9,7 @@
  */
 
 import { assert, assertEquals, assertRejects } from '@std/assert';
-import { scanPluginDir, type ScanDeps } from '$server/plugins/scan.ts';
+import { MAX_PLUGIN_MANIFEST_BYTES, scanPluginDir, type ScanDeps } from '$server/plugins/scan.ts';
 
 Deno.test('scanPluginDir returns one raw entry per subdir containing a manifest', async () => {
   const dir = await Deno.makeTempDir({ prefix: 'plugin-scan-manifests-' });
@@ -47,6 +47,38 @@ Deno.test('scanPluginDir captures malformed JSON as parseError without throwing'
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
+});
+
+Deno.test('scanPluginDir rejects an oversized manifest before JSON parsing', async () => {
+  const oversized = JSON.stringify({ value: 'x'.repeat(MAX_PLUGIN_MANIFEST_BYTES) });
+  const deps: ScanDeps = {
+    readDir: async function* (): AsyncGenerator<Deno.DirEntry> {
+      yield { name: 'oversized', isFile: false, isDirectory: true, isSymlink: false };
+    },
+    readTextFile: () => Promise.resolve(oversized),
+  };
+
+  const entries = await scanPluginDir('/any/dir', deps);
+
+  assertEquals(entries.length, 1);
+  assertEquals(entries[0].raw, undefined);
+  assertEquals(entries[0].parseError, `manifest exceeds ${MAX_PLUGIN_MANIFEST_BYTES} UTF-8 bytes`);
+});
+
+Deno.test('scanPluginDir applies the manifest limit to UTF-8 bytes, not string code units', async () => {
+  const oversizedUtf8 = JSON.stringify({ value: 'é'.repeat(MAX_PLUGIN_MANIFEST_BYTES / 2) });
+  assert(oversizedUtf8.length < MAX_PLUGIN_MANIFEST_BYTES);
+  const deps: ScanDeps = {
+    readDir: async function* (): AsyncGenerator<Deno.DirEntry> {
+      yield { name: 'oversized-utf8', isFile: false, isDirectory: true, isSymlink: false };
+    },
+    readTextFile: () => Promise.resolve(oversizedUtf8),
+  };
+
+  const entries = await scanPluginDir('/any/dir', deps);
+
+  assertEquals(entries[0].raw, undefined);
+  assertEquals(entries[0].parseError, `manifest exceeds ${MAX_PLUGIN_MANIFEST_BYTES} UTF-8 bytes`);
 });
 
 Deno.test('scanPluginDir skips subdirs without a manifest and ignores non-directory entries', async () => {

@@ -139,7 +139,6 @@ const PLUGIN_ERROR_CODES = {
   invalid_identity: true,
   plugins_disabled: true,
   plugin_not_found: true,
-  registry_conflict: true,
   internal_error: true,
 } satisfies Record<AppPluginErrorCode, true> & Record<PortablePluginErrorCode, true>;
 

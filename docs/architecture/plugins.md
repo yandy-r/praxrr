@@ -141,35 +141,54 @@ change that bumps the API version — never an ambient default.
 
 ## Lifecycle States
 
-`PluginLifecycleState` enumerates the states. Discovery and management reach `discovered`,
-`validated`, `registered`, `rejected`, and `unloaded`; `activated` and `failed` remain reserved for a
-future runtime and are not evidence that code executed.
+`PluginLifecycleState` enumerates the contract states, but the current host does not persist every
+scan phase. `discovered`, `validated`, and `rejected` describe scan-time outcomes. Successful
+reconciliation persists accepted candidates as `registered` and retains previously known identities
+that are absent from the accepted candidate as `unloaded`. `activated` and `failed` remain reserved
+for a future runtime and are not evidence that code executed.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> discovered: scan.ts lists subdirs,<br/>reads praxrr.plugin.json
-    discovered --> validated: validatePluginManifest() ok:true
-    discovered --> rejected: ok:false (skipped + logged)
-    validated --> registered: pluginRegistry.register()<br/>keyed (apiVersion, lowercased id)
-    rejected --> [*]: terminal in Phase 1
+    [*] --> discovered: scan entry (ephemeral)
+    discovered --> validated: parse + validation succeeds
+    discovered --> rejected: parse, validation, or<br/>duplicate check fails
+    rejected --> [*]: skipped + logged;<br/>no rejected row is persisted
 
-    registered --> activated: (Phase 2) executor bound
-    activated --> failed: (Phase 2) threw / timed out,<br/>isolated per-plugin
-    activated --> unloaded: (Phase 2) host.reset() / re-scan
-    registered --> unloaded: durable reconciliation<br/>plugin absent from successful scan
+    validated --> registered: pluginRegistryQueries.reconcile()<br/>upserts discovered=true
+    registered --> unloaded: successful reconciliation omits identity
+    unloaded --> registered: accepted identity reappears;<br/>enablement intent is preserved
+    registered --> registered: enable / disable persists first
+    registered --> liveSnapshot: PluginRegistry.replaceSnapshot()<br/>publishes current discovered rows
+    liveSnapshot --> liveSnapshot: setEnabled() mirrors a committed<br/>enablement mutation when present
+    liveSnapshot --> [*]: host.reset() clears live state only
+
+    liveSnapshot --> activated: future runtime only
+    activated --> failed: future execution threw / timed out
 ```
 
 - **discovered** — `scan.ts` lists each immediate subdir of `PLUGINS_DIR` and reads its
-  `praxrr.plugin.json`. This is the only `Deno.readDir` / `readTextFile` boundary in the subsystem.
+  `praxrr.plugin.json`. This is the only `Deno.readDir` / `readTextFile` boundary in the subsystem;
+  discovery itself is not a durable lifecycle transition.
 - **validated** — `validatePluginManifest(raw)` runs fail-fast, accumulating **all** field errors in
-  one pass.
-- **registered** — on `ok:true` the host calls `pluginRegistry.register(sourceDir, manifest)`;
-  duplicate id within a namespace is rejected.
-- **rejected** — terminal Phase-1 state for a bad/malformed manifest; recorded with its
-  `PluginManifestIssue[]` and logged. Initialization continues with the remaining plugins.
+  one pass. Accepted manifests enter the complete reconciliation candidate only after the host also
+  rejects case-insensitive duplicate ids within an API-version namespace.
+- **registered** — the host passes the complete accepted candidate to
+  `pluginRegistryQueries.reconcile()`, which upserts each current identity with `discovered:true` and
+  lifecycle state `registered` while preserving an existing enablement decision. After the
+  transaction commits, `PluginRegistry.replaceSnapshot()` atomically publishes the current
+  discovered rows; the reload path does not call `PluginRegistry.register()`.
+- **rejected** — a bad, malformed, or duplicate scan entry is skipped, logged, and counted in the
+  reload summary. The rejected entry and its validation issues are not stored as a durable row. If a
+  previously registered identity is no longer in the accepted candidate, reconciliation retains that
+  prior row as `unloaded`.
 - **unloaded** — the durable row remains queryable when a successful scan no longer finds the plugin;
   enablement intent is preserved for a later reappearance.
+- **enable / disable** — not a lifecycle-state transition. The host serializes the mutation with
+  reload, commits the durable `enabled` value first, and then mirrors it into the live snapshot with
+  `PluginRegistry.setEnabled()` when the identity is currently discovered.
 - **activated / failed** — reserved for a future runtime; neither is reached by management state.
+  `PluginHost.reset()` clears only the in-memory snapshot and does not rewrite durable lifecycle
+  state.
 
 ## Capability Model: Projection & Redaction Boundary
 

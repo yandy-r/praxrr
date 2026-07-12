@@ -2,7 +2,7 @@ import { assert, assertEquals, assertExists, assertRejects, assertThrows } from 
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { pluginRegistryQueries } from '$db/queries/pluginRegistry.ts';
+import { PLUGIN_REGISTRY_TOMBSTONE_LIMIT, pluginRegistryQueries } from '$db/queries/pluginRegistry.ts';
 import type { PluginManifest } from '$shared/plugins/index.ts';
 
 /** Run each assertion against a fresh database after the complete registered migration chain. */
@@ -45,6 +45,11 @@ function makeManifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
   };
 }
 
+function assertRfc3339Timestamp(value: string): void {
+  assert(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value), value);
+  assertEquals(new Date(value).toISOString(), value);
+}
+
 migratedTest('migration 20260724 is ordered and creates the namespace-qualified registry identity', () => {
   const applied = db.query<{ version: number; name: string }>(
     'SELECT version, name FROM migrations WHERE version IN (?, ?) ORDER BY version',
@@ -82,6 +87,12 @@ migratedTest('migration 20260724 is ordered and creates the namespace-qualified 
   );
   assertExists(identityIndex);
   assert(identityIndex.sql.includes('api_version, plugin_id COLLATE NOCASE'));
+
+  const retentionIndex = db.queryFirst<{ sql: string }>(
+    "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_plugin_registry_tombstone_retention'"
+  );
+  assertExists(retentionIndex);
+  assert(retentionIndex.sql.includes('discovered, updated_at DESC'));
 });
 
 migratedTest('first discovery defaults enabled and preserves exact validated manifest fields', async () => {
@@ -98,7 +109,17 @@ migratedTest('first discovery defaults enabled and preserves exact validated man
   assertEquals(rows[0].discovered, true);
   assertEquals(rows[0].state, 'registered');
   assertEquals(rows[0].lastError, null);
-  assert(rows[0].registeredAt.length > 0);
+  assertRfc3339Timestamp(rows[0].registeredAt);
+  assertRfc3339Timestamp(rows[0].createdAt);
+  assertRfc3339Timestamp(rows[0].updatedAt);
+
+  const persisted = db.queryFirst<{ registered_at: string }>(
+    'SELECT registered_at FROM plugin_registry WHERE api_version = ? AND plugin_id = ?',
+    rows[0].apiVersion,
+    rows[0].pluginId
+  );
+  assertExists(persisted);
+  assert(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(persisted.registered_at));
 });
 
 migratedTest('enable and disable decisions survive reconciliation and database restart', async () => {
@@ -134,6 +155,40 @@ migratedTest('missing and reappearing plugins retain their enablement decision',
   assertEquals(reappeared[0].enabled, false);
   assertEquals(reappeared[0].discovered, true);
   assertEquals(reappeared[0].state, 'registered');
+});
+
+migratedTest('reconciliation retains only the newest bounded tombstones and never prunes discoveries', async () => {
+  const tombstoneCount = PLUGIN_REGISTRY_TOMBSTONE_LIMIT + 2;
+  for (let index = 0; index < tombstoneCount; index += 1) {
+    const pluginId = `com.acme.tombstone.${index.toString().padStart(3, '0')}`;
+    const manifest = makeManifest({ id: pluginId });
+    const updatedAt = new Date(Date.UTC(2026, 0, 1) + index * 1_000).toISOString().replace('T', ' ').replace('Z', '');
+    db.execute(
+      `INSERT INTO plugin_registry
+       (api_version, plugin_id, manifest_json, enabled, discovered, lifecycle_state, updated_at)
+       VALUES (?, ?, ?, ?, 0, 'unloaded', ?)`,
+      manifest.apiVersion,
+      manifest.id,
+      JSON.stringify(manifest),
+      index === tombstoneCount - 1 ? 0 : 1,
+      updatedAt
+    );
+  }
+
+  const discovered = makeManifest({ id: 'com.acme.current-discovery' });
+  const rows = await pluginRegistryQueries.reconcile([{ manifest: discovered }]);
+
+  assertEquals(rows.length, PLUGIN_REGISTRY_TOMBSTONE_LIMIT + 1);
+  assertEquals(rows.filter((row) => !row.discovered).length, PLUGIN_REGISTRY_TOMBSTONE_LIMIT);
+  assertEquals(pluginRegistryQueries.get('1', discovered.id)?.discovered, true);
+  assertEquals(pluginRegistryQueries.get('1', 'com.acme.tombstone.000'), undefined);
+  assertEquals(pluginRegistryQueries.get('1', 'com.acme.tombstone.001'), undefined);
+
+  const newestId = `COM.ACME.TOMBSTONE.${(tombstoneCount - 1).toString().padStart(3, '0')}`;
+  const newest = pluginRegistryQueries.get('1', newestId);
+  assertExists(newest);
+  assertEquals(newest.enabled, false);
+  assertEquals(newest.discovered, false);
 });
 
 migratedTest('manifest changes preserve enablement and exact replacement values', async () => {

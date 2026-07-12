@@ -43,6 +43,15 @@ function hasCode(errors: readonly PluginManifestIssue[], code: string): boolean 
   return errors.some((error) => error.code === code);
 }
 
+/** Assert one field-level issue without coupling a test to unrelated accumulated errors. */
+function assertHasIssue(raw: unknown, field: string, code: string): void {
+  const errors = expectRejected(raw);
+  assert(
+    errors.some((error) => error.field === field && error.code === code),
+    `expected ${code} for ${field}`
+  );
+}
+
 Deno.test('validatePluginManifest accepts a minimal well-formed manifest', () => {
   const result = validatePluginManifest(baseManifest());
   assert(result.ok, 'expected the minimal manifest to be accepted');
@@ -75,6 +84,29 @@ Deno.test('validatePluginManifest rejects empty/whitespace id, name, version, en
   assert(hasCode(expectRejected({ ...baseManifest(), name: '   ' }), 'empty'));
   assert(hasCode(expectRejected({ ...baseManifest(), version: '' }), 'empty'));
   assert(hasCode(expectRejected({ ...baseManifest(), entry: '   ' }), 'empty'));
+});
+
+Deno.test('validatePluginManifest bounds authored string lengths', () => {
+  assertHasIssue({ ...baseManifest(), id: `com.example.${'a'.repeat(254)}` }, 'id', 'too_long');
+  assertHasIssue({ ...baseManifest(), name: 'n'.repeat(257) }, 'name', 'too_long');
+  assertHasIssue({ ...baseManifest(), version: 'v'.repeat(129) }, 'version', 'too_long');
+  assertHasIssue({ ...baseManifest(), entry: `${'e'.repeat(1020)}.wasm` }, 'entry', 'too_long');
+  assertHasIssue({ ...baseManifest(), description: 'd'.repeat(2049) }, 'description', 'too_long');
+  assertHasIssue({ ...baseManifest(), author: 'a'.repeat(257) }, 'author', 'too_long');
+  assertHasIssue({ ...baseManifest(), engines: { praxrr: 'p'.repeat(257) } }, 'engines.praxrr', 'too_long');
+});
+
+Deno.test('validatePluginManifest bounds extension-point and capability array lengths', () => {
+  assertHasIssue(
+    { ...baseManifest(), extensionPoints: Array(10).fill('sync.previewComputed.observe') },
+    'extensionPoints',
+    'too_many_items'
+  );
+  assertHasIssue(
+    { ...baseManifest(), capabilities: Array(5).fill('read:sync-preview') },
+    'capabilities',
+    'too_many_items'
+  );
 });
 
 Deno.test('validatePluginManifest rejects a malformed (non-slug) id', () => {

@@ -45,7 +45,6 @@ const ERROR_MESSAGES = {
   invalid_identity: 'Plugin apiVersion and id must be non-empty strings',
   plugins_disabled: 'Plugin management is disabled by PLUGINS_ENABLED',
   plugin_not_found: 'Plugin not found in the requested API-version namespace',
-  registry_conflict: 'Plugin registry state changed during the requested operation',
   internal_error: 'Plugin management operation failed',
 } as const satisfies Record<PluginErrorCode, string>;
 
@@ -131,13 +130,17 @@ export function getPlugin(apiVersion: string, id: string): PluginReadOutcome {
 }
 
 /** Persist enablement intent without treating enabled as runtime activation or execution. */
-export function setPluginEnabled(apiVersion: string, id: string, enabled: boolean): PluginMutationOutcome {
+export async function setPluginEnabled(
+  apiVersion: string,
+  id: string,
+  enabled: boolean
+): Promise<PluginMutationOutcome> {
   if (!config.pluginsEnabled) {
     return { kind: 'disabled' };
   }
 
   try {
-    const record = pluginRegistryQueries.setEnabled(apiVersion, id, enabled);
+    const record = await pluginHost.setPluginEnabled(apiVersion, id, enabled);
     if (!record) {
       return { kind: 'not_found' };
     }

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { getPlugin, toPluginErrorResponse } from '$server/plugins/index.ts';
+import { pluginInternalError } from '../../_errors.ts';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -9,7 +10,7 @@ function isNonEmptyIdentity(value: string | undefined): value is string {
 }
 
 /** GET one exact API-version-qualified plugin. Authentication is enforced by the global hook. */
-export const GET: RequestHandler = ({ params }) => {
+export const GET: RequestHandler = async ({ params }) => {
   const { apiVersion, id } = params;
   if (!isNonEmptyIdentity(apiVersion) || !isNonEmptyIdentity(id)) {
     return json(toPluginErrorResponse('invalid_identity'), { status: 400, headers: NO_STORE_HEADERS });
@@ -23,7 +24,7 @@ export const GET: RequestHandler = ({ params }) => {
     return json(toPluginErrorResponse('plugin_not_found'), { status: 404, headers: NO_STORE_HEADERS });
   }
   if (outcome.kind === 'error') {
-    return json(toPluginErrorResponse('internal_error'), { status: 500, headers: NO_STORE_HEADERS });
+    return await pluginInternalError('get', outcome.error);
   }
   return json(outcome.response, { headers: NO_STORE_HEADERS });
 };

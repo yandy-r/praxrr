@@ -36,6 +36,13 @@ export interface ReconcilePluginInput {
   readonly lastError?: string | null;
 }
 
+/**
+ * Maximum missing-plugin decisions retained across scans. The newest tombstones win, so recently
+ * removed plugins can reappear with their prior enablement while durable management work remains
+ * bounded by the current discovery set plus this historical allowance.
+ */
+export const PLUGIN_REGISTRY_TOMBSTONE_LIMIT = 256;
+
 function parseManifest(row: PluginRegistryRow): PluginManifest {
   let raw: unknown;
   try {
@@ -54,6 +61,23 @@ function parseManifest(row: PluginRegistryRow): PluginManifest {
   return result.manifest;
 }
 
+const SQLITE_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+const RFC3339_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** Normalize SQLite's UTC timestamp format to the RFC 3339 shape promised by OpenAPI. */
+function normalizeTimestamp(value: string, column: string, pluginId: string): string {
+  const candidate = SQLITE_UTC_TIMESTAMP.test(value) ? `${value.replace(' ', 'T')}Z` : value;
+  if (!RFC3339_TIMESTAMP.test(candidate)) {
+    throw new Error(`Persisted ${column} for plugin '${pluginId}' is not a valid timestamp`);
+  }
+
+  const parsed = new Date(candidate);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Persisted ${column} for plugin '${pluginId}' is not a valid timestamp`);
+  }
+  return parsed.toISOString();
+}
+
 function rowToRecord(row: PluginRegistryRow): PluginRegistryRecord {
   return {
     apiVersion: row.api_version,
@@ -63,9 +87,9 @@ function rowToRecord(row: PluginRegistryRow): PluginRegistryRecord {
     discovered: row.discovered === 1,
     state: row.lifecycle_state,
     lastError: row.last_error,
-    registeredAt: row.registered_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    registeredAt: normalizeTimestamp(row.registered_at, 'registered_at', row.plugin_id),
+    createdAt: normalizeTimestamp(row.created_at, 'created_at', row.plugin_id),
+    updatedAt: normalizeTimestamp(row.updated_at, 'updated_at', row.plugin_id),
   };
 }
 
@@ -126,8 +150,9 @@ export const pluginRegistryQueries = {
   },
 
   /**
-   * Atomically reconcile a successful scan. Missing rows remain durable but become undiscovered;
-   * current manifests are upserted without changing an existing administrator enablement decision.
+   * Atomically reconcile a successful scan. Missing rows become bounded tombstones ordered by the
+   * time they became missing (or their enablement was last changed); current manifests are upserted
+   * without changing an existing administrator enablement decision and are never pruned.
    */
   async reconcile(inputs: readonly ReconcilePluginInput[]): Promise<readonly PluginRegistryRecord[]> {
     validateReconcileInputs(inputs);
@@ -163,6 +188,19 @@ export const pluginRegistryQueries = {
           input.lastError ?? null
         );
       }
+
+      db.execute(
+        `DELETE FROM plugin_registry
+			 WHERE discovered = 0
+			   AND rowid NOT IN (
+			     SELECT rowid
+			     FROM plugin_registry
+			     WHERE discovered = 0
+			     ORDER BY updated_at DESC, api_version, plugin_id COLLATE NOCASE
+			     LIMIT ?
+			   )`,
+        PLUGIN_REGISTRY_TOMBSTONE_LIMIT
+      );
 
       return this.list();
     });
