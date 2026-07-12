@@ -15,7 +15,7 @@ PLUGIN_ID := dev.praxrr.examples.sync-preview-observer
 .PHONY: build install clean
 
 build:
-	./build.sh
+	sh build.sh
 
 install: build
 	mkdir -p "$(PLUGINS_DIR)/$(PLUGIN_ID)"

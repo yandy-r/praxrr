@@ -60,9 +60,10 @@ Two independent mechanisms guard the seam, applied **in this order**.
 
 2. **`scrubPluginBoundary` (== `redactSecrets`) — defense-in-depth
    _only_.** After projection, the host runs a key-suffix heuristic over
-   the snapshot. It replaces **only string values** whose key ends in
-   `api_key`, `token`, `secret`, `password`, `credential`, or
-   `authorization` with `[REDACTED]`.
+   the snapshot. It replaces **only string values** whose key ends in a
+   secret-shaped suffix — `api_key`, `token`, `secret`,
+   `password`/`passwd` (including `password_hash`), `credential`, or
+   `authorization` — with `[REDACTED]`.
 
 :::caution[Do not rely on redaction]
 

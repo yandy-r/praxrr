@@ -55,9 +55,12 @@ value, and error code.
 
 ## What works today vs. what is pending
 
-Phase-1 reaches only the first three lifecycle stages. The registry only ever
-stores plugins in the `registered` state; the later states exist for the
-future runtime.
+Phase-1 reaches only the front of the lifecycle: a manifest is discovered,
+validated, and then either registered or rejected. The registry only ever
+stores plugins in the `registered` state; the runtime states (`activated`,
+`failed`, `unloaded`) exist only for the future runtime. The table below tracks
+the forward, happy-path progression — the pending "Observed" stage is what the
+Phase-2 runtime adds.
 
 | Stage               | Status                                 |
 | ------------------- | -------------------------------------- |
