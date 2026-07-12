@@ -33,7 +33,7 @@
 </script>
 
 <article
-  class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 [&_button]:min-h-11"
+  class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
   aria-busy={pending}
 >
   <div class="border-b border-neutral-200 p-4 sm:p-5 dark:border-neutral-800">
@@ -62,7 +62,7 @@
         </div>
       </div>
 
-      <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end [&_button]:min-h-11">
+      <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
         <Button
           text={intent.actionLabel}
           variant={intent.action === 'disable' ? 'danger' : 'primary'}

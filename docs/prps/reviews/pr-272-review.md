@@ -44,7 +44,10 @@ None.
 
 ### LOW
 
-None.
+- **[F005]** `packages/praxrr-app/src/routes/settings/plugins/components/PluginCard.svelte:36` — The final re-review found duplicate descendant-button minimum-height policies at the page root, card root, and action wrapper, obscuring ownership of the 44px route contract. [quality]
+  - **Status**: Fixed
+  - **Category**: Maintainability
+  - **Suggested fix**: Keep the page root as the single route policy, remove the redundant card-level selectors, and retain the disclosure's explicit minimum height.
 
 ## Validation Results
 

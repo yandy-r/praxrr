@@ -3,17 +3,17 @@
 **Source**: `docs/prps/reviews/pr-272-review.md`
 **Applied**: 2026-07-12T02:43:07Z
 **Mode**: Parallel sub-agents (2 dependency-safe waves, max width 3)
-**Severity threshold**: MEDIUM
+**Severity threshold**: MEDIUM, plus one LOW final re-review cleanup
 
 ## Summary
 
-- **Total findings in source**: 4
+- **Total findings in source**: 5
 - **Already processed before this run**:
   - Fixed: 0
   - Failed: 0
-- **Eligible this run**: 4
+- **Eligible this run**: 5
 - **Applied this run**:
-  - Fixed: 4
+  - Fixed: 5
   - Failed: 0
 - **Skipped this run**:
   - Below severity threshold: 0
@@ -22,12 +22,13 @@
 
 ## Fixes Applied
 
-| ID   | Severity | File                                                                  | Line | Status | Notes                                                                                                         |
-| ---- | -------- | --------------------------------------------------------------------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------- |
-| F001 | MEDIUM   | `packages/praxrr-app/src/routes/api/v1/plugins/_origin.ts`            | 25   | Fixed  | Requires canonical origin-only syntax; credential/path/query/fragment cases have no-side-effect coverage.     |
-| F002 | MEDIUM   | `packages/praxrr-app/src/routes/settings/plugins/+page.svelte`        | 35   | Fixed  | Extracted four decoders and lifecycle validation into `contract.ts` with four focused runtime-contract tests. |
-| F003 | MEDIUM   | `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts` | 136  | Fixed  | Replaced repeated unscoped loop with one explicit globally compatible Settings-child invariant.               |
-| F004 | MEDIUM   | `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts`   | 474  | Fixed  | All page/card action and recovery controls now have measured 44px targets at 320px.                           |
+| ID   | Severity | File                                                                           | Line | Status | Notes                                                                                                         |
+| ---- | -------- | ------------------------------------------------------------------------------ | ---- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| F001 | MEDIUM   | `packages/praxrr-app/src/routes/api/v1/plugins/_origin.ts`                     | 25   | Fixed  | Requires canonical origin-only syntax; credential/path/query/fragment cases have no-side-effect coverage.     |
+| F002 | MEDIUM   | `packages/praxrr-app/src/routes/settings/plugins/+page.svelte`                 | 35   | Fixed  | Extracted four decoders and lifecycle validation into `contract.ts` with four focused runtime-contract tests. |
+| F003 | MEDIUM   | `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts`          | 136  | Fixed  | Replaced repeated unscoped loop with one explicit globally compatible Settings-child invariant.               |
+| F004 | MEDIUM   | `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts`            | 474  | Fixed  | All page/card action and recovery controls now have measured 44px targets at 320px.                           |
+| F005 | LOW      | `packages/praxrr-app/src/routes/settings/plugins/components/PluginCard.svelte` | 36   | Fixed  | Final re-review removed duplicate card-level touch-target policies; the page root remains authoritative.      |
 
 ## Files Changed
 
@@ -38,7 +39,7 @@
 - `packages/praxrr-app/src/tests/routes/pluginManagementContract.test.ts` (Fixed F002)
 - `scripts/test.ts` (Fixed F002)
 - `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts` (Fixed F003)
-- `packages/praxrr-app/src/routes/settings/plugins/components/PluginCard.svelte` (Fixed F004)
+- `packages/praxrr-app/src/routes/settings/plugins/components/PluginCard.svelte` (Fixed F004, F005)
 - `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts` (Fixed F004)
 - `docs/prps/reviews/pr-272-review.md` (Statuses updated)
 
@@ -60,6 +61,6 @@ None.
 
 ## Next Steps
 
-- Re-run the formal PR review against the updated head to verify no findings remain.
-- Commit and push the fixes plus updated review artifacts.
+- Final three-pass re-review completed with F005 fixed; no findings remain open.
+- Commit and push the final cleanup plus updated review artifacts.
 - Monitor PR #272 CI to green before merge.
