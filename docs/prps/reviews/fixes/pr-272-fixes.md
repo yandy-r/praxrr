@@ -22,12 +22,12 @@
 
 ## Fixes Applied
 
-| ID | Severity | File | Line | Status | Notes |
-| --- | --- | --- | --- | --- | --- |
-| F001 | MEDIUM | `packages/praxrr-app/src/routes/api/v1/plugins/_origin.ts` | 25 | Fixed | Requires canonical origin-only syntax; credential/path/query/fragment cases have no-side-effect coverage. |
-| F002 | MEDIUM | `packages/praxrr-app/src/routes/settings/plugins/+page.svelte` | 35 | Fixed | Extracted four decoders and lifecycle validation into `contract.ts` with four focused runtime-contract tests. |
-| F003 | MEDIUM | `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts` | 136 | Fixed | Replaced repeated unscoped loop with one explicit globally compatible Settings-child invariant. |
-| F004 | MEDIUM | `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts` | 474 | Fixed | All page/card action and recovery controls now have measured 44px targets at 320px. |
+| ID   | Severity | File                                                                  | Line | Status | Notes                                                                                                         |
+| ---- | -------- | --------------------------------------------------------------------- | ---- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| F001 | MEDIUM   | `packages/praxrr-app/src/routes/api/v1/plugins/_origin.ts`            | 25   | Fixed  | Requires canonical origin-only syntax; credential/path/query/fragment cases have no-side-effect coverage.     |
+| F002 | MEDIUM   | `packages/praxrr-app/src/routes/settings/plugins/+page.svelte`        | 35   | Fixed  | Extracted four decoders and lifecycle validation into `contract.ts` with four focused runtime-contract tests. |
+| F003 | MEDIUM   | `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts` | 136  | Fixed  | Replaced repeated unscoped loop with one explicit globally compatible Settings-child invariant.               |
+| F004 | MEDIUM   | `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts`   | 474  | Fixed  | All page/card action and recovery controls now have measured 44px targets at 320px.                           |
 
 ## Files Changed
 
@@ -48,15 +48,15 @@ None.
 
 ## Validation Results
 
-| Check | Result |
-| --- | --- |
-| Type check | Pass — server check and Svelte check with 0 errors / 0 warnings |
-| Plugin tests | Pass — 165 passed, 0 failed |
-| Navigation and bundle tests | Pass — 11 passed, 0 failed |
-| Full tests | Pass — 2,490 passed across 51 steps, 0 failed |
-| Playwright | Pass — 12 passed, 0 failed |
-| Formatting / diff | Pass for all changed files |
-| Graphify | Pass — 11,629 nodes, 32,927 edges, 470 communities |
+| Check                       | Result                                                          |
+| --------------------------- | --------------------------------------------------------------- |
+| Type check                  | Pass — server check and Svelte check with 0 errors / 0 warnings |
+| Plugin tests                | Pass — 165 passed, 0 failed                                     |
+| Navigation and bundle tests | Pass — 11 passed, 0 failed                                      |
+| Full tests                  | Pass — 2,490 passed across 51 steps, 0 failed                   |
+| Playwright                  | Pass — 12 passed, 0 failed                                      |
+| Formatting / diff           | Pass for all changed files                                      |
+| Graphify                    | Pass — 11,629 nodes, 32,927 edges, 470 communities              |
 
 ## Next Steps
 
