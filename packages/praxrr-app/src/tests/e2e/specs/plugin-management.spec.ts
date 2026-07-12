@@ -1,4 +1,4 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import type { components } from '$api/v1.d.ts';
 
 const E2E_USERNAME = process.env.E2E_USERNAME;
@@ -104,6 +104,12 @@ async function ensureAuthenticated(page: Page): Promise<void> {
 async function openPlugins(page: Page): Promise<void> {
   await page.goto('/settings/plugins');
   await expect(page.getByRole('heading', { name: 'Plugin Management' })).toBeVisible();
+}
+
+async function expectTouchTarget(control: Locator, name: string): Promise<void> {
+  const box = await control.boundingBox();
+  expect(box, `${name} is missing`).not.toBeNull();
+  expect(box!.height, `${name} touch height`).toBeGreaterThanOrEqual(44);
 }
 
 function list(items: PluginRecord[], pluginsEnabled = true): PluginListResponse {
@@ -448,6 +454,56 @@ test.describe('Plugin management', () => {
     await expect(page.getByText('Abandoned Response', { exact: true })).toHaveCount(0);
   });
 
+  test('320px action and recovery controls all provide 44px touch targets', async ({ page }) => {
+    type Scenario = 'records' | 'initial-error' | 'feature-off' | 'empty';
+
+    let scenario: Scenario = 'records';
+    await page.setViewportSize({ width: 320, height: 900 });
+    await installPluginMocks(page, async (route, url) => {
+      if (url.pathname.endsWith('/enable')) return fulfillJson(route, pluginError('Safe mutation failure'), 500);
+      if (url.pathname === '/api/v1/plugins/reload') return fulfillJson(route, pluginError('Safe reload failure'), 500);
+      if (scenario === 'initial-error') return fulfillJson(route, pluginError('Safe list failure'), 500);
+      await fulfillJson(route, list(scenario === 'records' ? [DISCOVERED] : [], scenario !== 'feature-off'));
+    });
+
+    await openPlugins(page);
+    await expectTouchTarget(page.getByRole('button', { name: 'Refresh registry' }), 'Header refresh');
+    await expectTouchTarget(page.getByRole('button', { name: 'Reload plugins' }).first(), 'Header reload');
+
+    const card = page.locator('article');
+    const rowAction = card.getByRole('button', { name: 'Enable plugin: Example Plugin' });
+    await expectTouchTarget(rowAction, 'Plugin enablement action');
+    await rowAction.click();
+    await expectTouchTarget(
+      card.getByRole('button', { name: 'Retry intent change: Example Plugin' }),
+      'Plugin row retry'
+    );
+
+    await page.getByRole('button', { name: 'Reload plugins' }).first().click();
+    await expectTouchTarget(page.getByRole('button', { name: 'Retry reload' }), 'Reload retry');
+
+    scenario = 'initial-error';
+    await page.getByRole('button', { name: 'Refresh registry' }).click();
+    await expectTouchTarget(page.getByRole('button', { name: 'Retry refresh' }), 'Stale refresh retry');
+
+    await page.reload();
+    await expectTouchTarget(page.getByRole('button', { name: 'Retry load' }), 'Initial load retry');
+
+    scenario = 'feature-off';
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Plugin management is disabled' })).toBeVisible();
+    await expectTouchTarget(
+      page.getByRole('button', { name: 'Check configuration again' }),
+      'Feature-off configuration retry'
+    );
+
+    scenario = 'empty';
+    await page.reload();
+    const empty = page.getByRole('heading', { name: 'No plugins discovered' }).locator('..');
+    await expect(empty).toBeVisible();
+    await expectTouchTarget(empty.getByRole('button', { name: 'Reload plugins' }), 'Empty-state reload');
+  });
+
   test('320px dark reflow has no document overflow, readable contrast, keyboard disclosure, and touch targets', async ({
     page,
   }) => {
@@ -472,12 +528,12 @@ test.describe('Plugin management', () => {
     const disclosure = card.locator('summary');
     const action = card.getByRole('button', { name: `Enable plugin: ${HOSTILE_NAME}` });
     for (const [name, control] of [
+      ['Header refresh', page.getByRole('button', { name: 'Refresh registry' })],
+      ['Header reload', page.getByRole('button', { name: 'Reload plugins' })],
       ['Plugin disclosure', disclosure],
       ['Plugin enablement action', action],
     ] as const) {
-      const box = await control.boundingBox();
-      expect(box, `${name} is missing`).not.toBeNull();
-      expect(box!.height, `${name} touch height`).toBeGreaterThanOrEqual(44);
+      await expectTouchTarget(control, name);
     }
 
     await disclosure.focus();

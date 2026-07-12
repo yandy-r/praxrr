@@ -23,22 +23,22 @@ None.
 ### MEDIUM
 
 - **[F001]** `packages/praxrr-app/src/routes/api/v1/plugins/_origin.ts:25` — The guard compares parsed origins but accepts same-host `Origin` values containing credentials, paths, queries, or fragments instead of requiring an origin-only serialization. [correctness]
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Correctness
   - **Suggested fix**: Parse once, require a canonical origin-only value exactly equal to `url.origin`, reject credentials/non-root paths/queries/fragments, and extend the no-side-effect route matrix with those malformed same-host shapes.
 
 - **[F002]** `packages/praxrr-app/src/routes/settings/plugins/+page.svelte:35` — The 608-line page hand-maintains the lifecycle set and four wire-response decoders, duplicating the generated contract without focused runtime-decoder tests. [quality]
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Maintainability
   - **Suggested fix**: Move the lifecycle set and response decoders into a small client-safe contract module, add focused valid/malformed tests for every decoder, and import the boundary from the page.
 
 - **[F003]** `packages/praxrr-app/src/tests/base/navigationScopeFiltering.test.ts:136` — The per-scope loop repeats the same unscoped Settings-child assertion four times and therefore does not test scope-dependent child filtering. [quality]
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Maintainability
   - **Suggested fix**: Since Settings children are intentionally scope-invariant, replace the loop with one explicit invariant assertion and rename the test to match what it proves.
 
 - **[F004]** `packages/praxrr-app/src/tests/e2e/specs/plugin-management.spec.ts:474` — The 44px mobile target assertion covers only disclosure and enablement controls, leaving page reload/refresh/retry and row retry controls below or outside the stated coverage. [correctness]
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Completeness
   - **Suggested fix**: Give every plugin-management action/recovery control a 44px minimum target and extend the mobile test to measure header reload/refresh, page recovery, and row retry controls.
 

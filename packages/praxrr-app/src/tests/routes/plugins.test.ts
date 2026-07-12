@@ -220,6 +220,10 @@ migratedTest(
       const rejectedHeaders: Array<{ label: string; headers: HeadersInit }> = [
         { label: 'foreign Origin', headers: { origin: 'https://evil.example' } },
         { label: 'malformed Origin', headers: { origin: '://not-an-origin' } },
+        { label: 'same-host Origin with credentials', headers: { origin: 'http://user:pass@localhost' } },
+        { label: 'same-host Origin with path', headers: { origin: 'http://localhost/admin' } },
+        { label: 'same-host Origin with query', headers: { origin: 'http://localhost?source=browser' } },
+        { label: 'same-host Origin with fragment', headers: { origin: 'http://localhost#fragment' } },
         {
           label: 'explicit cross-site browser request',
           headers: { origin: 'http://localhost', 'sec-fetch-site': 'cross-site' },

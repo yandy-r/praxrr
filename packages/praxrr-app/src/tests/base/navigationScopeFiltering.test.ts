@@ -133,20 +133,24 @@ Deno.test('scope filtering respects Arr capability constraints', () => {
   assertEquals(supportsFeature('lidarr' as ArrAppType, 'metadata_profiles'), true);
 });
 
-Deno.test('Plugins remains beneath Settings for every Arr scope', () => {
-  const shell = resolveNavShell({ user: scopeUser });
-  const settings = shell.groups.flatMap((group) => group.items).find((item) => item.id === 'settings.settings');
-  const scopes: ArrType[] = ['all', 'radarr', 'sonarr', 'lidarr'];
+Deno.test('Plugins is a globally compatible Settings child', () => {
+  const settings = NAV_REGISTRY.find((item) => item.id === 'settings.settings');
+  const plugins = settings?.children?.find((child) => child.id === 'settings.plugins');
 
-  for (const scope of scopes) {
-    const scopedEntries = resolveScopeEntries(scope, shell);
-
-    assertEquals(scopedEntries.visible.includes('settings.settings'), true);
-    assertEquals(
-      settings?.children.some((child) => child.id === 'settings.plugins' && child.href === '/settings/plugins'),
-      true
-    );
-  }
+  assertEquals(
+    {
+      settingsId: settings?.id,
+      settingsScope: settings?.arrScope,
+      pluginId: plugins?.id,
+      pluginHref: plugins?.href,
+    },
+    {
+      settingsId: 'settings.settings',
+      settingsScope: 'all',
+      pluginId: 'settings.plugins',
+      pluginHref: '/settings/plugins',
+    }
+  );
 });
 
 Deno.test('unsupported child-ful nav items are disabled while unsupported leaves are hidden', () => {

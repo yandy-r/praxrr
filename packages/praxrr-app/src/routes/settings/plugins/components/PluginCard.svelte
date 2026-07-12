@@ -33,7 +33,7 @@
 </script>
 
 <article
-  class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+  class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 [&_button]:min-h-11"
   aria-busy={pending}
 >
   <div class="border-b border-neutral-200 p-4 sm:p-5 dark:border-neutral-800">

@@ -22,7 +22,16 @@ export function rejectCrossOriginPluginMutation(request: Request, url: URL): Res
   }
 
   try {
-    if (new URL(origin).origin === url.origin) {
+    const parsedOrigin = new URL(origin);
+    const isCanonicalOrigin =
+      origin === url.origin &&
+      parsedOrigin.origin === url.origin &&
+      parsedOrigin.username === '' &&
+      parsedOrigin.password === '' &&
+      parsedOrigin.pathname === '/' &&
+      parsedOrigin.search === '' &&
+      parsedOrigin.hash === '';
+    if (isCanonicalOrigin) {
       return null;
     }
   } catch {
