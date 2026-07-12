@@ -3,6 +3,9 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { getArrInstanceReviewClient, type ArrInstanceReviewClient } from '$arr/arrInstanceClients.ts';
 import { logger } from '$logger/logger.ts';
+import { config } from '$config';
+import { pluginHost } from '$server/plugins/index.ts';
+import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { previewStore } from '$sync/preview/store.ts';
 import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
 import {
@@ -334,6 +337,19 @@ export async function _handleSyncPreviewCreateRequest(
       },
       { captureReviewContext: true, client: reviewClient.client }
     );
+
+    if (config.pluginsEnabled) {
+      try {
+        await pluginHost.notifyObservers('sync.previewComputed.observe', () =>
+          buildCapabilityInput('read:sync-preview', generated)
+        );
+      } catch (error) {
+        await logger.warn('sync.previewComputed.observe dispatch failed at call-site', {
+          source: 'Plugins',
+          meta: { previewId: storedPreview.id, instanceId: requestPayload.instanceId, error: String(error) },
+        });
+      }
+    }
 
     // Preserve successful-section evidence: a partial generation stays `ready` (successful
     // sections keep their diffs) but carries a typed top-level `sectionErrors` reason so apply

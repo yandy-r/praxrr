@@ -64,7 +64,7 @@ None.
 ### LOW
 
 - **[F008]** `ROADMAP.md:72` — The delivery row still says PR pending although PR #270 exists.
-  - **Status**: Open
+  - **Status**: Fixed
   - **Category**: Maintainability
   - **Suggested fix**: Link PR #270 and mark it pending review, CI, and merge.
 

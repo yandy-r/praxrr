@@ -27,6 +27,9 @@ import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
+import { config } from '$config';
+import { pluginHost } from '$server/plugins/index.ts';
+import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { getAllQualities, type SyncArrType } from '../mappings.ts';
 import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
 import type {
@@ -1258,6 +1261,19 @@ export class QualityProfileSyncer extends BaseSyncer {
           profile: arrProfile,
         },
       });
+
+      if (config.pluginsEnabled) {
+        try {
+          await pluginHost.notifyObservers('config.profileCompiled.observe', () =>
+            buildCapabilityInput('read:resolved-profile', { ...pcdProfile, arrType: this.instanceType })
+          );
+        } catch (error) {
+          await logger.warn('config.profileCompiled.observe dispatch failed at call-site', {
+            source: 'Plugins',
+            meta: { instanceId: this.instanceId, pcdName: pcdProfile.name, error: String(error) },
+          });
+        }
+      }
 
       const write = await this.writeQualityProfilePayload({
         pcdName: pcdProfile.name,
