@@ -353,8 +353,9 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
       buildChild('settings.backups', 'Backups', '/settings/backups', 3),
       buildChild('settings.notifications', 'Notifications', '/settings/notifications', 4),
       buildChild('settings.security', 'Security', '/settings/security', 5),
-      buildChild('settings.about', 'About', '/settings/about', 6),
-      buildChild('settings.logout', 'Log Out', '/auth/logout', 7),
+      buildChild('settings.plugins', 'Plugins', '/settings/plugins', 6),
+      buildChild('settings.about', 'About', '/settings/about', 7),
+      buildChild('settings.logout', 'Log Out', '/auth/logout', 8),
     ],
   },
   {

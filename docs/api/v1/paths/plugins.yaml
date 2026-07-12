@@ -85,7 +85,8 @@ enable:
     description: |
       Persists administrator enablement intent for one API-version-qualified plugin. This does not
       assert runtime activation or successful execution. Disabled feature state rejects without
-      mutating durable state.
+      mutating durable state. Browser requests must be same-origin; authenticated non-browser
+      clients may omit the `Origin` header.
     tags:
       - Plugins
     parameters:
@@ -116,6 +117,8 @@ enable:
           application/json:
             schema:
               $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
+      '403':
+        description: Cross-origin browser request rejected before mutation
       '404':
         description: Plugin not found in the requested API-version namespace
         content:
@@ -142,6 +145,8 @@ disable:
     description: |
       Persists administrator disablement intent for one API-version-qualified plugin. Missing plugins
       retain this decision for a later reappearance. Disabled feature state rejects without mutation.
+      Browser requests must be same-origin; authenticated non-browser clients may omit the `Origin`
+      header.
     tags:
       - Plugins
     parameters:
@@ -172,6 +177,8 @@ disable:
           application/json:
             schema:
               $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
+      '403':
+        description: Cross-origin browser request rejected before mutation
       '404':
         description: Plugin not found in the requested API-version namespace
         content:
@@ -199,7 +206,8 @@ reload:
       Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one
       transaction, then atomically publishes the new registry snapshot. Concurrent reload callers
       share the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary
-      with `reloaded: false`, zero counters, and no filesystem or database mutation.
+      with `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests
+      must be same-origin; authenticated non-browser clients may omit the `Origin` header.
     tags:
       - Plugins
     responses:
@@ -209,6 +217,8 @@ reload:
           application/json:
             schema:
               $ref: '../schemas/plugins.yaml#/PluginReloadResponse'
+      '403':
+        description: Cross-origin browser request rejected before scan or mutation
       '500':
         description: Reload failed; the previous in-memory registry remains usable
         content:

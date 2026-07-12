@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Sliders, ShieldCheck, Bell, Clock, FileText, Archive, Info, Bird } from 'lucide-svelte';
+  import { Sliders, ShieldCheck, Bell, Clock, FileText, Archive, Info, Bird, Package } from 'lucide-svelte';
 
   const settingsItems = [
     {
@@ -36,6 +36,13 @@
       description: 'Staged rollouts and blast-radius safety',
       icon: Bird,
       iconClass: 'text-teal-600 dark:text-teal-400',
+    },
+    {
+      label: 'Plugins',
+      href: '/settings/plugins',
+      description: 'Discover plugins and manage their saved enablement intent',
+      icon: Package,
+      iconClass: 'text-violet-600 dark:text-violet-400',
     },
     {
       label: 'Logs',

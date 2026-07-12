@@ -19,6 +19,11 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | PATCH  | `/ui-preferences`                                 | Save per-user section disclosure mode |
 | GET    | `/complexity-tiers`                               | Read per-user section complexity tier |
 | PATCH  | `/complexity-tiers`                               | Save per-user section complexity tier |
+| GET    | `/plugins`                                        | List redacted durable plugin state    |
+| POST   | `/plugins/reload`                                 | Reconcile the plugin registry         |
+| GET    | `/plugins/{apiVersion}/{id}`                      | Read one durable plugin record        |
+| POST   | `/plugins/{apiVersion}/{id}/enable`               | Save enabled plugin intent            |
+| POST   | `/plugins/{apiVersion}/{id}/disable`              | Save disabled plugin intent           |
 | POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches  |
 | GET    | `/arr/library`                                    | Paginated arr app library view        |
 | DELETE | `/arr/library`                                    | Invalidate Arr library cache          |
@@ -234,6 +239,32 @@ Semantics:
 - Stale `expected_updated_at` values return `409`.
 - Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
 - Internal SQL/error details are not included in `500` responses.
+
+## Plugin Management
+
+The auth-gated plugin route family exposes validated, redacted durable registry state. It does not
+expose local source directories, raw manifests, runtime availability, or execution telemetry.
+
+| Method | Path                                 | Behavior                                    |
+| ------ | ------------------------------------ | ------------------------------------------- |
+| GET    | `/plugins`                           | List discovered and retained plugin records |
+| POST   | `/plugins/reload`                    | Run serialized scan and reconciliation      |
+| GET    | `/plugins/{apiVersion}/{id}`         | Read one namespace-qualified durable record |
+| POST   | `/plugins/{apiVersion}/{id}/enable`  | Persist enabled administrator intent        |
+| POST   | `/plugins/{apiVersion}/{id}/disable` | Persist disabled administrator intent       |
+
+Feature-off behavior is explicit: list returns `200` with `pluginsEnabled:false` and no items;
+reload returns a `200` no-op summary with zero counters; detail and enable/disable return `409`.
+None of those paths scans or changes durable state while `PLUGINS_ENABLED` is off.
+
+Browser enable, disable, and reload requests must be exact same-origin. Malformed, foreign, or
+explicit cross-site browser requests receive an empty `403` before identity validation, scanning,
+or mutation. Authenticated non-browser clients may omit `Origin`; this does not bypass
+authentication or add CORS support. Read routes do not apply the mutation Origin guard.
+
+See the [generated OpenAPI source](./v1/openapi.yaml) for response schemas, the
+[Plugin Management guide](../features/plugin-management.md) for operator workflows, and the
+[Plugin System Architecture](../architecture/plugins.md) for registry and security boundaries.
 
 ## Entity Testing
 

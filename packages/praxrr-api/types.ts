@@ -183,7 +183,8 @@ export interface paths {
      * @description Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one
      *     transaction, then atomically publishes the new registry snapshot. Concurrent reload callers
      *     share the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary
-     *     with `reloaded: false`, zero counters, and no filesystem or database mutation.
+     *     with `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests
+     *     must be same-origin; authenticated non-browser clients may omit the `Origin` header.
      */
     post: operations['reloadPlugins'];
     delete?: never;
@@ -226,7 +227,8 @@ export interface paths {
      * Enable one durable plugin identity
      * @description Persists administrator enablement intent for one API-version-qualified plugin. This does not
      *     assert runtime activation or successful execution. Disabled feature state rejects without
-     *     mutating durable state.
+     *     mutating durable state. Browser requests must be same-origin; authenticated non-browser
+     *     clients may omit the `Origin` header.
      */
     post: operations['enablePlugin'];
     delete?: never;
@@ -248,6 +250,8 @@ export interface paths {
      * Disable one durable plugin identity
      * @description Persists administrator disablement intent for one API-version-qualified plugin. Missing plugins
      *     retain this decision for a later reappearance. Disabled feature state rejects without mutation.
+     *     Browser requests must be same-origin; authenticated non-browser clients may omit the `Origin`
+     *     header.
      */
     post: operations['disablePlugin'];
     delete?: never;
@@ -5798,6 +5802,13 @@ export interface operations {
           'application/json': components['schemas']['PluginReloadResponse'];
         };
       };
+      /** @description Cross-origin browser request rejected before scan or mutation */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
       /** @description Reload failed; the previous in-memory registry remains usable */
       500: {
         headers: {
@@ -5902,6 +5913,13 @@ export interface operations {
           'application/json': components['schemas']['PluginErrorResponse'];
         };
       };
+      /** @description Cross-origin browser request rejected before mutation */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
       /** @description Plugin not found in the requested API-version namespace */
       404: {
         headers: {
@@ -5962,6 +5980,13 @@ export interface operations {
         content: {
           'application/json': components['schemas']['PluginErrorResponse'];
         };
+      };
+      /** @description Cross-origin browser request rejected before mutation */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Plugin not found in the requested API-version namespace */
       404: {

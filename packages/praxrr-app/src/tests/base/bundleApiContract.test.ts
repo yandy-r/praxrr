@@ -101,6 +101,7 @@ const PLUGIN_DETAIL_STATUSES = {
 const PLUGIN_MUTATION_STATUSES = {
   '200': 'PluginMutationResponse',
   '400': 'PluginErrorResponse',
+  '403': null,
   '404': 'PluginErrorResponse',
   '409': 'PluginErrorResponse',
   '500': 'PluginErrorResponse',
@@ -446,7 +447,7 @@ Deno.test('plugin management source, bundle, paths, and generated declarations s
       sourceKey: 'reload',
       method: 'post',
       bundledPath: '/plugins/reload',
-      statuses: { '200': 'PluginReloadResponse', '500': 'PluginErrorResponse' },
+      statuses: { '200': 'PluginReloadResponse', '403': null, '500': 'PluginErrorResponse' },
     },
     {
       sourceKey: 'detail',
@@ -483,6 +484,12 @@ Deno.test('plugin management source, bundle, paths, and generated declarations s
     assertEquals(Object.keys(bundledResponses).sort(), expectedStatuses);
 
     for (const [status, schemaName] of Object.entries(operation.statuses)) {
+      if (schemaName === null) {
+        assertEquals('content' in getRecordProperty(sourceResponses, status), false);
+        assertEquals('content' in getRecordProperty(bundledResponses, status), false);
+        continue;
+      }
+
       const sourceRefs = schemaRefs(responseSchema(sourceResponses, status)).map((ref) => ref.split('/').at(-1));
       const bundledRefs = schemaRefs(responseSchema(bundledResponses, status)).map((ref) => ref.split('/').at(-1));
       assertEquals(sourceRefs, [schemaName]);
