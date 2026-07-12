@@ -309,7 +309,7 @@ that proves cancellation, deterministic fuel, total guest-memory bounds, denied 
 the supported compiled-artifact matrix. The Sync observe wiring (#263) is now implemented behind the
 flag ([#269](https://github.com/yandy-r/praxrr/pull/269)) — the two observe points fire from their real
 producers, but dispatch still no-ops via `UnavailablePluginExecutor` until that runtime ships. Issue
-#264's durable registry and management-only API is implemented in
+[#264](https://github.com/yandy-r/praxrr/issues/264)'s durable registry and management-only API is implemented in
 [#270](https://github.com/yandy-r/praxrr/pull/270), pending review/CI/merge, without claiming runtime
 activation or execution. Sibling phases #265 and #266 under #267 remain open and incomplete.
 
