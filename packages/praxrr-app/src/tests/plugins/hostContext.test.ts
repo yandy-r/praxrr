@@ -26,10 +26,11 @@ function isJsonArray(value: PluginJsonValue): value is readonly PluginJsonValue[
 
 Deno.test('buildCapabilityInput projects ONLY allow-listed fields for a granted capability', () => {
   const source = {
-    profileId: 'profile-1',
+    id: 1,
+    arrType: 'radarr',
     name: 'HD Bluray',
     qualities: ['Bluray-1080p', 'WEBDL-1080p'],
-    customFormatScores: { x264: 100 },
+    customFormats: [{ formatId: 7, formatName: 'x264', score: 100 }],
     // Fields NOT on the read:resolved-profile allow-list must never cross the boundary.
     apiKey: 'sk-should-not-appear',
     internalDbRow: { id: 42 },
@@ -39,8 +40,9 @@ Deno.test('buildCapabilityInput projects ONLY allow-listed fields for a granted 
   const projected = buildCapabilityInput('read:resolved-profile', source);
   assert(isJsonRecord(projected));
 
-  assertEquals(Object.keys(projected).sort(), ['customFormatScores', 'name', 'profileId', 'qualities']);
-  assertEquals(projected.profileId, 'profile-1');
+  assertEquals(Object.keys(projected).sort(), ['arrType', 'customFormats', 'id', 'name', 'qualities']);
+  assertEquals(projected.id, 1);
+  assertEquals(projected.arrType, 'radarr');
   assertEquals(projected.name, 'HD Bluray');
   assert(!('apiKey' in projected));
   assert(!('internalDbRow' in projected));
@@ -49,28 +51,28 @@ Deno.test('buildCapabilityInput projects ONLY allow-listed fields for a granted 
 
 Deno.test('scrubPluginBoundary redacts planted secret-shaped keys at the seam', () => {
   const source = {
-    summary: 'sync preview',
-    changeCount: 3,
-    // A secret planted INSIDE an allow-listed field survives projection, so the scrub must catch it.
-    entities: [{ name: 'Radarr A', api_key: 'sk-live-abcdef', token: 'raw-bearer-token' }],
-    instanceId: 'inst-1',
+    arrType: 'radarr',
+    id: 1,
+    name: 'HD Bluray',
+    // A secret planted INSIDE an allow-listed nested field survives projection, so the scrub must catch it.
+    customFormats: [{ formatName: 'CF A', api_key: 'sk-live-abcdef', token: 'raw-bearer-token' }],
   };
 
-  const projected = buildCapabilityInput('read:sync-preview', source);
+  const projected = buildCapabilityInput('read:resolved-profile', source);
   const scrubbed = scrubPluginBoundary(projected);
   assert(isJsonRecord(scrubbed));
 
-  const entities = scrubbed.entities;
-  assert(isJsonArray(entities));
-  const first = entities[0];
+  const customFormats = scrubbed.customFormats;
+  assert(isJsonArray(customFormats));
+  const first = customFormats[0];
   assert(isJsonRecord(first));
 
   assertEquals(first.api_key, '[REDACTED]');
   assertEquals(first.token, '[REDACTED]');
   // Non-secret fields are preserved through the scrub.
-  assertEquals(first.name, 'Radarr A');
-  assertEquals(scrubbed.summary, 'sync preview');
-  assertEquals(scrubbed.instanceId, 'inst-1');
+  assertEquals(first.formatName, 'CF A');
+  assertEquals(scrubbed.name, 'HD Bluray');
+  assertEquals(scrubbed.arrType, 'radarr');
 });
 
 Deno.test('buildCapabilityInput yields no snapshot when the source exposes no grantable fields', () => {
@@ -102,36 +104,36 @@ Deno.test('buildCapabilityInput output is structured-clone-safe and JSON round-t
 
 Deno.test('buildCapabilityInput coerces non-JSON values in allow-listed fields to a clone-safe shape', () => {
   const source = {
-    profileId: 'p',
+    id: 1,
     name: 'n',
     // Non-finite numbers collapse to null; a function value is dropped from the object.
     qualities: [Infinity, Number.NaN, 'ok'],
-    customFormatScores: { score: 5, compute: () => 1 },
+    customFormats: { score: 5, compute: () => 1 },
   };
 
   const projected = buildCapabilityInput('read:resolved-profile', source);
   assert(isJsonRecord(projected));
 
   assertEquals(projected.qualities, [null, null, 'ok']);
-  assertEquals(projected.customFormatScores, { score: 5 });
+  assertEquals(projected.customFormats, { score: 5 });
   assertEquals(JSON.parse(JSON.stringify(projected)), projected);
   assertEquals(structuredClone(projected), projected);
 });
 
 Deno.test('buildCapabilityInput drops class instances (Date/Map/Set) instead of emitting {}', () => {
   const source = {
-    profileId: 'p',
+    id: 1,
     name: 'n',
     // A plain object holding non-JSON class instances: each instance is dropped, plain fields survive.
     qualities: { when: new Date(0), lookup: new Map([['a', 1]]), tags: new Set([1, 2]), keep: 'ok' },
     // A bare class instance in an allow-listed field must be dropped entirely (not serialized to {}).
-    customFormatScores: new Date(0),
+    customFormats: new Date(0),
   };
 
   const projected = buildCapabilityInput('read:resolved-profile', source);
   assert(isJsonRecord(projected));
 
-  assert(!('customFormatScores' in projected));
+  assert(!('customFormats' in projected));
   assert(isJsonRecord(projected.qualities));
   assertEquals(projected.qualities, { keep: 'ok' });
   assertEquals(JSON.parse(JSON.stringify(projected)), projected);

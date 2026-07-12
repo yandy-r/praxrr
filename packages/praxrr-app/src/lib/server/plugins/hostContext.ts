@@ -17,14 +17,16 @@ import type { CapabilityId, PluginJsonValue } from '$shared/plugins/index.ts';
 import { redactSecrets } from '../mcp/redact.ts';
 
 /**
- * The minimal, observe-only, JSON-safe top-level fields a granted capability may project. Intentionally
- * minimal in Phase-1 (no live producer exists yet) and tightened once the real resolved-profile /
- * sync-preview / custom-format / config-validation snapshot types finalize. Keyed by every
- * {@link CapabilityId} so adding a capability forces a matching allow-list entry.
+ * The minimal, observe-only, JSON-safe top-level fields a granted capability may project.
+ * `read:resolved-profile` and `read:sync-preview` are now FINALIZED against their real producers
+ * (a PcdQualityProfile with an injected Arr-explicit `arrType`, and a GeneratePreviewResult,
+ * respectively). `read:custom-format` and `read:config-validation` remain unwired Phase-1 placeholders,
+ * tightened once their real snapshot types finalize. Keyed by every {@link CapabilityId} so adding a
+ * capability forces a matching allow-list entry.
  */
 const CAPABILITY_FIELD_ALLOWLIST: Record<CapabilityId, readonly string[]> = {
-  'read:resolved-profile': ['profileId', 'name', 'qualities', 'customFormatScores'],
-  'read:sync-preview': ['summary', 'changeCount', 'entities', 'instanceId'],
+  'read:resolved-profile': ['arrType', 'id', 'name', 'qualities', 'customFormats'],
+  'read:sync-preview': ['arrType', 'instanceId', 'summary', 'sections'],
   'read:custom-format': ['formatId', 'name', 'specifications'],
   'read:config-validation': ['valid', 'issues', 'entity'],
 };
