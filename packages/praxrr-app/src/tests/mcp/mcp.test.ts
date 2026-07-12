@@ -9,6 +9,7 @@ import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
+import { pluginRegistryQueries, type PluginRegistryRecord } from '$db/queries/pluginRegistry.ts';
 import { redactSecrets } from '$lib/server/mcp/redact.ts';
 import { toMcpDatabase, toMcpInstance } from '$lib/server/mcp/mappers.ts';
 import { toToolResult } from '$lib/server/mcp/serialize.ts';
@@ -21,6 +22,7 @@ import {
 import type { SecurityPostureSummaryResponse, WireDnsTransportEvidence } from '$lib/server/security/responses.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import type { PluginManifest } from '$shared/plugins/index.ts';
 import { DELETE, GET, POST } from '../../routes/api/v1/mcp/+server.ts';
 
 type PostEvent = Parameters<typeof POST>[0];
@@ -72,6 +74,17 @@ function buildEvent(bodyText: string, headers: Record<string, string> = {}): Pos
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous JSON-RPC test assertions intentionally traverse dynamic response bodies
 type JsonRpcBody = any;
+
+const MCP_PLUGIN_MANIFEST: PluginManifest = {
+  apiVersion: '1',
+  id: 'com.example.mcp',
+  name: 'MCP Plugin',
+  version: '1.0.0',
+  runtime: 'wasm',
+  entry: 'plugin.wasm',
+  extensionPoints: ['sync.previewComputed.observe'],
+  capabilities: ['read:sync-preview'],
+};
 
 async function callRpc(
   method: string,
@@ -129,6 +142,24 @@ function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
   return keys;
 }
 
+function withPrivatePluginFields(
+  record: PluginRegistryRecord,
+  privatePath: string,
+  rawSecret: string
+): PluginRegistryRecord {
+  const privateFields = {
+    sourceDir: privatePath,
+    source_dir: privatePath,
+    manifest_json: JSON.stringify({ token: rawSecret }),
+    token: rawSecret,
+  };
+  return {
+    ...record,
+    ...privateFields,
+    manifest: { ...record.manifest, ...privateFields },
+  } as unknown as PluginRegistryRecord;
+}
+
 // ============================================================================
 // Handshake + negotiation
 // ============================================================================
@@ -170,21 +201,27 @@ migratedTest('ping returns an empty result object', async () => {
 // Listings
 // ============================================================================
 
-migratedTest('tools/list returns 9 read-only tools', async () => {
+migratedTest('tools/list returns 10 read-only tools including closed-input list_plugins', async () => {
   const body = await rpcBody('tools/list');
   const tools = body.result.tools as Array<{
     name: string;
-    inputSchema: unknown;
+    description: string;
+    inputSchema: { type: string; properties: Record<string, unknown>; additionalProperties: boolean };
     annotations: { readOnlyHint: boolean };
   }>;
-  assertEquals(tools.length, 9);
+  assertEquals(tools.length, 10);
   for (const tool of tools) {
     assertEquals(tool.annotations.readOnlyHint, true);
     assertExists(tool.inputSchema);
   }
   const names = tools.map((tool) => tool.name);
   assert(names.includes('list_instances'));
+  assert(names.includes('list_plugins'));
   assert(names.includes('preview_sync'));
+  const listPluginsTool = tools.find((tool) => tool.name === 'list_plugins');
+  assertExists(listPluginsTool);
+  assertEquals(listPluginsTool.inputSchema, { type: 'object', properties: {}, additionalProperties: false });
+  assert(listPluginsTool.description.includes('raw manifests omitted'));
 });
 
 migratedTest('resources/list returns only static resources', async () => {
@@ -231,6 +268,80 @@ migratedTest('tools/call list_instances: happy path returns text content, isErro
   assertEquals(body.result.content[0].type, 'text');
   const parsed = JSON.parse(body.result.content[0].text);
   assertEquals(parsed.length, 1);
+});
+
+migratedTest('tools/call list_plugins returns the feature-off empty response', async () => {
+  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
+  const original = pluginsConfig.pluginsEnabled;
+  pluginsConfig.pluginsEnabled = false;
+  try {
+    const body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
+    assertEquals(body.result.isError, false);
+    assertEquals(JSON.parse(body.result.content[0].text), { pluginsEnabled: false, items: [] });
+  } finally {
+    pluginsConfig.pluginsEnabled = original;
+  }
+});
+
+migratedTest('tools/call list_plugins exposes only the redacted public plugin shape', async () => {
+  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
+  const original = pluginsConfig.pluginsEnabled;
+  pluginsConfig.pluginsEnabled = true;
+  try {
+    await pluginRegistryQueries.reconcile([{ manifest: MCP_PLUGIN_MANIFEST }]);
+
+    const record = pluginRegistryQueries.get('1', 'com.example.mcp');
+    assertExists(record);
+    const queries = pluginRegistryQueries as unknown as { list: typeof pluginRegistryQueries.list };
+    const originalList = queries.list;
+    const privatePath = '/tmp/private-plugin-root/com.example.mcp';
+    const rawSecret = 'RAW-MCP-PLUGIN-TOKEN-MUST-NOT-LEAK';
+    queries.list = () => [withPrivatePluginFields(record, privatePath, rawSecret)];
+
+    let body: JsonRpcBody;
+    try {
+      body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
+    } finally {
+      queries.list = originalList;
+    }
+    assertEquals(body.result.isError, false);
+    const payload = JSON.parse(body.result.content[0].text) as {
+      pluginsEnabled: boolean;
+      items: Array<{ manifest: { id: string } }>;
+    };
+    assertEquals(payload.pluginsEnabled, true);
+    assertEquals(payload.items[0].manifest.id, 'com.example.mcp');
+    const keys = collectKeys(payload);
+    assert(!keys.has('sourceDir'));
+    assert(!keys.has('source_dir'));
+    assert(!keys.has('manifest_json'));
+    const serialized = JSON.stringify(body);
+    assert(!serialized.includes(privatePath));
+    assert(!serialized.includes(rawSecret));
+  } finally {
+    pluginsConfig.pluginsEnabled = original;
+  }
+});
+
+migratedTest('tools/call list_plugins converts service failures to a safe domain error', async () => {
+  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
+  const queries = pluginRegistryQueries as unknown as { list: typeof pluginRegistryQueries.list };
+  const originalEnabled = pluginsConfig.pluginsEnabled;
+  const originalList = queries.list;
+  pluginsConfig.pluginsEnabled = true;
+  queries.list = () => {
+    throw new Error('database secret that must not leak');
+  };
+  try {
+    const body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
+    assertEquals(body.result.isError, true);
+    const serialized = JSON.stringify(body);
+    assert(serialized.includes('Unable to list plugins'));
+    assert(!serialized.includes('database secret'));
+  } finally {
+    queries.list = originalList;
+    pluginsConfig.pluginsEnabled = originalEnabled;
+  }
 });
 
 migratedTest('list_instances: type and enabledOnly compose (AND)', async () => {

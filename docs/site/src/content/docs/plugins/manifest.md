@@ -88,6 +88,15 @@ problem in the manifest at once.
 | `unknown_extension_point` | An `extensionPoints[i]` is not a known extension-point id.                                         |
 | `unknown_capability`      | A `capabilities[i]` is not a known capability id.                                                  |
 | `least_privilege`         | A declared capability is not consumable by any declared extension point (see below).               |
+| `too_long`                | A string field exceeds its length cap (see below).                                                 |
+| `too_many_items`          | `extensionPoints` or `capabilities` has more entries than the catalog defines.                     |
+
+Each string field has a finite length cap, and the two arrays are bounded by
+the size of their catalogs: `apiVersion` ≤ 32, `id` ≤ 253, `name` ≤ 256,
+`version` ≤ 128, `entry` ≤ 1024, `description` ≤ 2048, `author` ≤ 256,
+`engines.praxrr` ≤ 256 characters; `extensionPoints` ≤ 9 and `capabilities` ≤ 4
+items. Over-length values are rejected with `too_long`, and over-long arrays
+with `too_many_items`.
 
 ## Least privilege
 

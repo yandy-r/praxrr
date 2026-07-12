@@ -33,6 +33,8 @@ Deno.test('register returns a registered entry that get resolves case-insensitiv
   const entry: RegisteredPlugin = registry.register('/plugins/acme-tool', manifest);
   assertEquals(entry.manifest, manifest);
   assertEquals(entry.sourceDir, '/plugins/acme-tool');
+  assertEquals(entry.enabled, true);
+  assertEquals(entry.discovered, true);
   assertEquals(entry.state, 'registered');
   assert(!Number.isNaN(Date.parse(entry.registeredAt)));
 
@@ -90,25 +92,72 @@ Deno.test('listByApiVersion returns only in-namespace plugins and is empty for a
   assertEquals(registry.listByApiVersion('9'), []);
 });
 
-Deno.test('listForPoint returns only in-namespace plugins declaring that point', () => {
+Deno.test('listForPoint returns only enabled, discovered, in-namespace plugins declaring that point', () => {
   const registry = new PluginRegistry();
-  registry.register(
+  const enabled = registry.register(
     '/plugins/profile',
-    makeManifest({ apiVersion: '1', id: 'com.acme.profile', extensionPoints: ['config.profileCompiled.observe'] })
+    makeManifest({
+      apiVersion: '1',
+      id: 'com.acme.profile',
+      extensionPoints: ['config.profileCompiled.observe'],
+    })
   );
-  registry.register(
+  const disabled = registry.register(
     '/plugins/preview',
-    makeManifest({ apiVersion: '1', id: 'com.acme.preview', extensionPoints: ['sync.previewComputed.observe'] })
+    makeManifest({
+      apiVersion: '1',
+      id: 'com.acme.disabled',
+      extensionPoints: ['config.profileCompiled.observe'],
+    })
   );
-  registry.register(
+  const missing = registry.register(
+    '/plugins/missing',
+    makeManifest({
+      apiVersion: '1',
+      id: 'com.acme.missing',
+      extensionPoints: ['config.profileCompiled.observe'],
+    })
+  );
+  const otherNamespace = registry.register(
     '/plugins/other-namespace',
-    makeManifest({ apiVersion: '2', id: 'com.acme.profile', extensionPoints: ['config.profileCompiled.observe'] })
+    makeManifest({
+      apiVersion: '2',
+      id: 'com.acme.profile',
+      extensionPoints: ['config.profileCompiled.observe'],
+    })
   );
+  registry.replaceSnapshot([
+    enabled,
+    { ...disabled, enabled: false },
+    { ...missing, discovered: false },
+    otherNamespace,
+  ]);
 
   const matches = registry.listForPoint('1', 'config.profileCompiled.observe');
   assertEquals(matches.length, 1);
   assertEquals(matches[0].manifest.id, 'com.acme.profile');
   assertEquals(matches[0].sourceDir, '/plugins/profile');
+});
+
+Deno.test('replaceSnapshot rejects duplicates without mutating the current snapshot', () => {
+  const registry = new PluginRegistry();
+  const current = registry.register('/plugins/current', makeManifest({ id: 'com.acme.current' }));
+  const first = {
+    ...current,
+    manifest: makeManifest({ id: 'com.acme.replacement' }),
+  };
+  const duplicate = {
+    ...current,
+    manifest: makeManifest({ id: 'COM.ACME.REPLACEMENT' }),
+  };
+
+  assertThrows(() => registry.replaceSnapshot([first, duplicate]), Error, 'Duplicate plugin id');
+  assertEquals(registry.get('1', 'com.acme.current'), current);
+  assertEquals(registry.get('1', 'com.acme.replacement'), undefined);
+
+  registry.replaceSnapshot([first]);
+  assertEquals(registry.get('1', 'COM.ACME.REPLACEMENT'), first);
+  assertEquals(registry.get('1', 'com.acme.current'), undefined);
 });
 
 Deno.test('clear empties every namespace', () => {

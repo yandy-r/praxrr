@@ -5,7 +5,8 @@
  * `Map<apiVersion, Map<lowercased id, RegisteredPlugin>>`. Namespacing by `apiVersion` is a parser
  * cache-safety analog: a toggle/rollback across an incompatible contract version cannot resurrect a
  * plugin registered under a different `apiVersion`. Id uniqueness is case-insensitive within a single
- * namespace. Strictly in-memory (rebuilt from the manifest scan each boot) — no DB, no persistence.
+ * namespace. The registry remains a pure in-memory container; the host publishes complete snapshots
+ * after durable reconciliation succeeds.
  *
  * Imports only the pure `$shared/plugins` contract — nothing from the executor or host — so it sits at
  * the base of the server plugin layer with no runtime import cycle.
@@ -22,9 +23,28 @@ import type { ExtensionPointId, PluginLifecycleState, PluginManifest } from '$sh
 export interface RegisteredPlugin {
   readonly manifest: PluginManifest;
   readonly sourceDir: string;
+  readonly enabled: boolean;
+  readonly discovered: boolean;
   readonly state: PluginLifecycleState;
   readonly registeredAt: string;
   readonly lastError?: string;
+}
+
+type PluginSnapshot = Map<string, Map<string, RegisteredPlugin>>;
+
+function addToSnapshot(snapshot: PluginSnapshot, plugin: RegisteredPlugin): void {
+  const apiVersion = plugin.manifest.apiVersion;
+  let namespace = snapshot.get(apiVersion);
+  if (!namespace) {
+    namespace = new Map<string, RegisteredPlugin>();
+    snapshot.set(apiVersion, namespace);
+  }
+
+  const key = plugin.manifest.id.toLowerCase();
+  if (namespace.has(key)) {
+    throw new Error(`Duplicate plugin id '${plugin.manifest.id}' within apiVersion '${apiVersion}'`);
+  }
+  namespace.set(key, plugin);
 }
 
 /**
@@ -33,7 +53,7 @@ export interface RegisteredPlugin {
  * coexist under two different `apiVersion` namespaces, fully isolated.
  */
 export class PluginRegistry {
-  private readonly byApiVersion = new Map<string, Map<string, RegisteredPlugin>>();
+  private byApiVersion = new Map<string, Map<string, RegisteredPlugin>>();
 
   /**
    * Register a validated manifest, keyed by `(apiVersion, lowercased id)` with `state: 'registered'`.
@@ -48,6 +68,8 @@ export class PluginRegistry {
     const entry: RegisteredPlugin = {
       manifest,
       sourceDir,
+      enabled: true,
+      discovered: true,
       state: 'registered',
       registeredAt: new Date().toISOString(),
     };
@@ -73,6 +95,22 @@ export class PluginRegistry {
     return this.byApiVersion.get(apiVersion)?.get(id.toLowerCase());
   }
 
+  /**
+   * Publish a durable enablement decision into the current snapshot. Returns `false` when the
+   * identity is not currently discovered, which is valid for retained durable rows.
+   */
+  setEnabled(apiVersion: string, id: string, enabled: boolean): boolean {
+    const namespace = this.byApiVersion.get(apiVersion);
+    const key = id.toLowerCase();
+    const plugin = namespace?.get(key);
+    if (!namespace || !plugin) {
+      return false;
+    }
+
+    namespace.set(key, { ...plugin, enabled });
+    return true;
+  }
+
   /** Every plugin registered under an `apiVersion` namespace (empty when the namespace is unknown). */
   listByApiVersion(apiVersion: string): readonly RegisteredPlugin[] {
     const namespace = this.byApiVersion.get(apiVersion);
@@ -81,7 +119,23 @@ export class PluginRegistry {
 
   /** Plugins in an `apiVersion` namespace whose manifest declares the given extension point. */
   listForPoint(apiVersion: string, point: ExtensionPointId): readonly RegisteredPlugin[] {
-    return this.listByApiVersion(apiVersion).filter((plugin) => plugin.manifest.extensionPoints.includes(point));
+    return this.listByApiVersion(apiVersion).filter(
+      (plugin) => plugin.enabled && plugin.discovered && plugin.manifest.extensionPoints.includes(point)
+    );
+  }
+
+  /**
+   * Atomically replace every namespace with a complete candidate snapshot. The candidate is fully
+   * indexed and checked for case-insensitive duplicate ids before the current snapshot is mutated.
+   */
+  replaceSnapshot(plugins: readonly RegisteredPlugin[]): void {
+    const candidate: PluginSnapshot = new Map();
+
+    for (const plugin of plugins) {
+      addToSnapshot(candidate, plugin);
+    }
+
+    this.byApiVersion = candidate;
   }
 
   /** Drop every registered plugin across all namespaces (host `reset()` / re-scan / shutdown). */

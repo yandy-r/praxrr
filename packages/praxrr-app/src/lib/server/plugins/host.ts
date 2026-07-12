@@ -5,10 +5,10 @@
  * `NotificationManager` shape). It owns discovery, validation, registration, and the observe-dispatch
  * seam, and it degrades gracefully at every step so it can NEVER abort boot:
  *
- * - `initialize()` is a hard NO-OP + info log when `PLUGINS_ENABLED` is off. When enabled it stats
- *   `config.paths.plugins`, warns + degrades to an empty registry on {@link Deno.errors.NotFound},
- *   scans → validates → registers valid manifests, skips + logs invalid ones, and ends with a summary
- *   info log. Only unexpected errors propagate (hooks.server.ts wraps this in warn-and-continue).
+ * - `initialize()` and `reload()` share one serialized operation. When enabled it builds a complete
+ *   validated candidate, reconciles it durably, then atomically publishes the committed snapshot.
+ *   Expected bad manifests are skipped; unexpected scan/database failures preserve the old snapshot
+ *   and propagate to the startup or route boundary. Feature-off reload is a no-I/O no-op.
  * - `notifyObservers(point, buildInput)` dispatches ONLY wired observe points (else throws
  *   {@link PluginPointNotWiredError}). It projects + secret-scrubs the input AT THE SEAM (via
  *   `scrubPluginBoundary`) BEFORE any `executor.execute`, isolates every plugin in a try/catch bounded
@@ -24,6 +24,11 @@
  */
 
 import { config } from '$config';
+import {
+  pluginRegistryQueries,
+  type PluginRegistryRecord,
+  type ReconcilePluginInput,
+} from '$db/queries/pluginRegistry.ts';
 import { logger } from '$logger/logger.ts';
 import {
   getExtensionPoint,
@@ -44,8 +49,43 @@ const OBSERVE_DISPATCH_TIMEOUT_MS = 5000;
 /** Log `source` tag for every host message. */
 const LOG_SOURCE = 'Plugins';
 
-/** The disposition of one scanned manifest entry after validation + registration. */
-type EntryOutcome = 'registered' | 'rejected';
+/** Public reload result; kept in lockstep with the generated `PluginReloadResponse` contract. */
+export interface PluginReloadSummary {
+  readonly pluginsEnabled: boolean;
+  readonly reloaded: boolean;
+  readonly discovered: number;
+  readonly registered: number;
+  readonly rejected: number;
+  readonly missing: number;
+}
+
+interface PluginCandidate {
+  readonly sourceDir: string;
+  readonly manifest: ReconcilePluginInput['manifest'];
+}
+
+export interface PluginHostDependencies {
+  readonly scan?: (dir: string) => Promise<readonly RawManifestEntry[]>;
+  readonly reconcile?: (inputs: readonly ReconcilePluginInput[]) => Promise<readonly PluginRegistryRecord[]>;
+  readonly setEnabled?: (
+    apiVersion: string,
+    pluginId: string,
+    enabled: boolean
+  ) => PluginRegistryRecord | undefined | Promise<PluginRegistryRecord | undefined>;
+}
+
+const DISABLED_RELOAD_SUMMARY: PluginReloadSummary = {
+  pluginsEnabled: false,
+  reloaded: false,
+  discovered: 0,
+  registered: 0,
+  rejected: 0,
+  missing: 0,
+};
+
+function pluginIdentity(apiVersion: string, pluginId: string): string {
+  return `${apiVersion}\u0000${pluginId.toLowerCase()}`;
+}
 
 /**
  * A promise that rejects with a {@link PluginExecutionError} when `signal` aborts. Lets the host bound
@@ -75,9 +115,21 @@ function rejectOnAbort(signal: AbortSignal, pluginId: string): Promise<never> {
  */
 export class PluginHost {
   private executor: PluginExecutor;
+  private readonly scanPlugins: (dir: string) => Promise<readonly RawManifestEntry[]>;
+  private readonly reconcilePlugins: (
+    inputs: readonly ReconcilePluginInput[]
+  ) => Promise<readonly PluginRegistryRecord[]>;
+  private readonly persistPluginEnabled: NonNullable<PluginHostDependencies['setEnabled']>;
+  private operationTail: Promise<void> = Promise.resolve();
+  private reloadInFlight: Promise<PluginReloadSummary> | undefined;
 
-  constructor(executor: PluginExecutor = new UnavailablePluginExecutor()) {
+  constructor(executor: PluginExecutor = new UnavailablePluginExecutor(), dependencies: PluginHostDependencies = {}) {
     this.executor = executor;
+    this.scanPlugins = dependencies.scan ?? scanPluginDir;
+    this.reconcilePlugins = dependencies.reconcile ?? ((inputs) => pluginRegistryQueries.reconcile(inputs));
+    this.persistPluginEnabled =
+      dependencies.setEnabled ??
+      ((apiVersion, pluginId, enabled) => pluginRegistryQueries.setEnabled(apiVersion, pluginId, enabled));
   }
 
   /** Swap the execution seam (Phase-2 runtime or a test fake). Takes effect on the next dispatch. */
@@ -85,44 +137,93 @@ export class PluginHost {
     this.executor = executor;
   }
 
+  /** Initialize through the same serialized reconciliation path used by admin reloads. */
+  initialize(): Promise<PluginReloadSummary> {
+    return this.reload();
+  }
+
   /**
-   * Discover, validate, and register plugins. A hard NO-OP + info log when `PLUGINS_ENABLED` is off.
-   * When enabled it stats `config.paths.plugins` (warn + degrade to an empty registry on
-   * {@link Deno.errors.NotFound}), scans + validates each manifest, registers the valid ones, skips +
-   * logs the invalid ones, and ends with a summary info log. Only unexpected errors propagate — this
-   * never throws on the disabled, missing-dir, or invalid-manifest paths, so it cannot abort boot.
+   * Return the current reload promise, or synchronously install a new owning promise before any
+   * caller can start a second scan. The owning promise alone clears the single-flight slot.
    */
-  async initialize(): Promise<void> {
+  reload(): Promise<PluginReloadSummary> {
+    if (this.reloadInFlight !== undefined) {
+      return this.reloadInFlight;
+    }
+
+    const work = this.enqueueOperation(() => this.performReload());
+    const owned = work.finally(() => {
+      if (this.reloadInFlight === owned) {
+        this.reloadInFlight = undefined;
+      }
+    });
+    this.reloadInFlight = owned;
+    return owned;
+  }
+
+  /**
+   * Serialize a durable enablement mutation with reload, then publish the committed decision into
+   * the live snapshot before the caller can observe success. A retained-but-undiscovered durable
+   * row intentionally has no live entry to update.
+   */
+  async setPluginEnabled(
+    apiVersion: string,
+    pluginId: string,
+    enabled: boolean
+  ): Promise<PluginRegistryRecord | undefined> {
+    if (!config.pluginsEnabled) {
+      return undefined;
+    }
+
+    return await this.enqueueOperation(async () => {
+      const record = await this.persistPluginEnabled(apiVersion, pluginId, enabled);
+      if (record) {
+        pluginRegistry.setEnabled(record.apiVersion, record.pluginId, record.enabled);
+      }
+      return record;
+    });
+  }
+
+  /** Queue durable/live snapshot operations while allowing later work to continue after errors. */
+  private enqueueOperation<T>(operation: () => T | Promise<T>): Promise<T> {
+    const result = this.operationTail.then(operation);
+    this.operationTail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
+  private async performReload(): Promise<PluginReloadSummary> {
     if (!config.pluginsEnabled) {
       await logger.info('Plugins disabled via PLUGINS_ENABLED', {
         source: LOG_SOURCE,
         meta: { enabled: false },
       });
-      return;
+      return DISABLED_RELOAD_SUMMARY;
     }
 
     const dir = config.paths.plugins;
-    let discovered = 0;
-    let registered = 0;
-    let rejected = 0;
+    const entries = (await this.pluginDirExists(dir)) ? await this.scanPlugins(dir) : [];
+    const candidates = await this.buildCandidate(entries);
+    const rows = await this.reconcilePlugins(candidates.map(({ manifest }) => ({ manifest })));
+    const snapshot = this.toRegisteredPlugins(rows, candidates);
+    pluginRegistry.replaceSnapshot(snapshot);
 
-    if (await this.pluginDirExists(dir)) {
-      const entries = await scanPluginDir(dir);
-      discovered = entries.length;
-      for (const entry of entries) {
-        const outcome = await this.registerEntry(entry);
-        if (outcome === 'registered') {
-          registered += 1;
-        } else {
-          rejected += 1;
-        }
-      }
-    }
+    const summary: PluginReloadSummary = {
+      pluginsEnabled: true,
+      reloaded: true,
+      discovered: entries.length,
+      registered: snapshot.length,
+      rejected: entries.length - candidates.length,
+      missing: rows.filter((row) => !row.discovered).length,
+    };
 
     await logger.info('Plugin host initialized', {
       source: LOG_SOURCE,
-      meta: { enabled: true, discovered, registered, rejected },
+      meta: summary,
     });
+    return summary;
   }
 
   /**
@@ -180,38 +281,81 @@ export class PluginHost {
     }
   }
 
-  /**
-   * Validate and register one scanned entry. Malformed JSON, a failed validation, or a duplicate id is
-   * SKIPPED + logged (returns `'rejected'`), never thrown — one bad manifest never blocks the rest.
-   */
-  private async registerEntry(entry: RawManifestEntry): Promise<EntryOutcome> {
-    if (entry.parseError !== undefined) {
-      await logger.warn('Skipping plugin with unparseable manifest', {
-        source: LOG_SOURCE,
-        meta: { dir: entry.dir, error: entry.parseError },
-      });
-      return 'rejected';
+  /** Build a complete validated, namespace-unique candidate without touching durable or live state. */
+  private async buildCandidate(entries: readonly RawManifestEntry[]): Promise<readonly PluginCandidate[]> {
+    const candidates: PluginCandidate[] = [];
+    const identities = new Set<string>();
+
+    for (const entry of entries) {
+      if (entry.parseError !== undefined) {
+        await logger.warn('Skipping plugin with unparseable manifest', {
+          source: LOG_SOURCE,
+          meta: { dir: entry.dir, error: entry.parseError },
+        });
+        continue;
+      }
+
+      const result = validatePluginManifest(entry.raw);
+      if (!result.ok) {
+        await logger.warn('Skipping plugin with invalid manifest', {
+          source: LOG_SOURCE,
+          meta: { dir: entry.dir, issues: result.errors },
+        });
+        continue;
+      }
+
+      const identity = pluginIdentity(result.manifest.apiVersion, result.manifest.id);
+      if (identities.has(identity)) {
+        await logger.warn('Skipping plugin that failed registration', {
+          source: LOG_SOURCE,
+          meta: {
+            dir: entry.dir,
+            id: result.manifest.id,
+            error: `Duplicate plugin id within apiVersion '${result.manifest.apiVersion}'`,
+          },
+        });
+        continue;
+      }
+
+      identities.add(identity);
+      candidates.push({ sourceDir: entry.dir, manifest: result.manifest });
     }
 
-    const result = validatePluginManifest(entry.raw);
-    if (!result.ok) {
-      await logger.warn('Skipping plugin with invalid manifest', {
-        source: LOG_SOURCE,
-        meta: { dir: entry.dir, issues: result.errors },
-      });
-      return 'rejected';
-    }
+    return candidates;
+  }
 
-    try {
-      pluginRegistry.register(entry.dir, result.manifest);
-      return 'registered';
-    } catch (error) {
-      await logger.warn('Skipping plugin that failed registration', {
-        source: LOG_SOURCE,
-        meta: { dir: entry.dir, id: result.manifest.id, error: String(error) },
-      });
-      return 'rejected';
-    }
+  /** Combine committed durable decisions with current source directories for atomic publication. */
+  private toRegisteredPlugins(
+    rows: readonly PluginRegistryRecord[],
+    candidates: readonly PluginCandidate[]
+  ): readonly RegisteredPlugin[] {
+    const sources = new Map(
+      candidates.map((candidate) => [
+        pluginIdentity(candidate.manifest.apiVersion, candidate.manifest.id),
+        candidate.sourceDir,
+      ])
+    );
+
+    return rows.flatMap((row) => {
+      if (!row.discovered) {
+        return [];
+      }
+      const sourceDir = sources.get(pluginIdentity(row.apiVersion, row.pluginId));
+      if (sourceDir === undefined) {
+        throw new Error(`Reconciled plugin '${row.pluginId}' has no current discovery source`);
+      }
+      return [
+        {
+          manifest: row.manifest,
+          sourceDir,
+          enabled: row.enabled,
+          discovered: row.discovered,
+          state: row.state,
+          registeredAt: row.registeredAt,
+          ...(row.lastError === null ? {} : { lastError: row.lastError }),
+        },
+      ];
+    });
   }
 
   /**

@@ -71,13 +71,21 @@ per-entry outcome with the stored lifecycle state.
 
 ## The registry
 
-The registry is an in-memory,
-`apiVersion`-namespaced map — conceptually
-`Map<apiVersion, Map<lowercased-id, RegisteredPlugin>>`. It holds no
-persistent state: it is rebuilt from a fresh scan on every boot, with no
-database backing.
+The dispatch registry is an in-memory, `apiVersion`-namespaced map —
+conceptually `Map<apiVersion, Map<lowercased-id, RegisteredPlugin>>`. It is the
+snapshot the host reads when dispatching an observe point, and it is rebuilt
+from a fresh scan on every boot (each scan atomically replaces the previous
+snapshot).
 
-Key properties:
+A separate durable store (App SQLite, added by the management backend) records
+validated-manifest metadata and enablement intent and is reconciled against on
+each scan, so an operator's enable/disable decision survives restarts. That
+durable layer and its management API are outside the authoring contract this
+guide covers; nothing you write in a manifest depends on it. What matters for
+authoring is unchanged: your plugin is discovered, validated, and registered
+into the in-memory dispatch snapshot described here.
+
+Key properties of the dispatch registry:
 
 - **Namespaced by `apiVersion`.** The outer map is keyed by the
   manifest's `apiVersion` (the string `'1'` in Phase-1). Because the
