@@ -56,6 +56,8 @@ tags:
     description: Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations
   - name: MCP
     description: Model Context Protocol server — read-only tools, resources, and prompts over Praxrr's configuration and observability surface
+  - name: Plugins
+    description: Durable plugin discovery and enablement management, feature-flagged independently from runtime execution
   - name: WebAuthn
     description: Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)
 
@@ -70,6 +72,16 @@ paths:
     $ref: './paths/system.yaml#/startup-pull-latest'
   /mcp:
     $ref: './paths/mcp.yaml#/mcp'
+  /plugins:
+    $ref: './paths/plugins.yaml#/list'
+  /plugins/reload:
+    $ref: './paths/plugins.yaml#/reload'
+  /plugins/{apiVersion}/{id}:
+    $ref: './paths/plugins.yaml#/detail'
+  /plugins/{apiVersion}/{id}/enable:
+    $ref: './paths/plugins.yaml#/enable'
+  /plugins/{apiVersion}/{id}/disable:
+    $ref: './paths/plugins.yaml#/disable'
   /ui-preferences:
     get:
       operationId: getUiPreference
@@ -945,6 +957,31 @@ components:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettings'
     SyncHistorySettingsUpdateRequest:
       $ref: './schemas/sync-history.yaml#/SyncHistorySettingsUpdateRequest'
+    # Plugins
+    PluginExtensionPointId:
+      $ref: './schemas/plugins.yaml#/PluginExtensionPointId'
+    PluginCapabilityId:
+      $ref: './schemas/plugins.yaml#/PluginCapabilityId'
+    PluginLifecycleState:
+      $ref: './schemas/plugins.yaml#/PluginLifecycleState'
+    PluginEngines:
+      $ref: './schemas/plugins.yaml#/PluginEngines'
+    PluginManifestMetadata:
+      $ref: './schemas/plugins.yaml#/PluginManifestMetadata'
+    PluginRecord:
+      $ref: './schemas/plugins.yaml#/PluginRecord'
+    PluginListResponse:
+      $ref: './schemas/plugins.yaml#/PluginListResponse'
+    PluginDetailResponse:
+      $ref: './schemas/plugins.yaml#/PluginDetailResponse'
+    PluginMutationResponse:
+      $ref: './schemas/plugins.yaml#/PluginMutationResponse'
+    PluginReloadResponse:
+      $ref: './schemas/plugins.yaml#/PluginReloadResponse'
+    PluginErrorCode:
+      $ref: './schemas/plugins.yaml#/PluginErrorCode'
+    PluginErrorResponse:
+      $ref: './schemas/plugins.yaml#/PluginErrorResponse'
     # Canary
     CanaryArrType:
       $ref: './schemas/canary.yaml#/CanaryArrType'

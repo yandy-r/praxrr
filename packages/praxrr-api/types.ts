@@ -130,9 +130,11 @@ export interface paths {
      *     runtime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.
      *
      *     Read-only: exposes Praxrr's configuration and observability surface (instances, drift, config
-     *     health, security posture, PCD databases and resolved entities, sync history) plus a
-     *     write-free `preview_sync`. Authenticate with the `X-Api-Key` header (required under AUTH=on);
-     *     there is no OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.
+     *     health, security posture, PCD databases and resolved entities, sync history, and the redacted
+     *     feature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no
+     *     plugin source directory, raw manifest, credential, or mutation handler. Authenticate with the
+     *     `X-Api-Key` header (required under AUTH=on); there is no OAuth/Bearer support. Disabled (404)
+     *     when `MCP_ENABLED` is off.
      */
     post: operations['postMcp'];
     /**
@@ -140,6 +142,115 @@ export interface paths {
      * @description The MCP endpoint is stateless with no session lifecycle; DELETE returns 405 (use POST).
      */
     delete: operations['deleteMcp'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plugins': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List durable plugin registry state
+     * @description Returns redacted validated manifest metadata plus durable enablement/discovery state. When
+     *     `PLUGINS_ENABLED` is off, returns 200 with `pluginsEnabled: false` and an empty `items` array;
+     *     persisted state is not mutated. Local source directories and raw manifests are never exposed.
+     */
+    get: operations['listPlugins'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plugins/reload': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rescan and atomically reconcile plugins
+     * @description Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one
+     *     transaction, then atomically publishes the new registry snapshot. Concurrent reload callers
+     *     share the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary
+     *     with `reloaded: false`, zero counters, and no filesystem or database mutation.
+     */
+    post: operations['reloadPlugins'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plugins/{apiVersion}/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read one API-version-qualified plugin
+     * @description Looks up one durable plugin by exact API-version namespace and case-insensitive plugin id.
+     *     Valid persisted identity values are not trimmed, and no API version is inferred.
+     */
+    get: operations['getPlugin'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plugins/{apiVersion}/{id}/enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enable one durable plugin identity
+     * @description Persists administrator enablement intent for one API-version-qualified plugin. This does not
+     *     assert runtime activation or successful execution. Disabled feature state rejects without
+     *     mutating durable state.
+     */
+    post: operations['enablePlugin'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plugins/{apiVersion}/{id}/disable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Disable one durable plugin identity
+     * @description Persists administrator disablement intent for one API-version-qualified plugin. Missing plugins
+     *     retain this decision for a later reappearance. Disabled feature state rejects without mutation.
+     */
+    post: operations['disablePlugin'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -2911,6 +3022,112 @@ export interface components {
       retentionMaxEntries?: number;
     };
     /**
+     * @description Closed plugin extension-point identifier accepted by this API version.
+     * @enum {string}
+     */
+    PluginExtensionPointId:
+      | 'config.profileCompiled.observe'
+      | 'sync.previewComputed.observe'
+      | 'config.validation.observe'
+      | 'sync.beforeApply.observe'
+      | 'sync.afterApply.observe'
+      | 'parser.releaseTitle.transform'
+      | 'customFormat.condition.evaluate'
+      | 'notification.dispatch.observe'
+      | 'importExport.adapter';
+    /**
+     * @description Closed, least-privilege capability identifier accepted by this API version.
+     * @enum {string}
+     */
+    PluginCapabilityId: 'read:resolved-profile' | 'read:sync-preview' | 'read:custom-format' | 'read:config-validation';
+    /**
+     * @description Last recorded lifecycle state. `enabled` is administrator intent and does not imply that a
+     *     plugin was activated or executed successfully.
+     * @enum {string}
+     */
+    PluginLifecycleState: 'discovered' | 'validated' | 'registered' | 'rejected' | 'activated' | 'failed' | 'unloaded';
+    /** @description Advisory host-version constraints from the validated manifest. */
+    PluginEngines: {
+      praxrr?: string;
+    };
+    /**
+     * @description Validated manifest metadata. Authored identifiers and names are returned exactly as persisted;
+     *     local source directories and unvalidated raw manifest content are never exposed.
+     */
+    PluginManifestMetadata: {
+      apiVersion: string;
+      id: string;
+      name: string;
+      version: string;
+      /** @enum {string} */
+      runtime: 'wasm';
+      /** @description Manifest-relative module entry; never an absolute source path. */
+      entry: string;
+      extensionPoints: components['schemas']['PluginExtensionPointId'][];
+      capabilities: components['schemas']['PluginCapabilityId'][];
+      description?: string;
+      author?: string;
+      engines?: components['schemas']['PluginEngines'];
+    };
+    /** @description Durable, redacted plugin discovery and enablement state. */
+    PluginRecord: {
+      manifest: components['schemas']['PluginManifestMetadata'];
+      /** @description Persisted administrator intent; does not assert runtime activation or execution. */
+      enabled: boolean;
+      /** @description Whether the plugin was present in the latest successfully reconciled scan. */
+      discovered: boolean;
+      state: components['schemas']['PluginLifecycleState'];
+      /** Format: date-time */
+      registeredAt: string;
+      /** @description Safe last lifecycle error, or null when none is recorded. */
+      lastError: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PluginListResponse: {
+      pluginsEnabled: boolean;
+      /** @description Empty while `PLUGINS_ENABLED` is off; otherwise includes durable discovered and missing rows. */
+      items: components['schemas']['PluginRecord'][];
+    };
+    PluginDetailResponse: {
+      /** @constant */
+      pluginsEnabled: true;
+      plugin: components['schemas']['PluginRecord'];
+    };
+    /** @description Updated durable enablement intent for one API-version-qualified plugin. */
+    PluginMutationResponse: {
+      /** @constant */
+      pluginsEnabled: true;
+      plugin: components['schemas']['PluginRecord'];
+    };
+    /**
+     * @description Atomic reload summary. When plugins are disabled, `reloaded` is false and every counter is zero;
+     *     no filesystem scan or durable mutation occurs.
+     */
+    PluginReloadResponse: {
+      pluginsEnabled: boolean;
+      reloaded: boolean;
+      /** @description Manifest files found by the bounded scan. */
+      discovered: number;
+      /** @description Validated plugins published in the new registry snapshot. */
+      registered: number;
+      /** @description Malformed, invalid, duplicate, or otherwise rejected scan entries. */
+      rejected: number;
+      /** @description Persisted plugins marked undiscovered by this successful reconciliation. */
+      missing: number;
+    };
+    /**
+     * @description Stable management failure code; raw filesystem/database diagnostics are never returned.
+     * @enum {string}
+     */
+    PluginErrorCode: 'invalid_identity' | 'plugins_disabled' | 'plugin_not_found' | 'internal_error';
+    PluginErrorResponse: {
+      code: components['schemas']['PluginErrorCode'];
+      error: string;
+    };
+    /**
      * @description Arr family a rollout is scoped to. A rollout never spans types.
      * @enum {string}
      */
@@ -5531,6 +5748,247 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  listPlugins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Feature-aware plugin registry list */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginListResponse'];
+        };
+      };
+      /** @description Failed to read durable plugin registry state */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
+  reloadPlugins: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Reload completed or feature-off no-op summary */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginReloadResponse'];
+        };
+      };
+      /** @description Reload failed; the previous in-memory registry remains usable */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
+  getPlugin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Exact non-empty plugin contract API-version namespace; no current version is inferred. */
+        apiVersion: string;
+        /** @description Non-empty persisted plugin id; lookup is case-insensitive within the selected namespace. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redacted durable plugin state */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginDetailResponse'];
+        };
+      };
+      /** @description Empty or otherwise invalid path identity */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin not found in the requested API-version namespace */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin management is disabled by `PLUGINS_ENABLED` */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Failed to read durable plugin state */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
+  enablePlugin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Exact non-empty plugin contract API-version namespace; no current version is inferred. */
+        apiVersion: string;
+        /** @description Non-empty persisted plugin id; lookup is case-insensitive within the selected namespace. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Plugin enablement intent persisted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginMutationResponse'];
+        };
+      };
+      /** @description Empty or otherwise invalid path identity */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin not found in the requested API-version namespace */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin management is disabled or a registry reconciliation conflicts with this mutation */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Failed to persist plugin enablement */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
+  disablePlugin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Exact non-empty plugin contract API-version namespace; no current version is inferred. */
+        apiVersion: string;
+        /** @description Non-empty persisted plugin id; lookup is case-insensitive within the selected namespace. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Plugin disablement intent persisted */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginMutationResponse'];
+        };
+      };
+      /** @description Empty or otherwise invalid path identity */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin not found in the requested API-version namespace */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Plugin management is disabled or a registry reconciliation conflicts with this mutation */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Failed to persist plugin disablement */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
       };
     };
   };

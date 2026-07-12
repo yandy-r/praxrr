@@ -6,7 +6,28 @@
  * its inert default, and the full error taxonomy (trashguide `index.ts` barrel pattern).
  */
 
-export { pluginHost, PluginHost } from './host.ts';
+export { pluginHost, PluginHost, type PluginHostDependencies, type PluginReloadSummary } from './host.ts';
+export {
+  getPlugin,
+  listPlugins,
+  reloadPlugins,
+  setPluginEnabled,
+  toPluginErrorResponse,
+  toPluginManifestResponse,
+  toPluginResponse,
+  type PluginDetailResponse,
+  type PluginErrorCode,
+  type PluginErrorResponse,
+  type PluginListOutcome,
+  type PluginListResponse,
+  type PluginManifestResponse,
+  type PluginMutationOutcome,
+  type PluginMutationResponse,
+  type PluginReadOutcome,
+  type PluginReloadOutcome,
+  type PluginReloadResponse,
+  type PluginResponse,
+} from './responses.ts';
 export { pluginRegistry, PluginRegistry, type RegisteredPlugin } from './registry.ts';
 export {
   UnavailablePluginExecutor,
