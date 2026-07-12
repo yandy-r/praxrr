@@ -175,8 +175,7 @@ These are different claims:
 The current API proves only the second statement. Although the repository
 currently ships an unavailable default executor, hard-coding that implementation
 detail into the browser will become stale when a runtime is added. To satisfy
-
-# 266 fully, add an API status such as
+issue #266 fully, add an API status such as
 
 `runtimeAvailability: 'available' | 'unavailable' | 'unknown'` and structured
 recent-run evidence. Until then, show a page-level neutral limitation notice and
