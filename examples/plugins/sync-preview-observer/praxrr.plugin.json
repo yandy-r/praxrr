@@ -1,0 +1,11 @@
+{
+  "apiVersion": "1",
+  "id": "dev.praxrr.examples.sync-preview-observer",
+  "name": "Sync Preview Observer (Example)",
+  "version": "1.0.0",
+  "runtime": "wasm",
+  "entry": "plugin.wasm",
+  "description": "Example observe-only Praxrr plugin for sync.previewComputed.observe.",
+  "extensionPoints": ["sync.previewComputed.observe"],
+  "capabilities": ["read:sync-preview"]
+}

@@ -15,6 +15,16 @@ through, the capability projection/redaction boundary, the sole-I/O-mediator inv
 graceful-degradation contract. It documents the design as of Phase 1; points and capabilities
 that are declared-but-inert are called out explicitly.
 
+## Published Developer Docs
+
+Third-party plugin authors should start with the published **Plugin SDK** guide
+at <https://docs.praxrr.dev/plugins/> (source under
+`docs/site/src/content/docs/plugins/`). It covers the manifest contract, the
+capability catalog, the extension-point catalog, lifecycle, observe snapshots,
+and API versioning for external developers, plus a buildable example under
+`examples/plugins/sync-preview-observer/`. This note remains the authoritative
+contract mirror — the published pages must not contradict it.
+
 ## Module Map
 
 The subsystem is split across two roots by a hard **purity boundary**. Contract code is pure and

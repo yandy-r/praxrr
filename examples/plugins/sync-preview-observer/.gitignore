@@ -1,0 +1,3 @@
+# The compiled WebAssembly module is a build artifact — build it locally, never
+# commit it.
+plugin.wasm
