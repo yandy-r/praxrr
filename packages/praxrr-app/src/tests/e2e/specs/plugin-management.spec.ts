@@ -143,7 +143,9 @@ test.describe('Plugin management', () => {
     await ensureAuthenticated(page);
   });
 
-  test('feature-off is a normal configuration state with no mutation or reload controls', async ({ page }) => {
+  test('feature-off is a normal configuration state with an enable control and no registry mutations', async ({
+    page,
+  }) => {
     let requests = 0;
     await installPluginMocks(page, async (route, url) => {
       requests += 1;
@@ -153,11 +155,33 @@ test.describe('Plugin management', () => {
     });
 
     await openPlugins(page);
-    await expect(page.getByRole('heading', { name: 'Plugin management is disabled' })).toBeVisible();
-    await expect(page.getByText('PLUGINS_ENABLED')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Plugin ecosystem is off' })).toBeVisible();
+    await expect(page.getByText('Enable plugins', { exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Enable plugins' })).toBeVisible();
+    await expect(page.getByText('PLUGINS_ENABLED')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reload plugins' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Enable|Disable/ })).toHaveCount(0);
     expect(requests).toBe(1);
+  });
+
+  test('feature-off enable checkbox persists via settings API then loads the registry', async ({ page }) => {
+    let settingsCalls = 0;
+    let listCalls = 0;
+    await installPluginMocks(page, async (route, url) => {
+      if (url.pathname === '/api/v1/plugins/settings' && route.request().method() === 'PATCH') {
+        settingsCalls += 1;
+        expect(route.request().postDataJSON()).toEqual({ pluginsEnabled: true });
+        await fulfillJson(route, { pluginsEnabled: true });
+        return;
+      }
+      listCalls += 1;
+      await fulfillJson(route, listCalls === 1 ? list([], false) : list([DISCOVERED]));
+    });
+
+    await openPlugins(page);
+    await page.getByRole('checkbox', { name: 'Enable plugins' }).click();
+    await expect(page.getByText('Example Plugin', { exact: true }).first()).toBeVisible();
+    expect(settingsCalls).toBe(1);
+    expect(listCalls).toBe(2);
   });
 
   test('feature-off reload response transitions to disabled without claiming a successful scan', async ({ page }) => {
@@ -178,7 +202,7 @@ test.describe('Plugin management', () => {
     await expect(page.getByText('Example Plugin', { exact: true }).first()).toBeVisible();
     await page.getByRole('button', { name: 'Reload plugins' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Plugin management is disabled' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Plugin ecosystem is off' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Latest reload summary' })).toHaveCount(0);
     await expect(page.getByText(/Reload committed/)).toHaveCount(0);
     expect(reloadCalls).toBe(1);
@@ -350,7 +374,7 @@ test.describe('Plugin management', () => {
       if (outcome === 404) {
         await expect(page.getByRole('heading', { name: 'No plugins discovered' })).toBeVisible();
       } else {
-        await expect(page.getByRole('heading', { name: 'Plugin management is disabled' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Plugin ecosystem is off' })).toBeVisible();
       }
       expect(mutationCalls).toBe(1);
       expect(listCalls).toBeGreaterThanOrEqual(2);
@@ -491,11 +515,8 @@ test.describe('Plugin management', () => {
 
     scenario = 'feature-off';
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Plugin management is disabled' })).toBeVisible();
-    await expectTouchTarget(
-      page.getByRole('button', { name: 'Check configuration again' }),
-      'Feature-off configuration retry'
-    );
+    await expect(page.getByRole('heading', { name: 'Plugin ecosystem is off' })).toBeVisible();
+    await expectTouchTarget(page.getByRole('checkbox', { name: 'Enable plugins' }), 'Feature-off enable checkbox');
 
     scenario = 'empty';
     await page.reload();

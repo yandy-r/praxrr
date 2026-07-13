@@ -6,6 +6,7 @@ type PluginRecord = components['schemas']['PluginRecord'];
 type PluginListResponse = components['schemas']['PluginListResponse'];
 type PluginMutationResponse = components['schemas']['PluginMutationResponse'];
 type PluginReloadResponse = components['schemas']['PluginReloadResponse'];
+type PluginSettingsResponse = components['schemas']['PluginSettingsResponse'];
 type PluginLifecycleState = components['schemas']['PluginLifecycleState'];
 
 const LIFECYCLE_STATES = new Set<PluginLifecycleState>([
@@ -77,4 +78,8 @@ export function isPluginReloadResponse(value: unknown): value is PluginReloadRes
     const count = value[field];
     return typeof count === 'number' && Number.isInteger(count) && count >= 0;
   });
+}
+
+export function isPluginSettingsResponse(value: unknown): value is PluginSettingsResponse {
+  return isRecord(value) && typeof value.pluginsEnabled === 'boolean';
 }

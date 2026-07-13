@@ -33,6 +33,8 @@ type AppPluginRecord = AppComponents['schemas']['PluginRecord'];
 type PortablePluginRecord = PortableComponents['schemas']['PluginRecord'];
 type AppPluginListResponse = AppComponents['schemas']['PluginListResponse'];
 type PortablePluginListResponse = PortableComponents['schemas']['PluginListResponse'];
+type AppPluginSettingsResponse = AppComponents['schemas']['PluginSettingsResponse'];
+type PortablePluginSettingsResponse = PortableComponents['schemas']['PluginSettingsResponse'];
 type AppPluginReloadResponse = AppComponents['schemas']['PluginReloadResponse'];
 type PortablePluginReloadResponse = PortableComponents['schemas']['PluginReloadResponse'];
 type AppPluginErrorResponse = AppComponents['schemas']['PluginErrorResponse'];
@@ -87,8 +89,16 @@ const PLUGIN_RECORD_REQUIRED = [
   'updatedAt',
 ];
 const PLUGIN_LIST_REQUIRED = ['pluginsEnabled', 'items'];
+const PLUGIN_SETTINGS_REQUIRED = ['pluginsEnabled'];
 const PLUGIN_RELOAD_REQUIRED = ['pluginsEnabled', 'reloaded', 'discovered', 'registered', 'rejected', 'missing'];
 const PLUGIN_ERROR_REQUIRED = ['code', 'error'];
+
+const PLUGIN_SETTINGS_STATUSES = {
+  '200': 'PluginSettingsResponse',
+  '400': 'PluginErrorResponse',
+  '403': null,
+  '500': 'PluginErrorResponse',
+} as const;
 
 const PLUGIN_DETAIL_STATUSES = {
   '200': 'PluginDetailResponse',
@@ -228,6 +238,10 @@ const GENERATED_PLUGIN_LIST_SAMPLE = {
   pluginsEnabled: true,
   items: [GENERATED_PLUGIN_RECORD_SAMPLE],
 } satisfies AppPluginListResponse & PortablePluginListResponse;
+
+const GENERATED_PLUGIN_SETTINGS_SAMPLE = {
+  pluginsEnabled: true,
+} satisfies AppPluginSettingsResponse & PortablePluginSettingsResponse;
 
 const GENERATED_PLUGIN_RELOAD_SAMPLE = {
   pluginsEnabled: true,
@@ -406,6 +420,7 @@ Deno.test('plugin management source, bundle, paths, and generated declarations s
     ['PluginManifestMetadata', PLUGIN_MANIFEST_REQUIRED, Object.keys(GENERATED_PLUGIN_MANIFEST_SAMPLE)],
     ['PluginRecord', PLUGIN_RECORD_REQUIRED, Object.keys(GENERATED_PLUGIN_RECORD_SAMPLE)],
     ['PluginListResponse', PLUGIN_LIST_REQUIRED, Object.keys(GENERATED_PLUGIN_LIST_SAMPLE)],
+    ['PluginSettingsResponse', PLUGIN_SETTINGS_REQUIRED, Object.keys(GENERATED_PLUGIN_SETTINGS_SAMPLE)],
     ['PluginReloadResponse', PLUGIN_RELOAD_REQUIRED, Object.keys(GENERATED_PLUGIN_RELOAD_SAMPLE)],
     ['PluginErrorResponse', PLUGIN_ERROR_REQUIRED, Object.keys(GENERATED_PLUGIN_ERROR_SAMPLE)],
   ] as const;
@@ -442,6 +457,18 @@ Deno.test('plugin management source, bundle, paths, and generated declarations s
       method: 'get',
       bundledPath: '/plugins',
       statuses: { '200': 'PluginListResponse', '500': 'PluginErrorResponse' },
+    },
+    {
+      sourceKey: 'settings',
+      method: 'get',
+      bundledPath: '/plugins/settings',
+      statuses: { '200': 'PluginSettingsResponse', '500': 'PluginErrorResponse' },
+    },
+    {
+      sourceKey: 'settings',
+      method: 'patch',
+      bundledPath: '/plugins/settings',
+      statuses: PLUGIN_SETTINGS_STATUSES,
     },
     {
       sourceKey: 'reload',

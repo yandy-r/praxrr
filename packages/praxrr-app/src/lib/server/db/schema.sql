@@ -851,6 +851,10 @@ CREATE TABLE general_settings (
     -- Default delay profile settings
     apply_default_delay_profiles INTEGER NOT NULL DEFAULT 1,  -- 1=apply defaults when adding arr, 0=don't
 
+    -- Plugin ecosystem master enablement (UI-backed; default off)
+    -- Migration: 20260725_add_plugins_enabled_to_general_settings.ts
+    plugins_enabled INTEGER NOT NULL DEFAULT 0 CHECK (plugins_enabled IN (0, 1)),
+
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

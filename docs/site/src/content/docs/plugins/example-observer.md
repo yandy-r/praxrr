@@ -75,7 +75,7 @@ The plugin subsystem is off by default. Enable it and point it at an
 _existing_ directory:
 
 ```sh
-export PLUGINS_ENABLED=1
+# Enable plugins in the UI (Apps → Plugins), then optionally:
 mkdir -p /path/to/praxrr-plugins
 export PLUGINS_DIR=/path/to/praxrr-plugins
 ```

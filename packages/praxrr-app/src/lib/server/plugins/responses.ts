@@ -7,9 +7,9 @@
  */
 
 import type { components } from '$api/v1.d.ts';
-import { config } from '$config';
 import { pluginRegistryQueries, type PluginRegistryRecord } from '$db/queries/pluginRegistry.ts';
 import type { PluginManifest } from '$shared/plugins/index.ts';
+import { isPluginsEnabled, persistPluginsEnabled } from './featureFlag.ts';
 import { pluginHost } from './host.ts';
 
 export type PluginManifestResponse = components['schemas']['PluginManifestMetadata'];
@@ -20,6 +20,7 @@ export type PluginMutationResponse = components['schemas']['PluginMutationRespon
 export type PluginReloadResponse = components['schemas']['PluginReloadResponse'];
 export type PluginErrorCode = components['schemas']['PluginErrorCode'];
 export type PluginErrorResponse = components['schemas']['PluginErrorResponse'];
+export type PluginSettingsResponse = components['schemas']['PluginSettingsResponse'];
 
 export type PluginListOutcome =
   | { readonly kind: 'success'; readonly response: PluginListResponse }
@@ -41,9 +42,13 @@ export type PluginReloadOutcome =
   | { readonly kind: 'success'; readonly response: PluginReloadResponse }
   | { readonly kind: 'error'; readonly error: unknown };
 
+export type PluginSettingsOutcome =
+  | { readonly kind: 'success'; readonly response: PluginSettingsResponse }
+  | { readonly kind: 'error'; readonly error: unknown };
+
 const ERROR_MESSAGES = {
   invalid_identity: 'Plugin apiVersion and id must be non-empty strings',
-  plugins_disabled: 'Plugin management is disabled by PLUGINS_ENABLED',
+  plugins_disabled: 'Plugin management is disabled. Enable the plugin ecosystem in Settings → Plugins.',
   plugin_not_found: 'Plugin not found in the requested API-version namespace',
   internal_error: 'Plugin management operation failed',
 } as const satisfies Record<PluginErrorCode, string>;
@@ -90,9 +95,36 @@ export function toPluginResponse(record: PluginRegistryRecord): PluginResponse {
   };
 }
 
+/** Read the global plugin-ecosystem enablement flag. */
+export function getPluginSettings(): PluginSettingsOutcome {
+  try {
+    return { kind: 'success', response: { pluginsEnabled: isPluginsEnabled() } };
+  } catch (error) {
+    return { kind: 'error', error };
+  }
+}
+
+/**
+ * Persist global enablement, then activate or deactivate the host without requiring a restart.
+ * Enablement is written before host work so reload/initialize observes the new flag.
+ */
+export async function setPluginSettings(pluginsEnabled: boolean): Promise<PluginSettingsOutcome> {
+  try {
+    persistPluginsEnabled(pluginsEnabled);
+    if (pluginsEnabled) {
+      await pluginHost.initialize();
+    } else {
+      pluginHost.reset();
+    }
+    return { kind: 'success', response: { pluginsEnabled } };
+  } catch (error) {
+    return { kind: 'error', error };
+  }
+}
+
 /** List durable plugin state, returning the contract-defined empty view while the feature is off. */
 export function listPlugins(): PluginListOutcome {
-  if (!config.pluginsEnabled) {
+  if (!isPluginsEnabled()) {
     return { kind: 'success', response: { pluginsEnabled: false, items: [] } };
   }
 
@@ -111,7 +143,7 @@ export function listPlugins(): PluginListOutcome {
 
 /** Read one plugin without inferring an API-version namespace. */
 export function getPlugin(apiVersion: string, id: string): PluginReadOutcome {
-  if (!config.pluginsEnabled) {
+  if (!isPluginsEnabled()) {
     return { kind: 'disabled' };
   }
 
@@ -135,7 +167,7 @@ export async function setPluginEnabled(
   id: string,
   enabled: boolean
 ): Promise<PluginMutationOutcome> {
-  if (!config.pluginsEnabled) {
+  if (!isPluginsEnabled()) {
     return { kind: 'disabled' };
   }
 

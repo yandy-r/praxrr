@@ -337,7 +337,7 @@
       "get": {
         "operationId": "listPlugins",
         "summary": "List durable plugin registry state",
-        "description": "Returns redacted validated manifest metadata plus durable enablement/discovery state. When\n`PLUGINS_ENABLED` is off, returns 200 with `pluginsEnabled: false` and an empty `items` array;\npersisted state is not mutated. Local source directories and raw manifests are never exposed.\n",
+        "description": "Returns redacted validated manifest metadata plus durable enablement/discovery state. When\nthe plugin ecosystem is disabled, returns 200 with `pluginsEnabled: false` and an empty\n`items` array; persisted state is not mutated. Local source directories and raw manifests are\nnever exposed.\n",
         "tags": ["Plugins"],
         "responses": {
           "200": {
@@ -363,11 +363,92 @@
         }
       }
     },
+    "/plugins/settings": {
+      "get": {
+        "operationId": "getPluginSettings",
+        "summary": "Get plugin ecosystem enablement",
+        "description": "Returns the global UI-backed master switch for the plugin ecosystem. Default is off.\nNavigation remains available regardless of this flag.\n",
+        "tags": ["Plugins"],
+        "responses": {
+          "200": {
+            "description": "Current plugin ecosystem enablement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read plugin settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePluginSettings",
+        "summary": "Update plugin ecosystem enablement",
+        "description": "Persists the global enablement flag and hot-applies it: enabling initializes the plugin\nhost; disabling clears the live registry snapshot. Durable registry rows are retained.\nBrowser requests must be same-origin; authenticated non-browser clients may omit Origin.\n",
+        "tags": ["Plugins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginSettingsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated plugin ecosystem enablement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cross-origin browser request rejected before mutation"
+          },
+          "500": {
+            "description": "Failed to update plugin settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/plugins/reload": {
       "post": {
         "operationId": "reloadPlugins",
         "summary": "Rescan and atomically reconcile plugins",
-        "description": "Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one\ntransaction, then atomically publishes the new registry snapshot. Concurrent reload callers\nshare the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary\nwith `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests\nmust be same-origin; authenticated non-browser clients may omit the `Origin` header.\n",
+        "description": "Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one\ntransaction, then atomically publishes the new registry snapshot. Concurrent reload callers\nshare the serialized operation. When the plugin ecosystem is disabled, returns a successful\nno-op summary with `reloaded: false`, zero counters, and no filesystem or database mutation.\nBrowser requests must be same-origin; authenticated non-browser clients may omit the `Origin`\nheader.\n",
         "tags": ["Plugins"],
         "responses": {
           "200": {
@@ -456,7 +537,7 @@
             }
           },
           "409": {
-            "description": "Plugin management is disabled by `PLUGINS_ENABLED`",
+            "description": "Plugin management is disabled (ecosystem enablement off)",
             "content": {
               "application/json": {
                 "schema": {
@@ -10002,10 +10083,33 @@
           },
           "items": {
             "type": "array",
-            "description": "Empty while `PLUGINS_ENABLED` is off; otherwise includes durable discovered and missing rows.",
+            "description": "Empty while the plugin ecosystem is disabled; otherwise includes durable discovered and missing rows.",
             "items": {
               "$ref": "#/components/schemas/PluginRecord"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PluginSettingsResponse": {
+        "type": "object",
+        "description": "Global plugin-ecosystem enablement (UI-backed master switch; default off).",
+        "required": ["pluginsEnabled"],
+        "properties": {
+          "pluginsEnabled": {
+            "type": "boolean",
+            "description": "When false, plugin management/reload/observe are hard no-ops. Nav remains visible."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PluginSettingsUpdate": {
+        "type": "object",
+        "required": ["pluginsEnabled"],
+        "properties": {
+          "pluginsEnabled": {
+            "type": "boolean",
+            "description": "Persist and hot-apply global plugin ecosystem enablement without restart."
           }
         },
         "additionalProperties": false

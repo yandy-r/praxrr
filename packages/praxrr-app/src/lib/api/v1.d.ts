@@ -156,8 +156,9 @@ export interface paths {
     /**
      * List durable plugin registry state
      * @description Returns redacted validated manifest metadata plus durable enablement/discovery state. When
-     *     `PLUGINS_ENABLED` is off, returns 200 with `pluginsEnabled: false` and an empty `items` array;
-     *     persisted state is not mutated. Local source directories and raw manifests are never exposed.
+     *     the plugin ecosystem is disabled, returns 200 with `pluginsEnabled: false` and an empty
+     *     `items` array; persisted state is not mutated. Local source directories and raw manifests are
+     *     never exposed.
      */
     get: operations['listPlugins'];
     put?: never;
@@ -166,6 +167,33 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/plugins/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get plugin ecosystem enablement
+     * @description Returns the global UI-backed master switch for the plugin ecosystem. Default is off.
+     *     Navigation remains available regardless of this flag.
+     */
+    get: operations['getPluginSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update plugin ecosystem enablement
+     * @description Persists the global enablement flag and hot-applies it: enabling initializes the plugin
+     *     host; disabling clears the live registry snapshot. Durable registry rows are retained.
+     *     Browser requests must be same-origin; authenticated non-browser clients may omit Origin.
+     */
+    patch: operations['updatePluginSettings'];
     trace?: never;
   };
   '/plugins/reload': {
@@ -181,9 +209,10 @@ export interface paths {
      * Rescan and atomically reconcile plugins
      * @description Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one
      *     transaction, then atomically publishes the new registry snapshot. Concurrent reload callers
-     *     share the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary
-     *     with `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests
-     *     must be same-origin; authenticated non-browser clients may omit the `Origin` header.
+     *     share the serialized operation. When the plugin ecosystem is disabled, returns a successful
+     *     no-op summary with `reloaded: false`, zero counters, and no filesystem or database mutation.
+     *     Browser requests must be same-origin; authenticated non-browser clients may omit the `Origin`
+     *     header.
      */
     post: operations['reloadPlugins'];
     delete?: never;
@@ -3089,8 +3118,17 @@ export interface components {
     };
     PluginListResponse: {
       pluginsEnabled: boolean;
-      /** @description Empty while `PLUGINS_ENABLED` is off; otherwise includes durable discovered and missing rows. */
+      /** @description Empty while the plugin ecosystem is disabled; otherwise includes durable discovered and missing rows. */
       items: components['schemas']['PluginRecord'][];
+    };
+    /** @description Global plugin-ecosystem enablement (UI-backed master switch; default off). */
+    PluginSettingsResponse: {
+      /** @description When false, plugin management/reload/observe are hard no-ops. Nav remains visible. */
+      pluginsEnabled: boolean;
+    };
+    PluginSettingsUpdate: {
+      /** @description Persist and hot-apply global plugin ecosystem enablement without restart. */
+      pluginsEnabled: boolean;
     };
     PluginDetailResponse: {
       /** @constant */
@@ -5779,6 +5817,84 @@ export interface operations {
       };
     };
   };
+  getPluginSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current plugin ecosystem enablement */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginSettingsResponse'];
+        };
+      };
+      /** @description Failed to read plugin settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
+  updatePluginSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PluginSettingsUpdate'];
+      };
+    };
+    responses: {
+      /** @description Updated plugin ecosystem enablement */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginSettingsResponse'];
+        };
+      };
+      /** @description Invalid settings payload */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+      /** @description Cross-origin browser request rejected before mutation */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Failed to update plugin settings */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PluginErrorResponse'];
+        };
+      };
+    };
+  };
   reloadPlugins: {
     parameters: {
       query?: never;
@@ -5856,7 +5972,7 @@ export interface operations {
           'application/json': components['schemas']['PluginErrorResponse'];
         };
       };
-      /** @description Plugin management is disabled by `PLUGINS_ENABLED` */
+      /** @description Plugin management is disabled (ecosystem enablement off) */
       409: {
         headers: {
           [name: string]: unknown;

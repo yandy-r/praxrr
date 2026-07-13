@@ -9,7 +9,7 @@ The full authoring walkthrough lives in the docs:
 <https://docs.praxrr.dev/plugins/example-observer/>.
 
 > **Phase-1 status — read this first.** Praxrr can **discover, validate, and
-> register** this plugin today (behind `PLUGINS_ENABLED`), but it does **not run
+> register** this plugin today (when plugins are enabled in the UI), but it does **not run
 > WebAssembly yet**: the default executor rejects every dispatch with
 > `wasm runtime not yet available`, so a registered plugin is **never
 > observed/executed**. The runtime is a documented NO-GO for the evaluated
@@ -51,11 +51,11 @@ tinygo build -target wasi -o plugin.wasm main.go
 ## Install locally
 
 Praxrr scans `PLUGINS_DIR` (default `<APP_BASE_PATH>/plugins`) for plugin
-directories when `PLUGINS_ENABLED` is on. The directory is **never
+directories when plugins are enabled in the UI. The directory is **never
 auto-created**.
 
 ```sh
-export PLUGINS_ENABLED=1
+# Enable plugins via Apps → Plugins in the UI, then optionally:
 export PLUGINS_DIR="/path/to/praxrr/dist/dev/plugins"
 
 make install PLUGINS_DIR="$PLUGINS_DIR"

@@ -40,7 +40,7 @@
     {
       label: 'Plugins',
       href: '/settings/plugins',
-      description: 'Discover plugins and manage their saved enablement intent',
+      description: 'Enable the plugins ecosystem and manage saved enablement intent',
       icon: Package,
       iconClass: 'text-violet-600 dark:text-violet-400',
     },

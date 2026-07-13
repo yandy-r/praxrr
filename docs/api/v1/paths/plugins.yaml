@@ -4,8 +4,9 @@ list:
     summary: List durable plugin registry state
     description: |
       Returns redacted validated manifest metadata plus durable enablement/discovery state. When
-      `PLUGINS_ENABLED` is off, returns 200 with `pluginsEnabled: false` and an empty `items` array;
-      persisted state is not mutated. Local source directories and raw manifests are never exposed.
+      the plugin ecosystem is disabled, returns 200 with `pluginsEnabled: false` and an empty
+      `items` array; persisted state is not mutated. Local source directories and raw manifests are
+      never exposed.
     tags:
       - Plugins
     responses:
@@ -17,6 +18,65 @@ list:
               $ref: '../schemas/plugins.yaml#/PluginListResponse'
       '500':
         description: Failed to read durable plugin registry state
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
+
+settings:
+  get:
+    operationId: getPluginSettings
+    summary: Get plugin ecosystem enablement
+    description: |
+      Returns the global UI-backed master switch for the plugin ecosystem. Default is off.
+      Navigation remains available regardless of this flag.
+    tags:
+      - Plugins
+    responses:
+      '200':
+        description: Current plugin ecosystem enablement
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/plugins.yaml#/PluginSettingsResponse'
+      '500':
+        description: Failed to read plugin settings
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
+  patch:
+    operationId: updatePluginSettings
+    summary: Update plugin ecosystem enablement
+    description: |
+      Persists the global enablement flag and hot-applies it: enabling initializes the plugin
+      host; disabling clears the live registry snapshot. Durable registry rows are retained.
+      Browser requests must be same-origin; authenticated non-browser clients may omit Origin.
+    tags:
+      - Plugins
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/plugins.yaml#/PluginSettingsUpdate'
+    responses:
+      '200':
+        description: Updated plugin ecosystem enablement
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/plugins.yaml#/PluginSettingsResponse'
+      '400':
+        description: Invalid settings payload
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
+      '403':
+        description: Cross-origin browser request rejected before mutation
+      '500':
+        description: Failed to update plugin settings
         content:
           application/json:
             schema:
@@ -66,7 +126,7 @@ detail:
             schema:
               $ref: '../schemas/plugins.yaml#/PluginErrorResponse'
       '409':
-        description: Plugin management is disabled by `PLUGINS_ENABLED`
+        description: Plugin management is disabled (ecosystem enablement off)
         content:
           application/json:
             schema:
@@ -205,9 +265,10 @@ reload:
     description: |
       Runs the bounded plugin scan, validates complete candidates, reconciles durable state in one
       transaction, then atomically publishes the new registry snapshot. Concurrent reload callers
-      share the serialized operation. When `PLUGINS_ENABLED` is off, returns a successful no-op summary
-      with `reloaded: false`, zero counters, and no filesystem or database mutation. Browser requests
-      must be same-origin; authenticated non-browser clients may omit the `Origin` header.
+      share the serialized operation. When the plugin ecosystem is disabled, returns a successful
+      no-op summary with `reloaded: false`, zero counters, and no filesystem or database mutation.
+      Browser requests must be same-origin; authenticated non-browser clients may omit the `Origin`
+      header.
     tags:
       - Plugins
     responses:

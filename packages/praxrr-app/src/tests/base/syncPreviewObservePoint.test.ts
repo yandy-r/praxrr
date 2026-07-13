@@ -5,7 +5,7 @@
  * finalized design demands. The call-site sits inside the create handler's outer try, immediately
  * after `dependencies.generatePreview(...)` resolves and before the eligibility/section-error logic:
  *
- *     if (config.pluginsEnabled) {
+ *     if (isPluginsEnabled()) {
  *       try {
  *         await pluginHost.notifyObservers('sync.previewComputed.observe', () =>
  *           buildCapabilityInput('read:sync-preview', generated)
@@ -18,7 +18,7 @@
  * failed 500. These tests drive the real handler via the same injected `SyncPreviewCreateDependencies`
  * shape used by `syncPreviewRouteHardening.test.ts` (fake `generatePreview` returning a canned
  * `GeneratePreviewResult` + reviewContext, fake `getInstanceById`, fake `getReviewClient`) and mirror
- * the plugin idioms from `tests/plugins/host.test.ts` (readonly-cast config flip, `pluginRegistry`
+ * the plugin idioms from `tests/plugins/host.test.ts` (`withPluginsFeature`, `pluginRegistry`
  * register/clear, `pluginHost.setExecutor` capture seam).
  *
  * Invariants covered (5):
@@ -48,11 +48,12 @@ import { resetPreviewCreateRateLimitForTests } from '../../lib/server/sync/previ
 import type { GeneratePreviewResult } from '../../lib/server/sync/preview/orchestrator.ts';
 import type { SyncPreviewArrType, SyncPreviewResult } from '../../lib/server/sync/preview/types.ts';
 import type { BaseArrClient } from '../../lib/server/utils/arr/base.ts';
-import { config } from '$config';
 import {
   pluginHost,
   PluginHost,
   pluginRegistry,
+  resetPluginsEnabledCacheForTests,
+  setPluginsEnabledCacheForTests,
   UnavailablePluginExecutor,
   type PluginExecutionRequest,
   type PluginExecutor,
@@ -63,9 +64,6 @@ import { PLUGIN_API_VERSION, type PluginJsonValue, type PluginManifest } from '$
 const EXPECTED_SNAPSHOT_KEYS = ['arrType', 'instanceId', 'sections', 'summary'] as const;
 
 const ISO_NOW = '2026-07-11T00:00:00.000Z';
-
-/** Constructor-cached flag; flipped via readonly-cast + finally-restore (host.test.ts idiom). */
-const configFlag = config as unknown as { pluginsEnabled: boolean };
 
 /** The `notifyObservers` method type, used to stub the singleton host for the call-site-throw test. */
 type NotifyObservers = PluginHost['notifyObservers'];
@@ -256,11 +254,10 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const originalEnabled = configFlag.pluginsEnabled;
     const createdIds: string[] = [];
     const cell = newCaptureCell();
     pluginRegistry.clear();
-    configFlag.pluginsEnabled = true;
+    setPluginsEnabledCacheForTests(true);
     pluginRegistry.register('/tmp/preview-observer', observerManifest());
     pluginHost.setExecutor(captureExecutor(cell));
 
@@ -298,7 +295,7 @@ Deno.test({
       }
     } finally {
       resetPluginSingletons();
-      configFlag.pluginsEnabled = originalEnabled;
+      resetPluginsEnabledCacheForTests();
       for (const id of createdIds) previewStore.delete(id);
       resetPreviewCreateRateLimitForTests();
     }
@@ -307,18 +304,17 @@ Deno.test({
 
 // (ii) DISABLED INVARIANCE -----------------------------------------------------------------------
 Deno.test({
-  name: 'sync.previewComputed.observe never dispatches when PLUGINS_ENABLED is off (byte-identical preview)',
+  name: 'sync.previewComputed.observe never dispatches when plugins are disabled (byte-identical preview)',
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const originalEnabled = configFlag.pluginsEnabled;
     const createdIds: string[] = [];
     const cell = newCaptureCell();
     pluginRegistry.clear();
 
     try {
       // Baseline with a real plugin present but the flag OFF: the call-site guard must skip dispatch.
-      configFlag.pluginsEnabled = false;
+      setPluginsEnabledCacheForTests(false);
       pluginRegistry.register('/tmp/preview-observer', observerManifest());
       pluginHost.setExecutor(captureExecutor(cell));
 
@@ -334,7 +330,7 @@ Deno.test({
       assertEquals(stableView(payload), stableView(bare), 'disabled: preview unchanged vs inert baseline');
     } finally {
       resetPluginSingletons();
-      configFlag.pluginsEnabled = originalEnabled;
+      resetPluginsEnabledCacheForTests();
       for (const id of createdIds) previewStore.delete(id);
       resetPreviewCreateRateLimitForTests();
     }
@@ -347,18 +343,17 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const originalEnabled = configFlag.pluginsEnabled;
     const createdIds: string[] = [];
     pluginRegistry.clear();
 
     try {
       // Baseline with the plugin layer inert, for a structural-identity comparison (same instanceId).
       resetPluginSingletons();
-      configFlag.pluginsEnabled = false;
+      setPluginsEnabledCacheForTests(false);
       const { payload: baseline } = await driveCreate('radarr', 263020, createdIds);
 
       // Now flag ON with a registered plugin whose executor throws — the host must isolate it.
-      configFlag.pluginsEnabled = true;
+      setPluginsEnabledCacheForTests(true);
       pluginRegistry.register('/tmp/preview-observer', observerManifest());
       pluginHost.setExecutor(throwingExecutor);
 
@@ -367,7 +362,7 @@ Deno.test({
       assertEquals(stableView(payload), stableView(baseline), 'throwing: preview identical to inert baseline');
     } finally {
       resetPluginSingletons();
-      configFlag.pluginsEnabled = originalEnabled;
+      resetPluginsEnabledCacheForTests();
       for (const id of createdIds) previewStore.delete(id);
       resetPreviewCreateRateLimitForTests();
     }
@@ -380,14 +375,13 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const originalEnabled = configFlag.pluginsEnabled;
     const createdIds: string[] = [];
     const cell = newCaptureCell();
     pluginRegistry.clear();
 
     try {
       // Flag ON, but NO plugin registered: notifyObservers returns early before any executor call.
-      configFlag.pluginsEnabled = true;
+      setPluginsEnabledCacheForTests(true);
       pluginHost.setExecutor(captureExecutor(cell));
 
       const { response, payload } = await driveCreate('radarr', 263030, createdIds);
@@ -396,7 +390,7 @@ Deno.test({
       assertEquals(cell.input, undefined, 'no-plugin: no input may cross the seam');
     } finally {
       resetPluginSingletons();
-      configFlag.pluginsEnabled = originalEnabled;
+      resetPluginsEnabledCacheForTests();
       for (const id of createdIds) previewStore.delete(id);
       resetPreviewCreateRateLimitForTests();
     }
@@ -409,7 +403,6 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const originalEnabled = configFlag.pluginsEnabled;
     const createdIds: string[] = [];
     pluginRegistry.clear();
 
@@ -422,11 +415,11 @@ Deno.test({
     try {
       // Baseline (inert plugin layer, original host) for a structural-identity comparison (same id).
       resetPluginSingletons();
-      configFlag.pluginsEnabled = false;
+      setPluginsEnabledCacheForTests(false);
       const { payload: baseline } = await driveCreate('radarr', 263040, createdIds);
 
       // Flag ON + rejecting host: the handler must swallow the throw and return the good preview.
-      configFlag.pluginsEnabled = true;
+      setPluginsEnabledCacheForTests(true);
       hostAsRecord.notifyObservers = rejectingNotify;
 
       const { response, payload } = await driveCreate('radarr', 263040, createdIds);
@@ -437,7 +430,7 @@ Deno.test({
     } finally {
       hostAsRecord.notifyObservers = originalNotify;
       resetPluginSingletons();
-      configFlag.pluginsEnabled = originalEnabled;
+      resetPluginsEnabledCacheForTests();
       for (const id of createdIds) previewStore.delete(id);
       resetPreviewCreateRateLimitForTests();
     }

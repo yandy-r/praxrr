@@ -86,6 +86,7 @@ import { migration as migration20260721CreateQualityGoalApplyJournal } from './m
 import { migration as migration20260722AddJobRunHistoryEvidence } from './migrations/20260722_add_job_run_history_evidence.ts';
 import { migration as migration20260723AddCanaryPreviewEvidence } from './migrations/20260723_add_canary_preview_evidence.ts';
 import { migration as migration20260724CreatePluginRegistry } from './migrations/20260724_create_plugin_registry.ts';
+import { migration as migration20260725AddPluginsEnabledToGeneralSettings } from './migrations/20260725_add_plugins_enabled_to_general_settings.ts';
 
 export interface Migration {
   version: number;
@@ -406,6 +407,7 @@ export function loadMigrations(): Migration[] {
     migration20260722AddJobRunHistoryEvidence,
     migration20260723AddCanaryPreviewEvidence,
     migration20260724CreatePluginRegistry,
+    migration20260725AddPluginsEnabledToGeneralSettings,
   ];
 
   // Sort by version number

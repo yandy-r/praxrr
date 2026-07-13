@@ -23,7 +23,6 @@
  * See docs/plans/35-wasm-plugin-system/plan.md for the authoritative Phase-1 spec.
  */
 
-import { config } from '$config';
 import {
   pluginRegistryQueries,
   type PluginRegistryRecord,
@@ -37,6 +36,8 @@ import {
   type ExtensionPointId,
   type PluginJsonValue,
 } from '$shared/plugins/index.ts';
+import { config } from '$config';
+import { isPluginsEnabled } from './featureFlag.ts';
 import { scanPluginDir, type RawManifestEntry } from './scan.ts';
 import { pluginRegistry, type RegisteredPlugin } from './registry.ts';
 import { UnavailablePluginExecutor, type PluginExecutionRequest, type PluginExecutor } from './executor.ts';
@@ -171,7 +172,7 @@ export class PluginHost {
     pluginId: string,
     enabled: boolean
   ): Promise<PluginRegistryRecord | undefined> {
-    if (!config.pluginsEnabled) {
+    if (!isPluginsEnabled()) {
       return undefined;
     }
 
@@ -195,8 +196,8 @@ export class PluginHost {
   }
 
   private async performReload(): Promise<PluginReloadSummary> {
-    if (!config.pluginsEnabled) {
-      await logger.info('Plugins disabled via PLUGINS_ENABLED', {
+    if (!isPluginsEnabled()) {
+      await logger.info('Plugins disabled (UI enablement off)', {
         source: LOG_SOURCE,
         meta: { enabled: false },
       });

@@ -10,6 +10,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { pluginRegistryQueries, type PluginRegistryRecord } from '$db/queries/pluginRegistry.ts';
+import { withPluginsFeature } from '$server/plugins/index.ts';
 import { redactSecrets } from '$lib/server/mcp/redact.ts';
 import { toMcpDatabase, toMcpInstance } from '$lib/server/mcp/mappers.ts';
 import { toToolResult } from '$lib/server/mcp/serialize.ts';
@@ -271,23 +272,15 @@ migratedTest('tools/call list_instances: happy path returns text content, isErro
 });
 
 migratedTest('tools/call list_plugins returns the feature-off empty response', async () => {
-  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
-  const original = pluginsConfig.pluginsEnabled;
-  pluginsConfig.pluginsEnabled = false;
-  try {
+  await withPluginsFeature(false, async () => {
     const body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
     assertEquals(body.result.isError, false);
     assertEquals(JSON.parse(body.result.content[0].text), { pluginsEnabled: false, items: [] });
-  } finally {
-    pluginsConfig.pluginsEnabled = original;
-  }
+  });
 });
 
 migratedTest('tools/call list_plugins exposes only the redacted public plugin shape', async () => {
-  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
-  const original = pluginsConfig.pluginsEnabled;
-  pluginsConfig.pluginsEnabled = true;
-  try {
+  await withPluginsFeature(true, async () => {
     await pluginRegistryQueries.reconcile([{ manifest: MCP_PLUGIN_MANIFEST }]);
 
     const record = pluginRegistryQueries.get('1', 'com.example.mcp');
@@ -318,29 +311,25 @@ migratedTest('tools/call list_plugins exposes only the redacted public plugin sh
     const serialized = JSON.stringify(body);
     assert(!serialized.includes(privatePath));
     assert(!serialized.includes(rawSecret));
-  } finally {
-    pluginsConfig.pluginsEnabled = original;
-  }
+  });
 });
 
 migratedTest('tools/call list_plugins converts service failures to a safe domain error', async () => {
-  const pluginsConfig = config as unknown as { pluginsEnabled: boolean };
   const queries = pluginRegistryQueries as unknown as { list: typeof pluginRegistryQueries.list };
-  const originalEnabled = pluginsConfig.pluginsEnabled;
   const originalList = queries.list;
-  pluginsConfig.pluginsEnabled = true;
   queries.list = () => {
     throw new Error('database secret that must not leak');
   };
   try {
-    const body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
-    assertEquals(body.result.isError, true);
-    const serialized = JSON.stringify(body);
-    assert(serialized.includes('Unable to list plugins'));
-    assert(!serialized.includes('database secret'));
+    await withPluginsFeature(true, async () => {
+      const body = await rpcBody('tools/call', { name: 'list_plugins', arguments: {} });
+      assertEquals(body.result.isError, true);
+      const serialized = JSON.stringify(body);
+      assert(serialized.includes('Unable to list plugins'));
+      assert(!serialized.includes('database secret'));
+    });
   } finally {
     queries.list = originalList;
-    pluginsConfig.pluginsEnabled = originalEnabled;
   }
 });
 

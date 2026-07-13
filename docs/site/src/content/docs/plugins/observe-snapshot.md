@@ -19,7 +19,7 @@ validated, and registered but is **never executed**. Everything below
 describes what a plugin _would receive_ once the Phase-2 runtime lands —
 a runtime that stays deliberately deferred (see the
 [architecture note](https://github.com/yandy-r/praxrr/blob/main/docs/architecture/plugins.md)
-and issue #262). The whole subsystem is off unless `PLUGINS_ENABLED` is
+and issue #262). The whole subsystem is off unless plugins are
 set.
 
 :::

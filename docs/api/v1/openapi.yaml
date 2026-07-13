@@ -74,6 +74,8 @@ paths:
     $ref: './paths/mcp.yaml#/mcp'
   /plugins:
     $ref: './paths/plugins.yaml#/list'
+  /plugins/settings:
+    $ref: './paths/plugins.yaml#/settings'
   /plugins/reload:
     $ref: './paths/plugins.yaml#/reload'
   /plugins/{apiVersion}/{id}:
@@ -972,6 +974,10 @@ components:
       $ref: './schemas/plugins.yaml#/PluginRecord'
     PluginListResponse:
       $ref: './schemas/plugins.yaml#/PluginListResponse'
+    PluginSettingsResponse:
+      $ref: './schemas/plugins.yaml#/PluginSettingsResponse'
+    PluginSettingsUpdate:
+      $ref: './schemas/plugins.yaml#/PluginSettingsUpdate'
     PluginDetailResponse:
       $ref: './schemas/plugins.yaml#/PluginDetailResponse'
     PluginMutationResponse:

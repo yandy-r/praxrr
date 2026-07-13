@@ -3,8 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { getArrInstanceReviewClient, type ArrInstanceReviewClient } from '$arr/arrInstanceClients.ts';
 import { logger } from '$logger/logger.ts';
-import { config } from '$config';
-import { pluginHost } from '$server/plugins/index.ts';
+import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
 import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { previewStore } from '$sync/preview/store.ts';
 import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
@@ -338,7 +337,7 @@ export async function _handleSyncPreviewCreateRequest(
       { captureReviewContext: true, client: reviewClient.client }
     );
 
-    if (config.pluginsEnabled) {
+    if (isPluginsEnabled()) {
       try {
         await pluginHost.notifyObservers('sync.previewComputed.observe', () =>
           buildCapabilityInput('read:sync-preview', generated)

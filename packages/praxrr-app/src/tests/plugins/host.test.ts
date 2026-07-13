@@ -4,17 +4,17 @@
  * Exercises the optional-subsystem orchestrator end-to-end against the shared `pluginRegistry`
  * singleton and the `$shared/plugins` contract:
  *
- * - `initialize()` is a hard NO-OP when `PLUGINS_ENABLED` is off (and never stats `PLUGINS_DIR`),
+ * - `initialize()` is a hard NO-OP when the plugin ecosystem flag is off (and never stats `PLUGINS_DIR`),
  *   warns + degrades to an empty registry when the dir is missing, and registers valid manifests
  *   while skipping invalid ones — never throwing on any of those paths.
  * - `notifyObservers` swallows the default executor's `PluginRuntimeUnavailableError`, projects a
  *   secret-scrubbed input across the seam before `execute`, and throws `PluginPointNotWiredError`
  *   for a declared-but-unwired point.
  *
- * `config.pluginsEnabled` is constructor-cached, so it is flipped via a readonly-cast + finally-restore
- * (the `mcp.test.ts` `mcpEnabled` idiom). `PLUGINS_DIR` is read lazily by the `config.paths.plugins`
- * getter, so it is steered with `Deno.env.set` / `Deno.env.delete`. See
- * docs/plans/35-wasm-plugin-system/plan.md for the authoritative Phase-1 spec.
+ * Feature enablement is flipped via `withPluginsFeature` (process cache over DB-backed settings).
+ * `PLUGINS_DIR` is read lazily by the `config.paths.plugins` getter, so it is steered with
+ * `Deno.env.set` / `Deno.env.delete`. See docs/plans/35-wasm-plugin-system/plan.md for the
+ * authoritative Phase-1 spec.
  */
 
 import { assert, assertEquals, assertExists, assertRejects, assertStrictEquals } from '@std/assert';
@@ -27,23 +27,15 @@ import {
   pluginHost,
   PluginPointNotWiredError,
   pluginRegistry,
+  withPluginsFeature,
   type PluginExecutionRequest,
   type PluginExecutor,
 } from '$server/plugins/index.ts';
 import { PLUGIN_API_VERSION, type PluginJsonValue, type PluginManifest } from '$shared/plugins/index.ts';
 
-/** Constructor-cached flag; flipped via readonly-cast + finally-restore (mcp.test.ts idiom). */
-const configFlag = config as unknown as { pluginsEnabled: boolean };
-
-/** Run `fn` with `config.pluginsEnabled` forced to `enabled`, restoring the original afterward. */
+/** Run `fn` with the plugin ecosystem feature flag forced to `enabled`. */
 async function withPluginsEnabled(enabled: boolean, fn: () => Promise<void>): Promise<void> {
-  const original = configFlag.pluginsEnabled;
-  configFlag.pluginsEnabled = enabled;
-  try {
-    await fn();
-  } finally {
-    configFlag.pluginsEnabled = original;
-  }
+  await withPluginsFeature(enabled, fn);
 }
 
 /** Steer the lazy `config.paths.plugins` getter at `dir` via `PLUGINS_DIR`, restoring the original. */
@@ -133,7 +125,7 @@ function manifestEntry(dir: string, manifest: PluginManifest): { readonly dir: s
   return { dir, raw: manifest };
 }
 
-Deno.test('initialize() is a hard NO-OP and never stats PLUGINS_DIR when PLUGINS_ENABLED is off', async () => {
+Deno.test('initialize() is a hard NO-OP and never stats PLUGINS_DIR when plugins are disabled', async () => {
   await withPluginsEnabled(false, async () => {
     pluginRegistry.clear();
 

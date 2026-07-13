@@ -9,7 +9,9 @@ import { runMigrations } from '$db/migrations.ts';
 import { pluginRegistryQueries, type PluginRegistryRecord } from '$db/queries/pluginRegistry.ts';
 import {
   pluginHost,
+  resetPluginsEnabledCacheForTests,
   UnavailablePluginExecutor,
+  withPluginsFeature,
   type PluginExecutionRequest,
   type PluginExecutor,
 } from '$server/plugins/index.ts';
@@ -19,14 +21,15 @@ import { GET as GET_DETAIL } from '../../routes/api/v1/plugins/[apiVersion]/[id]
 import { POST as POST_ENABLE } from '../../routes/api/v1/plugins/[apiVersion]/[id]/enable/+server.ts';
 import { POST as POST_DISABLE } from '../../routes/api/v1/plugins/[apiVersion]/[id]/disable/+server.ts';
 import { POST as POST_RELOAD } from '../../routes/api/v1/plugins/reload/+server.ts';
+import { GET as GET_SETTINGS, PATCH as PATCH_SETTINGS } from '../../routes/api/v1/plugins/settings/+server.ts';
 
 type ListEvent = Parameters<typeof GET_LIST>[0];
 type DetailEvent = Parameters<typeof GET_DETAIL>[0];
 type EnableEvent = Parameters<typeof POST_ENABLE>[0];
 type DisableEvent = Parameters<typeof POST_DISABLE>[0];
 type ReloadEvent = Parameters<typeof POST_RELOAD>[0];
-
-type PluginFlag = { pluginsEnabled: boolean };
+type SettingsGetEvent = Parameters<typeof GET_SETTINGS>[0];
+type SettingsPatchEvent = Parameters<typeof PATCH_SETTINGS>[0];
 
 const TEST_MANIFEST: PluginManifest = {
   apiVersion: '1',
@@ -47,14 +50,13 @@ function migratedTest(name: string, fn: (pluginsDir: string) => Promise<void> | 
     fn: async () => {
       const originalBasePath = config.paths.base;
       const originalPluginsDir = Deno.env.get('PLUGINS_DIR');
-      const pluginsConfig = config as unknown as PluginFlag;
-      const originalPluginsEnabled = pluginsConfig.pluginsEnabled;
       const tempBasePath = `/tmp/praxrr-tests/plugins-route-${crypto.randomUUID()}`;
       const pluginsDir = `${tempBasePath}/plugins`;
       await Deno.mkdir(pluginsDir, { recursive: true });
 
       db.close();
       pluginHost.reset();
+      resetPluginsEnabledCacheForTests();
       config.setBasePath(tempBasePath);
       Deno.env.set('PLUGINS_DIR', pluginsDir);
 
@@ -63,7 +65,7 @@ function migratedTest(name: string, fn: (pluginsDir: string) => Promise<void> | 
         await runMigrations();
         await fn(pluginsDir);
       } finally {
-        pluginsConfig.pluginsEnabled = originalPluginsEnabled;
+        resetPluginsEnabledCacheForTests();
         pluginHost.reset();
         db.close();
         config.setBasePath(originalBasePath);
@@ -79,14 +81,7 @@ function migratedTest(name: string, fn: (pluginsDir: string) => Promise<void> | 
 }
 
 async function withPluginsEnabled<T>(enabled: boolean, fn: () => Promise<T> | T): Promise<T> {
-  const pluginsConfig = config as unknown as PluginFlag;
-  const original = pluginsConfig.pluginsEnabled;
-  pluginsConfig.pluginsEnabled = enabled;
-  try {
-    return await fn();
-  } finally {
-    pluginsConfig.pluginsEnabled = original;
-  }
+  return await withPluginsFeature(enabled, fn);
 }
 
 function requestContext(path: string, method: 'GET' | 'POST', headers: HeadersInit = {}) {
@@ -132,6 +127,22 @@ function disableEvent(apiVersion: string, id: string, headers: HeadersInit = {})
 
 function reloadEvent(headers: HeadersInit = {}): ReloadEvent {
   return requestContext('/api/v1/plugins/reload', 'POST', headers) as unknown as ReloadEvent;
+}
+
+function settingsGetEvent(headers: HeadersInit = {}): SettingsGetEvent {
+  return requestContext('/api/v1/plugins/settings', 'GET', headers) as unknown as SettingsGetEvent;
+}
+
+function settingsPatchEvent(pluginsEnabled: boolean, headers: HeadersInit = {}): SettingsPatchEvent {
+  const url = new URL('/api/v1/plugins/settings', 'http://localhost');
+  return {
+    request: new Request(url, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ pluginsEnabled }),
+    }),
+    url,
+  } as unknown as SettingsPatchEvent;
 }
 
 async function jsonBody<T = Record<string, unknown>>(response: Response): Promise<T> {
@@ -311,6 +322,28 @@ migratedTest(
     assertEquals(pluginRegistryQueries.get('1', TEST_MANIFEST.id)?.enabled, true);
   }
 );
+
+migratedTest('plugin settings GET/PATCH hot-enable and disable the ecosystem without restart', async () => {
+  const getOff = await GET_SETTINGS(settingsGetEvent());
+  assertEquals(getOff.status, 200);
+  assertEquals(await jsonBody(getOff), { pluginsEnabled: false });
+
+  const enable = await PATCH_SETTINGS(settingsPatchEvent(true, { origin: 'http://localhost' }));
+  assertEquals(enable.status, 200);
+  assertEquals(await jsonBody(enable), { pluginsEnabled: true });
+
+  const listOn = await GET_LIST(listEvent());
+  assertEquals(listOn.status, 200);
+  assertEquals((await jsonBody<{ pluginsEnabled: boolean }>(listOn)).pluginsEnabled, true);
+
+  const disable = await PATCH_SETTINGS(settingsPatchEvent(false, { origin: 'http://localhost' }));
+  assertEquals(disable.status, 200);
+  assertEquals(await jsonBody(disable), { pluginsEnabled: false });
+
+  const listOff = await GET_LIST(listEvent());
+  assertEquals(listOff.status, 200);
+  assertEquals(await jsonBody(listOff), { pluginsEnabled: false, items: [] });
+});
 
 migratedTest('list/get expose the allow-listed nested manifest and preserve exact namespace semantics', async () => {
   await seedPlugin();

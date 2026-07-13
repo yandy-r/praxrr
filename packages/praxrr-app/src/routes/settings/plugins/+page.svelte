@@ -1,10 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { RefreshCw, RotateCw } from 'lucide-svelte';
+  import { Check, RefreshCw, RotateCw } from 'lucide-svelte';
   import { alertStore } from '$alerts/store';
   import Button from '$ui/button/Button.svelte';
+  import IconCheckbox from '$ui/form/IconCheckbox.svelte';
   import PluginCard from './components/PluginCard.svelte';
-  import { isPluginListResponse, isPluginMutationResponse, isPluginReloadResponse } from './contract.ts';
+  import {
+    isPluginListResponse,
+    isPluginMutationResponse,
+    isPluginReloadResponse,
+    isPluginSettingsResponse,
+  } from './contract.ts';
   import {
     pluginIdentityKey,
     pluginMutationUrl,
@@ -30,6 +36,7 @@
   let items: PluginRecord[] = [];
   let pluginsEnabled: boolean | null = null;
   let loading = true;
+  let settingsPending = false;
   let loadError: string | null = null;
   let loadErrorKind: LoadErrorKind | null = null;
   let staleReason: string | null = null;
@@ -101,7 +108,7 @@
       rowErrors = {};
       statusMessage = payload.pluginsEnabled
         ? `Plugin registry loaded. ${payload.items.length} ${payload.items.length === 1 ? 'record' : 'records'} available.`
-        : 'Plugin management is disabled by deployment configuration.';
+        : 'Plugin ecosystem is off. Enable it below to scan and manage plugins.';
       return true;
     } catch {
       if (requestId !== listRequestId) return false;
@@ -127,8 +134,64 @@
   }
 
   async function refreshPlugins(): Promise<void> {
-    if (loading || reloadPending || pendingIdentities.size > 0) return;
+    if (loading || reloadPending || settingsPending || pendingIdentities.size > 0) return;
     await loadPlugins({ preserveOnFailure: pluginsEnabled !== null, announceFailure: true });
+  }
+
+  async function setEcosystemEnabled(enabled: boolean): Promise<void> {
+    if (loading || reloadPending || settingsPending || pendingIdentities.size > 0 || pluginsEnabled === enabled) {
+      return;
+    }
+
+    settingsPending = true;
+    statusMessage = enabled ? 'Enabling the plugin ecosystem…' : 'Disabling the plugin ecosystem…';
+
+    try {
+      const response = await fetch('/api/v1/plugins/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pluginsEnabled: enabled }),
+      });
+
+      if (!response.ok) {
+        const message = await responseError(
+          response,
+          `Unable to ${enabled ? 'enable' : 'disable'} plugins (HTTP ${response.status}).`
+        );
+        alertStore.add('error', message);
+        statusMessage = message;
+        return;
+      }
+
+      const payload = (await response.json().catch(() => null)) as unknown;
+      if (!isPluginSettingsResponse(payload)) {
+        const message = 'Plugin settings returned an unexpected response. Retry the request.';
+        alertStore.add('error', message);
+        statusMessage = message;
+        return;
+      }
+
+      pluginsEnabled = payload.pluginsEnabled;
+      if (!payload.pluginsEnabled) {
+        items = [];
+        reloadSummary = null;
+        reloadError = null;
+        rowErrors = {};
+        staleReason = null;
+        statusMessage = 'Plugin ecosystem disabled. Registry management is paused until re-enabled.';
+        alertStore.add('success', 'Plugin ecosystem disabled.');
+        return;
+      }
+
+      alertStore.add('success', 'Plugin ecosystem enabled.');
+      await loadPlugins({ preserveOnFailure: false, announceFailure: true });
+    } catch {
+      const message = 'Unable to update plugin settings. Check the connection and retry.';
+      alertStore.add('error', message);
+      statusMessage = message;
+    } finally {
+      settingsPending = false;
+    }
   }
 
   function replacePlugin(next: PluginRecord): boolean {
@@ -149,6 +212,7 @@
     if (
       loading ||
       reloadPending ||
+      settingsPending ||
       pendingIdentities.size > 0 ||
       pendingIdentities.has(identity) ||
       pluginsEnabled !== true
@@ -169,7 +233,7 @@
           const changedMessage =
             response.status === 404
               ? 'This plugin record changed or was removed. Refreshing the registry.'
-              : 'Plugin management was disabled while the change was pending. Refreshing deployment state.';
+              : 'Plugin management was disabled while the change was pending. Refreshing enablement state.';
           setRowError(identity, changedMessage);
           alertStore.add('warning', changedMessage);
           const refreshed = await loadPlugins({ preserveOnFailure: true });
@@ -226,7 +290,7 @@
   }
 
   async function reloadPlugins(): Promise<void> {
-    if (loading || reloadPending || pendingIdentities.size > 0 || pluginsEnabled !== true) return;
+    if (loading || reloadPending || settingsPending || pendingIdentities.size > 0 || pluginsEnabled !== true) return;
 
     invalidateListRequest();
     reloadPending = true;
@@ -264,7 +328,7 @@
         staleReason = null;
         loadError = null;
         loadErrorKind = null;
-        statusMessage = 'Plugin management is disabled by deployment configuration; no reload was performed.';
+        statusMessage = 'Plugin ecosystem is off. Enable it below to scan and manage plugins.';
         alertStore.add('info', statusMessage);
         return;
       }
@@ -332,28 +396,41 @@
       </p>
     </div>
 
-    {#if pluginsEnabled !== false}
-      <div class="flex shrink-0 flex-wrap gap-2">
-        <Button
-          text="Refresh registry"
-          variant="secondary"
-          size="sm"
-          icon={RefreshCw}
-          disabled={loading || reloadPending || pendingIdentities.size > 0}
-          aria-busy={loading}
-          onclick={refreshPlugins}
-        />
-        {#if pluginsEnabled === true}
+    {#if pluginsEnabled === true}
+      <div class="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+        <div class="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <IconCheckbox
+            icon={Check}
+            checked={true}
+            disabled={settingsPending || loading || reloadPending || pendingIdentities.size > 0}
+            title="Disable plugins"
+            on:click={() => setEcosystemEnabled(false)}
+          />
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">Plugins enabled</p>
+            <p class="text-xs text-neutral-500 dark:text-neutral-400">Turn off to pause scan and management</p>
+          </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap gap-2">
+          <Button
+            text="Refresh registry"
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            disabled={loading || reloadPending || settingsPending || pendingIdentities.size > 0}
+            aria-busy={loading}
+            onclick={refreshPlugins}
+          />
           <Button
             text="Reload plugins"
             variant="primary"
             size="sm"
             icon={RotateCw}
-            disabled={loading || reloadPending || pendingIdentities.size > 0}
+            disabled={loading || reloadPending || settingsPending || pendingIdentities.size > 0}
             aria-busy={reloadPending}
             onclick={reloadPlugins}
           />
-        {/if}
+        </div>
       </div>
     {/if}
   </header>
@@ -407,7 +484,7 @@
         text="Retry reload"
         variant="secondary"
         size="sm"
-        disabled={loading || reloadPending || pendingIdentities.size > 0}
+        disabled={loading || reloadPending || settingsPending || pendingIdentities.size > 0}
         onclick={reloadPlugins}
       />
     </section>
@@ -426,7 +503,7 @@
         text="Retry refresh"
         variant="secondary"
         size="sm"
-        disabled={loading || reloadPending || pendingIdentities.size > 0}
+        disabled={loading || reloadPending || settingsPending || pendingIdentities.size > 0}
         onclick={refreshPlugins}
       />
     </section>
@@ -456,22 +533,32 @@
     </section>
   {:else if pluginsEnabled === false}
     <section
-      class="rounded-xl border border-blue-300 bg-blue-50 p-5 text-blue-950 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100"
+      class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900"
       aria-labelledby="plugin-disabled-title"
     >
-      <h2 id="plugin-disabled-title" class="font-semibold">Plugin management is disabled</h2>
-      <p class="mt-2 max-w-3xl text-sm leading-6">
-        Set <code class="font-mono">PLUGINS_ENABLED</code> in the deployment configuration to expose the registry. No plugin
-        scan or enablement action is available while the feature is off.
+      <h2 id="plugin-disabled-title" class="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+        Plugin ecosystem is off
+      </h2>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-neutral-600 dark:text-neutral-400">
+        Enable plugins to scan
+        <code class="font-mono">PLUGINS_DIR</code>, register validated manifests, and manage each plugin's saved
+        enablement intent. Observe dispatch stays inactive until the ecosystem is on. Per-plugin toggles are separate
+        from this master switch.
       </p>
-      <div class="mt-4">
-        <Button
-          text="Check configuration again"
-          variant="secondary"
-          size="sm"
-          disabled={loading}
-          onclick={refreshPlugins}
+      <div class="mt-5 flex items-start gap-3">
+        <IconCheckbox
+          icon={Check}
+          checked={false}
+          disabled={settingsPending || loading}
+          title="Enable plugins"
+          on:click={() => setEcosystemEnabled(true)}
         />
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-medium text-neutral-900 dark:text-neutral-50">Enable plugins</p>
+          <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+            Turns on discovery and management without editing environment variables or restarting Praxrr.
+          </p>
+        </div>
       </div>
     </section>
   {:else if pluginsEnabled === true && items.length === 0}
@@ -492,7 +579,7 @@
           variant="primary"
           size="sm"
           icon={RotateCw}
-          disabled={loading || reloadPending}
+          disabled={loading || reloadPending || settingsPending}
           aria-busy={reloadPending}
           onclick={reloadPlugins}
         />
@@ -515,7 +602,7 @@
         <PluginCard
           {plugin}
           pending={pendingIdentities.has(identity)}
-          disabled={reloadPending || loading || pendingIdentities.size > 0}
+          disabled={reloadPending || loading || settingsPending || pendingIdentities.size > 0}
           error={rowErrors[identity] ?? null}
           retryLabel="Retry intent change"
           onRetry={() => setPluginEnabled(plugin, !plugin.enabled)}

@@ -26,6 +26,11 @@ class Config {
   public readonly validateInstances: boolean;
   public readonly pullOnStart: boolean;
   public readonly mcpEnabled: boolean;
+  /**
+   * @deprecated Legacy env seed source only. Runtime gating uses
+   * `$server/plugins/featureFlag.ts` (`general_settings.plugins_enabled`).
+   * Kept so one-time upgrade seed and older tests can still read `PLUGINS_ENABLED`.
+   */
   public readonly pluginsEnabled: boolean;
   public readonly pullOnStartMaxConcurrency: number | null;
   public readonly pullOnStartTimeoutMs: number | null;
@@ -82,7 +87,8 @@ class Config {
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
     // MCP server endpoint (/api/v1/mcp). Enabled by default; set MCP_ENABLED=0|false|no|off to disable.
     this.mcpEnabled = Config.parseBooleanEnvWithDefault(Deno.env.get('MCP_ENABLED'), true);
-    // Plugin host (issue #35). Feature-flagged foundation; default OFF (non-throwing).
+    // Legacy PLUGINS_ENABLED env (non-throwing). Runtime master switch is DB-backed via
+    // featureFlag.ts; this field remains only for one-time upgrade seed / deprecated reads.
     this.pluginsEnabled = Config.parseBooleanEnv(Deno.env.get('PLUGINS_ENABLED'));
     this.pullOnStartMaxConcurrency = Config.parsePositiveIntEnv('PULL_ON_START_MAX_CONCURRENCY');
     this.pullOnStartTimeoutMs = Config.parsePositiveIntEnv('PULL_ON_START_TIMEOUT_MS');

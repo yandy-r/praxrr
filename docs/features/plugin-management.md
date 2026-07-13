@@ -1,24 +1,25 @@
 # Plugin Management
 
-Praxrr exposes the plugin registry at **Settings → Plugins**. The page is an operator console for
-validated metadata, durable enablement intent, discovery, lifecycle evidence, declared extension
-points, and granted capabilities. It does not prove that a plugin runtime is available or that a
-plugin has run successfully.
+Praxrr exposes the plugin registry at **Apps → Plugins** (and still under **Settings → Plugins**).
+The page is an operator console for validated metadata, durable enablement intent, discovery,
+lifecycle evidence, declared extension points, and granted capabilities. It does not prove that a
+plugin runtime is available or that a plugin has run successfully.
 
 ## Configure plugin discovery
 
-Plugin management is deployment configuration, not an in-app preference:
+Plugin management uses an in-app master switch plus an optional directory override:
 
-- `PLUGINS_ENABLED` defaults to `false`. Set it to a supported true value in the Praxrr deployment
-  environment and restart the application to enable scanning and mutations.
+- **Enable plugins** (UI checkbox on the Plugins page) defaults to off and persists in
+  `general_settings.plugins_enabled`. Enabling/disabling applies immediately without restart.
 - `PLUGINS_DIR` selects the directory scanned for plugins. It defaults to `${base}/plugins`, is not
   created automatically, and contains one plugin subdirectory per manifest.
 - Each candidate subdirectory must contain `praxrr.plugin.json`. The host validates the complete
   scan before committing the new durable and in-memory registry state.
+- Legacy `PLUGINS_ENABLED` is seed-only on upgrade and is no longer the operator-facing gate.
 
-The Plugins destination remains visible when the feature is off. In that state the page explains
-`PLUGINS_ENABLED`; Praxrr does not scan `PLUGINS_DIR`, expose mutation controls, or change durable
-plugin state.
+The Plugins destination remains visible when the ecosystem is off. In that state the page offers
+**Enable plugins**; Praxrr does not scan `PLUGINS_DIR`, expose per-plugin mutation controls, or change
+durable plugin state until the master switch is on.
 
 ## Read a plugin record
 
@@ -75,16 +76,16 @@ reload committed but refresh failed. Retry **Refresh registry** to load the auth
 ## Request security
 
 All plugin management endpoints use Praxrr's existing API authentication. Browser enable, disable,
-and reload requests must be same-origin. Malformed, foreign, and explicit cross-site requests are
-rejected before scanning or durable mutation with an empty `403` response.
+reload, and settings requests must be same-origin. Malformed, foreign, and explicit cross-site
+requests are rejected before scanning or durable mutation with an empty `403` response.
 
 Authenticated non-browser clients may omit the `Origin` header, so existing API-key automation
 continues to work. This compatibility does not bypass authentication and does not enable CORS.
 
 ## Troubleshooting
 
-- **Plugin management is disabled**: set `PLUGINS_ENABLED` in the deployment environment and restart
-  Praxrr.
+- **Plugin ecosystem is off**: open Apps → Plugins (or Settings → Plugins) and select
+  **Enable plugins**.
 - **No plugins discovered**: verify `PLUGINS_DIR`, its permissions, and the expected
   `<plugin-directory>/praxrr.plugin.json` layout, then reload.
 - **A plugin is missing**: restore its directory and reload. Its saved enablement intent will apply
