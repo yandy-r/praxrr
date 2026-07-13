@@ -27,6 +27,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/config-health',
     '/security-posture',
     '/arr',
+    '/settings/plugins',
     '/quality-profiles',
     '/custom-formats',
     '/regular-expressions',
@@ -57,6 +58,7 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/config-health',
     '/security-posture',
     '/arr',
+    '/settings/plugins',
     '/quality-profiles',
     '/quality-profiles/entity-testing',
     '/custom-formats',
@@ -80,7 +82,6 @@ Deno.test('app layout shell is stable and deep-link hrefs remain unchanged', () 
     '/settings/backups',
     '/settings/notifications',
     '/settings/security',
-    '/settings/plugins',
     '/settings/about',
     '/auth/logout',
   ]);

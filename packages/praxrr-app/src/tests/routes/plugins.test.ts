@@ -557,9 +557,54 @@ migratedTest('reload failures are logged server-side and return only the redacte
   }
 });
 
+Deno.test('plugin mutation origin guard accepts Host-derived and proxied browser origins', async () => {
+  const { rejectCrossOriginPluginMutation } = await import('../../routes/api/v1/plugins/_origin.ts');
+
+  async function assertAllowed(
+    origin: string | undefined,
+    urlStr: string,
+    headers: Record<string, string> = {}
+  ): Promise<void> {
+    const url = new URL(urlStr);
+    const requestHeaders = new Headers(headers);
+    if (origin !== undefined) requestHeaders.set('origin', origin);
+    const response = rejectCrossOriginPluginMutation(new Request(url, { method: 'PATCH', headers: requestHeaders }), url);
+    assertEquals(response, null);
+  }
+
+  async function assertForbidden(
+    origin: string | undefined,
+    urlStr: string,
+    headers: Record<string, string> = {}
+  ): Promise<void> {
+    const url = new URL(urlStr);
+    const requestHeaders = new Headers(headers);
+    if (origin !== undefined) requestHeaders.set('origin', origin);
+    await assertOriginForbidden(
+      rejectCrossOriginPluginMutation(new Request(url, { method: 'PATCH', headers: requestHeaders }), url)!
+    );
+  }
+
+  await assertAllowed('http://localhost:6969', 'http://localhost/api/v1/plugins/settings', {
+    host: 'localhost:6969',
+  });
+  await assertAllowed('https://praxrr.example.com', 'http://127.0.0.1:6868/api/v1/plugins/settings', {
+    host: 'praxrr.example.com',
+    'x-forwarded-proto': 'https',
+  });
+  await assertAllowed(undefined, 'http://localhost:6969/api/v1/plugins/settings', { host: 'localhost:6969' });
+  await assertForbidden('https://evil.example', 'http://localhost:6969/api/v1/plugins/settings', {
+    host: 'localhost:6969',
+  });
+  await assertForbidden('http://user:pass@localhost:6969', 'http://localhost:6969/api/v1/plugins/settings', {
+    host: 'localhost:6969',
+  });
+});
+
 Deno.test('plugin management routes remain protected by the existing auth classification', () => {
   for (const path of [
     '/api/v1/plugins',
+    '/api/v1/plugins/settings',
     '/api/v1/plugins/reload',
     '/api/v1/plugins/1/com.example.route',
     '/api/v1/plugins/1/com.example.route/enable',

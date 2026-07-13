@@ -133,46 +133,35 @@ Deno.test('scope filtering respects Arr capability constraints', () => {
   assertEquals(supportsFeature('lidarr' as ArrAppType, 'metadata_profiles'), true);
 });
 
-Deno.test('Plugins is a globally compatible Settings child', () => {
+Deno.test('Plugins is absent from Settings children and appears once as apps.plugins', () => {
   const settings = NAV_REGISTRY.find((item) => item.id === 'settings.settings');
-  const plugins = settings?.children?.find((child) => child.id === 'settings.plugins');
+  const settingsPlugins = settings?.children?.find((child) => child.id === 'settings.plugins');
+  const appsPlugins = NAV_REGISTRY.filter((item) => item.id === 'apps.plugins');
+  const arrs = NAV_REGISTRY.find((item) => item.id === 'apps.arrs');
 
+  assertEquals(settingsPlugins, undefined);
   assertEquals(
     {
       settingsId: settings?.id,
       settingsScope: settings?.arrScope,
-      pluginId: plugins?.id,
-      pluginHref: plugins?.href,
+      appsPluginsCount: appsPlugins.length,
+      pluginId: appsPlugins[0]?.id,
+      pluginHref: appsPlugins[0]?.href,
+      pluginGroup: appsPlugins[0]?.groupId,
+      pluginOrder: appsPlugins[0]?.order,
+      pluginScope: appsPlugins[0]?.arrScope,
+      arrsOrder: arrs?.order,
     },
     {
       settingsId: 'settings.settings',
       settingsScope: 'all',
-      pluginId: 'settings.plugins',
-      pluginHref: '/settings/plugins',
-    }
-  );
-});
-
-Deno.test('Plugins is a first-class Apps item under Arrs', () => {
-  const arrs = NAV_REGISTRY.find((item) => item.id === 'apps.arrs');
-  const plugins = NAV_REGISTRY.find((item) => item.id === 'apps.plugins');
-
-  assertEquals(
-    {
-      arrsOrder: arrs?.order,
-      pluginId: plugins?.id,
-      pluginHref: plugins?.href,
-      pluginGroup: plugins?.groupId,
-      pluginOrder: plugins?.order,
-      pluginScope: plugins?.arrScope,
-    },
-    {
-      arrsOrder: 0,
+      appsPluginsCount: 1,
       pluginId: 'apps.plugins',
       pluginHref: '/settings/plugins',
       pluginGroup: 'apps',
       pluginOrder: 1,
       pluginScope: 'all',
+      arrsOrder: 0,
     }
   );
 });
