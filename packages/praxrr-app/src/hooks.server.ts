@@ -15,7 +15,7 @@ import { initializeJobs } from '$jobs/init.ts';
 import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { trashGuideManager } from '$trashguide/index.ts';
-import { pluginHost } from '$server/plugins/index.ts';
+import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
@@ -58,8 +58,9 @@ await logContainerConfig();
 await pcdManager.initialize();
 await trashGuideManager.initialize();
 
-// Initialize the plugin system (feature-flagged, default OFF; never aborts boot)
-if (config.pluginsEnabled) {
+// Initialize the plugin system (DB-backed UI opt-in, default OFF; never aborts boot)
+loadPluginsFeatureFlag();
+if (isPluginsEnabled()) {
   try {
     await pluginHost.initialize();
   } catch (error) {
@@ -69,7 +70,7 @@ if (config.pluginsEnabled) {
     });
   }
 } else {
-  await logger.info('Plugin system disabled via PLUGINS_ENABLED', {
+  await logger.info('Plugin system disabled (UI enablement off)', {
     source: 'Startup',
     meta: { enabled: false },
   });

@@ -155,9 +155,30 @@ PluginListResponse:
       type: boolean
     items:
       type: array
-      description: Empty while `PLUGINS_ENABLED` is off; otherwise includes durable discovered and missing rows.
+      description: Empty while the plugin ecosystem is disabled; otherwise includes durable discovered and missing rows.
       items:
         $ref: '#/PluginRecord'
+  additionalProperties: false
+
+PluginSettingsResponse:
+  type: object
+  description: Global plugin-ecosystem enablement (UI-backed master switch; default off).
+  required:
+    - pluginsEnabled
+  properties:
+    pluginsEnabled:
+      type: boolean
+      description: When false, plugin management/reload/observe are hard no-ops. Nav remains visible.
+  additionalProperties: false
+
+PluginSettingsUpdate:
+  type: object
+  required:
+    - pluginsEnabled
+  properties:
+    pluginsEnabled:
+      type: boolean
+      description: Persist and hot-apply global plugin ecosystem enablement without restart.
   additionalProperties: false
 
 PluginDetailResponse:

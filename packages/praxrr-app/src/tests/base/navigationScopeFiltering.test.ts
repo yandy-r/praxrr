@@ -153,6 +153,30 @@ Deno.test('Plugins is a globally compatible Settings child', () => {
   );
 });
 
+Deno.test('Plugins is a first-class Apps item under Arrs', () => {
+  const arrs = NAV_REGISTRY.find((item) => item.id === 'apps.arrs');
+  const plugins = NAV_REGISTRY.find((item) => item.id === 'apps.plugins');
+
+  assertEquals(
+    {
+      arrsOrder: arrs?.order,
+      pluginId: plugins?.id,
+      pluginHref: plugins?.href,
+      pluginGroup: plugins?.groupId,
+      pluginOrder: plugins?.order,
+      pluginScope: plugins?.arrScope,
+    },
+    {
+      arrsOrder: 0,
+      pluginId: 'apps.plugins',
+      pluginHref: '/settings/plugins',
+      pluginGroup: 'apps',
+      pluginOrder: 1,
+      pluginScope: 'all',
+    }
+  );
+});
+
 Deno.test('unsupported child-ful nav items are disabled while unsupported leaves are hidden', () => {
   const restores: Restore[] = [];
   const originalRegistry = [...NAV_REGISTRY];
@@ -212,6 +236,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/config-health',
     '/security-posture',
     '/arr',
+    '/settings/plugins',
     '/quality-profiles',
     '/custom-formats',
     '/regular-expressions',
@@ -239,6 +264,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
     '/drift',
     '/config-health',
     '/security-posture',
+    '/settings/plugins',
     '/regular-expressions',
     '/score-simulator',
     '/impact-simulator',
@@ -267,6 +293,7 @@ Deno.test('arr navigation remains scope-compatible while feature-gated routes st
     const bottomOrder = buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, scope);
 
     assertEquals(scopedEntries.visible.includes('apps.arrs'), true);
+    assertEquals(scopedEntries.visible.includes('apps.plugins'), true);
     assertEquals(bottomOrder.includes('/arr'), true);
     assertEquals(bottomOrder.includes('/quality-profiles'), true);
     assertEquals(bottomOrder.includes('/custom-formats'), true);

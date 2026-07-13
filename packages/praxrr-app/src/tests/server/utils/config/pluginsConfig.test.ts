@@ -1,12 +1,11 @@
 /**
- * Tests for the plugin-system config surface (issue #35): the non-throwing `config.pluginsEnabled`
- * feature flag and the lazy `config.paths.plugins` directory getter.
+ * Tests for the plugin-system config surface: the lazy `config.paths.plugins` directory getter.
  *
- * `pluginsEnabled` is parsed once in the `Config` constructor via the existing non-throwing
- * `parseBooleanEnv` (like `pullOnStart`, NOT the default-on `mcpEnabled`), so the singleton's value
- * is cached at module-eval time — a `PLUGINS_ENABLED` typo can never brick boot. `paths.plugins`, in
- * contrast, reads `PLUGINS_DIR` lazily on every access, so env mutation after import is observable
+ * Runtime enablement is DB-backed via `$server/plugins/featureFlag.ts` (not env). `paths.plugins`
+ * still reads `PLUGINS_DIR` lazily on every access, so env mutation after import is observable
  * (mirrors `parserUrl.test.ts`). No directory is created here — the host stats-and-degrades instead.
+ *
+ * Legacy `config.pluginsEnabled` remains as a deprecated env seed source for upgrades only.
  */
 
 import { assertEquals } from '@std/assert';
@@ -27,15 +26,7 @@ function withPluginsDir(value: string | undefined, run: () => void): void {
   }
 }
 
-Deno.test('config.pluginsEnabled defaults to false when PLUGINS_ENABLED is unset', () => {
-  // Constructor-cached from module-eval; the test process leaves PLUGINS_ENABLED unset.
-  assertEquals(config.pluginsEnabled, false);
-});
-
-Deno.test('config.pluginsEnabled is a strict boolean produced by a non-throwing parse', () => {
-  // Reaching this assertion at all proves importing `$config` (which runs `parseBooleanEnv` in the
-  // constructor) never threw — module-eval safety. Unlike `parsePositiveIntEnv`, the boolean parser
-  // coerces any/invalid value to `false` rather than throwing, so the field is always a strict boolean.
+Deno.test('legacy config.pluginsEnabled remains a boolean (env seed source only)', () => {
   assertEquals(typeof config.pluginsEnabled, 'boolean');
 });
 

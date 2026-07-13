@@ -8,10 +8,20 @@
 
 export { pluginHost, PluginHost, type PluginHostDependencies, type PluginReloadSummary } from './host.ts';
 export {
+  isPluginsEnabled,
+  loadPluginsFeatureFlag,
+  persistPluginsEnabled,
+  resetPluginsEnabledCacheForTests,
+  setPluginsEnabledCacheForTests,
+  withPluginsFeature,
+} from './featureFlag.ts';
+export {
   getPlugin,
+  getPluginSettings,
   listPlugins,
   reloadPlugins,
   setPluginEnabled,
+  setPluginSettings,
   toPluginErrorResponse,
   toPluginManifestResponse,
   toPluginResponse,
@@ -27,6 +37,8 @@ export {
   type PluginReloadOutcome,
   type PluginReloadResponse,
   type PluginResponse,
+  type PluginSettingsOutcome,
+  type PluginSettingsResponse,
 } from './responses.ts';
 export { pluginRegistry, PluginRegistry, type RegisteredPlugin } from './registry.ts';
 export {

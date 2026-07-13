@@ -5,6 +5,7 @@ import {
   isPluginMutationResponse,
   isPluginRecord,
   isPluginReloadResponse,
+  isPluginSettingsResponse,
 } from '../../routes/settings/plugins/contract.ts';
 
 type PluginRecord = components['schemas']['PluginRecord'];
@@ -41,6 +42,13 @@ Deno.test('plugin record decoder accepts the generated contract and rejects malf
   assertEquals(isPluginRecord({ ...valid, manifest: { ...valid.manifest, capabilities: ['write:all'] } }), false);
   assertEquals(isPluginRecord({ ...valid, manifest: { ...valid.manifest, extensionPoints: [42] } }), false);
   assertEquals(isPluginRecord({ ...valid, updatedAt: null }), false);
+});
+
+Deno.test('plugin settings decoder requires a boolean pluginsEnabled flag', () => {
+  assertEquals(isPluginSettingsResponse({ pluginsEnabled: true }), true);
+  assertEquals(isPluginSettingsResponse({ pluginsEnabled: false }), true);
+  assertEquals(isPluginSettingsResponse({ pluginsEnabled: 'true' }), false);
+  assertEquals(isPluginSettingsResponse({}), false);
 });
 
 Deno.test('plugin list decoder validates the feature flag, array, and every record', () => {

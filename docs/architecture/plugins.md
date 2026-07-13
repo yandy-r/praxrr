@@ -3,8 +3,8 @@
 > Phase-1 foundation for the WASM plugin system (issue #35), extended by the production observe
 > call-sites in issue #263, durable management backend in issue #264, and operator UI in issue
 > #266. This note describes the **stable, versioned contract, durable discovery state, and lifecycle
-> scaffolding**. It is feature-flagged
-> **OFF by default** (`PLUGINS_ENABLED`), adds **no WASM/Extism runtime dependency**, executes
+> scaffolding**. It is opt-in via the UI **Enable plugins** control
+> **OFF by default**, adds **no WASM/Extism runtime dependency**, executes
 > **no untrusted code**, and keeps every production dispatch behind the inert default executor. The
 > default executor throws `PluginRuntimeUnavailableError('wasm runtime not yet available')`.
 
@@ -307,7 +307,7 @@ Issue #264 adds durable management state without widening the runtime or capabil
 - Auth-gated `/api/v1/plugins*` endpoints list, read, enable, disable, and reload using the shared
   allow-list mapper. Responses omit `sourceDir` and raw persisted JSON. The read-only MCP
   `list_plugins` projection uses the same redacted list boundary and adds no mutation handler.
-- With `PLUGINS_ENABLED` off, list returns `pluginsEnabled:false` with no active entries, reload is a
+- With plugins disabled, list returns `pluginsEnabled:false` with no active entries, reload is a
   successful no-I/O summary, and enable/disable is rejected without changing durable state.
 
 ### Management UI and request flow
@@ -351,7 +351,7 @@ build** and never derives health from `enabled`, `discovered`, `registeredAt`, `
 The plugin subsystem must **never** destabilize boot or the core pipeline (the "optional parser
 degradation" convention). Three concrete guarantees:
 
-- **Disabled = hard no-op.** `PLUGINS_ENABLED` defaults **OFF**, parsed with the existing
+- **Disabled = hard no-op.** UI enablement defaults **OFF**, loaded from
   non-throwing `Config.parseBooleanEnv` (like `pullOnStart`, not the default-ON `mcpEnabled` helper)
   so a typo cannot brick module-eval boot. When off, reload never stats `PLUGINS_DIR` or mutates the
   database; management reads expose the contract-defined disabled view. Startup logs the disabled
@@ -387,17 +387,18 @@ FFI, native-artifact, ABI, permission, and platform design.
 
 Therefore the runtime seam remains intentionally inert: no Extism dependency, executor, selector,
 lockfile change, or production trigger is present; `UnavailablePluginExecutor` remains the only
-production executor; and `PLUGINS_ENABLED` remains default OFF. Timeout is not treated as fuel, and
+production executor; and UI enablement remains default OFF. Timeout is not treated as fuel, and
 exchange-memory accounting is not described as a total guest-memory limit. See the validated
 [issue #262 feature spec](../plans/262-wasm-extism-runtime/feature-spec.md) and its sibling
 `research-*.md` files for the reproducible spike, threat model, and gates a future backend must pass.
 
 ## Configuration
 
-| Variable          | Default           | Behavior                                                                                                                                           |
-| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PLUGINS_ENABLED` | `false` (OFF)     | Master flag, parsed non-throwing (`1\|true\|yes\|on`, else off). Off ⇒ host is a hard no-op.                                                       |
-| `PLUGINS_DIR`     | `${base}/plugins` | Directory scanned for manifests. Exposed as a trimmed, non-throwing `config.paths.plugins` getter. Not auto-created — the host stats and degrades. |
+| Setting / variable | Default            | Behavior                                                                                                                                           |
+| ------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI Enable plugins  | `false` (OFF)      | DB-backed master switch (`general_settings.plugins_enabled`). Off ⇒ host is a hard no-op. Hot-applied via `PATCH /api/v1/plugins/settings`.        |
+| `PLUGINS_DIR`      | `${base}/plugins`  | Directory scanned for manifests. Exposed as a trimmed, non-throwing `config.paths.plugins` getter. Not auto-created — the host stats and degrades. |
+| `PLUGINS_ENABLED`  | ignored at runtime | Legacy env seed only: on upgrade, a truthy value may one-time set `plugins_enabled=1`. Not the operator gate.                                      |
 
 ## Key References
 
@@ -407,10 +408,11 @@ exchange-memory accounting is not described as a total guest-memory limit. See t
   `executor.ts`, `scan.ts`, `hostContext.ts`, `responses.ts`, `errors.ts`, `index.ts`)
 - `packages/praxrr-app/src/lib/server/db/queries/pluginRegistry.ts` and migration `20260724` — durable
   reconciliation and namespace-qualified management state
-- `packages/praxrr-app/src/routes/api/v1/plugins/` — auth-gated list/get/enable/disable/reload handlers
+- `packages/praxrr-app/src/routes/api/v1/plugins/` — auth-gated list/get/enable/disable/reload/settings handlers
 - `packages/praxrr-app/src/routes/settings/plugins/` — operator page, presentation helpers, and
   plugin card
-- `packages/praxrr-app/src/lib/server/utils/config/config.ts` — `pluginsEnabled` flag +
+- `packages/praxrr-app/src/lib/server/plugins/featureFlag.ts` — DB-backed runtime enablement cache
+- `packages/praxrr-app/src/lib/server/utils/config/config.ts` — legacy `pluginsEnabled` seed +
   `paths.plugins` getter
 - `packages/praxrr-app/src/hooks.server.ts` — startup wiring (after `trashGuideManager.initialize()`)
 - `packages/praxrr-app/src/lib/server/mcp/context.ts`, `mcp/redact.ts`, `mcp/errors.ts` — the

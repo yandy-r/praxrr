@@ -108,7 +108,7 @@ The plugin subsystem is off by default and is engineered so that a bad
 plugin, a missing directory, or a disabled flag can never destabilize
 boot or affect another plugin.
 
-- **Disabled — a hard no-op.** When `PLUGINS_ENABLED` is unset (or not
+- **Disabled — a hard no-op.** When plugins are disabled in the UI (or not
   one of `1`, `true`, `yes`, `on`), `host.initialize` returns
   immediately. It never even stats `PLUGINS_DIR`.
 - **Enabled but the directory is missing.** The host warns and degrades

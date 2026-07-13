@@ -6,12 +6,14 @@ import { db } from '../db.ts';
 export interface GeneralSettings {
   id: number;
   apply_default_delay_profiles: number; // 1=true, 0=false
+  plugins_enabled: number; // 1=true, 0=false
   created_at: string;
   updated_at: string;
 }
 
 export interface UpdateGeneralSettingsInput {
   applyDefaultDelayProfiles?: boolean;
+  pluginsEnabled?: boolean;
 }
 
 /**
@@ -35,6 +37,14 @@ export const generalSettingsQueries = {
   },
 
   /**
+   * Check whether the plugin ecosystem master switch is on
+   */
+  isPluginsEnabled(): boolean {
+    const settings = this.get();
+    return settings?.plugins_enabled === 1;
+  },
+
+  /**
    * Update general settings
    */
   update(input: UpdateGeneralSettingsInput): boolean {
@@ -44,6 +54,11 @@ export const generalSettingsQueries = {
     if (input.applyDefaultDelayProfiles !== undefined) {
       updates.push('apply_default_delay_profiles = ?');
       params.push(input.applyDefaultDelayProfiles ? 1 : 0);
+    }
+
+    if (input.pluginsEnabled !== undefined) {
+      updates.push('plugins_enabled = ?');
+      params.push(input.pluginsEnabled ? 1 : 0);
     }
 
     if (updates.length === 0) {

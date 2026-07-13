@@ -163,6 +163,18 @@ export const NAV_REGISTRY: ArrCapabilityAwareNavItem[] = [
     hasChildren: false,
   },
   {
+    id: 'apps.plugins',
+    label: 'Plugins',
+    href: '/settings/plugins',
+    groupId: ensureGroupId('apps'),
+    order: 1,
+    arrScope: scopeAll,
+    mobilePriority: 'medium',
+    iconKey: 'Package',
+    emoji: '📦',
+    hasChildren: false,
+  },
+  {
     id: 'operations.sync_history',
     label: 'Sync History',
     href: '/sync-history',

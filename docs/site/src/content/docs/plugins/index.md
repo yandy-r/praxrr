@@ -10,8 +10,8 @@ proves today, and where the contract is (and is not) stable.
 
 :::caution[Phase-1 status]
 In Phase-1 the host **discovers, validates, and registers** a manifest, and
-this works today only when the feature flag `PLUGINS_ENABLED` is set (it is
-**off by default**).
+this works today only when the plugin ecosystem is enabled in the UI
+(**off by default** under Apps → Plugins / Settings → Plugins).
 
 **No WebAssembly executes.** The only executor shipped,
 `UnavailablePluginExecutor`, rejects every dispatch with
@@ -62,12 +62,12 @@ stores plugins in the `registered` state; the runtime states (`activated`,
 the forward, happy-path progression — the pending "Observed" stage is what the
 Phase-2 runtime adds.
 
-| Stage               | Status                                 |
-| ------------------- | -------------------------------------- |
-| Discovered          | Works today (behind `PLUGINS_ENABLED`) |
-| Validated           | Works today (behind `PLUGINS_ENABLED`) |
-| Registered          | Works today (behind `PLUGINS_ENABLED`) |
-| Observed (executed) | Pending Phase-2 (#262)                 |
+| Stage               | Status                                           |
+| ------------------- | ------------------------------------------------ |
+| Discovered          | Works today (when plugins are enabled in the UI) |
+| Validated           | Works today (when plugins are enabled in the UI) |
+| Registered          | Works today (when plugins are enabled in the UI) |
+| Observed (executed) | Pending Phase-2 (#262)                           |
 
 The Phase-2 runtime is a documented, reasoned deferral — not an omission and
 not a "never". The evaluated Extism JavaScript SDK on Deno is a no-go for
@@ -80,7 +80,7 @@ backend lands.
 
 The whole subsystem is off unless you opt in.
 
-- `PLUGINS_ENABLED` — accepts `1`, `true`, `yes`, or `on`; **default off**.
+- UI **Enable plugins** — master switch on Apps → Plugins / Settings → Plugins; **default off**.
   When off, the host is a hard no-op: `host.initialize` returns immediately
   and never stats `PLUGINS_DIR`.
 - `PLUGINS_DIR` — the directory scanned for `praxrr.plugin.json` manifests;

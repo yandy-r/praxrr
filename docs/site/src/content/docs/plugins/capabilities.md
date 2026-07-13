@@ -16,7 +16,7 @@ registered but never executed — the only executor,
 `wasm runtime not yet available`. Capabilities describe what a plugin
 _would_ receive once the Phase-2 runtime lands, not data any plugin
 observes today. The subsystem is also off by default: set
-`PLUGINS_ENABLED` (`1`, `true`, `yes`, or `on`) to enable discovery and
+the UI **Enable plugins** control to enable discovery and
 registration.
 :::
 

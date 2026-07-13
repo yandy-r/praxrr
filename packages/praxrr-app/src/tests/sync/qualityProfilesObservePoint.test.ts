@@ -18,15 +18,13 @@
  * Cross-Arr matrix: the FIRES case runs radarr AND sonarr AND lidarr and asserts the captured `arrType`
  * equals the syncer's own instanceType each time (never a sibling).
  *
- * Idioms mirrored from tests/plugins/host.test.ts: readonly-cast + finally-restore of the
- * constructor-cached `config.pluginsEnabled`, `pluginRegistry.register` + `pluginHost.setExecutor`
- * capture, and `{ sanitizeOps: false, sanitizeResources: false }` on tests that drive real dispatch (the
- * host arms a 5s AbortSignal timer). The singleton `pluginHost` is exercised (not a fresh PluginHost)
- * because the producer call-site imports that singleton.
+ * Idioms mirrored from tests/plugins/host.test.ts: `withPluginsFeature`, `pluginRegistry.register` +
+ * `pluginHost.setExecutor` capture, and `{ sanitizeOps: false, sanitizeResources: false }` on tests that
+ * drive real dispatch (the host arms a 5s AbortSignal timer). The singleton `pluginHost` is exercised
+ * (not a fresh PluginHost) because the producer call-site imports that singleton.
  */
 
 import { assert, assertEquals } from '@std/assert';
-import { config } from '$config';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 import type { SyncArrType } from '$sync/mappings.ts';
@@ -37,26 +35,15 @@ import {
   pluginHost,
   pluginRegistry,
   UnavailablePluginExecutor,
+  withPluginsFeature,
   type PluginExecutionRequest,
   type PluginExecutor,
 } from '$server/plugins/index.ts';
 import { PLUGIN_API_VERSION, type PluginJsonValue, type PluginManifest } from '$shared/plugins/index.ts';
 
-// ---------------------------------------------------------------------------
-// Config-flag control (constructor-cached; flipped via readonly-cast per host.test.ts).
-// ---------------------------------------------------------------------------
-
-const configFlag = config as unknown as { pluginsEnabled: boolean };
-
-/** Run `fn` with `config.pluginsEnabled` forced to `enabled`, restoring the original afterward. */
+/** Run `fn` with the plugin ecosystem feature flag forced to `enabled`. */
 async function withPluginsEnabled(enabled: boolean, fn: () => Promise<void>): Promise<void> {
-  const original = configFlag.pluginsEnabled;
-  configFlag.pluginsEnabled = enabled;
-  try {
-    await fn();
-  } finally {
-    configFlag.pluginsEnabled = original;
-  }
+  await withPluginsFeature(enabled, fn);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,19 +243,22 @@ Deno.test({
 // (ii) DISABLED INVARIANCE.
 // ---------------------------------------------------------------------------
 
-Deno.test('config.profileCompiled.observe DISABLED: flag off + plugin registered never calls the executor and output is byte-identical', async () => {
-  const baseline = await computeBaseline('radarr', ['Ultra-HD']);
-  const { executor, inputs } = createCapturingExecutor();
+Deno.test(
+  'config.profileCompiled.observe DISABLED: flag off + plugin registered never calls the executor and output is byte-identical',
+  async () => {
+    const baseline = await computeBaseline('radarr', ['Ultra-HD']);
+    const { executor, inputs } = createCapturingExecutor();
 
-  await withPluginsEnabled(false, () =>
-    withObserverDispatch(executor, async () => {
-      const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
-      assertEquals(inputs.length, 0);
-      assertEquals(writes.length, 1);
-      assertEquals(result, baseline);
-    })
-  );
-});
+    await withPluginsEnabled(false, () =>
+      withObserverDispatch(executor, async () => {
+        const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
+        assertEquals(inputs.length, 0);
+        assertEquals(writes.length, 1);
+        assertEquals(result, baseline);
+      })
+    );
+  }
+);
 
 // ---------------------------------------------------------------------------
 // (iii) THROWING-PLUGIN INVARIANCE.
@@ -297,48 +287,54 @@ Deno.test({
 // (iv) NO-PLUGIN.
 // ---------------------------------------------------------------------------
 
-Deno.test('config.profileCompiled.observe NO PLUGIN: an empty registry lets the producer return normally without the executor', async () => {
-  const { executor, inputs } = createCapturingExecutor();
+Deno.test(
+  'config.profileCompiled.observe NO PLUGIN: an empty registry lets the producer return normally without the executor',
+  async () => {
+    const { executor, inputs } = createCapturingExecutor();
 
-  await withPluginsEnabled(true, async () => {
-    pluginRegistry.clear();
-    pluginHost.setExecutor(executor);
-    try {
-      const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
-      assertEquals(result.success, true);
-      assertEquals(writes.length, 1);
-      // notifyObservers returns early with zero registered plugins — the executor is never reached.
-      assertEquals(inputs.length, 0);
-    } finally {
-      pluginHost.setExecutor(new UnavailablePluginExecutor());
+    await withPluginsEnabled(true, async () => {
       pluginRegistry.clear();
-    }
-  });
-});
+      pluginHost.setExecutor(executor);
+      try {
+        const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
+        assertEquals(result.success, true);
+        assertEquals(writes.length, 1);
+        // notifyObservers returns early with zero registered plugins — the executor is never reached.
+        assertEquals(inputs.length, 0);
+      } finally {
+        pluginHost.setExecutor(new UnavailablePluginExecutor());
+        pluginRegistry.clear();
+      }
+    });
+  }
+);
 
 // ---------------------------------------------------------------------------
 // (v) CALL-SITE THROW ISOLATION.
 // ---------------------------------------------------------------------------
 
-Deno.test('config.profileCompiled.observe CALL-SITE THROW: a notifyObservers rejection is caught at the call-site so the syncer still writes and returns normally', async () => {
-  const baseline = await computeBaseline('radarr', ['Ultra-HD']);
+Deno.test(
+  'config.profileCompiled.observe CALL-SITE THROW: a notifyObservers rejection is caught at the call-site so the syncer still writes and returns normally',
+  async () => {
+    const baseline = await computeBaseline('radarr', ['Ultra-HD']);
 
-  // Replace the singleton's `notifyObservers` with a rejecting stub (an own property that shadows the
-  // prototype method); `delete` restores the real method afterward.
-  const hostAny = pluginHost as unknown as { notifyObservers?: PluginHost['notifyObservers'] };
-  hostAny.notifyObservers = (() => Promise.reject(new Error('call-site boom'))) as PluginHost['notifyObservers'];
+    // Replace the singleton's `notifyObservers` with a rejecting stub (an own property that shadows the
+    // prototype method); `delete` restores the real method afterward.
+    const hostAny = pluginHost as unknown as { notifyObservers?: PluginHost['notifyObservers'] };
+    hostAny.notifyObservers = (() => Promise.reject(new Error('call-site boom'))) as PluginHost['notifyObservers'];
 
-  try {
-    await withPluginsEnabled(true, async () => {
+    try {
+      await withPluginsEnabled(true, async () => {
+        pluginRegistry.clear();
+        const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
+        assertEquals(result.success, true);
+        assertEquals(writes.length, 1);
+        assertEquals(writes[0].kind, 'create');
+        assertEquals(result, baseline);
+      });
+    } finally {
+      delete hostAny.notifyObservers;
       pluginRegistry.clear();
-      const { result, writes } = await runSyncerForArr('radarr', ['Ultra-HD']);
-      assertEquals(result.success, true);
-      assertEquals(writes.length, 1);
-      assertEquals(writes[0].kind, 'create');
-      assertEquals(result, baseline);
-    });
-  } finally {
-    delete hostAny.notifyObservers;
-    pluginRegistry.clear();
+    }
   }
-});
+);

@@ -15,7 +15,7 @@ _never_ executed. Phase-1 ships no WASM runtime — the only executor,
 `UnavailablePluginExecutor`, rejects every dispatch with `wasm runtime not yet
 available`. A valid manifest means the plugin _would_ receive observe input
 once the Phase-2 runtime lands, not that anything runs today. The subsystem is
-also off by default: set `PLUGINS_ENABLED` (accepts `1`, `true`, `yes`, or
+also off by default: enable plugins in the UI (Apps → Plugins), or
 `on`) to enable it. See [/plugins/lifecycle/](/plugins/lifecycle/) and
 [/plugins/versioning/](/plugins/versioning/) for the surrounding model.
 :::
