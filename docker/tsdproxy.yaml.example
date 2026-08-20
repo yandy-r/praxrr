@@ -1,15 +1,18 @@
-defaultProxyProvider: default
+# Provider name must match tsdproxy.proxyprovider on compose.dev.yml labels (`praxrr`).
+# rfmedia-apps tsdproxy-rfapps uses provider `rfapps` and skips containers pinned
+# to `praxrr`, which prevents duplicate Tailscale machines (git / git-1).
+defaultProxyProvider: praxrr
 
 docker:
   local:
     host: unix:///var/run/docker.sock
     targetHostname: host.docker.internal
     tryDockerInternalNetwork: true
-    defaultProxyProvider: default
+    defaultProxyProvider: praxrr
 
 tailscale:
   providers:
-    default:
+    praxrr:
       authKey: ''
       authKeyFile: ''
       controlUrl: https://controlplane.tailscale.com

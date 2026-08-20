@@ -65,9 +65,14 @@ mkdir -p .tsdproxy/config .tsdproxy/data
 cp docker/tsdproxy.yaml.example .tsdproxy/config/tsdproxy.yaml
 ```
 
-Optionally set `tailscale.providers.default.authKey` in `.tsdproxy/config/tsdproxy.yaml`
+Optionally set `tailscale.providers.praxrr.authKey` in `.tsdproxy/config/tsdproxy.yaml`
 for unattended (headless) Tailscale authentication. Otherwise, authenticate
 interactively through the TSDProxy dashboard.
+
+Dev compose labels set `tsdproxy.proxyprovider: praxrr`. That pin is required when another
+TSDProxy (for example rfmedia-apps `tsdproxy-rfapps`) is also watching the same Docker socket;
+without it both daemons register the same hostname and Tailscale creates `git-1` / `plex-1`
+duplicates.
 
 #### Tailscale hostnames
 

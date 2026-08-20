@@ -7,6 +7,12 @@
 #   Full stack:
 #     docker compose -f compose.dev.yml --profile dev --profile arr up --build --watch
 
+# Pin hosts to Tailscale provider `praxrr` so rfmedia-apps tsdproxy-rfapps on the
+# same Docker socket does not register duplicate machines.
+x-tsdproxy-praxrr: &tsdproxy-praxrr
+  tsdproxy.enable: 'true'
+  tsdproxy.proxyprovider: 'praxrr'
+
 services:
   tsdproxy:
     profiles: ['dev', 'arr']
@@ -21,7 +27,7 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     labels:
-      tsdproxy.enable: 'true'
+      <<: *tsdproxy-praxrr
       tsdproxy.name: 'praxrr-tsdproxy'
       tsdproxy.dash.visible: 'false'
       tsdproxy.port.1: '443/https:8080/http'
@@ -37,7 +43,7 @@ services:
     expose:
       - '6868'
     labels:
-      tsdproxy.enable: 'true'
+      <<: *tsdproxy-praxrr
       tsdproxy.name: 'praxrr-dev'
       tsdproxy.port.1: '443/https:6868/http'
       tsdproxy.dash.label: 'Praxrr Dev'
@@ -180,7 +186,7 @@ services:
     expose:
       - '7878'
     labels:
-      tsdproxy.enable: 'true'
+      <<: *tsdproxy-praxrr
       tsdproxy.name: 'praxrr-radarr'
       tsdproxy.port.1: '443/https:7878/http'
       tsdproxy.dash.label: 'Radarr'
@@ -201,7 +207,7 @@ services:
     expose:
       - '8989'
     labels:
-      tsdproxy.enable: 'true'
+      <<: *tsdproxy-praxrr
       tsdproxy.name: 'praxrr-sonarr'
       tsdproxy.port.1: '443/https:8989/http'
       tsdproxy.dash.label: 'Sonarr'
@@ -222,7 +228,7 @@ services:
     expose:
       - '8686'
     labels:
-      tsdproxy.enable: 'true'
+      <<: *tsdproxy-praxrr
       tsdproxy.name: 'praxrr-lidarr'
       tsdproxy.port.1: '443/https:8686/http'
       tsdproxy.dash.label: 'Lidarr'
