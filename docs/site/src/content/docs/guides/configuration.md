@@ -184,11 +184,25 @@ forwarded client: remote clients authenticate, LAN clients keep the intended
 local bypass. The Security Posture surfaces the unset case as the
 `proxy_trust_missing` advisory.
 
-## CSRF note
+## CSRF protection
 
-During active development, SvelteKit CSRF trusted origins may include a wildcard
-to tolerate reverse-proxy hostname mismatches. Tighten trusted origins to
-explicit URLs before production deployment.
+Mutating browser requests (POST/PUT/PATCH/DELETE with form or JSON bodies) are rejected with 403
+when the `Origin` header is present and does not match an expected origin. Requests without an
+`Origin` header (curl, API keys, server-to-server) pass through to authentication as before.
+
+Expected origins are, in order:
+
+1. The listener origin (what Praxrr itself serves, e.g. `http://praxrr:6868`).
+2. The public origin from `X-Forwarded-Proto`/`X-Forwarded-Host` — honored **only** when the
+   direct peer is a `TRUSTED_PROXY`-allowlisted reverse proxy. Set `TRUSTED_PROXY` to the proxy's
+   address (or `loopback` when it runs on the same host) so the proxied origin is accepted.
+3. The explicit allowlist in `PRAXRR_TRUSTED_ORIGINS` — a comma-separated list of extra
+   browser-reachable origins, e.g. `PRAXRR_TRUSTED_ORIGINS=https://praxrr.lan,https://praxrr.tailnet`.
+   Malformed entries are dropped without bricking boot.
+
+Example nginx setup (from the Trusted proxy section above): with `TRUSTED_PROXY` pointing at the
+proxy, `proxy_set_header X-Forwarded-Proto $scheme` makes the proxy-visible `https://…` origin
+accepted automatically; only genuinely different hostnames need `PRAXRR_TRUSTED_ORIGINS`.
 
 ## Env-managed Arr instances
 

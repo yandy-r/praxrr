@@ -2,7 +2,7 @@
  * Application configuration singleton
  */
 
-import { parseTrustedProxy, type TrustedProxyConfig } from '$shared/security/index.ts';
+import { parseTrustedOrigins, parseTrustedProxy, type TrustedProxyConfig } from '$shared/security/index.ts';
 import type { CookieSecureMode } from '$shared/security/types.ts';
 
 export type AuthMode = 'on' | 'local' | 'off' | 'oidc';
@@ -48,6 +48,8 @@ class Config {
   public readonly webauthnOrigin: string | null;
   public readonly webauthnRpName: string;
   public readonly webauthnChallengeTtlSeconds: number;
+  /** Explicit public origins allowed for browser mutations, comma-separated in PRAXRR_TRUSTED_ORIGINS. */
+  public readonly trustedOrigins: string[];
   // Explicit reverse-proxy trust allowlist (issue #228). Never null; unset => { mode: 'unset', … }.
   // Forwarded request properties (X-Forwarded-For, etc.) are honored only from a peer in this list.
   public readonly trustedProxy: TrustedProxyConfig;
@@ -112,6 +114,7 @@ class Config {
     this.webauthnRpName = Deno.env.get('WEBAUTHN_RP_NAME')?.trim() || 'Praxrr';
     const challengeTtl = parseInt(Deno.env.get('WEBAUTHN_CHALLENGE_TTL_SECONDS') || '300', 10);
     this.webauthnChallengeTtlSeconds = Number.isFinite(challengeTtl) && challengeTtl > 0 ? challengeTtl : 300;
+    this.trustedOrigins = parseTrustedOrigins(Deno.env.get('PRAXRR_TRUSTED_ORIGINS') ?? null);
 
     // Trusted-proxy allowlist (issue #228). Parsed once; fail-closed but NON-throwing so a typo cannot
     // brick boot and Shield Check can still surface the invalid tokens.

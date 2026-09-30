@@ -17,3 +17,4 @@ export {
   type TrustedProxyConfig,
   type TrustedProxyMode,
 } from './trustedProxy.ts';
+export { normalizeOrigin, parseTrustedOrigins } from './origin.ts';

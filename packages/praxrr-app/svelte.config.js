@@ -14,7 +14,13 @@ const config = {
 
   kit: {
     csrf: {
-      trustedOrigins: ['*'],
+      // CSRF is enforced at runtime by src/hooks.server.ts (src/lib/server/security/csrf.ts):
+      // proxy-aware (TRUSTED_PROXY-gated X-Forwarded-*), PRAXRR_TRUSTED_ORIGINS-aware, and it
+      // covers JSON bodies — none of which SvelteKit's build-time check can do (its
+      // trustedOrigins is baked into the generated bundle and cannot read runtime env).
+      // The previous trustedOrigins: ['*'] wildcard disabled origin checks in production
+      // builds — see YAN-433 / #276.
+      checkOrigin: false,
     },
     adapter: adapter({
       usage: 'deno-compile',
