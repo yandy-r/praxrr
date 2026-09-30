@@ -246,3 +246,9 @@ Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `P
 ### Mirror Governance
 
 `packages/praxrr-db` and `packages/praxrr-schema` are mirrored to their respective repos via subtree publish workflows. Cross-repo pushes target `yandy-r/praxrr-db` and `yandy-r/praxrr-schema` only. For package/API/PCD contract changes, update all affected workspace members in the same change set and run contract compatibility checks and type generation before publish-related follow-ups.
+
+## Branching & releases
+
+[`RELEASING.md`](../RELEASING.md) is the source of truth for branches and releases. Branch
+off `main` and PR back into it; every release is tagged from `main`. Never merge one
+long-lived branch into another to sync it.
