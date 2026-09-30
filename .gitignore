@@ -20,6 +20,7 @@ node_modules
 
 # worktrees
 /.claude/worktrees/
+/.config/opencode/worktrees/
 
 # Application
 /config
