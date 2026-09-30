@@ -15,7 +15,7 @@ const caches = new Map<number, PCDCache>();
  * Per-import ephemeral cache scope. While `withScopedCache` runs, `getCache`
  * answers with the scoped cache so deep import call paths (writer validation,
  * entity deserializers) read the base-only import view. The registered cache is
- * untouched for every other reader. Lifecyle: created and closed by the owner of
+ * untouched for every other reader. Lifecycle: created and closed by the owner of
  * the scope; never passed to `setCache`.
  */
 const scopedCaches = new AsyncLocalStorage<Map<number, PCDCache>>();

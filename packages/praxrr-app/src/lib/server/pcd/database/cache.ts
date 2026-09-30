@@ -322,6 +322,7 @@ export class PCDCache {
     options: {
       layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
       snapshotOpIds?: ReadonlySet<number>;
+      excludeBaseOpIds?: ReadonlySet<number>;
     },
     hooks?: BuildReadOnlyHooks
   ): Promise<void> {
@@ -336,6 +337,7 @@ export class PCDCache {
     //    op set for point-in-time snapshot restore (rollback, issue #16).
     const allOperations = await loadAllOperations(this.pcdPath, this.databaseInstanceId, {
       snapshotOpIds: options.snapshotOpIds,
+      excludeBaseOpIds: options.excludeBaseOpIds,
     });
     const operations = allOperations.filter((operation) => options.layers.has(operation.layer));
     validateOperations(operations);

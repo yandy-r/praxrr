@@ -10,7 +10,7 @@ import {
   readMigrationEntitySources,
 } from '$pcd/migration/reader.ts';
 import { sortMigrationCandidatesByImportOrder } from '$pcd/migration/migrationImportUtils.ts';
-import { compile } from '../database/compiler.ts';
+import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { withRepoImportWriteContext } from './writer.ts';
 
@@ -21,7 +21,7 @@ let getRegisteredCacheForTests = getRegisteredCache;
 /**
  * Build the ephemeral import cache: a read-only replay of schema + base + tweaks
  * with the refresh set removed from the published base layer (so refreshed
- * entities look absent and get re-imported), base drafts included, and NO user
+ * entities look absent and get re-imported; all other base ops keep normal ordering), and NO user
  * layer and NO value-guard/history side effects (YAN-461: a full compile() here
  * replays user ops against the partially refreshed base and permanently drops
  * them). In-scope only via `withScopedCache`; never registered; closed by the caller.
@@ -31,19 +31,16 @@ async function buildImportCache(
   databaseId: number,
   excludeOpIds: ReadonlySet<number>
 ): Promise<PCDCache> {
-  const baseRows = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base');
-  const replayOpIds = new Set<number>();
-  for (const op of baseRows) {
-    if (op.state !== 'published' && op.state !== 'draft') continue;
-    if (op.state === 'published' && excludeOpIds.has(op.id)) continue;
-    replayOpIds.add(op.id);
-  }
-
   const cache = new PCDCacheImpl(pcdPath, databaseId);
-  await cache.buildReadOnly({
-    layers: new Set<'schema' | 'base' | 'tweaks'>(['schema', 'base', 'tweaks']),
-    snapshotOpIds: replayOpIds,
-  });
+  try {
+    await cache.buildReadOnly({
+      layers: new Set<'schema' | 'base' | 'tweaks'>(['schema', 'base', 'tweaks']),
+      excludeBaseOpIds: excludeOpIds,
+    });
+  } catch (error) {
+    cache.close();
+    throw error;
+  }
   return cache;
 }
 let buildImportCacheForTests = buildImportCache;
@@ -542,6 +539,11 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       await compileForTests(pcdPath, databaseId);
     } catch (error) {
       restoreBaseRepoOpsFromSnapshot(databaseId, baseRepoSnapshot);
+      // If the final compile had already swapped the registered cache in (it can throw
+      // after setCache, e.g. in auto-override resolution), the swap now diverges from
+      // the restored rows. Invalidate so the next read rebuilds instead of serving a
+      // stale cache; a mid-import failure never swapped it, so this is a no-op there.
+      invalidate(databaseId);
       throw error;
     } finally {
       importCache.close();

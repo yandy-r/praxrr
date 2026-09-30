@@ -4,6 +4,7 @@ import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries, type ListPcdOpsOptions, type PcdOp } from '$db/queries/pcdOps.ts';
 import * as importBaseOpsModule from '$pcd/ops/importBaseOps.ts';
 import { PCDCache } from '$pcd/database/cache.ts';
+import { getCache, getRegisteredCache, setCache, deleteCache } from '$pcd/database/registry.ts';
 import type {
   MigrationEntityCandidate,
   MigrationReaderIssue,
@@ -877,6 +878,84 @@ Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layer
   }
 });
 
+Deno.test(
+  'importBaseOps: loadAllOperations excludes refresh ops but keeps other published and draft base ops',
+  async () => {
+    const restores: Restore[] = [];
+    const databaseId = 9214;
+    const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-ops-exclude-' });
+
+    try {
+      const publishedKeep: PcdOp = {
+        id: 600,
+        database_id: databaseId,
+        origin: 'base',
+        state: 'published',
+        source: 'repo',
+        filename: '1.keep.sql',
+        op_number: 1,
+        sequence: 1,
+        sql: 'CREATE TABLE keep_marker (id INTEGER PRIMARY KEY);',
+        metadata: null,
+        desired_state: null,
+        content_hash: null,
+        last_seen_in_repo_at: null,
+        superseded_by_op_id: null,
+        pushed_at: null,
+        pushed_commit: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const publishedRefresh: PcdOp = {
+        ...publishedKeep,
+        id: 601,
+        filename: '2.refresh.sql',
+        op_number: 2,
+        sequence: 2,
+        sql: 'CREATE TABLE refresh_marker (id INTEGER PRIMARY KEY);',
+      };
+      const draftKeep: PcdOp = {
+        ...publishedKeep,
+        id: 602,
+        state: 'draft',
+        source: 'local',
+        filename: '3.draft.sql',
+        op_number: 3,
+        sequence: 3,
+        sql: 'CREATE TABLE draft_marker (id INTEGER PRIMARY KEY);',
+      };
+
+      patch(
+        pcdOpsQueries,
+        'listByDatabaseAndOrigin',
+        (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
+          if (origin !== 'base') return [];
+          const rows = [publishedKeep, publishedRefresh, draftKeep];
+          if (options?.states?.length) {
+            return rows.filter((row) => options.states!.includes(row.state));
+          }
+          return rows;
+        },
+        restores
+      );
+
+      const operations = await loadAllOperations(tempDir, databaseId, {
+        excludeBaseOpIds: new Set([publishedRefresh.id]),
+      });
+
+      const filenames = operations.map((operation) => operation.filename);
+      assertEquals(filenames.includes('1.keep.sql'), true);
+      assertEquals(filenames.includes('2.refresh.sql'), false);
+      assertEquals(filenames.includes('3.draft.sql'), true);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await Deno.remove(tempDir, { recursive: true });
+    }
+  }
+);
+
 Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
   const restores: Restore[] = [];
   const databaseId = 9203;
@@ -1196,6 +1275,69 @@ Deno.test(
     }
   }
 );
+
+Deno.test('importBaseOps: routes deep getCache calls to the scoped import cache (real registry)', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9213;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-scoped-registry-' });
+
+  try {
+    const registered = absentCache();
+    setCache(databaseId, registered);
+    restores.push(() => {
+      deleteCache(databaseId);
+    });
+
+    let cacheSeenByDeserialize: unknown;
+    let cacheSeenByWriterContext: unknown;
+
+    const candidate = buildCandidate(
+      'custom-formats/alpha.yaml',
+      'custom_format',
+      { key: 'custom_format_name', value: 'Alpha', kind: 'stable' },
+      () => Promise.resolve({ success: true })
+    );
+    (candidate as unknown as { deserialize: (options: { cache: unknown }) => Promise<unknown> }).deserialize = (
+      options
+    ) => {
+      cacheSeenByDeserialize = options.cache;
+      return Promise.resolve({ success: true });
+    };
+
+    __testOnly_setReadMigrationEntitySources(() => Promise.resolve({ candidates: [candidate], issues: [] }));
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+
+    const importCache = absentCache();
+    __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+    restores.push(__testOnly_resetBuildImportCache);
+
+    __testOnly_setWithRepoImportWriteContext((_context, callback: () => Promise<unknown>) => {
+      // Deep writer-path getCache() lookup inside the scope must resolve to the
+      // scoped import cache, not the registered one.
+      cacheSeenByWriterContext = getCache(databaseId);
+      return callback();
+    });
+    restores.push(__testOnly_resetWithRepoImportWriteContext);
+
+    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
+    __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+    restores.push(__testOnly_resetCompile);
+
+    const result = await importBaseOps(databaseId, tempDir);
+
+    assertEquals(result.imported, 1);
+    assertEquals(cacheSeenByDeserialize === importCache, true);
+    assertEquals(cacheSeenByWriterContext === importCache, true);
+    // Outside the import the registered cache is untouched.
+    assertEquals(getRegisteredCache(databaseId) === registered, true);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
 
 Deno.test(
   'importBaseOps: failed import restores repo base ops from snapshot and does not compile (YAN-461)',
