@@ -37,6 +37,10 @@ const {
   __testOnly_resetWithRepoImportWriteContext,
   __testOnly_setGetCache,
   __testOnly_resetGetCache,
+  __testOnly_setGetRegisteredCache,
+  __testOnly_resetGetRegisteredCache,
+  __testOnly_setBuildImportCache,
+  __testOnly_resetBuildImportCache,
 } = importBaseOpsModule;
 
 function patch<T extends object, K extends keyof T>(target: T, key: K, replacement: T[K], restores: Restore[]): void {
@@ -45,6 +49,32 @@ function patch<T extends object, K extends keyof T>(target: T, key: K, replaceme
   restores.push(() => {
     target[key] = original;
   });
+}
+
+/**
+ * Fake import/registered cache for unit tests. `prepareGet` is the row returned by
+ * `rawDb.prepare(...).get(...)` — `undefined` means the entity is absent, a row means
+ * present. Tracks `closed` so tests can assert lifecycle ownership.
+ */
+function fakeCache(prepareGet: () => unknown, state?: { closed: boolean }): PCDCache {
+  return {
+    getRawDb: () => ({
+      prepare: () => ({
+        get: prepareGet,
+      }),
+    }),
+    close: () => {
+      if (state) state.closed = true;
+    },
+  } as unknown as PCDCache;
+}
+
+function absentCache(state?: { closed: boolean }): PCDCache {
+  return fakeCache(() => undefined, state);
+}
+
+function presentCache(state?: { closed: boolean }): PCDCache {
+  return fakeCache(() => ({ exists_in_cache: 1 }), state);
 }
 
 function buildCandidate(
@@ -218,16 +248,10 @@ Deno.test('importBaseOps: skips entities already present in the base cache', asy
     );
     restores.push(__testOnly_resetReadMigrationEntitySources);
 
-    __testOnly_setGetCache(
-      () =>
-        ({
-          getRawDb: () => ({
-            prepare: () => ({
-              get: () => ({ exists_in_cache: 1 }),
-            }),
-          }),
-        }) as unknown as PCDCache
-    );
+    const importCache = presentCache();
+    __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+    restores.push(__testOnly_resetBuildImportCache);
+    __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
     patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
@@ -276,16 +300,10 @@ Deno.test('importBaseOps: reimports entities already present in published repo b
     );
     restores.push(__testOnly_resetReadMigrationEntitySources);
 
-    __testOnly_setGetCache(
-      () =>
-        ({
-          getRawDb: () => ({
-            prepare: () => ({
-              get: () => undefined,
-            }),
-          }),
-        }) as unknown as PCDCache
-    );
+    const importCache = absentCache();
+    __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+    restores.push(__testOnly_resetBuildImportCache);
+    __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
     patch(
@@ -343,9 +361,9 @@ Deno.test('importBaseOps: reimports entities already present in published repo b
 
     assertEquals(result.imported, 1);
     assertEquals(result.orphaned, 0);
-    assertEquals(updates.length, 1);
-    assertEquals(updates[0].id, 7001);
-    assertEquals(updates[0].state, 'orphaned');
+    // No pcd_ops state changes happen during the import: refresh rows are rewritten in
+    // place by the writer and only markBaseOrphaned touches state (after the loop).
+    assertEquals(updates, []);
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -384,16 +402,10 @@ Deno.test('importBaseOps: matches legacy published base ops by entity filename p
     );
     restores.push(__testOnly_resetReadMigrationEntitySources);
 
-    __testOnly_setGetCache(
-      () =>
-        ({
-          getRawDb: () => ({
-            prepare: () => ({
-              get: () => undefined,
-            }),
-          }),
-        }) as unknown as PCDCache
-    );
+    const importCache = absentCache();
+    __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+    restores.push(__testOnly_resetBuildImportCache);
+    __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
     patch(
@@ -444,9 +456,7 @@ Deno.test('importBaseOps: matches legacy published base ops by entity filename p
     assertEquals(result.imported, 1);
     assertEquals(result.orphaned, 0);
     assertEquals(deserialized, ['custom-formats/not-original-or-english.yaml']);
-    assertEquals(updates.length, 1);
-    assertEquals(updates[0].id, 7301);
-    assertEquals(updates[0].state, 'orphaned');
+    assertEquals(updates, []);
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -455,11 +465,120 @@ Deno.test('importBaseOps: matches legacy published base ops by entity filename p
   }
 });
 
-Deno.test('importBaseOps: orphans published repo base op before cache-exists skip', async () => {
+Deno.test(
+  'importBaseOps: reimports refresh candidates even when the stale registered cache still shows the entity',
+  async () => {
+    const restores: Restore[] = [];
+    const databaseId = 9208;
+    const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-refresh-in-place-' });
+    const updates: Array<{ id: number; state?: string; lastSeenInRepoAt?: string | null }> = [];
+    const deserialized: string[] = [];
+
+    try {
+      __testOnly_setReadMigrationEntitySources(() =>
+        Promise.resolve({
+          candidates: [
+            buildCandidate(
+              'quality-profiles/default.yaml',
+              'quality_profile',
+              {
+                key: 'quality_profile_name',
+                value: 'Default',
+                kind: 'stable',
+              },
+              () => {
+                deserialized.push('quality-profiles/default.yaml');
+                return Promise.resolve({ success: true });
+              }
+            ),
+          ],
+          issues: [],
+        })
+      );
+      restores.push(__testOnly_resetReadMigrationEntitySources);
+
+      const importCache = absentCache();
+      __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+      restores.push(__testOnly_resetBuildImportCache);
+      __testOnly_setGetCache(() => importCache);
+      restores.push(__testOnly_resetGetCache);
+
+      // Stale registered cache: the entity still resolves here, which must NOT skip a
+      // refresh candidate (it is rewritten in place, not re-created).
+      __testOnly_setGetRegisteredCache(() => presentCache());
+      restores.push(__testOnly_resetGetRegisteredCache);
+
+      patch(
+        pcdOpsQueries,
+        'listByDatabaseAndOrigin',
+        (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
+          {
+            id: 7101,
+            database_id: databaseId,
+            origin: 'base',
+            state: 'published',
+            source: 'repo',
+            filename: 'entities/quality-profiles/default.yaml#00000.sql',
+            op_number: null,
+            sequence: 4_000_000_000,
+            sql: 'INSERT INTO quality_profiles (name) VALUES ("Default");',
+            metadata: JSON.stringify({
+              operation: 'create',
+              entity: 'quality_profile',
+              name: 'Default',
+              stable_key: {
+                key: 'quality_profile_name',
+                value: 'Default',
+              },
+            }),
+            desired_state: null,
+            content_hash: null,
+            last_seen_in_repo_at: null,
+            superseded_by_op_id: null,
+            pushed_at: null,
+            pushed_commit: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        restores
+      );
+
+      patch(
+        pcdOpsQueries,
+        'update',
+        (id: number, input: { state?: string; lastSeenInRepoAt?: string | null }) => {
+          updates.push({ id, state: input.state, lastSeenInRepoAt: input.lastSeenInRepoAt });
+          return true;
+        },
+        restores
+      );
+
+      patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
+
+      __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
+      restores.push(__testOnly_resetCompile);
+
+      const result = await importBaseOps(databaseId, tempDir);
+
+      assertEquals(result.imported, 1);
+      assertEquals(result.orphaned, 0);
+      assertEquals(deserialized, ['quality-profiles/default.yaml']);
+      assertEquals(updates, []);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await Deno.remove(tempDir, { recursive: true });
+    }
+  }
+);
+
+Deno.test('importBaseOps: skips non-refresh entity present in the registered cache', async () => {
   const restores: Restore[] = [];
-  const databaseId = 9208;
-  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-refresh-before-cache-skip-' });
-  const updates: Array<{ id: number; state?: string; lastSeenInRepoAt?: string | null }> = [];
+  const databaseId = 9209;
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-skip-registered-' });
+  const deserialized: string[] = [];
 
   try {
     __testOnly_setReadMigrationEntitySources(() =>
@@ -473,7 +592,10 @@ Deno.test('importBaseOps: orphans published repo base op before cache-exists ski
               value: 'Default',
               kind: 'stable',
             },
-            () => Promise.resolve({ success: true })
+            () => {
+              deserialized.push('quality-profiles/default.yaml');
+              return Promise.resolve({ success: true });
+            }
           ),
         ],
         issues: [],
@@ -481,64 +603,18 @@ Deno.test('importBaseOps: orphans published repo base op before cache-exists ski
     );
     restores.push(__testOnly_resetReadMigrationEntitySources);
 
-    __testOnly_setGetCache(
-      () =>
-        ({
-          getRawDb: () => ({
-            prepare: () => ({
-              get: () => ({ exists_in_cache: 1 }),
-            }),
-          }),
-        }) as unknown as PCDCache
-    );
+    const importCache = absentCache();
+    __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+    restores.push(__testOnly_resetBuildImportCache);
+    __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
-    patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
-      (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
-        {
-          id: 7101,
-          database_id: databaseId,
-          origin: 'base',
-          state: 'published',
-          source: 'repo',
-          filename: 'entities/quality-profiles/default.yaml#00000.sql',
-          op_number: null,
-          sequence: 4_000_000_000,
-          sql: 'INSERT INTO quality_profiles (name) VALUES ("Default");',
-          metadata: JSON.stringify({
-            operation: 'create',
-            entity: 'quality_profile',
-            name: 'Default',
-            stable_key: {
-              key: 'quality_profile_name',
-              value: 'Default',
-            },
-          }),
-          desired_state: null,
-          content_hash: null,
-          last_seen_in_repo_at: null,
-          superseded_by_op_id: null,
-          pushed_at: null,
-          pushed_commit: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
-      restores
-    );
+    // No matching published repo op -> not a refresh. The entity exists in the
+    // registered cache (e.g. user-created or base draft), so it must skip.
+    __testOnly_setGetRegisteredCache(() => presentCache());
+    restores.push(__testOnly_resetGetRegisteredCache);
 
-    patch(
-      pcdOpsQueries,
-      'update',
-      (id: number, input: { state?: string; lastSeenInRepoAt?: string | null }) => {
-        updates.push({ id, state: input.state, lastSeenInRepoAt: input.lastSeenInRepoAt });
-        return true;
-      },
-      restores
-    );
-
+    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
     patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
 
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
@@ -548,9 +624,7 @@ Deno.test('importBaseOps: orphans published repo base op before cache-exists ski
 
     assertEquals(result.imported, 0);
     assertEquals(result.orphaned, 0);
-    assertEquals(updates.length, 1);
-    assertEquals(updates[0].id, 7101);
-    assertEquals(updates[0].state, 'orphaned');
+    assertEquals(deserialized, []);
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -621,6 +695,8 @@ Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
 
     __testOnly_setGetCache(() => undefined as unknown as PCDCache);
     restores.push(__testOnly_resetGetCache);
+    __testOnly_setBuildImportCache(() => Promise.resolve(absentCache()));
+    restores.push(__testOnly_resetBuildImportCache);
     patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
@@ -712,6 +788,14 @@ Deno.test(
         () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
       );
       restores.push(__testOnly_resetGetCache);
+
+      __testOnly_setBuildImportCache(() =>
+        Promise.resolve({
+          getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'],
+          close: () => {},
+        } as unknown as PCDCache)
+      );
+      restores.push(__testOnly_resetBuildImportCache);
 
       patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
       patch(pcdOpsQueries, 'markBaseOrphaned', () => 1, restores);
@@ -949,3 +1033,310 @@ Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
     await Deno.remove(tempDir, { recursive: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// YAN-461 regression coverage
+// ---------------------------------------------------------------------------
+
+function repoBaseOp(id: number, filename: string, name: string, sql: string): PcdOp {
+  return {
+    id,
+    database_id: 0,
+    origin: 'base',
+    state: 'published',
+    source: 'repo',
+    filename,
+    op_number: null,
+    sequence: 4_000_000_000,
+    sql,
+    metadata: JSON.stringify({
+      operation: 'create',
+      entity: 'custom_format',
+      name,
+      stable_key: { key: 'custom_format_name', value: name },
+    }),
+    desired_state: null,
+    content_hash: null,
+    last_seen_in_repo_at: null,
+    superseded_by_op_id: null,
+    pushed_at: null,
+    pushed_commit: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function userOp(id: number, name: string): PcdOp {
+  return {
+    id,
+    database_id: 0,
+    origin: 'user',
+    state: 'published',
+    source: 'local',
+    filename: null,
+    op_number: null,
+    sequence: null,
+    sql: `UPDATE custom_formats SET description = 'user tweak' WHERE name = '${name}';`,
+    metadata: JSON.stringify({
+      operation: 'update',
+      entity: 'custom_format',
+      name,
+      changed_fields: ['description'],
+    }),
+    desired_state: null,
+    content_hash: null,
+    last_seen_in_repo_at: null,
+    superseded_by_op_id: null,
+    pushed_at: null,
+    pushed_commit: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+Deno.test(
+  'importBaseOps: refresh pass keeps user ops untouched and compiles exactly once after orphaning (YAN-461)',
+  async () => {
+    const restores: Restore[] = [];
+    const databaseId = 9211;
+    const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-user-ops-survive-' });
+    const events: string[] = [];
+    const droppedUpdates: Array<{ id: number; state?: string }> = [];
+
+    try {
+      const baseRow = repoBaseOp(7001, 'entities/custom-formats/legacy.yaml#00000.sql', 'Legacy Custom', 'INSERT 1');
+      const userRow = userOp(9001, 'Legacy Custom');
+
+      __testOnly_setReadMigrationEntitySources(() =>
+        Promise.resolve({
+          candidates: [
+            buildCandidate(
+              'custom-formats/legacy.yaml',
+              'custom_format',
+              {
+                key: 'custom_format_name',
+                value: 'Legacy Custom',
+                kind: 'stable',
+              },
+              () => Promise.resolve({ success: true })
+            ),
+          ],
+          issues: [],
+        })
+      );
+      restores.push(__testOnly_resetReadMigrationEntitySources);
+
+      const importCache = absentCache();
+      __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+      restores.push(__testOnly_resetBuildImportCache);
+      __testOnly_setGetCache(() => importCache);
+      restores.push(__testOnly_resetGetCache);
+      __testOnly_setGetRegisteredCache(() => presentCache());
+      restores.push(__testOnly_resetGetRegisteredCache);
+
+      patch(
+        pcdOpsQueries,
+        'listByDatabaseAndOrigin',
+        (_databaseId: number, origin: 'base' | 'user', _options?: ListPcdOpsOptions) =>
+          origin === 'base' ? [baseRow] : [userRow],
+        restores
+      );
+
+      patch(
+        pcdOpsQueries,
+        'update',
+        (id: number, input: { state?: string }) => {
+          if (input.state === 'dropped' || input.state === 'orphaned') {
+            droppedUpdates.push({ id, state: input.state });
+          }
+          return true;
+        },
+        restores
+      );
+
+      patch(
+        pcdOpHistoryQueries,
+        'create',
+        () => {
+          events.push('history');
+          return 1;
+        },
+        restores
+      );
+
+      patch(
+        pcdOpsQueries,
+        'markBaseOrphaned',
+        () => {
+          events.push('markBaseOrphaned');
+          return 0;
+        },
+        restores
+      );
+
+      __testOnly_setCompile(() => {
+        events.push('compile');
+        return Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 });
+      });
+      restores.push(__testOnly_resetCompile);
+
+      const result = await importBaseOps(databaseId, tempDir);
+
+      assertEquals(result.imported, 1);
+      // The regression (YAN-461): user ops are never dropped and repo base ops are never
+      // orphaned during the import — the value-guard gate only runs inside compile(),
+      // which must fire exactly once, after markBaseOrphaned, with the complete base.
+      assertEquals(droppedUpdates, []);
+      assertEquals(events, ['markBaseOrphaned', 'compile']);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await Deno.remove(tempDir, { recursive: true });
+    }
+  }
+);
+
+Deno.test(
+  'importBaseOps: failed import restores repo base ops from snapshot and does not compile (YAN-461)',
+  async () => {
+    const restores: Restore[] = [];
+    const databaseId = 9212;
+    const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-failure-restore-' });
+    const restoreCalls: Array<{ id: number; state?: string; sql?: string; lastSeenInRepoAt?: string | null }> = [];
+    let compileCalls = 0;
+    let nextCreatedId = 7100;
+
+    try {
+      const baseRow = repoBaseOp(
+        7001,
+        'entities/custom-formats/alpha.yaml#00000.sql',
+        'Alpha',
+        'INSERT INTO custom_formats ...'
+      );
+
+      // Mutable in-memory pcd_ops table: rows created/updated by the (stubbed) writer
+      // must be visible to the snapshot restore.
+      const baseRows = new Map<number, PcdOp>([[baseRow.id, { ...baseRow }]]);
+
+      __testOnly_setReadMigrationEntitySources(() =>
+        Promise.resolve({
+          candidates: [
+            buildCandidate(
+              'custom-formats/alpha.yaml',
+              'custom_format',
+              {
+                key: 'custom_format_name',
+                value: 'Alpha',
+                kind: 'stable',
+              },
+              () => {
+                // Simulate the writer: rewrite the matched repo op in place.
+                baseRows.set(7001, {
+                  ...baseRow,
+                  sql: 'REWRITTEN SQL',
+                  last_seen_in_repo_at: new Date().toISOString(),
+                });
+                return Promise.resolve({ success: true });
+              }
+            ),
+            buildCandidate(
+              'custom-formats/beta.yaml',
+              'custom_format',
+              {
+                key: 'custom_format_name',
+                value: 'Beta',
+                kind: 'stable',
+              },
+              () => {
+                // Simulate the writer creating a new op row, then the import failing.
+                nextCreatedId += 1;
+                baseRows.set(
+                  nextCreatedId,
+                  repoBaseOp(nextCreatedId, `entities/custom-formats/beta.yaml#00000.sql`, 'Beta', 'INSERT BETA')
+                );
+                return Promise.reject(new Error('beta deserialize failure'));
+              }
+            ),
+          ],
+          issues: [],
+        })
+      );
+      restores.push(__testOnly_resetReadMigrationEntitySources);
+
+      const importCache = absentCache();
+      __testOnly_setBuildImportCache(() => Promise.resolve(importCache));
+      restores.push(__testOnly_resetBuildImportCache);
+      __testOnly_setGetCache(() => importCache);
+      restores.push(__testOnly_resetGetCache);
+
+      patch(
+        pcdOpsQueries,
+        'listByDatabaseAndOrigin',
+        (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
+          if (origin !== 'base') return [];
+          const rows = Array.from(baseRows.values());
+          if (options?.states?.length) {
+            return rows.filter((row) => options.states!.includes(row.state));
+          }
+          return rows;
+        },
+        restores
+      );
+
+      patch(
+        pcdOpsQueries,
+        'update',
+        (id: number, input: { state?: PcdOp['state']; sql?: string; lastSeenInRepoAt?: string | null }) => {
+          const row = baseRows.get(id);
+          if (row) {
+            baseRows.set(id, {
+              ...row,
+              state: input.state ?? row.state,
+              sql: input.sql ?? row.sql,
+              last_seen_in_repo_at: input.lastSeenInRepoAt ?? row.last_seen_in_repo_at,
+            });
+          }
+          restoreCalls.push({ id, state: input.state, sql: input.sql, lastSeenInRepoAt: input.lastSeenInRepoAt });
+          return true;
+        },
+        restores
+      );
+
+      patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
+
+      __testOnly_setCompile(() => {
+        compileCalls += 1;
+        return Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 });
+      });
+      restores.push(__testOnly_resetCompile);
+
+      await assertRejects(
+        async () => {
+          await importBaseOps(databaseId, tempDir);
+        },
+        Error,
+        'beta deserialize failure'
+      );
+
+      // The rewritten repo op is restored to its snapshot fields; the op created during
+      // the failed run is orphaned; the final compile never ran.
+      const alphaRestore = restoreCalls.find((call) => call.id === 7001);
+      assertEquals(alphaRestore !== undefined, true);
+      assertEquals(alphaRestore?.sql, 'INSERT INTO custom_formats ...');
+      assertEquals(alphaRestore?.state, 'published');
+      assertEquals(alphaRestore?.lastSeenInRepoAt, null);
+
+      const betaRestore = restoreCalls.find((call) => call.id === nextCreatedId);
+      assertEquals(betaRestore !== undefined, true);
+      assertEquals(betaRestore?.state, 'orphaned');
+
+      assertEquals(compileCalls, 0);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await Deno.remove(tempDir, { recursive: true });
+    }
+  }
+);

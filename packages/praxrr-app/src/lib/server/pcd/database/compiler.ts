@@ -4,7 +4,7 @@
  */
 
 import { PCDCache } from './cache.ts';
-import { setCache, getCache, deleteCache, getCachedDatabaseIds } from './registry.ts';
+import { setCache, getRegisteredCache, deleteCache, getCachedDatabaseIds, isCacheScoped } from './registry.ts';
 import type { CacheBuildStats } from '../core/types.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
@@ -114,8 +114,13 @@ async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise
  * Returns build stats for logging
  */
 export async function compile(pcdPath: string, databaseInstanceId: number): Promise<CacheBuildStats> {
+  if (isCacheScoped(databaseInstanceId)) {
+    throw new Error(
+      `compile() cannot run inside a scoped import cache for database ${databaseInstanceId}; run the final compile after withScopedCache exits`
+    );
+  }
   // Build the new cache first so we don't leave a window with no usable cache.
-  const existing = getCache(databaseInstanceId);
+  const existing = getRegisteredCache(databaseInstanceId);
   let cache = new PCDCache(pcdPath, databaseInstanceId);
   let stats = await cache.build();
 
@@ -147,7 +152,7 @@ export async function compile(pcdPath: string, databaseInstanceId: number): Prom
  * Invalidate a cache (close and remove from registry)
  */
 export function invalidate(databaseInstanceId: number): void {
-  const cache = getCache(databaseInstanceId);
+  const cache = getRegisteredCache(databaseInstanceId);
   if (cache) {
     cache.close();
     deleteCache(databaseInstanceId);
