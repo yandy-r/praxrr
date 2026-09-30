@@ -255,6 +255,36 @@ migratedTest(
   }
 );
 
+migratedTest('arrSyncHandler: a held claim records a skipped section and keeps the scheduled run alive', async () => {
+  const handler = jobQueueRegistry.get('arr.sync');
+  assertExists(handler);
+
+  const id = createRadarrInstanceRow('Radarr Claimed');
+  const { observed, restore } = driveHandlerHarness('5.14.0.9383');
+  const qpHandler = getSection('qualityProfiles');
+  const nextRunWrites: (string | null)[] = [];
+  qpHandler.claimSync = () => false;
+  qpHandler.setNextRunAt = (_instanceId, nextRun) => {
+    nextRunWrites.push(nextRun);
+  };
+  arrSyncQueries.getSyncConfigStatus = () => ({
+    ...baselineSyncConfigStatus(),
+    qualityProfiles: { trigger: 'schedule', cron: '0 * * * *', nextRunAt: null, syncStatus: 'in_progress' },
+  });
+  try {
+    const result = await handler(createQualityProfilesSyncJob(id, 'schedule'));
+
+    assertEquals(observed.syncCalled, false);
+    assertEquals(result.status, 'skipped');
+    assertEquals(result.output, 'qualityProfiles: skipped (sync already in progress)');
+    assertEquals(nextRunWrites.length, 1);
+    assertExists(nextRunWrites[0]);
+    assertEquals(result.rescheduleAt, nextRunWrites[0]);
+  } finally {
+    restore();
+  }
+});
+
 // =============================================================================
 // Focused unit coverage of the section -> capability version gate.
 // =============================================================================

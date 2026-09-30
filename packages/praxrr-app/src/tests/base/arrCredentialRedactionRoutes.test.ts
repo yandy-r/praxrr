@@ -211,6 +211,7 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       () => ({
         id: 1,
         apply_default_delay_profiles: 1,
+        plugins_enabled: 0,
         created_at: FIXTURE_TIMESTAMP,
         updated_at: FIXTURE_TIMESTAMP,
       }),

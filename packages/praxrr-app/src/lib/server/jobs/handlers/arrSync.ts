@@ -1058,8 +1058,25 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
       continue;
     }
 
+    const scheduleNextSectionRun = () => {
+      if (config.trigger !== 'schedule') return;
+      const nextRun = calculateNextRun(config.cron);
+      handler.setNextRunAt(instanceId, nextRun);
+      if (job.source === 'schedule') {
+        rescheduleAt = nextRun ?? null;
+      }
+    };
+
     handler.setStatusPending(instanceId);
     if (!handler.claimSync(instanceId)) {
+      results.push(`${section}: skipped (sync already in progress)`);
+      sectionResults.push({
+        section,
+        status: 'skipped',
+        itemsSynced: 0,
+        error: 'Sync already in progress',
+      });
+      scheduleNextSectionRun();
       continue;
     }
 
@@ -1124,13 +1141,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         },
       });
     } finally {
-      if (config.trigger === 'schedule') {
-        const nextRun = calculateNextRun(config.cron);
-        handler.setNextRunAt(instanceId, nextRun);
-        if (job.source === 'schedule') {
-          rescheduleAt = nextRun ?? null;
-        }
-      }
+      scheduleNextSectionRun();
     }
   }
 
