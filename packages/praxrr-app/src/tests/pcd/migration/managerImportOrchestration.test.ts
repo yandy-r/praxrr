@@ -4,12 +4,16 @@ import {
   __testOnly_resetCompile,
   __testOnly_resetBuildPublishedRepoBaseOpIndex,
   __testOnly_resetGetCache,
+  __testOnly_resetGetRegisteredCache,
+  __testOnly_resetBuildImportCache,
   __testOnly_resetReadMigrationEntitySources,
   __testOnly_setBuildPublishedRepoBaseOpIndex,
   __testOnly_resetWithRepoImportWriteContext,
   importBaseOps,
   __testOnly_setCompile,
   __testOnly_setGetCache,
+  __testOnly_setGetRegisteredCache,
+  __testOnly_setBuildImportCache,
   __testOnly_setReadMigrationEntitySources,
   __testOnly_setWithRepoImportWriteContext,
 } from '$pcd/ops/importBaseOps.ts';
@@ -109,6 +113,16 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
       () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
     );
     restores.push(__testOnly_resetGetCache);
+    __testOnly_setGetRegisteredCache(() => undefined);
+    restores.push(__testOnly_resetGetRegisteredCache);
+    __testOnly_setBuildImportCache(() =>
+      Promise.resolve({
+        getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'],
+        close: () => {},
+      } as unknown as PCDCache)
+    );
+    restores.push(__testOnly_resetBuildImportCache);
+    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
     __testOnly_setWithRepoImportWriteContext(
       async (
         _context: {
@@ -171,6 +185,16 @@ Deno.test('pcdManager: successful migration import still continues orchestration
       () => ({ getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'] }) as unknown as PCDCache
     );
     restores.push(__testOnly_resetGetCache);
+    __testOnly_setGetRegisteredCache(() => undefined);
+    restores.push(__testOnly_resetGetRegisteredCache);
+    __testOnly_setBuildImportCache(() =>
+      Promise.resolve({
+        getRawDb: (() => ({})) as unknown as PCDCache['getRawDb'],
+        close: () => {},
+      } as unknown as PCDCache)
+    );
+    restores.push(__testOnly_resetBuildImportCache);
+    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
     __testOnly_setWithRepoImportWriteContext(
       async (
         _context: {

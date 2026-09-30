@@ -25,6 +25,10 @@ function toOperation(op: PcdOp, layer: 'base' | 'user', orderOffset = 0): Operat
   };
 }
 
+function parseOpIdFromFilepath(filepath: string): number {
+  return Number(filepath.slice('pcd_ops:'.length));
+}
+
 function compareOperations(a: Operation, b: Operation): number {
   if (a.order !== b.order) return a.order - b.order;
   if (a.filename !== b.filename) return a.filename.localeCompare(b.filename);
@@ -87,6 +91,12 @@ export interface LoadOperationsOptions {
    * `pcd_ops` base+user, so file layers use their current on-disk content.
    */
   snapshotOpIds?: ReadonlySet<number>;
+  /**
+   * Published base op ids to leave out of the normal (non-snapshot) base layer load.
+   * Used by the base-op import cache so refreshed entities look absent while every other
+   * published/draft base op keeps its normal ordering (YAN-461). Ignored with `snapshotOpIds`.
+   */
+  excludeBaseOpIds?: ReadonlySet<number>;
 }
 
 /**
@@ -117,7 +127,10 @@ export async function loadAllOperations(
     allOperations.push(...loadDbOpsByIds(databaseInstanceId, 'base', snapshotOpIds));
   } else {
     // published, then drafts
-    const basePublished = loadDbOps(databaseInstanceId, 'base', ['published']);
+    const excludeBaseOpIds = options?.excludeBaseOpIds;
+    const basePublished = loadDbOps(databaseInstanceId, 'base', ['published']).filter(
+      (operation) => !excludeBaseOpIds?.has(parseOpIdFromFilepath(operation.filepath))
+    );
     allOperations.push(...basePublished);
     const baseDrafts = loadDbOps(databaseInstanceId, 'base', ['draft'], DRAFT_SEQUENCE_BASE);
     allOperations.push(...baseDrafts);
