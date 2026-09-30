@@ -78,11 +78,12 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 
 <!-- markdownlint-disable-next-line MD028 -->
 
-> [!NOTE] CSRF origin checks are currently configured with a wildcard
-> (`kit.csrf.trustedOrigins = ['*']`) to avoid proxy-origin mismatches during active development
-> (for example when running behind Traefik or other reverse proxies with TLS termination). This is a
-> temporary dev tradeoff and should be tightened to explicit trusted origin URLs before production
-> deployment.
+> [!NOTE] Cross-origin mutations are rejected server-side: Praxrr enforces a runtime CSRF origin
+> check (covering form and JSON bodies) in `packages/praxrr-app/src/lib/server/security/csrf.ts`.
+> Behind a TLS-terminating reverse proxy, set `TRUSTED_PROXY` so the public origin (from
+> `X-Forwarded-Proto`/`X-Forwarded-Host`) is accepted, and add any extra browser-reachable origins
+> (different hostname, port, or alias) to `PRAXRR_TRUSTED_ORIGINS` (comma-separated). See the
+> [Trusted proxy guide](docs/site/src/content/docs/guides/configuration.md).
 
 ## Documentation
 

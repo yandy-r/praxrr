@@ -3,6 +3,8 @@ await import('$lib/server/utils/parser/spawn.ts');
 
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
+import { csrfGuard } from '$server/security/csrf.ts';
 import { config } from '$config';
 import { printBanner, getServerInfo, logContainerConfig } from '$logger/startup.ts';
 import { logSettings } from '$logger/settings.ts';
@@ -224,7 +226,7 @@ printBanner();
  * Auth middleware
  * Handles authentication, authorization, and session management
  */
-export const handle: Handle = async ({ event, resolve }) => {
+const authHandle: Handle = async ({ event, resolve }) => {
   const auth = getAuthState(event);
   event.locals.user = auth.user;
   event.locals.session = auth.session;
@@ -283,3 +285,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   // Authenticated - attach user to locals for use in routes
   return resolve(event);
 };
+
+/**
+ * Request pipeline: CSRF origin gate runs first (YAN-433 / #276) so cross-origin mutations are
+ * rejected before auth or routing can apply them; auth handling is unchanged.
+ */
+export const handle = sequence(csrfGuard, authHandle);
