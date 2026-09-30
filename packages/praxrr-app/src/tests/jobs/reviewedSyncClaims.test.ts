@@ -365,6 +365,22 @@ Deno.test({
           assertEquals(status.last_error, 'review invalidated', section);
         }
       });
+
+      await t.step('startup recovery unsticks rows left in_progress by a crash', () => {
+        for (const section of SECTIONS) {
+          setStatus(1, section, 'in_progress');
+          setOrdinaryPending(1, section);
+          assertEquals(claimOrdinary(1, section), false, section);
+        }
+
+        arrSyncQueries.recoverInterruptedSyncs();
+
+        for (const section of SECTIONS) {
+          assertEquals(getStatus(1, section).sync_status, 'pending', section);
+          assertEquals(claimOrdinary(1, section), true, section);
+          completeOrdinary(1, section);
+        }
+      });
     } finally {
       arrSyncQueries.recoverInterruptedSyncs();
       db.close();

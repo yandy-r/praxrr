@@ -984,6 +984,17 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
   for (const section of sectionsToRun) {
     const handler = getSection(section);
     const config = configStatus[section];
+    // Every exit path must advance a scheduled section's next run; a stale next_run_at
+    // makes the aggregate scheduled job refire immediately (YAN-450).
+    const scheduleNextSectionRun = () => {
+      if (config.trigger !== 'schedule') return;
+      const nextRun = calculateNextRun(config.cron);
+      handler.setNextRunAt(instanceId, nextRun);
+      if (job.source === 'schedule') {
+        rescheduleAt = nextRun ?? null;
+      }
+    };
+
     const unsupportedReason = getUnsupportedSyncSectionReason(syncArrType, section);
 
     if (unsupportedReason) {
@@ -1005,6 +1016,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
           reason: unsupportedReason,
         },
       });
+      scheduleNextSectionRun();
       continue;
     }
 
@@ -1033,6 +1045,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
           reason: versionAvailability.reason,
         },
       });
+      scheduleNextSectionRun();
       continue;
     }
 
@@ -1055,17 +1068,9 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         itemsSynced: 0,
         error: null,
       });
+      scheduleNextSectionRun();
       continue;
     }
-
-    const scheduleNextSectionRun = () => {
-      if (config.trigger !== 'schedule') return;
-      const nextRun = calculateNextRun(config.cron);
-      handler.setNextRunAt(instanceId, nextRun);
-      if (job.source === 'schedule') {
-        rescheduleAt = nextRun ?? null;
-      }
-    };
 
     handler.setStatusPending(instanceId);
     if (!handler.claimSync(instanceId)) {
