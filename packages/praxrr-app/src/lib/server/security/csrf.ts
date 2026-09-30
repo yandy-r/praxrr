@@ -10,12 +10,11 @@
  * This module replaces that check at runtime in `hooks.server.ts` (`checkOrigin` stays disabled in
  * `svelte.config.js` so this hook is the single source of truth):
  *
- * - Mutating requests (POST/PUT/PATCH/DELETE) carrying a form content type
- *   (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`) or a JSON content
- *   type (`application/json`, `application/*+json`) are rejected with 403 when the `Origin` header
- *   is present and does not match an expected origin. JSON is covered too because handlers call
- *   `request.json()` without validating `Content-Type` — a browser can smuggle JSON cross-site as
- *   `text/plain` without a CORS preflight.
+ * - EVERY mutating request (POST/PUT/PATCH/DELETE) is rejected with 403 when the `Origin` header
+ *   is present and does not match an expected origin, regardless of `Content-Type`. Handlers call
+ *   `request.json()` without validating `Content-Type`, and a browser can send a cross-site
+ *   no-cors `fetch` with no/`text/plain`/blob body (no preflight, cookies attached), so gating on
+ *   content type would leave a bypass.
  * - Requests without an `Origin` header (curl, API keys, server-to-server, native apps) pass; the
  *   auth middleware remains the gate for them. This mirrors the existing MCP and plugin endpoint
  *   checks.
@@ -23,6 +22,9 @@
  *   `X-Forwarded-Proto`/`X-Forwarded-Host` (honored ONLY when the direct socket peer is a
  *   `TRUSTED_PROXY`-allowlisted reverse proxy, same contract as `getClientIp`) + the explicit
  *   `PRAXRR_TRUSTED_ORIGINS` allowlist.
+ *
+ * OPERATOR CONTRACT: a trusted proxy MUST overwrite (not append to) `X-Forwarded-Proto` and
+ * `X-Forwarded-Host`; the first token is used, so an appended client-supplied value would win.
  */
 
 import type { Handle } from '@sveltejs/kit';
@@ -32,20 +34,6 @@ import { firstForwardedValue } from '$http/forwardedHeader.ts';
 import { isTrustedProxyPeer, normalizeOrigin, type TrustedProxyConfig } from '$shared/security/index.ts';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-/** Content types a browser can send cross-site without a CORS preflight, plus JSON. */
-const GUARDED_CONTENT_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
-
-/**
- * Content types whose request bodies this gate protects. Form content types mirror SvelteKit's
- * `is_form_content_type`; JSON types close the `request.json()` smuggling hole.
- */
-export function isGuardedContentType(contentType: string | null): boolean {
-  if (!contentType) return false;
-  const mime = contentType.split(';', 1)[0].trim().toLowerCase();
-  if (GUARDED_CONTENT_TYPES.includes(mime)) return true;
-  return mime === 'application/json' || (mime.startsWith('application/') && mime.endsWith('+json'));
-}
 
 export interface ExpectedOriginsInput {
   /** Listener origin of the request URL (`event.url.origin`). */
@@ -83,7 +71,6 @@ export function resolveExpectedOrigins(input: ExpectedOriginsInput): string[] {
 export interface CrossOriginMutationInput {
   method: string;
   origin: string | null;
-  contentType: string | null;
   expectedOrigins: readonly string[];
 }
 
@@ -94,8 +81,9 @@ export interface CrossOriginMutationInput {
  */
 export function isCrossOriginMutation(input: CrossOriginMutationInput): boolean {
   if (!MUTATING_METHODS.has(input.method.toUpperCase())) return false;
-  if (!isGuardedContentType(input.contentType)) return false;
   if (input.origin === null) return false;
+  // Duplicate Origin headers join into a comma list; a browser never sends that, so reject it.
+  if (input.origin.includes(',')) return true;
   const origin = normalizeOrigin(input.origin);
   // A present-but-unparseable Origin (including the literal `null` sent for sandboxed contexts)
   // never matches: it cannot be proven same-site, so the request is rejected.
@@ -142,7 +130,6 @@ export const csrfGuard: Handle = async ({ event, resolve }) => {
     isCrossOriginMutation({
       method: event.request.method,
       origin: event.request.headers.get('origin'),
-      contentType: event.request.headers.get('content-type'),
       expectedOrigins,
     })
   ) {
@@ -151,7 +138,7 @@ export const csrfGuard: Handle = async ({ event, resolve }) => {
       meta: {
         method: event.request.method,
         path: event.url.pathname,
-        origin: event.request.headers.get('origin'),
+        origin: event.request.headers.get('origin')?.slice(0, 200),
         ip: safeClientAddress(event),
       },
     });

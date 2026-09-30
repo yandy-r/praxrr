@@ -1,17 +1,12 @@
 /**
- * Pure tests for the runtime CSRF origin gate (YAN-433 / #276). `isCrossOriginMutation` is the
+ * Tests for the runtime CSRF origin gate (YAN-433 / #276). `isCrossOriginMutation` is the
  * accept/reject classifier; `resolveExpectedOrigins` builds the trusted-origin set from the
  * listener origin, trusted-proxy forwarded headers, and the explicit allowlist;
  * `parseTrustedOrigins`/`normalizeOrigin` are the shared env parsers. No DB, no env, no network.
  */
 
 import { assertEquals } from '@std/assert';
-import {
-  csrfGuard,
-  isCrossOriginMutation,
-  isGuardedContentType,
-  resolveExpectedOrigins,
-} from '$lib/server/security/csrf.ts';
+import { csrfGuard, isCrossOriginMutation, resolveExpectedOrigins } from '$lib/server/security/csrf.ts';
 import { normalizeOrigin, parseTrustedOrigins } from '$lib/shared/security/origin.ts';
 
 const LISTENER = 'http://praxrr:6868';
@@ -32,32 +27,20 @@ function mutation(overrides: Partial<Parameters<typeof isCrossOriginMutation>[0]
   return isCrossOriginMutation({
     method: 'POST',
     origin: 'http://evil.example',
-    contentType: 'application/x-www-form-urlencoded',
     expectedOrigins: expected(),
     ...overrides,
   });
 }
 
-Deno.test('isGuardedContentType: form content types and JSON are guarded', () => {
-  assertEquals(isGuardedContentType('application/x-www-form-urlencoded'), true);
-  assertEquals(isGuardedContentType('multipart/form-data; boundary=abc'), true);
-  assertEquals(isGuardedContentType('text/plain'), true);
-  assertEquals(isGuardedContentType('text/plain; charset=utf-8'), true);
-  assertEquals(isGuardedContentType('application/json'), true);
-  assertEquals(isGuardedContentType('application/ld+json'), true);
+Deno.test('isCrossOriginMutation: cross-site mutation is rejected for every method', () => {
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    assertEquals(mutation({ method }), true, method);
+  }
 });
 
-Deno.test('isGuardedContentType: absent or unrelated content types pass', () => {
-  assertEquals(isGuardedContentType(null), false);
-  assertEquals(isGuardedContentType('application/octet-stream'), false);
-  assertEquals(isGuardedContentType('image/png'), false);
-  assertEquals(isGuardedContentType('text/html'), false);
-});
-
-Deno.test('isCrossOriginMutation: cross-site form POST is rejected', () => {
-  assertEquals(mutation(), true);
-  assertEquals(mutation({ contentType: 'text/plain' }), true);
-  assertEquals(mutation({ contentType: 'application/json' }), true);
+Deno.test('isCrossOriginMutation: comma-joined duplicate Origin is rejected', () => {
+  assertEquals(mutation({ origin: `${LISTENER}, http://evil.example` }), true);
+  assertEquals(mutation({ origin: `http://evil.example, ${LISTENER}` }), true);
 });
 
 Deno.test('isCrossOriginMutation: same-origin POST to the listener passes', () => {
@@ -195,6 +178,23 @@ Deno.test('csrfGuard: cross-site form/text/plain POST to a page route returns 40
     const response = await runGuard(event);
     assertEquals(response.status, 403, contentType);
     assertEquals((await response.text()).includes('Cross-site POST submissions are forbidden'), true, contentType);
+  }
+});
+
+Deno.test('csrfGuard: cross-origin mutation with no Content-Type (no-cors blob) is rejected', async () => {
+  const event = guardEvent('/api/v1/pcd/import', {
+    method: 'POST',
+    headers: { origin: 'http://evil.example' },
+    body: new Blob(['{"a":1}']),
+  });
+  assertEquals(event.request.headers.get('content-type'), null);
+  assertEquals((await runGuard(event)).status, 403);
+});
+
+Deno.test('csrfGuard: cross-origin DELETE and PUT are rejected', async () => {
+  for (const method of ['DELETE', 'PUT']) {
+    const event = guardEvent('/api/v1/databases/1', { method, headers: { origin: 'http://evil.example' } });
+    assertEquals((await runGuard(event)).status, 403, method);
   }
 });
 

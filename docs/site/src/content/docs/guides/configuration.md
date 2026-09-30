@@ -202,7 +202,9 @@ Expected origins are, in order:
 
 Example nginx setup (from the Trusted proxy section above): with `TRUSTED_PROXY` pointing at the
 proxy, `proxy_set_header X-Forwarded-Proto $scheme` makes the proxy-visible `https://…` origin
-accepted automatically; only genuinely different hostnames need `PRAXRR_TRUSTED_ORIGINS`.
+accepted automatically; only genuinely different hostnames need `PRAXRR_TRUSTED_ORIGINS`. The proxy
+**must overwrite** `X-Forwarded-Host`/`X-Forwarded-Proto` (not append); Praxrr reads the first
+token, so an appended client-supplied value would win.
 
 ## Env-managed Arr instances
 
