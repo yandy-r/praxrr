@@ -35,6 +35,8 @@ Lidarr semantics are validated separately.
 The test action calls the Arr system status endpoint using the URL and key you
 provided. Fix networking or keys before proceeding to sync setup.
 
+![Connected Arr instances](../../../assets/screenshots/arr-instances.png)
+
 ## Dual URL mode
 
 Praxrr distinguishes two URLs:

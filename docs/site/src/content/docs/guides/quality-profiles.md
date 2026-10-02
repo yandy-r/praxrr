@@ -14,6 +14,8 @@ PCD and compiles Arr-specific payloads during sync.
 
 Each profile includes **General**, **Qualities**, and **Scoring** tabs.
 
+![Quality profile catalog](../../../assets/screenshots/quality-profiles.png)
+
 ## General settings
 
 Configure profile metadata:
@@ -44,8 +46,12 @@ Assign custom format scores:
 - Negative scores penalize unwanted patterns.
 - Minimum score and cutoff format interact with Arr grab logic.
 
+![Per-app custom format scoring](../../../assets/screenshots/profile-scoring.png)
+
 Use the **Simulate** tooling (when available) to rank sample releases against
 the profile without syncing.
+
+![Score simulator](../../../assets/screenshots/score-simulator.png)
 
 Entity testing under **Quality Profiles → Entity testing** imports release
 titles and compares scores in bulk when the parser service is available.

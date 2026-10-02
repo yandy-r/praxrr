@@ -38,6 +38,8 @@ Conditions reference:
 Edit conditions on the **Conditions** tab. Reordering and negation follow the
 portable PCD schema for the target app.
 
+![Custom format conditions](../../../assets/screenshots/custom-format-conditions.png)
+
 ## Shared regular expressions
 
 Regular expressions are first-class entities. Define a regex once under

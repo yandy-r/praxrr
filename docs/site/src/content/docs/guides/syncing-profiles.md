@@ -18,6 +18,8 @@ Depending on `arr_type`, an instance may expose:
 Open **Arr → {instance} → Sync** to enable profiles from each linked PCD and
 configure when pushes run.
 
+![Per-instance sync configuration](../../../assets/screenshots/arr-sync.png)
+
 ## Sync triggers
 
 Each section supports a trigger mode:
@@ -96,7 +98,10 @@ The sync pipeline for each section:
 2. Transform to Arr-specific API payloads.
 3. Push creates, updates, and deletes through the Arr REST client.
 
-Logs for each run appear under **Arr → {instance} → Logs**.
+Logs for each run appear under **Arr → {instance} → Logs**. **Sync History** keeps a durable,
+exportable audit entry for every run across all instances.
+
+![Sync history](../../../assets/screenshots/sync-history.png)
 
 ## Base ops vs user ops
 
