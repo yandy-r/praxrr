@@ -72,7 +72,10 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Start Here',
-          items: [{ label: 'Overview', link: '/' }],
+          items: [
+            { label: 'Overview', link: '/' },
+            { label: 'Feature Tour', link: '/getting-started/tour/' },
+          ],
         },
         {
           label: 'Getting Started',
@@ -111,6 +114,7 @@ export default defineConfig({
             { label: 'Notifications', link: '/app/notifications/' },
             { label: 'Testing', link: '/app/testing/' },
             { label: 'Docs Versioning', link: '/app/docs-versioning/' },
+            { label: 'Screenshots', link: '/app/screenshots/' },
             {
               label: 'Component Library',
               collapsed: true,

@@ -19,6 +19,75 @@ custom formats, and media settings once in a Git-backed configuration database, 
 across any number of Arr instances (for example Radarr, Sonarr, and Lidarr) — with intelligent upgrade automation and
 more on the way.
 
+<p align="center">
+  <img src="docs/site/src/assets/screenshots/hero.png" alt="Praxrr — quality profiles, score simulator, and sync history" width="100%">
+</p>
+
+## A Look Inside
+
+<p align="center">
+  <img src="docs/site/src/assets/screenshots/quality-profiles.png" alt="Quality profile catalog" width="100%">
+  <br>
+  <em>Browse every curated quality profile — target, codec and audio focus, expected sizes, and scored formats.</em>
+</p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/profile-scoring.png" alt="Per-app scoring">
+      <p><b>Per-app scoring</b> — one scoring table drives Radarr, Sonarr, and Lidarr, with per-app scores.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/custom-formats.png" alt="Custom formats">
+      <p><b>Custom formats</b> — tagged, app-scoped formats built from reusable conditions and shared regex.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/arr-sync.png" alt="Sync configuration">
+      <p><b>Sync configuration</b> — pick profiles, delay profiles, and media settings per instance; sync manually, on pull, on change, or on a schedule.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/arr-library.png" alt="Library scoring">
+      <p><b>Library scoring</b> — every file scored against its profile — see what meets the target, what can upgrade, and what gets rejected.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/score-simulator.png" alt="Score simulator">
+      <p><b>Score simulator</b> — paste a release title and see parsed metadata, every format match, and the final score before anything is grabbed.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/quality-goals.png" alt="Quality goals">
+      <p><b>Quality goals</b> — describe what you want in plain terms and preview the generated scores before applying them.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/sync-history.png" alt="Sync history">
+      <p><b>Sync history</b> — every run recorded as an exportable audit entry with per-section outcomes.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/drift.png" alt="Drift detection">
+      <p><b>Drift detection</b> — scheduled checks compare live Arr config with the resolved database state.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/parity-map.png" alt="Cross-Arr parity map">
+      <p><b>Cross-Arr parity map</b> — see where Radarr, Sonarr, and Lidarr differ and how Praxrr handles each difference.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/site/src/assets/screenshots/database-commits.png" alt="Git-backed history">
+      <p><b>Git-backed history</b> — browse commits, incoming changes, conflicts, tweaks, and snapshots for every linked database.</p>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <b><a href="https://docs.praxrr.dev/getting-started/tour/">Take the full feature tour →</a></b>
+</p>
+
 ## Features
 
 ### Core
@@ -87,6 +156,7 @@ API access via `X-Api-Key` header or `?apikey=` query param. See
 
 ## Documentation
 
+- [Feature Tour](https://docs.praxrr.dev/getting-started/tour/) — visual walkthrough ([source](docs/site/src/content/docs/getting-started/tour.md))
 - [Architecture Guide](docs/ARCHITECTURE.md)
 - [Contributing Guide](docs/CONTRIBUTING.md)
 - [Parser Service](packages/praxrr-parser/README.md)

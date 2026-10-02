@@ -92,6 +92,7 @@
     "test:e2e:headed": "deno run -A scripts/e2e.ts --headed",
     "test:e2e:debug": "deno run -A scripts/e2e.ts --debug",
     "test:e2e:reset": "deno run -A scripts/e2e-reset.ts",
+    "screenshots": "deno run -A scripts/screenshots.ts",
     "stats": "bash scripts/stats.sh",
     "bundle:api": "deno run -A scripts/bundle-api.ts",
     "publish:api": "deno task bundle:api && cd packages/praxrr-api && deno publish",

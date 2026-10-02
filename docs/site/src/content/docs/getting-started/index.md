@@ -8,6 +8,7 @@ configuration database, connect Arr instances, and sync quality profiles.
 
 ## Install and Run
 
+- [Feature Tour](./tour/) — a visual walkthrough of what Praxrr does
 - [Installation](./installation/) — Docker, binary, and from-source setup
 - [Quick Start](./quick-start/) — link a PCD, bridge Arr, and sync end-to-end
 - [Docker](./docker/) — compose files, volumes, networking, parser opt-in
