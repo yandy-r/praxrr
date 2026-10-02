@@ -7,8 +7,8 @@
  *
  * Usage:
  *   deno task screenshots
- *   deno task screenshots -- --base-url http://localhost:6969 --only arr-library,hero
- *   deno task screenshots -- --frame-only          # re-frame existing raw captures
+ *   deno task screenshots --base-url http://localhost:6969 --only arr-library,hero
+ *   deno task screenshots --frame-only          # re-frame existing raw captures
  *
  * See docs/site/src/content/docs/app/screenshots.md for how to seed a demo instance
  * (throwaway Radarr/Sonarr/Lidarr, synced profiles, sample library) before capturing.
@@ -16,6 +16,7 @@
 
 import { chromium, type Page } from '@playwright/test';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 type Accent = 'cyan' | 'indigo' | 'blue';
 
@@ -24,7 +25,7 @@ type Shot = {
   /** Path shown in the frame's address bar (cosmetic). */
   label: string;
   accent: Accent;
-  capture: (page: Page, ids: Ids) => Promise<void>;
+  capture: (page: Page, ids: Ids, simProfile: string) => Promise<void>;
 };
 
 type Ids = { database: number; radarr: number; profile: number; customFormat: number };
@@ -36,6 +37,7 @@ type Options = {
   only: Set<string>;
   frameOnly: boolean;
   executablePath: string | undefined;
+  simProfile: string;
   ids: Ids;
 };
 
@@ -44,7 +46,12 @@ const VIEWPORT = { width: 1536, height: 960 };
 function parseArgs(args: string[]): Options {
   const value = (flag: string): string | undefined => {
     const index = args.indexOf(flag);
-    return index >= 0 ? args[index + 1] : undefined;
+    if (index < 0) return undefined;
+    const next = args[index + 1];
+    if (next === undefined || next.startsWith('--')) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return next;
   };
   const num = (flag: string, fallback: number): number => {
     const raw = value(flag);
@@ -62,6 +69,7 @@ function parseArgs(args: string[]): Options {
     only: new Set((value('--only') ?? '').split(',').filter(Boolean)),
     frameOnly: args.includes('--frame-only'),
     executablePath: value('--chrome') ?? Deno.env.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE'),
+    simProfile: value('--sim-profile') ?? '2160p Quality',
     ids: {
       database: num('--database-id', 1),
       radarr: num('--radarr-id', 1),
@@ -177,11 +185,11 @@ function shots(baseUrl: string): Shot[] {
       name: 'score-simulator',
       label: '/score-simulator',
       accent: 'blue',
-      capture: async (page, ids) => {
+      capture: async (page, ids, simProfile) => {
         await open(page, `${baseUrl}/score-simulator/${ids.database}`);
         await page.getByText('Select quality profile...').click();
         await page.waitForTimeout(400);
-        await page.getByText('2160p Quality', { exact: true }).last().click();
+        await page.getByText(simProfile, { exact: true }).last().click();
         await page.waitForTimeout(400);
         await page
           .locator('textarea')
@@ -289,6 +297,11 @@ function heroHtml(raw: (name: string) => string, logo: string): string {
 async function main(): Promise<void> {
   const options = parseArgs(Deno.args);
   const all = shots(options.baseUrl);
+  const known = new Set([...all.map((shot) => shot.name), 'hero']);
+  const unknown = [...options.only].filter((name) => !known.has(name));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown shot name(s): ${unknown.join(', ')}. Known: ${[...known].join(', ')}`);
+  }
   const wanted = (name: string) => options.only.size === 0 || options.only.has(name);
   await Deno.mkdir(options.rawDir, { recursive: true });
   await Deno.mkdir(options.outDir, { recursive: true });
@@ -307,7 +320,7 @@ async function main(): Promise<void> {
       });
       const page = await context.newPage();
       for (const shot of all.filter((s) => wanted(s.name))) {
-        await shot.capture(page, options.ids);
+        await shot.capture(page, options.ids, options.simProfile);
         await page.mouse.move(0, VIEWPORT.height - 1);
         await page.screenshot({ path: path.join(options.rawDir, `${shot.name}.png`) });
         console.log(`captured ${shot.name}`);
@@ -317,7 +330,17 @@ async function main(): Promise<void> {
 
     const context = await browser.newContext({ deviceScaleFactor: 1.25 });
     const page = await context.newPage();
-    const raw = (name: string) => `file://${path.join(options.rawDir, `${name}.png`)}`;
+    const rawPath = (name: string) => path.join(options.rawDir, `${name}.png`);
+    const raw = (name: string) => pathToFileURL(rawPath(name)).href;
+    const requireRaw = async (names: string[]) => {
+      for (const name of names) {
+        try {
+          await Deno.stat(rawPath(name));
+        } catch {
+          throw new Error(`Missing raw capture ${rawPath(name)}; capture "${name}" first.`);
+        }
+      }
+    };
     const htmlPath = path.join(options.rawDir, 'frame.html');
     const render = async (body: string, file: string, width: number, height: number) => {
       await page.setViewportSize({ width, height });
@@ -325,16 +348,18 @@ async function main(): Promise<void> {
         htmlPath,
         `<!doctype html><html><head><meta charset="utf-8"><style>${FRAME_CSS}</style></head><body>${body}</body></html>`
       );
-      await page.goto(`file://${htmlPath}`, { waitUntil: 'load' });
+      await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
       await page.waitForTimeout(300);
       await page.screenshot({ path: path.join(options.outDir, `${file}.png`) });
       console.log(`framed ${file}`);
     };
 
     for (const shot of all.filter((s) => wanted(s.name))) {
+      await requireRaw([shot.name]);
       await render(framedHtml(raw(shot.name), shot.label, shot.accent), shot.name, 1600, 1040);
     }
     if (wanted('hero')) {
+      await requireRaw(['quality-profiles', 'score-simulator', 'sync-history']);
       const logo = await Deno.readTextFile('packages/praxrr-app/src/lib/client/assets/logo.svg');
       await render(heroHtml(raw, logo), 'hero', 1600, 960);
     }

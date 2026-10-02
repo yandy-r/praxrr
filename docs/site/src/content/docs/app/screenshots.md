@@ -44,9 +44,10 @@ deno task screenshots --base-url http://localhost:6969
 | `--only`                                                             | all                                | Comma-separated shot names (for example `arr-library,hero`) |
 | `--frame-only`                                                       | off                                | Re-frame existing raw captures without a running server     |
 | `--chrome`                                                           | Playwright Chromium                | Browser executable (`PLAYWRIGHT_CHROMIUM_EXECUTABLE`)       |
+| `--sim-profile`                                                      | `2160p Quality`                    | Quality profile selected in the score simulator shot        |
 | `--database-id`, `--radarr-id`, `--profile-id`, `--custom-format-id` | `1`, `1`, `4`, `10`                | Entity ids used in captured routes                          |
 
-The hero collage is composed from the `quality-profiles`, `score-simulator`, and `sync-history` raw
+Address-bar labels are cosmetic and fixed per shot. The hero collage is composed from the `quality-profiles`, `score-simulator`, and `sync-history` raw
 captures, so capture those before framing `hero` on its own.
 
 ## Guidelines
@@ -54,5 +55,5 @@ captures, so capture those before framing `hero` on its own.
 - Capture in dark mode at the default 1536×960 viewport so every frame matches.
 - Never capture real hostnames, API keys, or personal paths; the frame's address bar always shows
   `praxrr.local`.
-- Keep the committed set small (about 350 KB per image). Regenerate the whole set after visible UI
+- Keep the committed set small (most images stay under about 500 KB). Regenerate the whole set after visible UI
   changes rather than mixing old and new captures.

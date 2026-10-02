@@ -3,9 +3,8 @@ title: Feature Tour
 description: A visual walkthrough of Praxrr — curate, sync, verify, and observe your Arr configuration.
 ---
 
-A quick visual tour of what Praxrr does, captured from a live instance linked to the default
-[Praxrr-DB](https://github.com/yandy-r/praxrr-db) and synced to real Radarr, Sonarr, and Lidarr
-instances.
+A quick visual tour of what Praxrr does, captured from a demo instance linked to the default
+[Praxrr-DB](https://github.com/yandy-r/praxrr-db) and synced to Radarr, Sonarr, and Lidarr.
 
 ![Praxrr — media automation, perfected in practice](../../../assets/screenshots/hero.png)
 
