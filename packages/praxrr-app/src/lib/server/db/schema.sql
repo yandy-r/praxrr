@@ -932,11 +932,15 @@ CREATE TABLE sessions (
     device_type TEXT,                       -- Device category (Desktop, Mobile, Tablet)
     last_active_at DATETIME,                            -- Updated on sliding expiration
 
+    -- Client-visible handle (Migration 20261006); independent of id, never a credential
+    public_id TEXT,
+
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+CREATE UNIQUE INDEX idx_sessions_public_id ON sessions(public_id);
 
 -- ==============================================================================
 -- TABLE: auth_settings

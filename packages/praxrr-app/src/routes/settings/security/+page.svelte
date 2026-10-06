@@ -3,7 +3,20 @@
   import { onMount } from 'svelte';
   import { enhance, applyAction, deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
-  import { RefreshCw, LogOut, Check, Globe, Monitor, Smartphone, Network, Clock, ShieldCheck, Fingerprint, Trash2, Pencil } from 'lucide-svelte';
+  import {
+    RefreshCw,
+    LogOut,
+    Check,
+    Globe,
+    Monitor,
+    Smartphone,
+    Network,
+    Clock,
+    ShieldCheck,
+    Fingerprint,
+    Trash2,
+    Pencil,
+  } from 'lucide-svelte';
   import { parseUTC } from '$shared/utils/dates';
   import Button from '$ui/button/Button.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
@@ -14,7 +27,12 @@
   import { alertStore } from '$alerts/store';
   import { SETTINGS_SECURITY_SESSIONS } from '$shared/disclosure/sectionKeys';
   import type { Column } from '$ui/table/types';
-  import { supportsWebAuthn, registerPasskey as doRegisterPasskey, WebAuthnError, type WebAuthnCredentialSummary } from '$lib/client/utils/webauthn.ts';
+  import {
+    supportsWebAuthn,
+    registerPasskey as doRegisterPasskey,
+    WebAuthnError,
+    type WebAuthnCredentialSummary,
+  } from '$lib/client/utils/webauthn.ts';
 
   export let data: PageData;
   export let form: ActionData;
@@ -182,7 +200,7 @@
   }
 
   interface SessionRow {
-    id: string;
+    public_id: string;
     created_at: string;
     expires_at: string;
     last_active_at: string | null;
@@ -235,17 +253,13 @@
       key: 'ip_address',
       header: 'IP',
       headerIcon: Network,
-      cell: (row) => ({
-        html: `<span class="font-mono text-xs text-neutral-500 dark:text-neutral-400">${row.ip_address ?? 'Unknown'}</span>`,
-      }),
+      cell: (row) => row.ip_address ?? 'Unknown',
     },
     {
       key: 'last_active_at',
       header: 'Last Active',
       headerIcon: Clock,
-      cell: (row) => ({
-        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${formatRelativeTime(row.last_active_at)}</span>`,
-      }),
+      cell: (row) => formatRelativeTime(row.last_active_at),
     },
   ];
 
@@ -366,65 +380,67 @@
 
   <div class="space-y-8">
     <!-- Change Password -->
-    <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-        <h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">Change Password</h2>
-        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Update your account password</p>
-      </div>
-      <div class="p-6">
-        <form
-          method="POST"
-          action="?/changePassword"
-          class="space-y-4"
-          use:enhance={() => {
-            changingPassword = true;
-            return async ({ update }) => {
-              await update({ reset: false });
-              changingPassword = false;
-            };
-          }}
-        >
-          <FormInput
-            name="currentPassword"
-            label="Current Password"
-            type="password"
-            placeholder="Enter current password"
-            autocomplete="current-password"
-            private_
-            bind:value={currentPassword}
-          />
-          <FormInput
-            name="newPassword"
-            label="New Password"
-            type="password"
-            placeholder="Minimum 8 characters"
-            autocomplete="new-password"
-            private_
-            bind:value={newPassword}
-          />
-          <FormInput
-            name="confirmPassword"
-            label="Confirm New Password"
-            type="password"
-            placeholder="Re-enter new password"
-            autocomplete="new-password"
-            private_
-            bind:value={confirmPassword}
-          />
-          <div class="flex justify-end">
-            <Button
-              type="submit"
-              variant="secondary"
-              size="sm"
-              icon={Check}
-              iconColor="text-accent-500"
-              text={changingPassword ? 'Saving...' : 'Change Password'}
-              disabled={changingPassword}
+    {#if data.passwordEnabled}
+      <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
+          <h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">Change Password</h2>
+          <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Update your account password</p>
+        </div>
+        <div class="p-6">
+          <form
+            method="POST"
+            action="?/changePassword"
+            class="space-y-4"
+            use:enhance={() => {
+              changingPassword = true;
+              return async ({ update }) => {
+                await update({ reset: false });
+                changingPassword = false;
+              };
+            }}
+          >
+            <FormInput
+              name="currentPassword"
+              label="Current Password"
+              type="password"
+              placeholder="Enter current password"
+              autocomplete="current-password"
+              private_
+              bind:value={currentPassword}
             />
-          </div>
-        </form>
+            <FormInput
+              name="newPassword"
+              label="New Password"
+              type="password"
+              placeholder="Minimum 8 characters"
+              autocomplete="new-password"
+              private_
+              bind:value={newPassword}
+            />
+            <FormInput
+              name="confirmPassword"
+              label="Confirm New Password"
+              type="password"
+              placeholder="Re-enter new password"
+              autocomplete="new-password"
+              private_
+              bind:value={confirmPassword}
+            />
+            <div class="flex justify-end">
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                icon={Check}
+                iconColor="text-accent-500"
+                text={changingPassword ? 'Saving...' : 'Change Password'}
+                disabled={changingPassword}
+              />
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    {/if}
 
     <!-- API Key -->
     <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -588,7 +604,13 @@
                       }}
                     >
                       <input type="hidden" name="credentialId" value={row.id} />
-                      <TableActionButton icon={Trash2} title="Delete passkey" variant="danger" size="sm" type="submit" />
+                      <TableActionButton
+                        icon={Trash2}
+                        title="Delete passkey"
+                        variant="danger"
+                        size="sm"
+                        type="submit"
+                      />
                     </form>
                   </div>
                 </svelte:fragment>
@@ -607,56 +629,65 @@
       description="Manage your logged-in sessions across devices"
       sectionKey={SETTINGS_SECURITY_SESSIONS}
     >
-      {#if data.sessions.length > 1}
-        <div class="mb-4 flex justify-end">
-          <form
-            method="POST"
-            action="?/revokeOtherSessions"
-            use:enhance={() => {
-              return async ({ update }) => {
-                await update();
-                await invalidateAll();
-              };
-            }}
-          >
-            <Button
-              type="submit"
-              variant="secondary"
-              size="xs"
-              icon={LogOut}
-              iconColor="text-red-500"
-              text="Revoke Others"
-            />
-          </form>
-        </div>
-      {/if}
-      {#if data.sessions.length > 0}
-        <Table columns={sessionColumns} data={data.sessions} compact responsive actionsHeader="Status">
-          <svelte:fragment slot="actions" let:row>
-            {#if row.isCurrent}
-              <span
-                class="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-                >Current</span
-              >
-            {:else}
-              <form
-                method="POST"
-                action="?/revokeSession"
-                use:enhance={() => {
-                  return async ({ update }) => {
-                    await update();
-                    await invalidateAll();
-                  };
-                }}
-              >
-                <input type="hidden" name="sessionId" value={row.id} />
-                <TableActionButton icon={LogOut} title="Revoke session" variant="danger" size="sm" type="submit" />
-              </form>
-            {/if}
-          </svelte:fragment>
-        </Table>
+      {#if !data.canManageSessions}
+        <p class="text-sm text-neutral-500 dark:text-neutral-400">
+          Session management is not available for this sign-in method.
+        </p>
+        <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          Sign in with a user account to review and revoke sessions.
+        </p>
       {:else}
-        <p class="text-sm text-neutral-500 dark:text-neutral-400">No active sessions</p>
+        {#if data.sessions.length > 1}
+          <div class="mb-4 flex justify-end">
+            <form
+              method="POST"
+              action="?/revokeOtherSessions"
+              use:enhance={() => {
+                return async ({ update }) => {
+                  await update();
+                  await invalidateAll();
+                };
+              }}
+            >
+              <Button
+                type="submit"
+                variant="secondary"
+                size="xs"
+                icon={LogOut}
+                iconColor="text-red-500"
+                text="Revoke Others"
+              />
+            </form>
+          </div>
+        {/if}
+        {#if data.sessions.length > 0}
+          <Table columns={sessionColumns} data={data.sessions} compact responsive actionsHeader="Status">
+            <svelte:fragment slot="actions" let:row>
+              {#if row.isCurrent}
+                <span
+                  class="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                  >Current</span
+                >
+              {:else}
+                <form
+                  method="POST"
+                  action="?/revokeSession"
+                  use:enhance={() => {
+                    return async ({ update }) => {
+                      await update();
+                      await invalidateAll();
+                    };
+                  }}
+                >
+                  <input type="hidden" name="public_id" value={row.public_id} />
+                  <TableActionButton icon={LogOut} title="Revoke session" variant="danger" size="sm" type="submit" />
+                </form>
+              {/if}
+            </svelte:fragment>
+          </Table>
+        {:else}
+          <p class="text-sm text-neutral-500 dark:text-neutral-400">No active sessions</p>
+        {/if}
       {/if}
     </CollapsibleCard>
   </div>

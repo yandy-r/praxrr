@@ -16,7 +16,6 @@ import { databaseInstancesQueries } from '../../lib/server/db/queries/databaseIn
 import { generalSettingsQueries } from '../../lib/server/db/queries/generalSettings.ts';
 import { logSettingsQueries } from '../../lib/server/db/queries/logSettings.ts';
 import { pcdOpHistoryQueries } from '../../lib/server/db/queries/pcdOpHistory.ts';
-import { sessionsQueries } from '../../lib/server/db/queries/sessions.ts';
 import { config } from '../../lib/server/utils/config/config.ts';
 import { maskApiKey } from '../../lib/shared/utils/masking.ts';
 import { tmdbSettingsQueries } from '../../lib/server/db/queries/tmdbSettings.ts';
@@ -39,7 +38,6 @@ import { GET as resolvedConfigCompareGet } from '../../routes/api/v1/pcd/[databa
 import { load as resolvedConfigPageLoad } from '../../routes/resolved-config/[databaseId]/+page.server.ts';
 import { resetPreviewCreateRateLimitForTests } from '../../lib/server/sync/preview/limits.ts';
 import { resetRateLimitForTests } from '../../lib/server/utils/rateLimit.ts';
-import { usersQueries } from '../../lib/server/db/queries/users.ts';
 import { load as settingsGeneralLoad } from '../../routes/settings/general/+page.server.ts';
 import { load as settingsSecurityLoad } from '../../routes/settings/security/+page.server.ts';
 
@@ -247,34 +245,6 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
   }
 
   private patchSecuritySettingsLoadDependencies(apiKey: string | null): void {
-    this.installPatch(
-      usersQueries,
-      'getByUsername',
-      () => ({
-        id: 1,
-        username: 'admin',
-        password_hash: 'bcrypt-hash',
-        created_at: FIXTURE_TIMESTAMP,
-        updated_at: FIXTURE_TIMESTAMP,
-      }),
-      this.restoreStack
-    );
-
-    this.installPatch(
-      usersQueries,
-      'getById',
-      () => ({
-        id: 1,
-        username: 'admin',
-        password_hash: 'bcrypt-hash',
-        created_at: FIXTURE_TIMESTAMP,
-        updated_at: FIXTURE_TIMESTAMP,
-      }),
-      this.restoreStack
-    );
-
-    this.installPatch(sessionsQueries, 'getByUserId', () => [], this.restoreStack);
-
     this.installPatch(authSettingsQueries, 'getApiKey', () => apiKey, this.restoreStack);
   }
 
@@ -749,10 +719,8 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       this.patchSecuritySettingsLoadDependencies(apiKey);
 
       const payload = (await settingsSecurityLoad({
-        cookies: {
-          get: () => null,
-        },
-        locals: { user: null },
+        setHeaders: () => {},
+        locals: { user: null, session: null, authBypass: false },
       } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
         apiKeyMasked: string;
         hasApiKey: boolean;
@@ -771,10 +739,8 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
       this.patchSecuritySettingsLoadDependencies(apiKey);
 
       const payload = (await settingsSecurityLoad({
-        cookies: {
-          get: () => null,
-        },
-        locals: { user: null },
+        setHeaders: () => {},
+        locals: { user: null, session: null, authBypass: false },
       } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
         apiKeyMasked: string;
         hasApiKey: boolean;

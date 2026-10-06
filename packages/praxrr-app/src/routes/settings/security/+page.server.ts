@@ -10,9 +10,31 @@ import { config } from '$config';
 import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
 import { toCredentialSummary } from '$lib/server/webauthn/ceremonies.ts';
 
-export const load: ServerLoad = async ({ cookies, locals }) => {
-  const currentSessionId = cookies.get('session');
-  const user = usersQueries.getByUsername('admin') ?? usersQueries.getById(1);
+const PUBLIC_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Trusted live principal for personal session/password actions. Requires a real user (no bypass,
+ * no API-key id 0), a session cookie principal that matches the user, and the session row still
+ * being valid in the DB. Never reads the cookie value from `cookies`.
+ */
+function getSessionPrincipal(locals: App.Locals): { user: NonNullable<App.Locals['user']>; sessionId: string } | null {
+  if (locals.authBypass || !locals.user || locals.user.id <= 0 || !locals.session) {
+    return null;
+  }
+  if (locals.session.user_id !== locals.user.id) {
+    return null;
+  }
+  const session = sessionsQueries.getValidById(locals.session.id);
+  if (!session || session.user_id !== locals.user.id) {
+    return null;
+  }
+  return { user: locals.user, sessionId: locals.session.id };
+}
+
+export const load: ServerLoad = async ({ locals, setHeaders }) => {
+  setHeaders({ 'cache-control': 'no-store' });
+
+  const principal = getSessionPrincipal(locals);
 
   const authedUser = locals.user;
   const passkeysEnabled =
@@ -22,49 +44,49 @@ export const load: ServerLoad = async ({ cookies, locals }) => {
       ? webauthnCredentialsQueries.listByUserId(authedUser.id).map(toCredentialSummary)
       : [];
 
-  if (!user) {
-    return {
-      sessions: [],
-      apiKeyMasked: '',
-      hasApiKey: false,
-      currentSessionId: null,
-      passkeys,
-      passkeysEnabled,
-    };
-  }
-
-  const sessions = sessionsQueries.getByUserId(user.id);
   const apiKey = authSettingsQueries.getApiKey();
-  const apiKeyMasked = maskApiKey(apiKey);
 
   return {
-    sessions: sessions.map((s) => ({
-      id: s.id,
-      created_at: s.created_at,
-      expires_at: s.expires_at,
-      last_active_at: s.last_active_at,
-      ip_address: s.ip_address,
-      browser: s.browser,
-      os: s.os,
-      device_type: s.device_type,
-      isCurrent: s.id === currentSessionId,
-    })),
-    apiKeyMasked,
+    sessions: principal ? sessionsQueries.listSummariesByUserId(principal.user.id, principal.sessionId) : [],
+    apiKeyMasked: maskApiKey(apiKey),
     hasApiKey: Boolean(apiKey),
-    currentSessionId,
+    canManageSessions: !!principal,
+    passwordEnabled: !!principal && !principal.user.username.startsWith('oidc:'),
     passkeys,
     passkeysEnabled,
   };
 };
 
 export const actions: Actions = {
-  changePassword: async ({ request, cookies }) => {
-    const formData = await request.formData();
-    const currentPassword = formData.get('currentPassword') as string;
-    const newPassword = formData.get('newPassword') as string;
-    const confirmPassword = formData.get('confirmPassword') as string;
+  changePassword: async ({ request, locals }) => {
+    const principal = getSessionPrincipal(locals);
+    if (!principal) {
+      return fail(401, { passwordError: 'Not authenticated' });
+    }
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (principal.user.username.startsWith('oidc:')) {
+      return fail(403, { passwordError: 'Password change is not available for this account' });
+    }
+
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return fail(400, { passwordError: 'All fields are required' });
+    }
+
+    const currentPassword = formData.get('currentPassword');
+    const newPassword = formData.get('newPassword');
+    const confirmPassword = formData.get('confirmPassword');
+
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string' ||
+      typeof confirmPassword !== 'string' ||
+      !currentPassword ||
+      !newPassword ||
+      !confirmPassword
+    ) {
       return fail(400, { passwordError: 'All fields are required' });
     }
 
@@ -76,18 +98,13 @@ export const actions: Actions = {
       return fail(400, { passwordError: 'Passwords do not match' });
     }
 
-    // Get current user from session
-    const sessionId = cookies.get('session');
-    if (!sessionId) {
+    // Re-check the principal after awaiting form parsing (session may have been revoked meanwhile)
+    const livePrincipal = getSessionPrincipal(locals);
+    if (!livePrincipal) {
       return fail(401, { passwordError: 'Not authenticated' });
     }
 
-    const session = sessionsQueries.getValidById(sessionId);
-    if (!session) {
-      return fail(401, { passwordError: 'Invalid session' });
-    }
-
-    const user = usersQueries.getById(session.user_id);
+    const user = usersQueries.getById(livePrincipal.user.id);
     if (!user) {
       return fail(401, { passwordError: 'User not found' });
     }
@@ -138,46 +155,63 @@ export const actions: Actions = {
     }
   },
 
-  revokeSession: async ({ request, cookies }) => {
-    const formData = await request.formData();
-    const sessionId = formData.get('sessionId') as string;
-    const currentSessionId = cookies.get('session');
+  revokeSession: async ({ request, locals }) => {
+    const principal = getSessionPrincipal(locals);
+    if (!principal) {
+      return fail(401, { sessionError: 'Not authenticated' });
+    }
 
-    if (!sessionId) {
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
       return fail(400, { sessionError: 'Session ID required' });
     }
 
-    if (sessionId === currentSessionId) {
-      return fail(400, { sessionError: 'Cannot revoke current session' });
+    const values = formData.getAll('public_id');
+    const publicId = values.length === 1 && typeof values[0] === 'string' ? values[0] : null;
+
+    if (!publicId || !PUBLIC_ID_PATTERN.test(publicId)) {
+      return fail(400, { sessionError: 'Session ID required' });
     }
 
-    sessionsQueries.deleteById(sessionId);
+    // Re-check the principal after awaiting form parsing (session may have been revoked meanwhile)
+    const livePrincipal = getSessionPrincipal(locals);
+    if (!livePrincipal) {
+      return fail(401, { sessionError: 'Not authenticated' });
+    }
+
+    const deleted = sessionsQueries.deleteOtherByPublicId(
+      livePrincipal.user.id,
+      publicId.toLowerCase(),
+      livePrincipal.sessionId
+    );
+
+    if (!deleted) {
+      // Uniform miss: foreign owner, unknown id, or the current session
+      return fail(404, { sessionError: 'Session not found or cannot be revoked' });
+    }
 
     await logger.info('Session revoked', {
       source: 'Auth:Session',
-      meta: { revokedSessionId: sessionId.slice(0, 8) + '...' },
+      meta: { userId: livePrincipal.user.id, publicId },
     });
 
     return { sessionRevoked: true };
   },
 
-  revokeOtherSessions: async ({ cookies }) => {
-    const currentSessionId = cookies.get('session');
-    if (!currentSessionId) {
+  revokeOtherSessions: async ({ locals }) => {
+    const principal = getSessionPrincipal(locals);
+    if (!principal) {
       return fail(401, { sessionError: 'Not authenticated' });
     }
 
-    const session = sessionsQueries.getValidById(currentSessionId);
-    if (!session) {
-      return fail(401, { sessionError: 'Invalid session' });
-    }
-
-    const count = sessionsQueries.deleteOthersByUserId(session.user_id, currentSessionId);
+    const count = sessionsQueries.deleteOthersByUserId(principal.user.id, principal.sessionId);
 
     if (count > 0) {
       await logger.info(`Revoked ${count} other session${count === 1 ? '' : 's'}`, {
         source: 'Auth:Session',
-        meta: { userId: session.user_id, count },
+        meta: { userId: principal.user.id, count },
       });
     }
 
