@@ -15,6 +15,23 @@ export interface Session {
   os: string | null;
   device_type: string | null;
   last_active_at: string | null;
+  // Client-visible handle (Migration 20261006); independent of id
+  public_id: string;
+}
+
+/**
+ * Metadata-only session row safe to serialize to the browser (no bearer id)
+ */
+export interface SessionSummary {
+  public_id: string;
+  created_at: string;
+  expires_at: string;
+  last_active_at: string | null;
+  ip_address: string | null;
+  browser: string | null;
+  os: string | null;
+  device_type: string | null;
+  isCurrent: boolean;
 }
 
 /**
@@ -38,12 +55,14 @@ export const sessionsQueries = {
    */
   create(userId: number, durationHours: number, metadata?: SessionMetadata): string {
     const id = crypto.randomUUID();
+    const publicId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
 
     db.execute(
-      `INSERT INTO sessions (id, user_id, expires_at, ip_address, user_agent, browser, os, device_type, last_active_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      `INSERT INTO sessions (id, public_id, user_id, expires_at, ip_address, user_agent, browser, os, device_type, last_active_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
       id,
+      publicId,
       userId,
       expiresAt.toISOString(),
       metadata?.ipAddress ?? null,
@@ -79,6 +98,35 @@ export const sessionsQueries = {
    */
   getByUserId(userId: number): Session[] {
     return db.query<Session>('SELECT * FROM sessions WHERE user_id = ? ORDER BY created_at DESC', userId);
+  },
+
+  /**
+   * List a user's unexpired sessions as metadata only (never selects id/user_agent/user_id)
+   */
+  listSummariesByUserId(userId: number, currentSessionId: string): SessionSummary[] {
+    const rows = db.query<Omit<SessionSummary, 'isCurrent'> & { is_current: number }>(
+      `SELECT public_id, created_at, expires_at, last_active_at, ip_address, browser, os, device_type,
+			        CASE WHEN id = ? THEN 1 ELSE 0 END AS is_current
+			 FROM sessions
+			 WHERE user_id = ? AND datetime(expires_at) > datetime('now')
+			 ORDER BY created_at DESC`,
+      currentSessionId,
+      userId
+    );
+    return rows.map(({ is_current, ...row }) => ({ ...row, isCurrent: is_current === 1 }));
+  },
+
+  /**
+   * Delete one of a user's other sessions by public_id (owner-scoped, never the current session)
+   */
+  deleteOtherByPublicId(userId: number, publicId: string, currentSessionId: string): boolean {
+    const affected = db.execute(
+      'DELETE FROM sessions WHERE public_id = ? AND user_id = ? AND id <> ?',
+      publicId,
+      userId,
+      currentSessionId
+    );
+    return affected > 0;
   },
 
   /**
