@@ -250,3 +250,34 @@ Deno.test('valueGuard: evaluateValueGuardApply treats bigint 1 as boolean true',
     db.close();
   }
 });
+
+// CodeRabbit (#286): tag-link deletes must not mask a missed guarded parent DELETE.
+for (const [label, rows, expected] of [
+  ['flags delete whose guarded parent DELETE missed', "('Foo', 'x')", 'full_list_conflict'],
+  ['applies delete that removed the row', "('Other', 'x')", 'applied'],
+] as const) {
+  Deno.test(`valueGuard: evaluateValueGuardApply ${label}`, () => {
+    const db = new Database(':memory:', { int64: true });
+    try {
+      db.exec('CREATE TABLE regular_expressions (name TEXT PRIMARY KEY, pattern TEXT)');
+      db.exec(`INSERT INTO regular_expressions VALUES ${rows}`);
+      const result = evaluateValueGuardApply({
+        db,
+        conflictStrategy: 'ask',
+        isUserOp: true,
+        rowcount: 1,
+        metadataJson: JSON.stringify({
+          operation: 'delete',
+          entity: 'regular_expression',
+          name: 'Foo',
+          stableKey: { key: 'regular_expression_name', value: 'Foo' },
+        }),
+        desiredStateJson: null,
+        priorConflictReason: null,
+      });
+      assertEquals(result.decision, expected);
+    } finally {
+      db.close();
+    }
+  });
+}

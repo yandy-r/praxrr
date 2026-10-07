@@ -27,11 +27,18 @@ export function checkScalarGuardConflict(
   metadata: ParsedOpMetadata | null,
   desiredState: Record<string, unknown> | null
 ): boolean {
-  if (metadata?.operation !== 'update') return false;
-  if (!desiredState) return false;
-
   const entityConfig = metadata?.entity ? AUTO_ALIGN_ENTITIES.get(metadata.entity) : undefined;
   if (!entityConfig) return false;
+
+  // Delete: side statements (tag links) can change rows while the guarded parent DELETE
+  // misses. If the target row is still present after the op, the guard did not match.
+  if (metadata?.operation === 'delete') {
+    const key = metadata.stableKey?.value ?? metadata.name;
+    return !!key && fetchRow(db, entityConfig.table, entityConfig.keyColumn, key) !== null;
+  }
+
+  if (metadata?.operation !== 'update') return false;
+  if (!desiredState) return false;
 
   const scalarEntries: Array<{ field: string; to: unknown }> = [];
   for (const [field, value] of Object.entries(desiredState)) {
