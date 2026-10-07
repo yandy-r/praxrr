@@ -186,3 +186,98 @@ Deno.test('valueGuard: evaluateValueGuardApply uses ask conflict strategy for ze
   assertEquals(result.decision, 'rowcount_zero_conflict');
   assertEquals(result.status, 'conflicted_pending');
 });
+
+// YAN-464: aggregate rowcount > 0 (side statements) must not mask a missed scalar guard.
+for (const [label, currentPattern, desired, expected] of [
+  ['flags missed scalar guard', 'a', { pattern: { from: 'b', to: 'c' } }, 'full_list_conflict'],
+  ['applies when scalar guard hit', 'c', { pattern: { from: 'b', to: 'c' } }, 'applied'],
+  ['ignores tags-only desired state', 'a', { tags: { add: ['NewTag'], remove: [] } }, 'applied'],
+  [
+    'resolves renames by the new name, not a reused old name',
+    'a',
+    { name: { from: 'Foo', to: 'Bar' }, pattern: { from: 'b', to: 'c' } },
+    'applied',
+  ],
+] as const) {
+  Deno.test(`valueGuard: evaluateValueGuardApply ${label}`, () => {
+    const db = new Database(':memory:', { int64: true });
+    try {
+      db.exec('CREATE TABLE regular_expressions (name TEXT PRIMARY KEY, pattern TEXT)');
+      // 'Foo' is the stable key; for the rename case it is now held by another entity.
+      db.exec(`INSERT INTO regular_expressions VALUES ('Foo', '${currentPattern}'), ('Bar', 'c')`);
+      const result = evaluateValueGuardApply({
+        db,
+        conflictStrategy: 'ask',
+        isUserOp: true,
+        rowcount: 1,
+        metadataJson: JSON.stringify({
+          operation: 'update',
+          entity: 'regular_expression',
+          name: 'Foo',
+          stableKey: { key: 'regular_expression_name', value: 'Foo' },
+        }),
+        desiredStateJson: JSON.stringify(desired),
+        priorConflictReason: null,
+      });
+      assertEquals(result.decision, expected);
+    } finally {
+      db.close();
+    }
+  });
+}
+
+Deno.test('valueGuard: evaluateValueGuardApply treats bigint 1 as boolean true', () => {
+  const db = new Database(':memory:', { int64: true });
+  try {
+    db.exec('CREATE TABLE custom_formats (name TEXT PRIMARY KEY, include_in_rename INTEGER)');
+    db.exec("INSERT INTO custom_formats VALUES ('Foo', 1)");
+    const result = evaluateValueGuardApply({
+      db,
+      conflictStrategy: 'ask',
+      isUserOp: true,
+      rowcount: 1,
+      metadataJson: JSON.stringify({
+        operation: 'update',
+        entity: 'custom_format',
+        name: 'Foo',
+        stableKey: { key: 'custom_format_name', value: 'Foo' },
+      }),
+      desiredStateJson: JSON.stringify({ include_in_rename: { from: false, to: true } }),
+      priorConflictReason: null,
+    });
+    assertEquals(result.decision, 'applied');
+  } finally {
+    db.close();
+  }
+});
+
+// CodeRabbit (#286): tag-link deletes must not mask a missed guarded parent DELETE.
+for (const [label, rows, expected] of [
+  ['flags delete whose guarded parent DELETE missed', "('Foo', 'x')", 'full_list_conflict'],
+  ['applies delete that removed the row', "('Other', 'x')", 'applied'],
+] as const) {
+  Deno.test(`valueGuard: evaluateValueGuardApply ${label}`, () => {
+    const db = new Database(':memory:', { int64: true });
+    try {
+      db.exec('CREATE TABLE regular_expressions (name TEXT PRIMARY KEY, pattern TEXT)');
+      db.exec(`INSERT INTO regular_expressions VALUES ${rows}`);
+      const result = evaluateValueGuardApply({
+        db,
+        conflictStrategy: 'ask',
+        isUserOp: true,
+        rowcount: 1,
+        metadataJson: JSON.stringify({
+          operation: 'delete',
+          entity: 'regular_expression',
+          name: 'Foo',
+          stableKey: { key: 'regular_expression_name', value: 'Foo' },
+        }),
+        desiredStateJson: null,
+        priorConflictReason: null,
+      });
+      assertEquals(result.decision, expected);
+    } finally {
+      db.close();
+    }
+  });
+}

@@ -14,6 +14,7 @@ import { compile } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import type { OperationLayer, OperationMetadata, OperationType, WriteOptions, WriteResult } from '../core/types.ts';
 import type { ConflictStrategy } from '$pcd/conflicts/autoAlign/index.ts';
+import { valuesEqual } from '../conflicts/overrideUtils.ts';
 import {
   evaluateValueGuardApply,
   evaluateValueGuardError,
@@ -279,6 +280,9 @@ export function __testOnly_runValueGuardGate(
   return runValueGuardGate(databaseId, layer, operations);
 }
 
+export const __testOnly_supersedePriorUserOps = (...args: Parameters<typeof supersedePriorUserOps>) =>
+  supersedePriorUserOps(...args);
+
 async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
   if (metadata.operation !== 'delete') {
     return false;
@@ -452,7 +456,87 @@ function hasFieldCoverage(newFields: string[] | undefined, oldFields: string[] |
   return oldFields.every((field) => newSet.has(field));
 }
 
-async function supersedePriorUserOps(databaseId: number, newOpId: number, metadata: OperationMetadata): Promise<void> {
+type ScalarEntry = { from: unknown; to: unknown };
+
+/** Scalar `{from,to}` entries of a desired_state; non-scalar shapes (tags, lists) are ignored. */
+function scalarEntries(state: Record<string, unknown> | null | undefined): Map<string, ScalarEntry> {
+  const out = new Map<string, ScalarEntry>();
+  for (const [field, entry] of Object.entries(state ?? {})) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (!('from' in entry) || !('to' in entry) || 'mode' in entry) continue;
+    out.set(field, entry as ScalarEntry);
+  }
+  return out;
+}
+
+function parseDesired(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decide which covered prior update ops are redundant (YAN-462).
+ *
+ * Each op's SQL guard was built from cache state that included every earlier published op.
+ * Walking newest-first, `expected` tracks the value each field must have before the next
+ * (later) op replays. A prior op whose `to` produces an expected value feeds the chain and
+ * must stay published (a->b, b->c); one whose `from` already equals the expected value is
+ * redundant (a->b, a->d) and may be superseded unless it also carries non-scalar deltas
+ * (tags, lists), which the new op does not restate. Anything unverifiable (missing or
+ * unparseable desired_state anywhere in the walk, divergent pre-image) is kept: replaying a redundant op is
+ * harmless, dropping a load-bearing one loses data.
+ */
+function selectRedundantPriorOps(
+  priors: Array<{ id: number; desired_state: string | null }>,
+  newDesired: Record<string, unknown> | null | undefined
+): Set<number> {
+  const redundant = new Set<number>();
+  if (!newDesired) return redundant;
+  const expected = new Map<string, unknown>();
+  for (const [field, entry] of scalarEntries(newDesired)) expected.set(field, entry.from);
+
+  for (const prior of [...priors].sort((a, b) => b.id - a.id)) {
+    const desired = parseDesired(prior.desired_state);
+    // Unknown effect: its result may feed the chain, so nothing can be proven redundant.
+    if (!desired) return new Set();
+    const entries = scalarEntries(desired);
+    let feedsChain = false;
+    let sharesPreImage = true;
+    for (const [field, entry] of entries) {
+      if (!expected.has(field)) {
+        sharesPreImage = false;
+        continue;
+      }
+      const want = expected.get(field);
+      if (!valuesEqual(entry.from, want)) {
+        sharesPreImage = false;
+        if (valuesEqual(entry.to, want)) feedsChain = true;
+      }
+    }
+    if (sharesPreImage) {
+      // Tag/list deltas are not restatements; superseding would drop them.
+      const onlyScalars = Object.keys(desired).every((field) => entries.has(field));
+      if (onlyScalars) redundant.add(prior.id);
+      continue;
+    }
+    if (feedsChain) {
+      for (const [field, entry] of entries) expected.set(field, entry.from);
+    }
+  }
+  return redundant;
+}
+
+async function supersedePriorUserOps(
+  databaseId: number,
+  newOpId: number,
+  metadata: OperationMetadata,
+  desiredState?: Record<string, unknown> | null
+): Promise<void> {
   if (metadata.operation === 'create') {
     return;
   }
@@ -463,6 +547,7 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
 
   const batchId = uuid();
   const superseded: number[] = [];
+  const matches: Array<{ op: (typeof candidates)[number]; parsed: ParsedMetadata }> = [];
 
   for (const op of candidates) {
     if (op.id === newOpId || !op.metadata) continue;
@@ -480,11 +565,28 @@ async function supersedePriorUserOps(databaseId: number, newOpId: number, metada
       continue;
     }
 
-    if (metadata.operation === 'update') {
-      if (parsed.operation !== 'update') {
-        continue;
-      }
-      if (!hasFieldCoverage(metadata.changedFields, parsed.changed_fields)) {
+    matches.push({ op, parsed });
+  }
+
+  // For updates, chain analysis spans every same-entity prior update (covered or not) so a
+  // load-bearing op is never mistaken for a redundant one.
+  const redundant =
+    metadata.operation === 'update'
+      ? selectRedundantPriorOps(
+          matches.filter(({ parsed }) => parsed.operation === 'update').map(({ op }) => op),
+          desiredState
+        )
+      : null;
+
+  for (const { op, parsed } of matches) {
+    if (redundant !== null) {
+      if (parsed.operation !== 'update') continue;
+      if (!hasFieldCoverage(metadata.changedFields, parsed.changed_fields)) continue;
+      if (!redundant.has(op.id)) {
+        await logger.debug('Keeping prior user op: it feeds the new op guard chain', {
+          source: 'PCDWriter',
+          meta: { databaseId, newOpId, priorOpId: op.id },
+        });
         continue;
       }
     }
@@ -674,7 +776,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
         operation.metadata &&
         (operation.metadata.operation === 'update' || operation.metadata.operation === 'delete')
       ) {
-        await supersedePriorUserOps(databaseId, opId, operation.metadata);
+        await supersedePriorUserOps(databaseId, opId, operation.metadata, operation.desiredState);
       }
 
       if (fastPathRepoImport && cache) {
