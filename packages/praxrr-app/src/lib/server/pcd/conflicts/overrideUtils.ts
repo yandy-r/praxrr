@@ -237,6 +237,7 @@ export function valuesEqual(expected: unknown, actual: unknown): boolean {
   if (typeof expected === 'boolean') {
     if (typeof actual === 'boolean') return expected === actual;
     if (typeof actual === 'number') return actual === (expected ? 1 : 0);
+    if (typeof actual === 'bigint') return actual === (expected ? 1n : 0n);
     if (typeof actual === 'string') return actual === (expected ? '1' : '0');
     return false;
   }

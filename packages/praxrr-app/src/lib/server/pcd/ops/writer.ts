@@ -486,9 +486,9 @@ function parseDesired(raw: string | null): Record<string, unknown> | null {
  * Walking newest-first, `expected` tracks the value each field must have before the next
  * (later) op replays. A prior op whose `to` produces an expected value feeds the chain and
  * must stay published (a->b, b->c); one whose `from` already equals the expected value is
- * redundant (a->b, a->d) and may be superseded. Non-scalar fields (tags, lists) are full
- * restatements, so coverage alone suffices for them. Anything unverifiable (missing or
- * unparseable desired_state, divergent pre-image) is kept: replaying a redundant op is
+ * redundant (a->b, a->d) and may be superseded unless it also carries non-scalar deltas
+ * (tags, lists), which the new op does not restate. Anything unverifiable (missing or
+ * unparseable desired_state anywhere in the walk, divergent pre-image) is kept: replaying a redundant op is
  * harmless, dropping a load-bearing one loses data.
  */
 function selectRedundantPriorOps(
@@ -502,7 +502,8 @@ function selectRedundantPriorOps(
 
   for (const prior of [...priors].sort((a, b) => b.id - a.id)) {
     const desired = parseDesired(prior.desired_state);
-    if (!desired) break; // unknown effect: keep this and every older op
+    // Unknown effect: its result may feed the chain, so nothing can be proven redundant.
+    if (!desired) return new Set();
     const entries = scalarEntries(desired);
     let feedsChain = false;
     let sharesPreImage = true;
@@ -518,7 +519,9 @@ function selectRedundantPriorOps(
       }
     }
     if (sharesPreImage) {
-      redundant.add(prior.id);
+      // Tag/list deltas are not restatements; superseding would drop them.
+      const onlyScalars = Object.keys(desired).every((field) => entries.has(field));
+      if (onlyScalars) redundant.add(prior.id);
       continue;
     }
     if (feedsChain) {
@@ -576,7 +579,7 @@ async function supersedePriorUserOps(
       : null;
 
   for (const { op, parsed } of matches) {
-    if (redundant) {
+    if (redundant !== null) {
       if (parsed.operation !== 'update') continue;
       if (!hasFieldCoverage(metadata.changedFields, parsed.changed_fields)) continue;
       if (!redundant.has(op.id)) {

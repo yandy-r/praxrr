@@ -225,3 +225,28 @@ for (const [label, currentPattern, desired, expected] of [
     }
   });
 }
+
+Deno.test('valueGuard: evaluateValueGuardApply treats bigint 1 as boolean true', () => {
+  const db = new Database(':memory:', { int64: true });
+  try {
+    db.exec('CREATE TABLE custom_formats (name TEXT PRIMARY KEY, include_in_rename INTEGER)');
+    db.exec("INSERT INTO custom_formats VALUES ('Foo', 1)");
+    const result = evaluateValueGuardApply({
+      db,
+      conflictStrategy: 'ask',
+      isUserOp: true,
+      rowcount: 1,
+      metadataJson: JSON.stringify({
+        operation: 'update',
+        entity: 'custom_format',
+        name: 'Foo',
+        stableKey: { key: 'custom_format_name', value: 'Foo' },
+      }),
+      desiredStateJson: JSON.stringify({ include_in_rename: { from: false, to: true } }),
+      priorConflictReason: null,
+    });
+    assertEquals(result.decision, 'applied');
+  } finally {
+    db.close();
+  }
+});

@@ -240,7 +240,7 @@ const supersedeCases: Array<{
     expected: [1],
   },
   {
-    label: 'supersedes same pre-image with tags (non-scalar restatement)',
+    label: 'keeps same pre-image prior that carries a tag delta',
     entity: 'regular_expression',
     changed: ['pattern', 'tags'],
     priors: [
@@ -250,7 +250,7 @@ const supersedeCases: Array<{
       },
     ],
     next: { ...pattern('a', 'd'), tags: { add: ['Y'], remove: [] } },
-    expected: [1],
+    expected: [],
   },
   {
     label: 'supersedes same pre-image when changed_fields are camelCase',
@@ -259,6 +259,18 @@ const supersedeCases: Array<{
     priors: [{ changed: ['usenetDelay'], desired: { usenet_delay: { from: 60, to: 120 } } }],
     next: { usenet_delay: { from: 60, to: 90 } },
     expected: [1],
+  },
+  {
+    label: 'supersedes nothing when any prior desired_state is unknown',
+    entity: 'regular_expression',
+    changed: ['pattern'],
+    priors: [
+      { changed: ['pattern'], desired: pattern('a', 'z') },
+      { changed: ['pattern'], desired: pattern('a', 'd') },
+      { changed: ['pattern'], desired: undefined },
+    ],
+    next: pattern('a', 'x'),
+    expected: [],
   },
   {
     label: 'keeps prior op without desired_state',
