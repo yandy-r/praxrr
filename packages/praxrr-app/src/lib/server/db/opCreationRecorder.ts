@@ -11,9 +11,10 @@ const storage = new AsyncLocalStorage<CreatedOpRecord>();
 /**
  * Record every op/history row inserted by `fn`'s async context (YAN-466), so a failed
  * import can delete exactly its own rows. Inserts from unrelated async contexts are
- * never recorded.
+ * never recorded. Not reentrant: a nested scope would hide inserts from the outer record.
  */
-export function withOpCreationRecorder<T>(record: CreatedOpRecord, fn: () => Promise<T>): Promise<T> {
+export function withOpCreationRecorder<T>(record: CreatedOpRecord, fn: () => T): T {
+  if (storage.getStore()) throw new Error('withOpCreationRecorder cannot be nested');
   return storage.run(record, fn);
 }
 

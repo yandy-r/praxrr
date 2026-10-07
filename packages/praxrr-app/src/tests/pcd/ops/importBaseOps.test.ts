@@ -726,6 +726,60 @@ Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
   }
 });
 
+Deno.test('importBaseOps: failed rollback disables the database and rethrows the original error', async () => {
+  const restores: Restore[] = [];
+  const databaseId = 9206;
+  const disabled: number[] = [];
+  const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-rollback-fail-' });
+
+  try {
+    __testOnly_setReadMigrationEntitySources(() =>
+      Promise.resolve({
+        candidates: [
+          buildCandidate(
+            'quality-profiles/default.yaml',
+            'quality_profile',
+            { key: 'quality_profile_name', value: 'Default', kind: 'stable' },
+            () => Promise.resolve({ success: true })
+          ),
+        ],
+        issues: [],
+      })
+    );
+    restores.push(__testOnly_resetReadMigrationEntitySources);
+    __testOnly_setGetCache(() => undefined as unknown as PCDCache);
+    restores.push(__testOnly_resetGetCache);
+    __testOnly_setBuildImportCache(() => Promise.resolve(absentCache()));
+    restores.push(__testOnly_resetBuildImportCache);
+    patchOpsTable(() => [], restores);
+    patch(
+      pcdOpsQueries,
+      'restoreImportSnapshot',
+      () => {
+        throw new Error('restore exploded');
+      },
+      restores
+    );
+    patch(
+      databaseInstancesQueries,
+      'disable',
+      (id: number) => {
+        disabled.push(id);
+        return true;
+      },
+      restores
+    );
+
+    await assertRejects(() => importBaseOps(databaseId, tempDir), Error, 'Cache not available');
+    assertEquals(disabled, [databaseId]);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+    await Deno.remove(tempDir, { recursive: true });
+  }
+});
+
 Deno.test(
   'importBaseOps: imports YAML candidates in deterministic order and applies deterministic sequencing',
   async () => {

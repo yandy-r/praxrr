@@ -254,7 +254,9 @@ export const pcdOpsQueries = {
    * Guarantee: every pre-import row of `databaseId` in `snapshot` is restored column-for-column
    * (including `updated_at`; `created_at` is never touched), and only the ops/history rows that
    * were created inside the import's async context (recorded in `created`) are deleted.
-   * Unrelated concurrent inserts survive. The caller must invalidate the PCD cache afterwards.
+   * Unrelated concurrent inserts survive; concurrent updates to snapshot rows made while the
+   * import ran are reverted (per-PCD mutex follow-up: YAN-747). Throws (after rolling the
+   * savepoint back) if a snapshot row no longer exists. The caller must invalidate the PCD cache.
    */
   restoreImportSnapshot(databaseId: number, snapshot: ReadonlyArray<PcdOp>, created: CreatedOpRecord): void {
     const opChunks = chunkIds(created.opIds);
@@ -272,29 +274,33 @@ export const pcdOpsQueries = {
            updated_at = ?
          WHERE id = ? AND database_id = ?`
       );
-      for (const row of snapshot) {
-        if (row.database_id !== databaseId) continue;
-        const restored = restoreRow.run(
-          row.origin,
-          row.state,
-          row.source,
-          row.filename,
-          row.op_number,
-          row.sequence,
-          row.sql,
-          row.metadata,
-          row.desired_state,
-          row.content_hash,
-          row.last_seen_in_repo_at,
-          row.superseded_by_op_id,
-          row.pushed_at,
-          row.pushed_commit,
-          row.updated_at,
-          row.id,
-          databaseId
-        );
-        // A vanished snapshot row cannot be restored; fail rather than claim exactness.
-        if (restored === 0) throw new Error(`Snapshot op ${row.id} no longer exists; cannot restore`);
+      try {
+        for (const row of snapshot) {
+          if (row.database_id !== databaseId) continue;
+          const restored = restoreRow.run(
+            row.origin,
+            row.state,
+            row.source,
+            row.filename,
+            row.op_number,
+            row.sequence,
+            row.sql,
+            row.metadata,
+            row.desired_state,
+            row.content_hash,
+            row.last_seen_in_repo_at,
+            row.superseded_by_op_id,
+            row.pushed_at,
+            row.pushed_commit,
+            row.updated_at,
+            row.id,
+            databaseId
+          );
+          // A vanished snapshot row cannot be restored; fail rather than claim exactness.
+          if (restored === 0) throw new Error(`Snapshot op ${row.id} no longer exists; cannot restore`);
+        }
+      } finally {
+        restoreRow.finalize();
       }
 
       // 2. Un-point rows from ops about to be deleted (self-FK is NO ACTION). Created rows
@@ -324,11 +330,17 @@ export const pcdOpsQueries = {
 
       db.exec('RELEASE SAVEPOINT pcd_import_restore');
     } catch (error) {
+      // Best-effort cleanup; never leave the savepoint open on the shared connection and
+      // never let a cleanup failure mask the original error.
       try {
         db.exec('ROLLBACK TO SAVEPOINT pcd_import_restore');
-      } finally {
-        // Never leave the savepoint open on the shared connection.
+      } catch {
+        // fall through to RELEASE
+      }
+      try {
         db.exec('RELEASE SAVEPOINT pcd_import_restore');
+      } catch {
+        // nothing more to do
       }
       throw error;
     }

@@ -145,6 +145,26 @@ migratedTest('restoreImportSnapshot deletes >600 chained created ops within SQLi
   assertEquals(pcdOpsQueries.listByDatabase(databaseId), []);
 });
 
+migratedTest('restoreImportSnapshot throws and rolls back when a snapshot row vanished', () => {
+  const databaseId = createTestDatabase();
+  const keptId = seedStaleBase(databaseId, 'kept', null, OLD);
+  const goneId = seedStaleBase(databaseId, 'gone', null, OLD);
+  const snapshot = pcdOpsQueries.listByDatabase(databaseId);
+
+  pcdOpsQueries.update(keptId, { sql: 'SELECT mutated' });
+  db.execute('DELETE FROM pcd_ops WHERE id = ?', goneId);
+
+  let threw = false;
+  try {
+    pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, { opIds: [], historyIds: [] });
+  } catch {
+    threw = true;
+  }
+  assert(threw);
+  // Savepoint rolled back: the partial restore of `kept` did not persist.
+  assertEquals(pcdOpsQueries.getById(keptId)?.sql, 'SELECT mutated');
+});
+
 migratedTest('restoreImportSnapshot never deletes ids belonging to another database', () => {
   const dbA = createTestDatabase();
   const dbB = createTestDatabase();

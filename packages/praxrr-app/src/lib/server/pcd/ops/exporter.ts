@@ -110,7 +110,7 @@ function buildMetadataJson(message: string, opIds: number[], exportedAt: string)
     op_ids: opIds,
     // Import reads only entities/ YAML, so nothing refreshes this op's
     // last_seen_in_repo_at; the flag exempts it from markBaseOrphaned (YAN-463).
-    // ponytail: pins the batch locally; drop once export regenerates entity YAML.
+    // ponytail: pins the batch locally; drop once export regenerates entity YAML (YAN-744).
     [EXPORT_BATCH_METADATA_KEY]: true,
   });
 }
