@@ -67,12 +67,12 @@ None — internal change, no route/component/alert copy changes.
 
 ## External Documentation
 
-| Topic                     | Source                                         | Key Takeaway                                                                                                   |
-| ------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| json_extract / json_valid | https://sqlite.org/json1.html#jex              | JSON `true` → 1; missing/NULL → NULL; malformed text THROWS — guard with `CASE WHEN json_valid(...)`.          |
-| SAVEPOINT nesting         | https://sqlite.org/lang_savepoint.html         | Nests inside an open transaction; after `ROLLBACK TO` must `RELEASE`. Bare `BEGIN` inside a transaction fails. |
-| FK actions                | https://sqlite.org/foreignkeys.html#fk_actions | `pcd_op_history.op_id` ON DELETE CASCADE; `pcd_ops.superseded_by_op_id` NO ACTION (checked per statement).     |
-| REPLACE pitfalls          | https://sqlite.org/lang_conflict.html          | Never `INSERT OR REPLACE` to restore — cascades history deletion. Use UPDATE.                                  |
+| Topic                     | Source                                           | Key Takeaway                                                                                                   |
+| ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| json_extract / json_valid | <https://sqlite.org/json1.html#jex>              | JSON `true` → 1; missing/NULL → NULL; malformed text THROWS — guard with `CASE WHEN json_valid(...)`.          |
+| SAVEPOINT nesting         | <https://sqlite.org/lang_savepoint.html>         | Nests inside an open transaction; after `ROLLBACK TO` must `RELEASE`. Bare `BEGIN` inside a transaction fails. |
+| FK actions                | <https://sqlite.org/foreignkeys.html#fk_actions> | `pcd_op_history.op_id` ON DELETE CASCADE; `pcd_ops.superseded_by_op_id` NO ACTION (checked per statement).     |
+| REPLACE pitfalls          | <https://sqlite.org/lang_conflict.html>          | Never `INSERT OR REPLACE` to restore — cascades history deletion. Use UPDATE.                                  |
 
 ## Patterns to Mirror
 

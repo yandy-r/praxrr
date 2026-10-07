@@ -58,7 +58,7 @@ Scope: make multi-step base-op import (many `pcd_ops` inserts/updates) atomic wi
 
 ### denodrivers/sqlite3 `Database#transaction` (sync, better-sqlite3 style)
 
-Docs: https://github.com/denodrivers/sqlite3/blob/main/doc.md , API: https://jsr.io/@db/sqlite/doc
+Docs: <https://github.com/denodrivers/sqlite3/blob/main/doc.md> , API: <https://jsr.io/@db/sqlite/doc>
 
 - `db.transaction(fn)` returns a function; calling it does `BEGIN`, runs `fn`, then `COMMIT`; `ROLLBACK` if `fn` throws.
 - Variants on the returned function: `.deferred(...)`, `.immediate(...)`, `.exclusive(...)` -> `BEGIN DEFERRED/IMMEDIATE/EXCLUSIVE`.
@@ -72,18 +72,18 @@ Docs: https://github.com/denodrivers/sqlite3/blob/main/doc.md , API: https://jsr
 
 ### Kysely transactions (reference; applies to PCD cache only)
 
-Docs: https://kysely.dev/docs/examples/transactions/controlled-transaction-w-savepoints ,
-API: https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.html
+Docs: <https://kysely.dev/docs/examples/transactions/controlled-transaction-w-savepoints> ,
+API: <https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.html>
 
 - `db.transaction().execute(async (trx) => {...})` - reserves the single connection, `begin`, commit on resolve, rollback +
   rethrow on throw. Uses `SingleConnectionProvider`: **only queries through `trx` are in the txn; the global `db` is not.**
-  (Maintainer statement, https://github.com/kysely-org/kysely/issues/895).
+  (Maintainer statement, <https://github.com/kysely-org/kysely/issues/895>).
 - `trx.transaction()` -> throws `calling the transaction method for a Transaction is not supported` (0.27.6 `kysely.ts:429-431`).
 - 0.28.0+: `db.startTransaction().setIsolationLevel(..).setAccessMode(..).execute()` -> `ControlledTransaction` with
   `commit()/rollback()` and `savepoint(name)/rollbackToSavepoint(name)/releaseSavepoint(name)` (each `.execute()`).
-  Release notes: https://github.com/kysely-org/kysely/releases/tag/0.28.0 (2025-04-13). Current line seen: 0.28.17.
+  Release notes: <https://github.com/kysely-org/kysely/releases/tag/0.28.0> (2025-04-13). Current line seen: 0.28.17.
 - SQLite driver ignores `isolationLevel`; begin is always plain `begin` (= DEFERRED), **no `BEGIN IMMEDIATE` hook**
-  (driver source: https://raw.githubusercontent.com/kysely-org/kysely/0.27.6/src/dialect/sqlite/sqlite-driver.ts).
+  (driver source: <https://raw.githubusercontent.com/kysely-org/kysely/0.27.6/src/dialect/sqlite/sqlite-driver.ts>).
 - `db.connection().execute(async (conn) => ...)` pins one connection without a txn.
 
 ## Libraries and SDKs
@@ -93,7 +93,7 @@ API: https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.ht
 | Raw `BEGIN IMMEDIATE`/`SAVEPOINT` via existing `db.exec`                                            | **Preferred.** Zero deps, matches `applyRewind`, `arrSync.ts`.                                                               |
 | `@jsr/db__sqlite` `db.getDatabase().transaction(fn).immediate()`                                    | Good if apply phase is sync; gives auto rollback + auto SAVEPOINT nesting. Needs a thin `DatabaseManager.transactionSync()`. |
 | Upgrade Kysely to >=0.28 for controlled txns                                                        | Not useful: app DB is not Kysely; soapbox driver has no savepoint support; no IMMEDIATE.                                     |
-| `fileshed/kysely-node-sqlite` (savepoints, `transactionMode: 'immediate'`, mutex)                   | Reference only (node:sqlite, different runtime). https://github.com/fileshed/kysely-node-sqlite                              |
+| `fileshed/kysely-node-sqlite` (savepoints, `transactionMode: 'immediate'`, mutex)                   | Reference only (node:sqlite, different runtime). <https://github.com/fileshed/kysely-node-sqlite>                            |
 | Async mutex (e.g. `@std/async` `Mutex`-style or the ~15-line `ConnectionMutex` pattern from kysely) | Only for the "must stay async" fallback.                                                                                     |
 
 ## Integration Patterns
@@ -114,7 +114,7 @@ API: https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.ht
 
 Use `SAVEPOINT` for sub-steps (per-candidate) inside the outer sync txn so one bad candidate can be rolled back without
 losing the whole import if desired (policy decision; current behavior is all-or-nothing). SQLite semantics
-(https://sqlite.org/lang_savepoint.html): `RELEASE` of the outermost savepoint == `COMMIT`; inner release is not durable
+(<https://sqlite.org/lang_savepoint.html>): `RELEASE` of the outermost savepoint == `COMMIT`; inner release is not durable
 until outer commit; `ROLLBACK TO` keeps the savepoint on the stack (must still `RELEASE`).
 
 ### C. Async-mutex fallback
@@ -133,11 +133,11 @@ NOT stop unrelated bare `db.execute` calls (jobs, drift, history) from landing i
   binds or use a temp table), or stamp `last_seen_in_repo_at = :seenAt` on **every** retained row (UPDATE ... WHERE id IN ...) before the sweep.
   Timestamp string comparison with ms resolution is fragile (equal-ms rows are not `<`; clock skew; skipped rows keep an old stamp).
 - Mark-and-sweep generation counter (`import_run_id`) is the more robust long-term form (see "mark and sweep" reconciliation prior art:
-  https://github.com/boardsesh/boardsesh/pull/4728 - rows may commit but the checkpoint/sweep only in the final txn).
+  <https://github.com/boardsesh/boardsesh/pull/4728> - rows may commit but the checkpoint/sweep only in the final txn).
 
 ## Constraints and Gotchas
 
-**SQLite / WAL semantics** (https://sqlite.org/lang_transaction.html, https://sqlite.org/wal.html)
+**SQLite / WAL semantics** (<https://sqlite.org/lang_transaction.html>, <https://sqlite.org/wal.html>)
 
 - One writer at a time even in WAL; readers don't block writers. A long write txn blocks other _connections'_ writers; in
   this app there is effectively one app-DB connection, so contention is with other **processes** (tests' `better-sqlite3`
@@ -145,16 +145,16 @@ NOT stop unrelated bare `db.execute` calls (jobs, drift, history) from landing i
   connection**.
 - `BEGIN` = DEFERRED: lock acquired lazily; a read-then-write txn that gets upgraded can fail **immediately** with
   `SQLITE_BUSY`/"database is locked" even with a busy timeout (deadlock avoidance). Use `BEGIN IMMEDIATE` for any txn that
-  will write. https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout/ (2025-02-16),
-  https://sqlite.org/src/doc/tip/doc/wal-lock.md
+  will write. <https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout/> (2025-02-16),
+  <https://sqlite.org/src/doc/tip/doc/wal-lock.md>
 - `BEGIN` inside an open transaction (or after `SAVEPOINT`) errors. `DatabaseManager.transaction()` is therefore not
   re-entrant; nested call sites throw (already noted in `driftStatus.ts`/`syncHistory.ts` comments; swept rows silently dropped).
-- No isolation inside a single connection (https://www.sqlite.org/isolation.html): statements from unrelated code see
+- No isolation inside a single connection (<https://www.sqlite.org/isolation.html>): statements from unrelated code see
   uncommitted rows and are rolled back together with the txn.
 - Default `busy_timeout` is 0 in the C library; this repo never sets it. Add `PRAGMA busy_timeout` (e.g. 5000) so
-  cross-process writers wait instead of failing instantly (https://hynek.me/til/sqlite-read-only-wal-locked/, 2026-07-26).
+  cross-process writers wait instead of failing instantly (<https://hynek.me/til/sqlite-read-only-wal-locked/>, 2026-07-26).
   Does not help read->write upgrade failures.
-- Very large write txns grow the WAL until commit/checkpoint (https://sqlite.org/wal.html "Very large write transactions");
+- Very large write txns grow the WAL until commit/checkpoint (<https://sqlite.org/wal.html> "Very large write transactions");
   bound it by batching only if import size warrants (PCD imports here are small; unlikely).
 - Failure modes that auto-rollback the whole txn (`SQLITE_FULL/IOERR/INTERRUPT/NOMEM`): after any error, always issue
   `ROLLBACK`, tolerate "no transaction is active" so it does not mask the original error.
@@ -171,7 +171,7 @@ NOT stop unrelated bare `db.execute` calls (jobs, drift, history) from landing i
 - Kysely `db` global vs `trx`: using the global instance inside a transaction callback runs **outside** the txn and, on a
   single-connection dialect with `ConnectionMutex`, **deadlocks forever** (the txn holds the only connection; the outer
   query waits for it). Kysely maintainer: "use another Kysely instance for non-transactional queries"
-  (https://www.answeroverflow.com/m/1263425731527184405). Applies to the PCD cache Kysely instance: never `await cache.kysely...`
+  (<https://www.answeroverflow.com/m/1263425731527184405>). Applies to the PCD cache Kysely instance: never `await cache.kysely...`
   from inside a `cache.kysely.transaction()` callback unless via `trx`.
 - Kysely `streamQuery` holds the connection for the stream's life; another query on the same instance deadlocks.
 - Sync FFI driver blocks the event loop; a long sync apply block stalls HTTP/jobs - acceptable for small imports, but keep the
@@ -182,7 +182,7 @@ NOT stop unrelated bare `db.execute` calls (jobs, drift, history) from landing i
 **Version/compat**
 
 - Kysely pinned to 0.27.6 (no controlled txns). Don't bump just for this.
-- `@soapbox/kysely-deno-sqlite` is flagged by a third-party dialect author as outdated (https://jsr.io/@marshift/kysely-deno-sqlite3); its executor calls `prepare(sql).all()` for every statement.
+- `@soapbox/kysely-deno-sqlite` is flagged by a third-party dialect author as outdated (<https://jsr.io/@marshift/kysely-deno-sqlite3>); its executor calls `prepare(sql).all()` for every statement.
 - `DatabaseManager.beginTransaction/commit/rollback` silently swallow `DatabaseNotInitializedError` (return without txn) - a
   caller may believe it is in a txn when it is not. Don't reuse for the new path without removing that swallow or asserting `inTransaction`.
 
@@ -288,22 +288,22 @@ await db.transaction().execute(async (trx) => {
 
 ## Sources
 
-- Kysely controlled transactions + savepoints: https://kysely.dev/docs/examples/transactions/controlled-transaction-w-savepoints (current docs)
-- Kysely `ControlledTransaction` API: https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.html
-- Kysely 0.28.0 release (2025-04-13): https://github.com/kysely-org/kysely/releases/tag/0.28.0
-- Kysely issue #895 (queries use trx object only): https://github.com/kysely-org/kysely/issues/895
-- Kysely single-connection deadlock discussion: https://www.answeroverflow.com/m/1263425731527184405
-- Kysely 0.27.6 SQLite driver source: https://raw.githubusercontent.com/kysely-org/kysely/0.27.6/src/dialect/sqlite/sqlite-driver.ts
-- Soapbox dialect source: https://gitlab.com/soapbox-pub/kysely-deno-sqlite (src/deno-sqlite3-dialect.ts, src/poly-sqlite-driver.ts); JSR: https://jsr.io/@soapbox/kysely-deno-sqlite
-- denodrivers/sqlite3 docs: https://github.com/denodrivers/sqlite3/blob/main/doc.md ; JSR API: https://jsr.io/@db/sqlite/doc
-- SQLite transactions: https://sqlite.org/lang_transaction.html (updated 2026-02-18)
-- SQLite savepoints: https://sqlite.org/lang_savepoint.html
-- SQLite WAL: https://www.sqlite.org/wal.html ; WAL locks: https://sqlite.org/src/doc/tip/doc/wal-lock.md
-- SQLite isolation: https://www.sqlite.org/isolation.html
-- BEGIN IMMEDIATE / busy despite timeout: https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout/ (2025-02-16)
-- WAL busy_timeout default 0: https://hynek.me/til/sqlite-read-only-wal-locked/ (2026-07-26)
-- SQLite forum on read->write upgrade: https://sqlite.org/forum/forumpost/423403c8a3f79d79
-- Prior art, batched/atomic import with final-txn checkpoint: https://github.com/boardsesh/boardsesh/pull/4728
+- Kysely controlled transactions + savepoints: <https://kysely.dev/docs/examples/transactions/controlled-transaction-w-savepoints> (current docs)
+- Kysely `ControlledTransaction` API: <https://kysely-org.github.io/kysely-apidoc/classes/ControlledTransaction.html>
+- Kysely 0.28.0 release (2025-04-13): <https://github.com/kysely-org/kysely/releases/tag/0.28.0>
+- Kysely issue #895 (queries use trx object only): <https://github.com/kysely-org/kysely/issues/895>
+- Kysely single-connection deadlock discussion: <https://www.answeroverflow.com/m/1263425731527184405>
+- Kysely 0.27.6 SQLite driver source: <https://raw.githubusercontent.com/kysely-org/kysely/0.27.6/src/dialect/sqlite/sqlite-driver.ts>
+- Soapbox dialect source: <https://gitlab.com/soapbox-pub/kysely-deno-sqlite> (src/deno-sqlite3-dialect.ts, src/poly-sqlite-driver.ts); JSR: <https://jsr.io/@soapbox/kysely-deno-sqlite>
+- denodrivers/sqlite3 docs: <https://github.com/denodrivers/sqlite3/blob/main/doc.md> ; JSR API: <https://jsr.io/@db/sqlite/doc>
+- SQLite transactions: <https://sqlite.org/lang_transaction.html> (updated 2026-02-18)
+- SQLite savepoints: <https://sqlite.org/lang_savepoint.html>
+- SQLite WAL: <https://www.sqlite.org/wal.html> ; WAL locks: <https://sqlite.org/src/doc/tip/doc/wal-lock.md>
+- SQLite isolation: <https://www.sqlite.org/isolation.html>
+- BEGIN IMMEDIATE / busy despite timeout: <https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout/> (2025-02-16)
+- WAL busy_timeout default 0: <https://hynek.me/til/sqlite-read-only-wal-locked/> (2026-07-26)
+- SQLite forum on read->write upgrade: <https://sqlite.org/forum/forumpost/423403c8a3f79d79>
+- Prior art, batched/atomic import with final-txn checkpoint: <https://github.com/boardsesh/boardsesh/pull/4728>
 - Repo files inspected: `packages/praxrr-app/src/lib/server/db/db.ts`, `.../db/queries/pcdOps.ts`, `.../pcd/ops/importBaseOps.ts`,
   `.../pcd/ops/writer.ts`, `.../pcd/database/cache.ts`, `.../pcd/snapshots/rollback/restore.ts`,
   `.../db/queries/{arrSync,qualityGoalApplyJournal,driftStatus}.ts`, `deno.json`, `package.json`
