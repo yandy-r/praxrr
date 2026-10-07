@@ -2,6 +2,7 @@ import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import { databaseInstancesQueries, type DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries, type ListPcdOpsOptions, type PcdOp } from '$db/queries/pcdOps.ts';
+import { recordCreatedOpId, type CreatedOpRecord } from '$db/opCreationRecorder.ts';
 import * as importBaseOpsModule from '$pcd/ops/importBaseOps.ts';
 import { PCDCache } from '$pcd/database/cache.ts';
 import { getCache, getRegisteredCache, setCache, deleteCache } from '$pcd/database/registry.ts';
@@ -50,6 +51,20 @@ function patch<T extends object, K extends keyof T>(target: T, key: K, replaceme
   restores.push(() => {
     target[key] = original;
   });
+}
+
+/**
+ * Fake the pcd_ops table reads: `listByDatabaseAndOrigin` plus `listByDatabase` (the
+ * importer's rollback snapshot), derived from the same fake so they never disagree.
+ */
+function patchOpsTable(listByOrigin: (typeof pcdOpsQueries)['listByDatabaseAndOrigin'], restores: Restore[]): void {
+  patch(pcdOpsQueries, 'listByDatabaseAndOrigin', listByOrigin, restores);
+  patch(
+    pcdOpsQueries,
+    'listByDatabase',
+    (databaseId: number) => [...listByOrigin(databaseId, 'base'), ...listByOrigin(databaseId, 'user')],
+    restores
+  );
 }
 
 /**
@@ -255,7 +270,7 @@ Deno.test('importBaseOps: skips entities already present in the base cache', asy
     __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
-    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patchOpsTable(() => [], restores);
 
     patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
 
@@ -307,9 +322,7 @@ Deno.test('importBaseOps: reimports entities already present in published repo b
     __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
-    patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
+    patchOpsTable(
       (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
         {
           id: 7001,
@@ -409,9 +422,7 @@ Deno.test('importBaseOps: matches legacy published base ops by entity filename p
     __testOnly_setGetCache(() => importCache);
     restores.push(__testOnly_resetGetCache);
 
-    patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
+    patchOpsTable(
       (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
         {
           id: 7301,
@@ -509,9 +520,7 @@ Deno.test(
       __testOnly_setGetRegisteredCache(() => presentCache());
       restores.push(__testOnly_resetGetRegisteredCache);
 
-      patch(
-        pcdOpsQueries,
-        'listByDatabaseAndOrigin',
+      patchOpsTable(
         (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [
           {
             id: 7101,
@@ -615,7 +624,7 @@ Deno.test('importBaseOps: skips non-refresh entity present in the registered cac
     __testOnly_setGetRegisteredCache(() => presentCache());
     restores.push(__testOnly_resetGetRegisteredCache);
 
-    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patchOpsTable(() => [], restores);
     patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
 
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
@@ -698,7 +707,7 @@ Deno.test('importBaseOps: throws when base cache is unavailable', async () => {
     restores.push(__testOnly_resetGetCache);
     __testOnly_setBuildImportCache(() => Promise.resolve(absentCache()));
     restores.push(__testOnly_resetBuildImportCache);
-    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patchOpsTable(() => [], restores);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
 
@@ -798,7 +807,7 @@ Deno.test(
       );
       restores.push(__testOnly_resetBuildImportCache);
 
-      patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+      patchOpsTable(() => [], restores);
       patch(pcdOpsQueries, 'markBaseOrphaned', () => 1, restores);
 
       __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
@@ -848,12 +857,7 @@ Deno.test('importBaseOps: loadAllOperations includes schema and tweaks SQL layer
     await Deno.writeTextFile(`${schemaPath}/1.test.sql`, 'CREATE TABLE test_marker (id INTEGER PRIMARY KEY);');
     await Deno.writeTextFile(`${tweaksPath}/1.tweak.sql`, 'CREATE TABLE tweak_marker (id INTEGER PRIMARY KEY);');
 
-    patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
-      (_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [],
-      restores
-    );
+    patchOpsTable((_databaseId: number, _origin: 'base' | 'user', _options?: ListPcdOpsOptions) => [], restores);
 
     const operations = await loadAllOperations(tempDir, databaseId);
 
@@ -925,19 +929,14 @@ Deno.test(
         sql: 'CREATE TABLE draft_marker (id INTEGER PRIMARY KEY);',
       };
 
-      patch(
-        pcdOpsQueries,
-        'listByDatabaseAndOrigin',
-        (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
-          if (origin !== 'base') return [];
-          const rows = [publishedKeep, publishedRefresh, draftKeep];
-          if (options?.states?.length) {
-            return rows.filter((row) => options.states!.includes(row.state));
-          }
-          return rows;
-        },
-        restores
-      );
+      patchOpsTable((_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
+        if (origin !== 'base') return [];
+        const rows = [publishedKeep, publishedRefresh, draftKeep];
+        if (options?.states?.length) {
+          return rows.filter((row) => options.states!.includes(row.state));
+        }
+        return rows;
+      }, restores);
 
       const operations = await loadAllOperations(tempDir, databaseId, {
         excludeBaseOpIds: new Set([publishedRefresh.id]),
@@ -1071,15 +1070,10 @@ Deno.test('PCDCache: legacy SQL helper functions are preserved', async () => {
       restores
     );
 
-    patch(
-      pcdOpsQueries,
-      'listByDatabaseAndOrigin',
-      (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
-        if (origin === 'base' && options?.states?.includes('published')) return baseOps;
-        return [];
-      },
-      restores
-    );
+    patchOpsTable((_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
+      if (origin === 'base' && options?.states?.includes('published')) return baseOps;
+      return [];
+    }, restores);
 
     patch(pcdOpHistoryQueries, 'create', () => 1, restores);
     patch(pcdOpHistoryQueries, 'listLatestByDatabaseWithOps', () => [], restores);
@@ -1213,9 +1207,7 @@ Deno.test(
       __testOnly_setGetRegisteredCache(() => presentCache());
       restores.push(__testOnly_resetGetRegisteredCache);
 
-      patch(
-        pcdOpsQueries,
-        'listByDatabaseAndOrigin',
+      patchOpsTable(
         (_databaseId: number, origin: 'base' | 'user', _options?: ListPcdOpsOptions) =>
           origin === 'base' ? [baseRow] : [userRow],
         restores
@@ -1319,7 +1311,7 @@ Deno.test('importBaseOps: routes deep getCache calls to the scoped import cache 
     });
     restores.push(__testOnly_resetWithRepoImportWriteContext);
 
-    patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patchOpsTable(() => [], restores);
     patch(pcdOpsQueries, 'markBaseOrphaned', () => 0, restores);
     __testOnly_setCompile(() => Promise.resolve({ schema: 0, base: 0, tweaks: 0, user: 0, timing: 0 }));
     restores.push(__testOnly_resetCompile);
@@ -1340,12 +1332,12 @@ Deno.test('importBaseOps: routes deep getCache calls to the scoped import cache 
 });
 
 Deno.test(
-  'importBaseOps: failed import restores repo base ops from snapshot and does not compile (YAN-461)',
+  'importBaseOps: failed import hands the full snapshot and created ids to the rollback and does not compile (YAN-466)',
   async () => {
     const restores: Restore[] = [];
     const databaseId = 9212;
     const tempDir = await Deno.makeTempDir({ prefix: 'importBaseOps-failure-restore-' });
-    const restoreCalls: Array<{ id: number; state?: string; sql?: string; lastSeenInRepoAt?: string | null }> = [];
+    const restoreCalls: Array<{ databaseId: number; snapshot: PcdOp[]; created: CreatedOpRecord }> = [];
     let compileCalls = 0;
     let nextCreatedId = 7100;
 
@@ -1391,12 +1383,14 @@ Deno.test(
                 kind: 'stable',
               },
               () => {
-                // Simulate the writer creating a new op row, then the import failing.
+                // Simulate the writer creating a new op row (reported to the recorder exactly
+                // as pcdOpsQueries.create does), then the import failing.
                 nextCreatedId += 1;
                 baseRows.set(
                   nextCreatedId,
                   repoBaseOp(nextCreatedId, `entities/custom-formats/beta.yaml#00000.sql`, 'Beta', 'INSERT BETA')
                 );
+                recordCreatedOpId(nextCreatedId);
                 return Promise.reject(new Error('beta deserialize failure'));
               }
             ),
@@ -1412,35 +1406,20 @@ Deno.test(
       __testOnly_setGetCache(() => importCache);
       restores.push(__testOnly_resetGetCache);
 
-      patch(
-        pcdOpsQueries,
-        'listByDatabaseAndOrigin',
-        (_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
-          if (origin !== 'base') return [];
-          const rows = Array.from(baseRows.values());
-          if (options?.states?.length) {
-            return rows.filter((row) => options.states!.includes(row.state));
-          }
-          return rows;
-        },
-        restores
-      );
+      patchOpsTable((_databaseId: number, origin: 'base' | 'user', options?: ListPcdOpsOptions) => {
+        if (origin !== 'base') return [];
+        const rows = Array.from(baseRows.values());
+        if (options?.states?.length) {
+          return rows.filter((row) => options.states!.includes(row.state));
+        }
+        return rows;
+      }, restores);
 
       patch(
         pcdOpsQueries,
-        'update',
-        (id: number, input: { state?: PcdOp['state']; sql?: string; lastSeenInRepoAt?: string | null }) => {
-          const row = baseRows.get(id);
-          if (row) {
-            baseRows.set(id, {
-              ...row,
-              state: input.state ?? row.state,
-              sql: input.sql ?? row.sql,
-              last_seen_in_repo_at: input.lastSeenInRepoAt ?? row.last_seen_in_repo_at,
-            });
-          }
-          restoreCalls.push({ id, state: input.state, sql: input.sql, lastSeenInRepoAt: input.lastSeenInRepoAt });
-          return true;
+        'restoreImportSnapshot',
+        (id: number, snapshot: ReadonlyArray<PcdOp>, created: CreatedOpRecord) => {
+          restoreCalls.push({ databaseId: id, snapshot: [...snapshot], created });
         },
         restores
       );
@@ -1461,18 +1440,14 @@ Deno.test(
         'beta deserialize failure'
       );
 
-      // The rewritten repo op is restored to its snapshot fields; the op created during
-      // the failed run is orphaned; the final compile never ran.
-      const alphaRestore = restoreCalls.find((call) => call.id === 7001);
-      assertEquals(alphaRestore !== undefined, true);
-      assertEquals(alphaRestore?.sql, 'INSERT INTO custom_formats ...');
-      assertEquals(alphaRestore?.state, 'published');
-      assertEquals(alphaRestore?.lastSeenInRepoAt, null);
-
-      const betaRestore = restoreCalls.find((call) => call.id === nextCreatedId);
-      assertEquals(betaRestore !== undefined, true);
-      assertEquals(betaRestore?.state, 'orphaned');
-
+      // Rollback receives the pre-import snapshot (taken before the writer rewrote
+      // 7001); exact row restore/deletion is covered against a real DB in
+      // tests/db/pcdOpsAtomicity.test.ts. The final compile never ran.
+      assertEquals(restoreCalls.length, 1);
+      assertEquals(restoreCalls[0].databaseId, databaseId);
+      assertEquals(restoreCalls[0].snapshot, [baseRow]);
+      // The op created inside the import's async context is handed to the rollback.
+      assertEquals(restoreCalls[0].created.opIds, [nextCreatedId]);
       assertEquals(compileCalls, 0);
     } finally {
       for (const restore of restores.reverse()) {

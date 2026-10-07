@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { recordCreatedOpId, type CreatedOpRecord } from '../opCreationRecorder.ts';
 
 export type PcdOpOrigin = 'base' | 'user';
 export type PcdOpState = 'published' | 'draft' | 'superseded' | 'dropped' | 'orphaned';
@@ -73,6 +74,19 @@ export interface ListPcdOpsOptions {
   source?: PcdOpSource;
 }
 
+/**
+ * Metadata key marking an export batch op (written by the exporter). The YAML import never
+ * re-sees these ops, so `markBaseOrphaned` must skip them (YAN-463).
+ */
+export const EXPORT_BATCH_METADATA_KEY = 'export_batch';
+
+function chunkIds(ids: ReadonlyArray<number>): number[][] {
+  const chunks: number[][] = [];
+  const uniqueIds = [...new Set(ids)];
+  for (let i = 0; i < uniqueIds.length; i += 400) chunks.push(uniqueIds.slice(i, i + 400));
+  return chunks;
+}
+
 export const pcdOpsQueries = {
   create(input: CreatePcdOpInput): number {
     db.execute(
@@ -101,7 +115,9 @@ export const pcdOpsQueries = {
     );
 
     const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');
-    return result?.id ?? 0;
+    const id = result?.id ?? 0;
+    recordCreatedOpId(id);
+    return id;
   },
 
   getById(id: number): PcdOp | undefined {
@@ -212,6 +228,11 @@ export const pcdOpsQueries = {
     return affected > 0;
   },
 
+  /**
+   * Orphan repo base ops the import did not re-see. Export batch ops (JSON `true` under
+   * `EXPORT_BATCH_METADATA_KEY`) are exempt (YAN-463); NULL/malformed metadata stays
+   * sweepable and the `json_valid` guard keeps it from throwing.
+   */
   markBaseOrphaned(databaseId: number, seenAt: string): number {
     return db.execute(
       `UPDATE pcd_ops
@@ -219,9 +240,97 @@ export const pcdOpsQueries = {
        WHERE database_id = ?
          AND origin = 'base'
          AND source = 'repo'
-         AND (last_seen_in_repo_at IS NULL OR last_seen_in_repo_at < ?)`,
+         AND (last_seen_in_repo_at IS NULL OR last_seen_in_repo_at < ?)
+         AND (CASE WHEN json_valid(metadata) THEN json_extract(metadata, ?) ELSE NULL END) IS NOT 1`,
       databaseId,
-      seenAt
+      seenAt,
+      `$.${EXPORT_BATCH_METADATA_KEY}`
     );
+  },
+
+  /**
+   * Roll back a failed import (YAN-463/YAN-466). Fully synchronous, one SAVEPOINT.
+   *
+   * Guarantee: every pre-import row of `databaseId` in `snapshot` is restored column-for-column
+   * (including `updated_at`; `created_at` is never touched), and only the ops/history rows that
+   * were created inside the import's async context (recorded in `created`) are deleted.
+   * Unrelated concurrent inserts survive. The caller must invalidate the PCD cache afterwards.
+   */
+  restoreImportSnapshot(databaseId: number, snapshot: ReadonlyArray<PcdOp>, created: CreatedOpRecord): void {
+    const opChunks = chunkIds(created.opIds);
+    const historyChunks = chunkIds(created.historyIds);
+    const inList = (ids: number[]) => ids.map(() => '?').join(', ');
+
+    db.exec('SAVEPOINT pcd_import_restore');
+    try {
+      // 1. Restore snapshot rows verbatim (do not use update(): it stamps updated_at).
+      const restoreRow = db.prepare(
+        `UPDATE pcd_ops SET
+           origin = ?, state = ?, source = ?, filename = ?, op_number = ?, sequence = ?,
+           sql = ?, metadata = ?, desired_state = ?, content_hash = ?,
+           last_seen_in_repo_at = ?, superseded_by_op_id = ?, pushed_at = ?, pushed_commit = ?,
+           updated_at = ?
+         WHERE id = ? AND database_id = ?`
+      );
+      for (const row of snapshot) {
+        if (row.database_id !== databaseId) continue;
+        const restored = restoreRow.run(
+          row.origin,
+          row.state,
+          row.source,
+          row.filename,
+          row.op_number,
+          row.sequence,
+          row.sql,
+          row.metadata,
+          row.desired_state,
+          row.content_hash,
+          row.last_seen_in_repo_at,
+          row.superseded_by_op_id,
+          row.pushed_at,
+          row.pushed_commit,
+          row.updated_at,
+          row.id,
+          databaseId
+        );
+        // A vanished snapshot row cannot be restored; fail rather than claim exactness.
+        if (restored === 0) throw new Error(`Snapshot op ${row.id} no longer exists; cannot restore`);
+      }
+
+      // 2. Un-point rows from ops about to be deleted (self-FK is NO ACTION). Created rows
+      // pointing at each other are also cleared; they are deleted in step 4 anyway.
+      for (const chunk of opChunks) {
+        db.execute(
+          `UPDATE pcd_ops SET superseded_by_op_id = NULL
+           WHERE database_id = ? AND superseded_by_op_id IN (${inList(chunk)})`,
+          databaseId,
+          ...chunk
+        );
+      }
+
+      // 3. History first (op_id cascades anyway; explicit ids cover rows on surviving ops).
+      for (const chunk of historyChunks) {
+        db.execute(
+          `DELETE FROM pcd_op_history WHERE database_id = ? AND id IN (${inList(chunk)})`,
+          databaseId,
+          ...chunk
+        );
+      }
+
+      // 4. Created ops.
+      for (const chunk of opChunks) {
+        db.execute(`DELETE FROM pcd_ops WHERE database_id = ? AND id IN (${inList(chunk)})`, databaseId, ...chunk);
+      }
+
+      db.exec('RELEASE SAVEPOINT pcd_import_restore');
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK TO SAVEPOINT pcd_import_restore');
+      } finally {
+        // Never leave the savepoint open on the shared connection.
+        db.exec('RELEASE SAVEPOINT pcd_import_restore');
+      }
+      throw error;
+    }
   },
 };

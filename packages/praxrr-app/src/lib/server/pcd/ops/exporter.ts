@@ -1,5 +1,5 @@
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { EXPORT_BATCH_METADATA_KEY, pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { logger } from '$logger/logger.ts';
 import { stage, commit, configureIdentity } from '$utils/git/write.ts';
@@ -108,6 +108,10 @@ function buildMetadataJson(message: string, opIds: number[], exportedAt: string)
     name: message,
     exported_at: exportedAt,
     op_ids: opIds,
+    // Import reads only entities/ YAML, so nothing refreshes this op's
+    // last_seen_in_repo_at; the flag exempts it from markBaseOrphaned (YAN-463).
+    // ponytail: pins the batch locally; drop once export regenerates entity YAML.
+    [EXPORT_BATCH_METADATA_KEY]: true,
   });
 }
 

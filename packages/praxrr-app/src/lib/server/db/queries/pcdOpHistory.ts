@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { recordCreatedHistoryId } from '../opCreationRecorder.ts';
 import type { PcdOp } from './pcdOps.ts';
 
 export type PcdOpHistoryStatus =
@@ -119,7 +120,9 @@ export const pcdOpHistoryQueries = {
     );
 
     const result = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() as id');
-    return result?.id ?? 0;
+    const id = result?.id ?? 0;
+    recordCreatedHistoryId(id);
+    return id;
   },
 
   listByOp(opId: number): PcdOpHistory[] {
