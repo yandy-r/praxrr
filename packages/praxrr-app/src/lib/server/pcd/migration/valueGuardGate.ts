@@ -14,6 +14,7 @@ import {
   parseOpMetadata,
 } from '$pcd/conflicts/autoAlign/index.ts';
 import { checkFullListConflict } from '$pcd/conflicts/fullListCheck.ts';
+import { checkScalarGuardConflict } from '$pcd/conflicts/scalarGuardCheck.ts';
 import type { PcdOpHistoryStatus } from '$db/queries/pcdOpHistory.ts';
 import type { OperationType } from '../core/types.ts';
 
@@ -214,7 +215,7 @@ export function evaluateValueGuardApply(input: ValueGuardApplyContext): ValueGua
     };
   }
 
-  if (checkFullListConflict(db, metadata, desiredState)) {
+  if (checkFullListConflict(db, metadata, desiredState) || checkScalarGuardConflict(db, metadata, desiredState)) {
     if (conflictStrategy === 'align') {
       return {
         ...defaultResult,
