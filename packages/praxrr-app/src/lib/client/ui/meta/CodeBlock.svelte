@@ -28,9 +28,11 @@
       {label}
     </div>
   {/if}
+  <!-- eslint-disable svelte/no-at-html-tags -- highlight.js output escapes source text -->
   <pre
     class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs break-words whitespace-pre-wrap text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
 <code class="hljs font-mono">{@html highlighted}</code></pre>
+  <!-- eslint-enable svelte/no-at-html-tags -->
 </div>
 
 <style>

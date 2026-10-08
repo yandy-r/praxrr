@@ -17,6 +17,7 @@
     "marked": "^15.0.6",
     "simple-icons": "^15.17.0",
     "sveltekit-adapter-deno": "^0.16.1",
+    "xss": "1.0.15",
     "yaml": "^2.8.2"
   },
   "devDependencies": {

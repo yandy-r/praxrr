@@ -1,7 +1,7 @@
 <script lang="ts">
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
-  import { marked } from 'marked';
+  import { parseMarkdown } from '$shared/markdown/markdown.ts';
   import type { Column } from '$ui/table/types';
   import type { TestDiff, TestSnapshot } from './types';
 
@@ -48,10 +48,6 @@
       before: row.before?.[field],
       after: row.after?.[field],
     };
-  }
-
-  function parseMarkdown(text: string): string {
-    return marked.parse(text) as string;
   }
 
   function changeBadgeVariant(change: TestDiff['change']): 'success' | 'danger' | 'neutral' {
@@ -109,18 +105,21 @@
           <div>
             <div class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Before</div>
             <div class="prose prose-sm prose-neutral dark:prose-invert text-sm">
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
               {@html parseMarkdown(String(change.before ?? ''))}
             </div>
           </div>
           <div>
             <div class="text-xs font-medium text-neutral-500 dark:text-neutral-400">After</div>
             <div class="prose prose-sm prose-neutral dark:prose-invert text-sm">
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
               {@html parseMarkdown(String(change.after ?? ''))}
             </div>
           </div>
         </div>
       {:else if change.after !== undefined || change.before !== undefined}
         <div class="prose prose-sm prose-neutral dark:prose-invert text-sm">
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
           {@html parseMarkdown(String(change.after ?? change.before ?? ''))}
         </div>
       {:else}

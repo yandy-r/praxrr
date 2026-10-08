@@ -30,7 +30,13 @@ export interface Column<T> {
   /** Default sort direction when column is first sorted */
   defaultSortDirection?: SortDirection;
   /** Custom cell renderer - receives the full row object */
-  cell?: (row: T) => string | ComponentType | { html: string };
+  cell?: (row: T) =>
+    | string
+    | ComponentType
+    | {
+        /** Rendered via {@html}: producers must escape untrusted text (escapeHtml) or use $shared/markdown. */
+        html: string;
+      };
   /** Hide column in mobile responsive layout */
   hideOnMobile?: boolean;
 }

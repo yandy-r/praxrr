@@ -41,6 +41,8 @@ export default defineConfig(
     files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'off',
+      // Raw HTML sinks must go through $shared/markdown or carry a justified line-level disable.
+      'svelte/no-at-html-tags': 'error',
     },
     languageOptions: {
       parserOptions: {

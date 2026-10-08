@@ -5,7 +5,7 @@
   import type { Column } from '$ui/table/types';
   import type { RegularExpressionWithTags } from '$shared/pcd/display';
   import { Tag, Code, FileText, Link, Copy, Download } from 'lucide-svelte';
-  import { marked } from 'marked';
+  import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { page } from '$app/stores';
 
   export let expressions: RegularExpressionWithTags[];
@@ -25,11 +25,6 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-  }
-
-  function parseMarkdown(text: string | null): string {
-    if (!text) return '';
-    return marked.parseInline(text) as string;
   }
 
   const columns: Column<RegularExpressionWithTags>[] = [
@@ -83,7 +78,7 @@
       width: 'w-[30%]',
       cell: (row: RegularExpressionWithTags) => ({
         html: row.description
-          ? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdown(row.description)}</span>`
+          ? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdownInline(row.description)}</span>`
           : `<span class="text-neutral-400">-</span>`,
       }),
     },

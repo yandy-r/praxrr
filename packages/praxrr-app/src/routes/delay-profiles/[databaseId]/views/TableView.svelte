@@ -4,6 +4,7 @@
   import Button from '$ui/button/Button.svelte';
   import type { Column } from '$ui/table/types';
   import type { DelayProfilesRow } from '$shared/pcd/display.ts';
+  import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
   import { Tag, Clock, Zap, Shield, Copy, Download } from 'lucide-svelte';
   import { page } from '$app/stores';
 
@@ -46,7 +47,7 @@
       align: 'left',
       sortable: true,
       cell: (row: DelayProfilesRow) => ({
-        html: `<div class="font-medium">${row.name}</div>`,
+        html: `<div class="font-medium">${escapeHtml(row.name)}</div>`,
       }),
     },
     {
