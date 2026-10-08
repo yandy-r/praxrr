@@ -41,14 +41,19 @@ jobs:
           cache-from: type=gha,scope=parser-image-smoke
           cache-to: type=gha,scope=parser-image-smoke,mode=max
 
+      - name: Install Trivy
+        run: |
+          wget -qO- https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.65.0
+          trivy --version
+
       - name: Scan parser image with Trivy
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
-        with:
-          image-ref: ${{ env.IMAGE_BASE }}/praxrr-parser:smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: 'CRITICAL'
+        run: |
+          trivy image \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table \
+            "${IMAGE_BASE}/praxrr-parser:smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Smoke parser image
         run: |
