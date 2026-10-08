@@ -157,7 +157,7 @@ async function collectConfigHealth(lines: string[]): Promise<void> {
     band: string;
   }>(`SELECT arr_instance_id, instance_name, arr_type, overall_score, band FROM (
 		SELECT *, ROW_NUMBER() OVER (
-			PARTITION BY arr_instance_id ORDER BY generated_at DESC, id DESC
+			PARTITION BY arr_instance_id, instance_name, arr_type ORDER BY generated_at DESC, id DESC
 		) AS rn FROM config_health_snapshots
 	) WHERE rn = 1`);
   lines.push(header('praxrr_config_health_score', 'Latest config health score per instance.', 'gauge'));
