@@ -70,7 +70,7 @@ export interface ConvertReport {
   readonly totalFiles: number;
 }
 
-const ENTITY_DIRECTORY_BY_TYPE: Readonly<Record<EntityType, string>> = {
+export const ENTITY_DIRECTORY_BY_TYPE: Readonly<Record<EntityType, string>> = {
   regular_expression: 'regular-expressions',
   custom_format: 'custom-formats',
   quality_profile: 'quality-profiles',
@@ -103,6 +103,25 @@ const ENTITY_SERIALIZERS: Readonly<Record<EntityType, PortableEntitySerializer>>
   lidarr_quality_definitions: serializeLidarrQualityDefinitions,
   lidarr_metadata_profile: serializeLidarrMetadataProfile,
 } as const;
+
+/**
+ * Serialize one entity to its portable payload. Fails fast on an unknown entity type
+ * (no sibling-Arr fallback) or a non-object serializer result.
+ */
+export async function serializeEntityPortable(
+  entityType: EntityType,
+  cache: PCDCache,
+  name: string
+): Promise<SerializableRecord> {
+  if (!Object.hasOwn(ENTITY_SERIALIZERS, entityType)) {
+    throw new Error(`No portable serializer for entity type "${entityType}"`);
+  }
+  const payload = await ENTITY_SERIALIZERS[entityType](cache, name);
+  if (!isPortablePayload(payload)) {
+    throw new Error('Serializer did not return a portable object payload');
+  }
+  return payload;
+}
 
 function normalizeOutputFormat(format: PortableMigrationFormat | string): PortableMigrationFormat {
   if (format !== 'json' && format !== 'yaml') {

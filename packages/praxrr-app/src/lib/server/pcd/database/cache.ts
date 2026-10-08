@@ -323,6 +323,7 @@ export class PCDCache {
       layers: ReadonlySet<'schema' | 'base' | 'tweaks' | 'user'>;
       snapshotOpIds?: ReadonlySet<number>;
       excludeBaseOpIds?: ReadonlySet<number>;
+      replayBaseOpIds?: ReadonlySet<number>;
     },
     hooks?: BuildReadOnlyHooks
   ): Promise<void> {
@@ -338,6 +339,7 @@ export class PCDCache {
     const allOperations = await loadAllOperations(this.pcdPath, this.databaseInstanceId, {
       snapshotOpIds: options.snapshotOpIds,
       excludeBaseOpIds: options.excludeBaseOpIds,
+      replayBaseOpIds: options.replayBaseOpIds,
     });
     const operations = allOperations.filter((operation) => options.layers.has(operation.layer));
     validateOperations(operations);

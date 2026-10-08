@@ -97,6 +97,13 @@ export interface LoadOperationsOptions {
    * published/draft base op keeps its normal ordering (YAN-461). Ignored with `snapshotOpIds`.
    */
   excludeBaseOpIds?: ReadonlySet<number>;
+  /**
+   * When present (non-snapshot load), the base layer is published ops followed by EXACTLY the
+   * non-published base ops whose id is in this set (instead of all drafts). Used by the export
+   * snapshot cache to replay published base + the drafts being exported, and by the legacy
+   * export-batch repair to replay one orphaned op. Ignored with `snapshotOpIds`.
+   */
+  replayBaseOpIds?: ReadonlySet<number>;
 }
 
 /**
@@ -132,7 +139,14 @@ export async function loadAllOperations(
       (operation) => !excludeBaseOpIds?.has(parseOpIdFromFilepath(operation.filepath))
     );
     allOperations.push(...basePublished);
-    const baseDrafts = loadDbOps(databaseInstanceId, 'base', ['draft'], DRAFT_SEQUENCE_BASE);
+    const replayBaseOpIds = options?.replayBaseOpIds;
+    const baseDrafts = replayBaseOpIds
+      ? pcdOpsQueries
+          .listByDatabaseAndOrigin(databaseInstanceId, 'base')
+          .filter((op) => op.state !== 'published' && replayBaseOpIds.has(op.id))
+          .map((op) => toOperation(op, 'base', DRAFT_SEQUENCE_BASE))
+          .sort(compareOperations)
+      : loadDbOps(databaseInstanceId, 'base', ['draft'], DRAFT_SEQUENCE_BASE);
     allOperations.push(...baseDrafts);
   }
 

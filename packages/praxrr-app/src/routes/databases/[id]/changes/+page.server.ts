@@ -7,6 +7,7 @@ import { logger } from '$logger/logger.ts';
 import { compile } from '$pcd/index.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { exportDraftOps, previewDraftOps } from '$pcd/ops/exporter.ts';
+import { repairExportBatchOps } from '$pcd/ops/repairExportBatches.ts';
 import { enqueueManualPcdSync } from '$jobs/helpers/pcdSyncQueue.ts';
 import { uuid } from '$shared/utils/uuid.ts';
 
@@ -254,6 +255,34 @@ export const actions: Actions = {
       return {
         success: false,
         error: err instanceof Error ? err.message : 'Failed to pull',
+      };
+    }
+  },
+  repairExportBatches: async ({ params }) => {
+    const id = parseInt(params.id || '', 10);
+    const database = databaseInstancesQueries.getById(id);
+
+    if (!database) {
+      return { success: false, error: 'Database not found' };
+    }
+
+    try {
+      const result = await repairExportBatchOps(id);
+      const repaired = result.flagged + result.republished;
+      let message = `Repaired ${repaired} of ${result.inspected} legacy export batches`;
+      if (result.skipped.length > 0) {
+        const reasons = result.skipped.map((s) => `${s.entity} "${s.name}": ${s.reason}`).join('; ');
+        message += ` — ${result.skipped.length} skipped (${reasons})`;
+      }
+      return { success: true, message };
+    } catch (err) {
+      await logger.error('Failed to repair export batches', {
+        source: 'changes',
+        meta: { databaseId: id, error: String(err) },
+      });
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to repair export batches',
       };
     }
   },

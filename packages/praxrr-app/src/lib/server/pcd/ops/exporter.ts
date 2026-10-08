@@ -7,6 +7,8 @@ import { execGit } from '$utils/git/exec.ts';
 import { getBranch, getStatus } from '$utils/git/read.ts';
 import { compile } from '../database/compiler.ts';
 import { entityNameToSlug } from '../migration/slug.ts';
+import { buildExportSnapshotCache, deriveEntityChanges, loadOpMetadatas } from './exportSnapshot.ts';
+import { removeSnapshotEntityYaml, writeSnapshotEntityYaml } from './snapshotEntityFiles.ts';
 import { canWriteToBase } from './writer.ts';
 import { listDraftEntityChanges } from './draftChanges.ts';
 import { uuid } from '$shared/utils/uuid.ts';
@@ -162,9 +164,10 @@ function buildMetadataJson(message: string, opIds: number[], exportedAt: string)
     name: message,
     exported_at: exportedAt,
     op_ids: opIds,
-    // Import reads only entities/ YAML, so nothing refreshes this op's
+    // Import matches only entities/-derived ops, so nothing refreshes this op's
     // last_seen_in_repo_at; the flag exempts it from markBaseOrphaned (YAN-463).
-    // ponytail: pins the batch locally; drop once export regenerates entity YAML (YAN-744).
+    // Entity YAML is regenerated on export now (YAN-744).
+    // ponytail: per-entity export rows would retire this flag (YAN-772).
     [EXPORT_BATCH_METADATA_KEY]: true,
   });
 }
@@ -434,7 +437,15 @@ async function buildExportPlan(
     );
 
   const maxOpNumber = await getMaxOpNumber(repoPath);
-  const opNumber = maxOpNumber + 1;
+  // Repos whose ops/ history was emptied (entities-only) can still hold DB rows with legacy
+  // low sequences; the batch row must stay above both bands or the cache recompile throws
+  // "Duplicate order number" (YAN-746 regression guard). Only published ops carry repo op-file
+  // numbering — drafts live in their own high band and must not drag opNumber up.
+  const maxDbSequence = pcdOpsQueries
+    .listByDatabase(databaseId, 'base')
+    .filter((op) => op.state === 'published')
+    .reduce((max, op) => Math.max(max, op.sequence ?? op.id), 0);
+  const opNumber = Math.max(maxOpNumber, maxDbSequence) + 1;
   // Export numbering is based on committed export-artifact history in ops/ only.
   // Import no longer reads ops/ as a source; these files are retained for audit history.
   const filename = `${opNumber}.${entityNameToSlug(trimmedMessage)}.sql`;
@@ -657,6 +668,37 @@ export async function exportDraftOps(
           }
           await Deno.copyFile(src, dest);
           toStage.push(dest);
+        }
+      }
+
+      // Regenerate canonical entity YAML (YAN-744): import reads only entities/ YAML, so
+      // the clone's tree must mirror the post-export state for every affected entity.
+      // The snapshot replays published base ops plus exactly the selected drafts
+      // (tweaks and user layers stay excluded: canonical upstream state only).
+      if (plan) {
+        const replayOpIds = new Set(
+          pcdOpsQueries
+            .listByDatabaseAndOrigin(databaseId, 'base')
+            .filter((op) => op.state === 'published')
+            .map((op) => op.id)
+        );
+        for (const op of plan.ops) replayOpIds.add(op.id);
+
+        let snapshotCache: Awaited<ReturnType<typeof buildExportSnapshotCache>> | null = null;
+        try {
+          snapshotCache = await buildExportSnapshotCache(sourcePath, databaseId, replayOpIds);
+          const { toWrite, toRemove } = deriveEntityChanges(
+            loadOpMetadatas(databaseId, new Set(plan.ops.map((op) => op.id)))
+          );
+          for (const ref of toWrite) {
+            toStage.push(await writeSnapshotEntityYaml(repoDir, snapshotCache, ref));
+          }
+          for (const ref of toRemove) {
+            const removed = await removeSnapshotEntityYaml(repoDir, ref, databaseId);
+            if (removed) toStage.push(removed);
+          }
+        } finally {
+          snapshotCache?.close();
         }
       }
 
