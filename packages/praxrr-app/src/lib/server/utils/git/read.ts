@@ -78,7 +78,7 @@ export async function getStatus(repoPath: string, options: GetStatusOptions = {}
     } else if (status[1] === 'M' || status[1] === 'D') {
       modified.push(file);
     }
-    if (status[0] === 'M' || status[0] === 'A' || status[0] === 'D') {
+    if ('MADRC'.includes(status[0])) {
       staged.push(file);
     }
   }
