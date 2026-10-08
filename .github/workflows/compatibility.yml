@@ -43,7 +43,7 @@ permissions:
 
 env:
   DENO_VERSION: '2.5.6'
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.26.6'
 
 jobs:
   detect-changes:
@@ -54,11 +54,11 @@ jobs:
       parser_paths: ${{ steps.path-changes.outputs.parser_paths }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Detect workflow and contract/app changes
         id: path-changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
           filters: |
             contracts_paths:
@@ -123,10 +123,10 @@ jobs:
     if: ${{ needs.detect-changes.outputs.contracts_paths == 'true' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
@@ -145,10 +145,10 @@ jobs:
     if: ${{ needs.detect-changes.outputs.app_paths == 'true' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
@@ -187,17 +187,17 @@ jobs:
     if: ${{ needs.detect-changes.outputs.parser_paths == 'true' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: false
           cache-dependency-path: packages/praxrr-parser/go.sum
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
@@ -213,6 +213,11 @@ jobs:
 
       - name: Run parser Go compatibility gates
         run: bash scripts/check-parser-go.sh
+
+      - name: Run govulncheck on parser
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          cd packages/praxrr-parser && govulncheck ./...
 
   parser-release-artifacts:
     needs: detect-changes

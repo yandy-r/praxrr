@@ -205,7 +205,7 @@ services:
 
 - [Git](https://git-scm.com/) (for PCD operations)
 - [Deno](https://deno.com/) 2.x
-- [Go](https://go.dev/) 1.26.5 (optional, for parser development)
+- [Go](https://go.dev/) 1.26.6 (optional, for parser development)
 
 ```bash
 git clone https://github.com/yandy-r/praxrr.git

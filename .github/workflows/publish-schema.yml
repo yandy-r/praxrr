@@ -30,7 +30,7 @@ jobs:
       published_branch: ${{ steps.publish.outputs.published_branch }}
       dry_run: ${{ steps.publish.outputs.dry_run }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false

@@ -14,7 +14,7 @@ permissions:
 
 env:
   DENO_VERSION: '2.5.6'
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.26.6'
   PARSER_BEHAVIOR_VERSION: '2.0.0-go.1'
   PARSER_PROJECT_DIR: 'packages/praxrr-parser'
   LEGACY_PARSER_ROLLBACK_IMAGE: 'ghcr.io/yandy-r/praxrr-parser@sha256:59edc5953cf89b237461f5df1d44d0f9b6887baaee9f096626ffb99a2d67802c'
@@ -25,10 +25,10 @@ jobs:
     name: release-compatibility
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
@@ -101,15 +101,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ env.DENO_VERSION }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           check-latest: false
@@ -185,7 +185,7 @@ jobs:
           echo "name=${archive}" >>"${GITHUB_OUTPUT}"
 
       - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: dist/staging
           format: spdx-json
@@ -264,7 +264,7 @@ jobs:
             --adjacent "${{ matrix.adjacent }}"
 
       - name: Upload archive evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: praxrr-${{ matrix.platform }}
           if-no-files-found: error

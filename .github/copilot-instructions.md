@@ -8,7 +8,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 - **Web framework:** SvelteKit (Vite + sveltekit-adapter-deno), Svelte 5
 - **Database:** SQLite (app DB via Kysely) + in-memory SQLite (PCD cache)
 - **UI:** Tailwind CSS v4
-- **Parser:** Go microservice (Go 1.26.5 toolchain, optional for CF/profile testing)
+- **Parser:** Go microservice (Go 1.26.6 toolchain, optional for CF/profile testing)
 - **SCM:** Git (PCD repos + export flow)
 
 ## Commands

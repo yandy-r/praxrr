@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'npm'
+    directory: '/docs/site'
+    schedule:
+      interval: weekly
+    groups:
+      docs-npm-dependencies:
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'gomod'
+    directory: '/packages/praxrr-parser'
+    schedule:
+      interval: weekly
+    groups:
+      go-dependencies:
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: weekly
+    groups:
+      docker-images:
+        patterns:
+          - '*'

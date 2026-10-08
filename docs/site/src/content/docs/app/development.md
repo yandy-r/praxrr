@@ -1,6 +1,6 @@
 ---
 title: Development Setup
-description: Contributor guide for Deno 2.x, Go 1.26.5, the optional parser service, dev tasks, environment variables, Docker workflows, and monorepo layout in Praxrr.
+description: Contributor guide for Deno 2.x, Go 1.26.6, the optional parser service, dev tasks, environment variables, Docker workflows, and monorepo layout in Praxrr.
 ---
 
 This page covers how to run Praxrr locally for development. For end-user installation,
@@ -12,7 +12,7 @@ files are documented there, not duplicated here.
 | Requirement       | Notes                                                                        |
 | ----------------- | ---------------------------------------------------------------------------- |
 | **Deno 2.x**      | Primary runtime; invoke tooling through `deno task …`, not npm for app code. |
-| **Go 1.26.5**     | Pinned parser toolchain; install it with `mise install`.                     |
+| **Go 1.26.6**     | Pinned parser toolchain; install it with `mise install`.                     |
 | **mise**          | Installs the repository-pinned Go toolchain.                                 |
 | **Node.js + npm** | Required for the docs site (`docs/site`) and Svelte client type-check.       |
 | **Git**           | PCD repositories and export flows depend on Git.                             |

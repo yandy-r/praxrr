@@ -60,7 +60,7 @@ tests, and security rationale.
 
 ## Run and build
 
-Use the pinned Go 1.26.5 toolchain from the repository root:
+Use the pinned Go 1.26.6 toolchain from the repository root:
 
 ```bash
 mise install
