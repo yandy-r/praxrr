@@ -4,4 +4,4 @@ go 1.25.0
 
 toolchain go1.26.6
 
-require github.com/dlclark/regexp2/v2 v2.3.0
+require github.com/dlclark/regexp2/v2 v2.8.3

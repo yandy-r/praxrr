@@ -41,6 +41,10 @@ type baselineMetric struct {
 }
 
 func TestPerformanceListenerLatencyAndLifecycle(t *testing.T) {
+	if raceDetectorEnabled {
+		t.Log("skipping latency budget under -race: instrumented timings are not representative")
+		return
+	}
 	baseline := loadBaseline(t)
 	started := time.Now()
 	baseURL := startParityServer(t)

@@ -23,7 +23,7 @@ const (
 	wantModulePath      = "github.com/yandy-r/praxrr/packages/praxrr-parser"
 	wantLanguageVersion = "1.25.0"
 	wantToolchain       = "go1.26.6"
-	wantRegexp2Version  = "v2.3.0"
+	wantRegexp2Version  = "v2.8.3"
 	wantCorpusRecords   = 114
 )
 
