@@ -15,17 +15,17 @@
 - `marked.parse(md: string): string` (sync unless `async:true`), `marked.parseInline(md): string`. Link/image tokens keep raw `href` (`javascript:`, `data:`, `vbscript:` pass through). No `sanitize` option (removed in v0.4+).
 - Safe-link hardening pattern: `marked.use({ renderer: { link({href,title,tokens}) { …validate href… } } })` OR `walkTokens` to rewrite `token.href` before render. Renderer `link`/`image` overrides + `html` override (to escape raw inline HTML) are token-typed (USING_PRO.md).
 - `marked.use({ hooks: { postprocess(html) { return sanitize(html); } } })` — official sanitize-output hook; proves intent: sanitize **after** parse, not inside renderer.
-- Docs: https://marked.js.org/ , https://github.com/markedjs/marked (README "Marked does not sanitize"; USING_PRO.md renderer/hooks).
+- Docs: <https://marked.js.org/> , <https://github.com/markedjs/marked> (README "Marked does not sanitize"; USING_PRO.md renderer/hooks).
 
 ### DOMPurify / isomorphic-dompurify
 
 - `DOMPurify.sanitize(dirty, { USE_PROFILES: { html: true }, ALLOWED_TAGS/ATTR, FORBID_TAGS/ATTR, ALLOWED_URI_REGEXP })`. DOM-only; server needs `new JSDOM('').window` passed in. isomorphic-dompurify wraps this; server path pulls **jsdom** (heavy, needs periodic `clearWindow()` in long-lived processes; happy-dom explicitly unsafe per DOMPurify README).
-- Docs: https://github.com/cure53/DOMPurify , https://github.com/kkomelin/isomorphic-dompurify .
+- Docs: <https://github.com/cure53/DOMPurify> , <https://github.com/kkomelin/isomorphic-dompurify> .
 
 ### js-xss (leizongmin/xss)
 
 - `filterXSS(html, { whiteList, stripIgnoreTagBody: ['script'], allowCommentTag, onTagAttr, safeAttrValue, css })`. Pure string parser, no DOM, works in browser + Deno (`npm:xss` / `jsr` equivalent). Default whitelist already strips `on*`, `<script>`, `javascript:` hrefs (safeAttrValue blanks them). `stripIgnoreTagBody:['script']` drops script bodies like current behavior.
-- Docs: https://github.com/leizongmin/js-xss .
+- Docs: <https://github.com/leizongmin/js-xss> .
 
 ### sanitize-html — do NOT adopt
 
@@ -33,8 +33,8 @@
 
 ### eslint-plugin-svelte 3.20.0
 
-- Rule doc: https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/ — "`{@html}` is XSS footgun; if content is sanitized, disable rule". Enable globally: `'svelte/no-at-html-tags': 'error'` in eslint.config.js.
-- Per-line allow in `.svelte` template: `<!-- eslint-disable-next-line svelte/no-at-html-tags -- Description -->` on line above `{@html …}` (comment-directive rule, already active via `svelte.configs.base` in repo's eslint.config.js). Syntax verified in rule + comment-directive docs: https://sveltejs.github.io/eslint-plugin-svelte/rules/comment-directive/ .
+- Rule doc: <https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/> — "`{@html}` is XSS footgun; if content is sanitized, disable rule". Enable globally: `'svelte/no-at-html-tags': 'error'` in eslint.config.js.
+- Per-line allow in `.svelte` template: `<!-- eslint-disable-next-line svelte/no-at-html-tags -- Description -->` on line above `{@html …}` (comment-directive rule, already active via `svelte.configs.base` in repo's eslint.config.js). Syntax verified in rule + comment-directive docs: <https://sveltejs.github.io/eslint-plugin-svelte/rules/comment-directive/> .
 
 ## Libraries and SDKs
 
@@ -128,11 +128,11 @@ rules: { 'svelte/no-at-html-tags': 'error' }
 
 ## Sources
 
-- marked docs (sanitize stance, renderer/link tokens, postprocess hook): https://marked.js.org/ , https://github.com/markedjs/marked/blob/master/README.md , https://github.com/markedjs/marked/blob/master/docs/USING_PRO.md
-- js-xss API (filterXSS, stripIgnoreTagBody, safeAttrValue): https://github.com/leizongmin/js-xss
-- DOMPurify server-side/jsdom requirement + happy-dom warning: https://github.com/cure53/DOMPurify
-- isomorphic-dompurify (jsdom wrapper, clearWindow): https://github.com/kkomelin/isomorphic-dompurify
-- sanitize-html archived notice: https://github.com/apostrophecms/sanitize-html
-- svelte/no-at-html-tags rule: https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/
-- svelte/comment-directive (HTML-comment disables): https://sveltejs.github.io/eslint-plugin-svelte/rules/comment-directive/
+- marked docs (sanitize stance, renderer/link tokens, postprocess hook): <https://marked.js.org/> , <https://github.com/markedjs/marked/blob/master/README.md> , <https://github.com/markedjs/marked/blob/master/docs/USING_PRO.md>
+- js-xss API (filterXSS, stripIgnoreTagBody, safeAttrValue): <https://github.com/leizongmin/js-xss>
+- DOMPurify server-side/jsdom requirement + happy-dom warning: <https://github.com/cure53/DOMPurify>
+- isomorphic-dompurify (jsdom wrapper, clearWindow): <https://github.com/kkomelin/isomorphic-dompurify>
+- sanitize-html archived notice: <https://github.com/apostrophecms/sanitize-html>
+- svelte/no-at-html-tags rule: <https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/>
+- svelte/comment-directive (HTML-comment disables): <https://sveltejs.github.io/eslint-plugin-svelte/rules/comment-directive/>
 - Repo pins verified 2026-10-07: root `deno.json` (`marked: npm:marked@^15.0.6`), `deno.lock` (marked 15.0.12, eslint-plugin-svelte 3.20.0), `eslint.config.js` (`svelte.configs.base`), `packages/praxrr-app/src/lib/server/utils/markdown/markdown.ts`.

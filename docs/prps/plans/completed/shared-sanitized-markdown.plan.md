@@ -89,12 +89,12 @@ same wrappers (.markdown / .prose-inline / .prose prose-sm), same clamps, same-t
 
 ## External Documentation
 
-| Topic                       | Source                                                                 | Key Takeaway                                                                                                                                                                   |
-| --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| js-xss options              | https://github.com/leizongmin/js-xss                                   | `new FilterXSS({ whiteList, stripIgnoreTag, stripIgnoreTagBody, onTagAttr, safeAttrValue })`; defaults too permissive — always supply explicit `whiteList` and `safeAttrValue` |
-| js-xss default URL handling | https://github.com/leizongmin/js-xss/blob/master/lib/default.js        | Default `safeAttrValue` allows `data:image/`, `ftp:`, `tel:`, `//`; override entirely                                                                                          |
-| marked instance API         | https://marked.js.org/using_pro                                        | `new Marked({ gfm: true, async: false })` isolates config; `.parse()` block, `.parseInline()` inline                                                                           |
-| eslint-plugin-svelte rule   | https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/ | Per-line `<!-- eslint-disable-next-line svelte/no-at-html-tags -->` in markup                                                                                                  |
+| Topic                       | Source                                                                   | Key Takeaway                                                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| js-xss options              | <https://github.com/leizongmin/js-xss>                                   | `new FilterXSS({ whiteList, stripIgnoreTag, stripIgnoreTagBody, onTagAttr, safeAttrValue })`; defaults too permissive — always supply explicit `whiteList` and `safeAttrValue` |
+| js-xss default URL handling | <https://github.com/leizongmin/js-xss/blob/master/lib/default.js>        | Default `safeAttrValue` allows `data:image/`, `ftp:`, `tel:`, `//`; override entirely                                                                                          |
+| marked instance API         | <https://marked.js.org/using_pro>                                        | `new Marked({ gfm: true, async: false })` isolates config; `.parse()` block, `.parseInline()` inline                                                                           |
+| eslint-plugin-svelte rule   | <https://sveltejs.github.io/eslint-plugin-svelte/rules/no-at-html-tags/> | Per-line `<!-- eslint-disable-next-line svelte/no-at-html-tags -->` in markup                                                                                                  |
 
 ---
 
