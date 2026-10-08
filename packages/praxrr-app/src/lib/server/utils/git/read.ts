@@ -51,7 +51,8 @@ export async function getStatus(repoPath: string, options: GetStatusOptions = {}
 
   // Get file status — use raw output to preserve leading spaces in porcelain format
   const statusCmd = new Deno.Command('git', {
-    args: ['status', '--porcelain'],
+    // -z: raw (unquoted) paths; -uall: list files inside untracked directories individually
+    args: ['status', '--porcelain', '-z', '-uall'],
     cwd: repoPath,
     stdout: 'piped',
     stderr: 'piped',
@@ -62,18 +63,22 @@ export async function getStatus(repoPath: string, options: GetStatusOptions = {}
   const modified: string[] = [];
   const staged: string[] = [];
 
-  for (const line of statusOutput.split('\n')) {
+  const entries = statusOutput.split('\0');
+  for (let i = 0; i < entries.length; i++) {
+    const line = entries[i];
     if (!line || line.length < 4) continue;
 
     const status = line.substring(0, 2);
     const file = line.substring(3);
+    // Renames/copies are followed by an extra NUL-terminated field holding the original path
+    if (status[0] === 'R' || status[0] === 'C') i++;
 
     if (status.startsWith('??')) {
       untracked.push(file);
     } else if (status[1] === 'M' || status[1] === 'D') {
       modified.push(file);
     }
-    if (status[0] === 'M' || status[0] === 'A' || status[0] === 'D') {
+    if ('MADRC'.includes(status[0])) {
       staged.push(file);
     }
   }

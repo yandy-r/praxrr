@@ -489,7 +489,7 @@ export async function stage(repoPath: string, filepaths: string[]): Promise<void
   for (const filepath of filepaths) {
     // Convert to relative path if it starts with the repo path
     const relativePath = filepath.startsWith(repoPath + '/') ? filepath.slice(repoPath.length + 1) : filepath;
-    await execGit(['add', relativePath], repoPath);
+    await execGit(['add', '--', relativePath], repoPath);
   }
 }
 
