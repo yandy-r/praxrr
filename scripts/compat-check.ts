@@ -151,6 +151,15 @@ function installQueryShims(databaseId: number): QueryStateResult {
     return operations.find((op) => op.id === id);
   }) as never);
 
+  // importBaseOps snapshots every op before importing so a failed import can roll back (YAN-466).
+  patch(pcdOpsQueries as Record<string, unknown>, 'listByDatabase', ((
+    searchDatabaseId: number,
+    origin?: 'base' | 'user'
+  ) =>
+    operations
+      .filter((op) => op.database_id === searchDatabaseId && (!origin || op.origin === origin))
+      .sort((a, b) => a.id - b.id)) as never);
+
   patch(pcdOpsQueries as Record<string, unknown>, 'listByDatabaseAndOrigin', ((
     searchDatabaseId: number,
     origin: 'base' | 'user',
