@@ -65,7 +65,7 @@ const filter = new xss.FilterXSS({
 function safeAttr(tag: string, name: string, value: string): string {
   if (tag === 'ol' && name === 'start') return /^\d+$/.test(value) ? xss.escapeAttrValue(value) : '';
   if ((tag === 'th' || tag === 'td') && name === 'align') {
-    return /^(left|center|right)$/.test(value) ? xss.escapeAttrValue(value) : '';
+    return /^(left|center|right)$/i.test(value) ? xss.escapeAttrValue(value.toLowerCase()) : '';
   }
   if ((tag === 'a' && name === 'href') || (tag === 'img' && name === 'src')) {
     // Entity-decode once (`&#115;`, `&colon;`, `&#x09;`) without friendlyAttrValue's control-char cleanup, so

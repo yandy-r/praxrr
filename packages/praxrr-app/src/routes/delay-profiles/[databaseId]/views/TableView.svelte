@@ -29,7 +29,8 @@
       case 'only_torrent':
         return 'Only Torrent';
       default:
-        return protocol;
+        // Rendered via a Table html cell: escape anything outside the known enum.
+        return escapeHtml(protocol);
     }
   }
 

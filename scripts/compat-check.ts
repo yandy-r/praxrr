@@ -158,7 +158,9 @@ function installQueryShims(databaseId: number): QueryStateResult {
   ) =>
     operations
       .filter((op) => op.database_id === searchDatabaseId && (!origin || op.origin === origin))
-      .sort((a, b) => a.id - b.id)) as never);
+      .sort((a, b) => a.id - b.id)
+      // Row copies, like the real query: a rollback snapshot must not alias rows the shim mutates.
+      .map((op) => ({ ...op }))) as never);
 
   patch(pcdOpsQueries as Record<string, unknown>, 'listByDatabaseAndOrigin', ((
     searchDatabaseId: number,

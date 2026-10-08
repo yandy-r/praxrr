@@ -129,7 +129,7 @@
       align: 'left',
       width: 'w-40',
       cell: (row: LidarrMetadataProfileListItem) => ({
-        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${row.updated_at || 'Never'}</span>`,
+        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${escapeHtml(row.updated_at || 'Never')}</span>`,
       }),
     },
   ];
