@@ -85,6 +85,11 @@ export async function getLogFilesList(): Promise<
  */
 export async function readLogsFromFile(filename: string): Promise<LogEntry[]> {
   try {
+    // Only open files the log viewer itself lists; blocks path traversal out of the logs dir.
+    const known = await getLogFilesList();
+    if (!known.some((f) => f.filename === filename)) {
+      return [];
+    }
     const logsDir = config.paths.logs;
     const filePath = `${logsDir}/${filename}`;
     const logs: LogEntry[] = [];

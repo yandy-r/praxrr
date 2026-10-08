@@ -90,6 +90,60 @@ function isCleanEnough(status: ExportPreflightStatus): boolean {
   return true;
 }
 
+const FILE_CHANGE_EXCLUDED_PREFIXES = ['deps/', 'ops/'];
+
+function isInside(root: string, path: string): boolean {
+  return path.startsWith(root.endsWith('/') ? root : `${root}/`);
+}
+
+/**
+ * Confine caller-supplied export file paths to working-tree changes inside the repo.
+ * Each path must be a plain relative path listed as modified/untracked by git status,
+ * resolve to a regular (non-symlink) file, and stay under the repo's real path.
+ */
+export async function validateExportFilePaths(
+  repoPath: string,
+  filePaths: string[],
+  status: Pick<ExportPreflightStatus, 'modified' | 'untracked'> | undefined
+): Promise<string | null> {
+  if (filePaths.length === 0) return null;
+  if (!status) return 'Repository status unavailable; cannot export file changes.';
+
+  const allowed = new Set(
+    [...status.modified, ...status.untracked].filter(
+      (fp) => !FILE_CHANGE_EXCLUDED_PREFIXES.some((prefix) => fp.startsWith(prefix))
+    )
+  );
+
+  let root: string;
+  try {
+    root = await Deno.realPath(repoPath);
+  } catch {
+    return 'Repository not found on disk.';
+  }
+
+  for (const fp of filePaths) {
+    const invalid = `Invalid file path: ${JSON.stringify(fp)}`;
+    if (
+      typeof fp !== 'string' ||
+      fp.startsWith('/') ||
+      /[\\\0]/.test(fp) ||
+      fp.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')
+    ) {
+      return invalid;
+    }
+    if (!allowed.has(fp)) return invalid;
+    try {
+      const info = await Deno.lstat(`${root}/${fp}`);
+      if (!info.isFile || info.isSymlink) return invalid;
+      if (!isInside(root, await Deno.realPath(`${root}/${fp}`))) return invalid;
+    } catch {
+      return invalid;
+    }
+  }
+  return null;
+}
+
 function buildHeader(message: string, opIds: number[], exportedAt: string): string {
   const ids = opIds.join(', ');
   return [
@@ -450,6 +504,11 @@ export async function previewDraftOps(
     };
   }
 
+  const filePathError = await validateExportFilePaths(database.local_path, filePaths, preflight.status);
+  if (filePathError) {
+    return { success: false, error: filePathError };
+  }
+
   // Build ops plan if there are ops
   let plan: ExportPlan | null = null;
   if (opIds.length > 0) {
@@ -508,6 +567,11 @@ export async function exportDraftOps(
       success: false,
       error: preflight.errors.length > 0 ? preflight.errors[0] : 'Export preflight failed',
     };
+  }
+
+  const filePathError = await validateExportFilePaths(database.local_path, filePaths, preflight.status);
+  if (filePathError) {
+    return { success: false, error: filePathError };
   }
 
   // Build ops plan if there are ops
@@ -577,9 +641,19 @@ export async function exportDraftOps(
         for (const fp of filePaths) {
           const src = `${sourcePath}/${fp}`;
           const dest = `${repoDir}/${fp}`;
-          const destDir = dest.substring(0, dest.lastIndexOf('/'));
-          if (destDir !== repoDir) {
-            await Deno.mkdir(destDir, { recursive: true });
+          // Tracked symlinks in the clone must not redirect the write outside it:
+          // create parents one segment at a time and refuse any symlink on the way.
+          let current = repoDir;
+          for (const segment of fp.split('/')) {
+            current = `${current}/${segment}`;
+            const info = await Deno.lstat(current).catch(() => null);
+            if (info?.isSymlink) throw new Error(`Invalid file path: ${JSON.stringify(fp)}`);
+            if (!info && current !== dest) await Deno.mkdir(current);
+          }
+          // Re-check right before copying: the source may have changed since validation.
+          const srcInfo = await Deno.lstat(src);
+          if (!srcInfo.isFile || srcInfo.isSymlink) {
+            throw new Error(`Invalid file path: ${JSON.stringify(fp)}`);
           }
           await Deno.copyFile(src, dest);
           toStage.push(dest);
