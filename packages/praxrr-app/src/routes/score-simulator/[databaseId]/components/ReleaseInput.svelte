@@ -126,7 +126,8 @@
       class="focus:border-accent-500 dark:focus:border-accent-400 h-24 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 transition-colors outline-none placeholder:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
       placeholder="Movie.2024.2160p.WEB-DL.DDP5.1.H.265-GROUP"
       value={title}
-      on:input={handleTitleInput}></textarea>
+      on:input={handleTitleInput}
+    ></textarea>
   </div>
 
   <div class="space-y-1.5">

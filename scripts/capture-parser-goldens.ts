@@ -1,6 +1,6 @@
-import babelPlugin from 'npm:prettier@3.9.5/plugins/babel';
-import estreePlugin from 'npm:prettier@3.9.5/plugins/estree';
-import { format } from 'npm:prettier@3.9.5/standalone';
+import babelPlugin from 'npm:prettier@3.9.9/plugins/babel';
+import estreePlugin from 'npm:prettier@3.9.9/plugins/estree';
+import { format } from 'npm:prettier@3.9.9/standalone';
 
 type JsonValue =
   | null
