@@ -8,7 +8,7 @@ Prerequisites:
 
 - Git
 - Deno 2.x
-- Go 1.26.5 (optional, only for parser development; pinned in `mise.toml`)
+- Go 1.26.6 (optional, only for parser development; pinned in `mise.toml`)
 
 ```bash
 git clone https://github.com/yandy-r/praxrr.git
