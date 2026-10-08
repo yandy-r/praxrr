@@ -8,7 +8,7 @@
   import Modal from '$ui/modal/Modal.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import CodeBlock from '$ui/meta/CodeBlock.svelte';
-  import { Check, ArrowDown, ExternalLink, FileText, Loader2, Upload, Trash2 } from 'lucide-svelte';
+  import { Check, ArrowDown, ExternalLink, FileText, Loader2, Upload, Trash2, Wrench } from 'lucide-svelte';
   import IconCheckbox from '$ui/form/IconCheckbox.svelte';
   import { afterNavigate } from '$app/navigation';
   import { deserialize } from '$app/forms';
@@ -55,6 +55,7 @@
     type?: 'success' | 'redirect' | 'failure' | 'error';
     success?: boolean;
     error?: string;
+    message?: string;
     preview?: ExportPreview;
     dropped?: number;
     alreadyRunning?: boolean;
@@ -63,6 +64,7 @@
     data?: {
       success?: boolean;
       error?: string;
+      message?: string;
       preview?: ExportPreview;
       dropped?: number;
       fileCount?: number;
@@ -85,6 +87,7 @@
   let commitMessage = '';
   let committing = false;
   let dropping = false;
+  let repairing = false;
   let showDropModal = false;
   let previewing = false;
   let showPreviewModal = false;
@@ -546,6 +549,30 @@
     }
   }
 
+  async function handleRepair() {
+    repairing = true;
+    try {
+      const response = await fetch('?/repairExportBatches', {
+        method: 'POST',
+        body: new FormData(),
+        headers: { Accept: 'application/json' },
+      });
+
+      const result = await parseActionResult(response);
+      const isSuccess = result?.type === 'success' || result?.type === 'redirect' || result?.data?.success;
+      const message = result?.data?.message || result?.message;
+      const errorMsg = result?.data?.error || result?.error;
+
+      if (isSuccess && !errorMsg) {
+        alertStore.add('success', message || 'Repair complete');
+      } else {
+        alertStore.add('error', `Repair failed: ${errorMsg || 'Unknown error'}`);
+      }
+    } finally {
+      repairing = false;
+    }
+  }
+
   function formatTitle(value: string): string {
     const trimmed = value.replace(/[_-]+/g, ' ').trim();
     return trimmed.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -851,6 +878,16 @@
                 title="Drop selected changes"
                 disabled={dropping}
                 on:click={requestDrop}
+              />
+            </div>
+
+            <div class="flex">
+              <ActionButton
+                icon={repairing ? Loader2 : Wrench}
+                iconClass={repairing ? 'animate-spin' : ''}
+                title="Repair legacy export batches"
+                disabled={repairing || committing || previewing}
+                on:click={handleRepair}
               />
             </div>
           </ActionsBar>
