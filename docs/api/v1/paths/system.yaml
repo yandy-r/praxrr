@@ -64,6 +64,40 @@ parser-health:
                   type: boolean
                   description: Whether the parser service is reachable and healthy
 
+metrics:
+  get:
+    operationId: getMetrics
+    summary: Prometheus metrics
+    description: |
+      Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config
+      health, security posture, parser availability, notification delivery, PCD cache state and
+      build info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`
+      header (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.
+    tags:
+      - System
+    parameters:
+      - name: X-Api-Key
+        in: header
+        required: false
+        description: Praxrr API key. Required for non-browser clients under AUTH=on.
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Metrics in Prometheus text exposition format.
+        content:
+          text/plain:
+            schema:
+              type: string
+      '401':
+        description: Unauthenticated (missing or invalid API key).
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: The metrics endpoint is disabled (METRICS_ENABLED is off).
+
 startup-pull-latest:
   get:
     operationId: getLatestStartupPull

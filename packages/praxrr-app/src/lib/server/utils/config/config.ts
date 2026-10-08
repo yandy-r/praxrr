@@ -26,6 +26,7 @@ class Config {
   public readonly validateInstances: boolean;
   public readonly pullOnStart: boolean;
   public readonly mcpEnabled: boolean;
+  public readonly metricsEnabled: boolean;
   /**
    * @deprecated Legacy env seed source only. Runtime gating uses
    * `$server/plugins/featureFlag.ts` (`general_settings.plugins_enabled`).
@@ -89,6 +90,9 @@ class Config {
     this.pullOnStart = Config.parseBooleanEnv(Deno.env.get('PULL_ON_START'));
     // MCP server endpoint (/api/v1/mcp). Enabled by default; set MCP_ENABLED=0|false|no|off to disable.
     this.mcpEnabled = Config.parseBooleanEnvWithDefault(Deno.env.get('MCP_ENABLED'), true);
+    // Prometheus metrics endpoint (/api/v1/metrics). Disabled by default; set
+    // METRICS_ENABLED=1|true|yes|on to enable.
+    this.metricsEnabled = Config.parseBooleanEnv(Deno.env.get('METRICS_ENABLED'));
     // Legacy PLUGINS_ENABLED env (non-throwing). Runtime master switch is DB-backed via
     // featureFlag.ts; this field remains only for one-time upgrade seed / deprecated reads.
     this.pluginsEnabled = Config.parseBooleanEnv(Deno.env.get('PLUGINS_ENABLED'));
