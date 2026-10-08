@@ -43,7 +43,7 @@ permissions:
 
 env:
   DENO_VERSION: '2.5.6'
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.26.6'
 
 jobs:
   detect-changes:

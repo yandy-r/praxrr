@@ -14,7 +14,7 @@ permissions:
 
 env:
   DENO_VERSION: '2.5.6'
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.26.6'
   PARSER_BEHAVIOR_VERSION: '2.0.0-go.1'
   PARSER_PROJECT_DIR: 'packages/praxrr-parser'
   LEGACY_PARSER_ROLLBACK_IMAGE: 'ghcr.io/yandy-r/praxrr-parser@sha256:59edc5953cf89b237461f5df1d44d0f9b6887baaee9f096626ffb99a2d67802c'
