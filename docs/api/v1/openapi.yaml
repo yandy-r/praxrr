@@ -68,6 +68,8 @@ paths:
     $ref: './paths/system.yaml#/openapi'
   /parser/health:
     $ref: './paths/system.yaml#/parser-health'
+  /metrics:
+    $ref: './paths/system.yaml#/metrics'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
   /mcp:

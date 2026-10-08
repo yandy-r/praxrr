@@ -97,8 +97,8 @@ class ParserClient extends BaseHttpClient {
   /**
    * Check health and get version
    */
-  async health(): Promise<HealthResponse> {
-    return this.get<HealthResponse>('/health');
+  async health(timeoutMs?: number): Promise<HealthResponse> {
+    return this.get<HealthResponse>('/health', timeoutMs === undefined ? undefined : { timeout: timeoutMs });
   }
 
   /**
@@ -182,11 +182,11 @@ export async function parseQuality(title: string, type: MediaType): Promise<Qual
 }
 
 /**
- * Check parser service health
+ * Check parser service health. `timeoutMs` caps each attempt (e.g. the metrics scrape path).
  */
-export async function isParserHealthy(): Promise<boolean> {
+export async function isParserHealthy(timeoutMs?: number): Promise<boolean> {
   try {
-    await getClient().health();
+    await getClient().health(timeoutMs);
     return true;
   } catch {
     return false;

@@ -98,6 +98,7 @@ export default defineConfig({
             { label: 'Custom Formats', link: '/guides/custom-formats/' },
             { label: 'Quality Profiles', link: '/guides/quality-profiles/' },
             { label: 'MCP Server', link: '/guides/mcp-server/' },
+            { label: 'Metrics', link: '/guides/metrics/' },
             { label: 'Upgrading', link: '/guides/upgrading/' },
             { label: 'Troubleshooting', link: '/guides/troubleshooting/' },
           ],

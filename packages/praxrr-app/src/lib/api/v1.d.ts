@@ -71,6 +71,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/metrics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Prometheus metrics
+     * @description Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config
+     *     health, security posture, parser availability, notification delivery, PCD cache state and
+     *     build info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`
+     *     header (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.
+     */
+    get: operations['getMetrics'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/system/startup-pull/latest': {
     parameters: {
       query?: never;
@@ -5634,6 +5657,45 @@ export interface operations {
             parserAvailable: boolean;
           };
         };
+      };
+    };
+  };
+  getMetrics: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Praxrr API key. Required for non-browser clients under AUTH=on. */
+        'X-Api-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Metrics in Prometheus text exposition format. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/plain': string;
+        };
+      };
+      /** @description Unauthenticated (missing or invalid API key). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The metrics endpoint is disabled (METRICS_ENABLED is off). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

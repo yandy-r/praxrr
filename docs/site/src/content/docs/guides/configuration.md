@@ -81,6 +81,15 @@ Praxrr can store or use instance credentials:
 Treat the master key like any other secret. Load it from a secret manager or
 `.env` file excluded from version control.
 
+## Observability
+
+| Variable          | Default | Description                                        |
+| ----------------- | ------- | -------------------------------------------------- |
+| `METRICS_ENABLED` | `false` | Expose `/api/v1/metrics` (Prometheus text format). |
+
+Accepts `1`, `true`, `yes`, or `on`. When disabled, `/api/v1/metrics`
+returns 404. See [Metrics](./metrics/).
+
 ## Startup behavior
 
 | Variable                        | Default | Description                     |
