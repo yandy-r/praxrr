@@ -81,13 +81,13 @@ export const JUNK_QUALITIES: ReadonlySet<string> = new Set([
   'DVDSCR',
   'REGIONAL',
   'BR-DISK',
-  'Raw-HD'
+  'Raw-HD',
 ]);
 
 const CEILING_RESOLUTION: Record<GoalResolutionCeiling, number> = {
   '720p': 720,
   '1080p': 1080,
-  '2160p': 2160
+  '2160p': 2160,
 };
 
 function cloneItem(item: OrderedItem, overrides: Partial<OrderedItem>): OrderedItem {
@@ -97,7 +97,7 @@ function cloneItem(item: OrderedItem, overrides: Partial<OrderedItem>): OrderedI
     position: item.position,
     enabled: item.enabled,
     upgradeUntil: item.upgradeUntil,
-    ...overrides
+    ...overrides,
   };
   if (item.type === 'group') {
     cloned.members = (item.members ?? []).map((member) => ({ name: member.name }));
@@ -161,7 +161,7 @@ export function buildCeilingLadder(
         upgradeUntil: nextUpgradeUntil,
         position: item.position,
         resolution: fact ? fact.resolution : null,
-        mapped
+        mapped,
       });
       orderedItems.push(cloneItem(item, { enabled: nextEnabled, upgradeUntil: nextUpgradeUntil }));
       continue;
@@ -178,7 +178,7 @@ export function buildCeilingLadder(
         upgradeUntil: nextUpgradeUntil,
         position: item.position,
         resolution: null,
-        mapped: false
+        mapped: false,
       });
       orderedItems.push(cloneItem(item, { upgradeUntil: nextUpgradeUntil }));
       continue;
@@ -203,7 +203,7 @@ export function buildCeilingLadder(
       upgradeUntil: nextUpgradeUntil,
       position: item.position,
       resolution: maxResolution,
-      mapped: true
+      mapped: true,
     });
     orderedItems.push(cloneItem(item, { enabled: nextEnabled, upgradeUntil: nextUpgradeUntil }));
   }
@@ -221,7 +221,7 @@ export function buildCeilingLadder(
     cutoff: hasLadder ? cutoffName : null,
     items,
     reshapesSiblingArrs,
-    sharedLadderNote
+    sharedLadderNote,
   };
 
   return { ladderInput: hasLadder ? { orderedItems } : null, ladder };

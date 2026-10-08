@@ -55,14 +55,14 @@ const FACTS: GoalQualityFact[] = [
   { name: 'Bluray-2160p', resolution: 2160 },
   { name: 'Bluray-1080p', resolution: 1080 },
   { name: 'Bluray-720p', resolution: 720 },
-  { name: 'DVD-R', resolution: 480 }
+  { name: 'DVD-R', resolution: 480 },
 ];
 
 const CURRENT_LADDER: OrderedItem[] = [
   { type: 'quality', name: 'Bluray-2160p', position: 1, enabled: true, upgradeUntil: true },
   { type: 'quality', name: 'Bluray-1080p', position: 2, enabled: true, upgradeUntil: false },
   { type: 'quality', name: 'Bluray-720p', position: 3, enabled: false, upgradeUntil: false },
-  { type: 'quality', name: 'DVD-R', position: 4, enabled: false, upgradeUntil: false }
+  { type: 'quality', name: 'DVD-R', position: 4, enabled: false, upgradeUntil: false },
 ];
 
 function buildPlan(): GoalPlan {
@@ -79,10 +79,10 @@ function buildPlan(): GoalPlan {
       minimumScore: 0,
       upgradeUntilScore: 100,
       upgradeScoreIncrement: 1,
-      customFormatScores: [{ customFormatName: 'Remux', arrType: 'radarr', score: 100 }]
+      customFormatScores: [{ customFormatName: 'Remux', arrType: 'radarr', score: 100 }],
     },
     ladderInput,
-    qualityLadder: ladder
+    qualityLadder: ladder,
   };
 }
 
@@ -104,7 +104,7 @@ function buildInstance(): DatabaseInstance {
     conflict_strategy: 'override',
     last_synced_at: null,
     created_at: '2026-01-01 00:00:00',
-    updated_at: '2026-01-01 00:00:00'
+    updated_at: '2026-01-01 00:00:00',
   };
 }
 
@@ -137,7 +137,7 @@ function createFixture(): Fixture {
       await kb.destroy();
       sqlite.close();
       deleteCache(DATABASE_ID);
-    }
+    },
   };
 }
 
@@ -150,7 +150,7 @@ Deno.test('goal apply: assembles scoring + ladder ops sharing the exact preview 
       cache: fixture.cache,
       layer: 'user',
       profileName: 'Movies',
-      plan
+      plan,
     });
     assert(!('error' in built), 'expected assembled operations');
 
@@ -167,7 +167,7 @@ Deno.test('goal apply: assembles scoring + ladder ops sharing the exact preview 
       layer: 'user',
       profileName: 'Movies',
       input: plan.ladderInput!,
-      forbidRemovals: true
+      forbidRemovals: true,
     });
     assert(!('error' in ladderBuilt) && ladderBuilt.batched !== null);
     const expectedLadderSql = ladderBuilt.batched.queries.map(compiledQueryToSql).join(';\n\n') + ';';
@@ -187,7 +187,7 @@ Deno.test('goal apply: the value-guard gate passes on a clean cache and is a dry
       cache: fixture.cache,
       layer: 'user',
       profileName: 'Movies',
-      plan
+      plan,
     });
     assert(!('error' in built));
 
@@ -204,7 +204,7 @@ Deno.test('goal apply: the value-guard gate passes on a clean cache and is a dry
       { quality_name: 'Bluray-2160p', enabled: 1, upgrade_until: 1 },
       { quality_name: 'Bluray-1080p', enabled: 1, upgrade_until: 0 },
       { quality_name: 'Bluray-720p', enabled: 0, upgrade_until: 0 },
-      { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 }
+      { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 },
     ]);
   } finally {
     fixture.restore();
@@ -212,41 +212,44 @@ Deno.test('goal apply: the value-guard gate passes on a clean cache and is a dry
   }
 });
 
-Deno.test('goal apply: a ladder row changed out from under the plan is rejected → 409, no partial write (AC4)', async () => {
-  const fixture = createFixture();
-  try {
-    const plan = buildPlan();
-    const built = await buildGoalApplyOps({
-      databaseId: DATABASE_ID,
-      cache: fixture.cache,
-      layer: 'user',
-      profileName: 'Movies',
-      plan
-    });
-    assert(!('error' in built));
+Deno.test(
+  'goal apply: a ladder row changed out from under the plan is rejected → 409, no partial write (AC4)',
+  async () => {
+    const fixture = createFixture();
+    try {
+      const plan = buildPlan();
+      const built = await buildGoalApplyOps({
+        databaseId: DATABASE_ID,
+        cache: fixture.cache,
+        layer: 'user',
+        profileName: 'Movies',
+        plan,
+      });
+      assert(!('error' in built));
 
-    // Simulate an upstream/sibling change between plan-read and persist: flip Bluray-720p enabled.
-    fixture.sqlite.exec(
-      `UPDATE quality_profile_qualities SET enabled = 1 WHERE quality_profile_name = 'Movies' AND quality_name = 'Bluray-720p'`
-    );
+      // Simulate an upstream/sibling change between plan-read and persist: flip Bluray-720p enabled.
+      fixture.sqlite.exec(
+        `UPDATE quality_profile_qualities SET enabled = 1 WHERE quality_profile_name = 'Movies' AND quality_name = 'Bluray-720p'`
+      );
 
-    const gate = __testOnly_runValueGuardGate(DATABASE_ID, 'user', built.operations);
-    assertEquals(gate.ok, false, 'the guarded ladder op no longer matches → conflict (apply returns 409)');
+      const gate = __testOnly_runValueGuardGate(DATABASE_ID, 'user', built.operations);
+      assertEquals(gate.ok, false, 'the guarded ladder op no longer matches → conflict (apply returns 409)');
 
-    // Nothing was persisted by the gate beyond the deliberate tamper (only Bluray-720p enabled).
-    const rows = fixture.sqlite
-      .prepare(
-        `SELECT quality_name, enabled, upgrade_until FROM quality_profile_qualities WHERE quality_profile_name = 'Movies' ORDER BY position`
-      )
-      .all() as Array<{ quality_name: string; enabled: number; upgrade_until: number }>;
-    assertEquals(rows, [
-      { quality_name: 'Bluray-2160p', enabled: 1, upgrade_until: 1 },
-      { quality_name: 'Bluray-1080p', enabled: 1, upgrade_until: 0 },
-      { quality_name: 'Bluray-720p', enabled: 1, upgrade_until: 0 },
-      { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 }
-    ]);
-  } finally {
-    fixture.restore();
-    await fixture.destroy();
+      // Nothing was persisted by the gate beyond the deliberate tamper (only Bluray-720p enabled).
+      const rows = fixture.sqlite
+        .prepare(
+          `SELECT quality_name, enabled, upgrade_until FROM quality_profile_qualities WHERE quality_profile_name = 'Movies' ORDER BY position`
+        )
+        .all() as Array<{ quality_name: string; enabled: number; upgrade_until: number }>;
+      assertEquals(rows, [
+        { quality_name: 'Bluray-2160p', enabled: 1, upgrade_until: 1 },
+        { quality_name: 'Bluray-1080p', enabled: 1, upgrade_until: 0 },
+        { quality_name: 'Bluray-720p', enabled: 1, upgrade_until: 0 },
+        { quality_name: 'DVD-R', enabled: 0, upgrade_until: 0 },
+      ]);
+    } finally {
+      fixture.restore();
+      await fixture.destroy();
+    }
   }
-});
+);

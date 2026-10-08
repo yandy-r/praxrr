@@ -25,7 +25,7 @@ export function observeSessionTransport(info: SessionTransportInfo): SessionTran
 export function resolveSessionTransport(ctx?: SessionRequestContext): SessionTransport {
   return observeSessionTransport({
     urlProtocol: ctx?.url?.protocol ?? null,
-    forwardedProto: firstForwardedValue(ctx?.request?.headers?.get('x-forwarded-proto') ?? null)
+    forwardedProto: firstForwardedValue(ctx?.request?.headers?.get('x-forwarded-proto') ?? null),
   });
 }
 

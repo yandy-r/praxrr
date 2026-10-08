@@ -568,7 +568,10 @@ Deno.test('plugin mutation origin guard accepts Host-derived and proxied browser
     const url = new URL(urlStr);
     const requestHeaders = new Headers(headers);
     if (origin !== undefined) requestHeaders.set('origin', origin);
-    const response = rejectCrossOriginPluginMutation(new Request(url, { method: 'PATCH', headers: requestHeaders }), url);
+    const response = rejectCrossOriginPluginMutation(
+      new Request(url, { method: 'PATCH', headers: requestHeaders }),
+      url
+    );
     assertEquals(response, null);
   }
 

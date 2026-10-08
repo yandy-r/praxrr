@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { config } from '$config';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
-import type { AuthenticationResponseJSON, AuthenticatorTransportFuture } from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, AuthenticatorTransport } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { resolveWebAuthnRp } from '$lib/server/webauthn/rp.ts';
 import { webauthnChallengesQueries } from '$db/queries/webauthnChallenges.ts';
@@ -80,16 +80,17 @@ export const POST: RequestHandler = async (event) => {
         id: credential.id,
         publicKey: isoBase64URL.toBuffer(credential.public_key),
         counter: credential.counter,
-        transports: credential.transports
-          ? (JSON.parse(credential.transports) as AuthenticatorTransportFuture[])
-          : undefined,
+        transports: credential.transports ? (JSON.parse(credential.transports) as AuthenticatorTransport[]) : undefined,
       },
       requireUserVerification: false,
     });
   } catch (error) {
     await logger.warn('Passkey authentication verification failed', {
       source: 'Auth:WebAuthn',
-      meta: { credentialId: credential.id.slice(0, 8) + '...', error: error instanceof Error ? error.message : String(error) },
+      meta: {
+        credentialId: credential.id.slice(0, 8) + '...',
+        error: error instanceof Error ? error.message : String(error),
+      },
     });
     return json({ error: 'Authentication verification failed' } satisfies ErrorResponse, { status: 400 });
   }

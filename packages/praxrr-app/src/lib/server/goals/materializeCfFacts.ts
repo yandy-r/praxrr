@@ -33,6 +33,6 @@ export async function materializeCfFacts(cache: PCDCache): Promise<CfFacts[]> {
   return formats.map((format) => ({
     name: format.name,
     description: format.description,
-    tags: tagsByCf.get(format.name) ?? []
+    tags: tagsByCf.get(format.name) ?? [],
   }));
 }

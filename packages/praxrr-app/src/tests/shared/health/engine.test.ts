@@ -188,7 +188,9 @@ Deno.test('computeHealthReport: enabling trash_alignment preserves exact contrib
         makeProfile({ name: 'Alpha', cfScores: [{ name: 'CF-A', score: 100 }] }),
         makeProfile({ name: 'Beta', cfScores: [{ name: 'CF-B', score: 50 }] }),
       ],
-      criteria: DEFAULT_CRITERIA.map((c) => (c.id === 'trash_alignment' ? { ...c, enabled: true, weight: 20 } : { ...c })),
+      criteria: DEFAULT_CRITERIA.map((c) =>
+        c.id === 'trash_alignment' ? { ...c, enabled: true, weight: 20 } : { ...c }
+      ),
     })
   );
   const overallTrash = report.overall.criteria.find((c) => c.id === 'trash_alignment');

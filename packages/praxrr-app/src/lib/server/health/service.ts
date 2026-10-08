@@ -34,7 +34,7 @@ export async function scoreFleet(): Promise<HealthReport[]> {
     } catch (error) {
       await logger.error('Config health: failed to score instance in fleet sweep', {
         source: SOURCE,
-        meta: { instanceId: instance.id, error: error instanceof Error ? error.message : String(error) }
+        meta: { instanceId: instance.id, error: error instanceof Error ? error.message : String(error) },
       });
     }
   }

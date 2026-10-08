@@ -78,7 +78,11 @@ migratedTest('migration 20260717 creates the webauthn tables and indexes', () =>
       "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_webauthn_credentials_user', 'idx_webauthn_credentials_name', 'idx_webauthn_challenges_expires') ORDER BY name"
     )
     .map((r) => r.name);
-  assertEquals(indexes, ['idx_webauthn_challenges_expires', 'idx_webauthn_credentials_name', 'idx_webauthn_credentials_user']);
+  assertEquals(indexes, [
+    'idx_webauthn_challenges_expires',
+    'idx_webauthn_credentials_name',
+    'idx_webauthn_credentials_user',
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -102,7 +106,9 @@ migratedTest('create + getById round-trips all fields with correct encodings', (
 
 migratedTest('null transports persist as null', () => {
   const userId = seedUser('admin');
-  webauthnCredentialsQueries.create(makeCredentialInput(userId, { id: 'credN', transports: null, name: 'No Transports' }));
+  webauthnCredentialsQueries.create(
+    makeCredentialInput(userId, { id: 'credN', transports: null, name: 'No Transports' })
+  );
   assertEquals(webauthnCredentialsQueries.getById('credN')?.transports, null);
 });
 
@@ -115,7 +121,10 @@ migratedTest('listByUserId is per-user, ordered by created_at then id', () => {
 
   const forUser1 = webauthnCredentialsQueries.listByUserId(user1).map((r) => r.id);
   assertEquals(forUser1, ['c1', 'c2']);
-  assertEquals(webauthnCredentialsQueries.listByUserId(user2).map((r) => r.id), ['c3']);
+  assertEquals(
+    webauthnCredentialsQueries.listByUserId(user2).map((r) => r.id),
+    ['c3']
+  );
 });
 
 migratedTest('countByUserId and count', () => {

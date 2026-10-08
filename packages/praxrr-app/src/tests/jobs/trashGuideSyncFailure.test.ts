@@ -47,10 +47,7 @@ Deno.test('safe copy never embeds raw-diagnostic shapes', () => {
     const { message, recoveryAction } = buildTrashGuideSyncFailure(code);
     for (const forbidden of FORBIDDEN_SUBSTRINGS) {
       assert(!message.includes(forbidden), `message for ${code} contains forbidden token "${forbidden}"`);
-      assert(
-        !recoveryAction.includes(forbidden),
-        `recoveryAction for ${code} contains forbidden token "${forbidden}"`
-      );
+      assert(!recoveryAction.includes(forbidden), `recoveryAction for ${code} contains forbidden token "${forbidden}"`);
     }
   }
 });

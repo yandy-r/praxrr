@@ -35,7 +35,7 @@ const DEFAULT_DEPENDENCIES: GoalApplyDependencies = {
   insertPendingJournal: (input) => qualityGoalApplyJournalQueries.insertPending(input),
   markJournalSucceeded: (id, scoringPersisted) => qualityGoalApplyJournalQueries.markSucceeded(id, scoringPersisted),
   markJournalFailed: (id, input) => qualityGoalApplyJournalQueries.markFailed(id, input),
-  logInfo: (message, options) => logger.info(message, options)
+  logInfo: (message, options) => logger.info(message, options),
 };
 
 /**
@@ -90,7 +90,7 @@ export async function _handleGoalApplyRequest(
     engineVersion: GOALS_ENGINE_VERSION,
     intentFingerprint,
     origin: 'apply',
-    startedAt
+    startedAt,
   });
 
   // Scoring persist (atomic within pcd_ops via the value-guard gate; recompiles the cache itself).
@@ -101,7 +101,7 @@ export async function _handleGoalApplyRequest(
       cache,
       layer: 'user',
       profileName: goalRequest.profileName,
-      plan
+      plan,
     });
   } catch (err) {
     // Rare mid-persist infra throw (op k of N): a partial pcd_ops write is possible and the success-path
@@ -109,7 +109,14 @@ export async function _handleGoalApplyRequest(
     const message = err instanceof Error ? err.message : String(err);
     dependencies.markJournalFailed(applyId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 1 });
     return json(
-      buildApplyFailure({ applyId, message, scoringChanged: true, failureStage: 'scoring', intentFingerprint, startedAt }),
+      buildApplyFailure({
+        applyId,
+        message,
+        scoringChanged: true,
+        failureStage: 'scoring',
+        intentFingerprint,
+        startedAt,
+      }),
       { status: 500 }
     );
   }
@@ -120,7 +127,14 @@ export async function _handleGoalApplyRequest(
     const isGuardConflict = /value-guard gate/i.test(message);
     dependencies.markJournalFailed(applyId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 0 });
     return json(
-      buildApplyFailure({ applyId, message, scoringChanged: false, failureStage: 'scoring', intentFingerprint, startedAt }),
+      buildApplyFailure({
+        applyId,
+        message,
+        scoringChanged: false,
+        failureStage: 'scoring',
+        intentFingerprint,
+        startedAt,
+      }),
       { status: isGuardConflict ? 409 : 500 }
     );
   }
@@ -138,7 +152,7 @@ export async function _handleGoalApplyRequest(
       presetId: goalRequest.presetId,
       weightsJson: JSON.stringify(goalRequest.weights),
       engineVersion: GOALS_ENGINE_VERSION,
-      appliedAt: new Date().toISOString()
+      appliedAt: new Date().toISOString(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -148,7 +162,7 @@ export async function _handleGoalApplyRequest(
       failureStage: 'binding',
       failureReason: message,
       scoringPersisted: scoringChanged ? 1 : 0,
-      bindingPersisted: 0
+      bindingPersisted: 0,
     });
     return json(
       buildApplyFailure({ applyId, message, scoringChanged, failureStage: 'binding', intentFingerprint, startedAt }),
@@ -166,8 +180,8 @@ export async function _handleGoalApplyRequest(
       databaseId: goalRequest.databaseId,
       profileName: goalRequest.profileName,
       presetId: goalRequest.presetId,
-      plan
-    })
+      plan,
+    }),
   });
 
   const applyStatus = buildApplyStatus({
@@ -179,7 +193,7 @@ export async function _handleGoalApplyRequest(
     failureReason: null,
     intentFingerprint,
     startedAt,
-    settledAt: new Date().toISOString()
+    settledAt: new Date().toISOString(),
   });
 
   return json({
@@ -187,7 +201,7 @@ export async function _handleGoalApplyRequest(
     binding: toWireBinding(binding),
     configDiff,
     applyId,
-    applyStatus
+    applyStatus,
   } satisfies GoalApplyResponse);
 }
 

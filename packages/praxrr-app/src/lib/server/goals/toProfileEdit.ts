@@ -18,7 +18,7 @@ export function toProfileEdit(profileName: string, plan: GoalPlan): ProfileEdit 
     profileName,
     kind: 'set_cf_score',
     customFormatName: decision.customFormatName,
-    score: decision.score
+    score: decision.score,
   }));
 
   changes.push(
@@ -26,19 +26,19 @@ export function toProfileEdit(profileName: string, plan: GoalPlan): ProfileEdit 
       profileName,
       kind: 'set_profile_setting',
       field: 'minimum_custom_format_score',
-      value: plan.thresholds.minimumScore
+      value: plan.thresholds.minimumScore,
     },
     {
       profileName,
       kind: 'set_profile_setting',
       field: 'upgrade_until_score',
-      value: plan.thresholds.upgradeUntilScore
+      value: plan.thresholds.upgradeUntilScore,
     },
     {
       profileName,
       kind: 'set_profile_setting',
       field: 'upgrade_score_increment',
-      value: plan.thresholds.upgradeScoreIncrement
+      value: plan.thresholds.upgradeScoreIncrement,
     }
   );
 

@@ -26,11 +26,8 @@ function isCanonicalBrowserOrigin(parsedOrigin: URL): boolean {
  */
 export function resolveExpectedPluginMutationOrigin(request: Request, url: URL): string {
   const hostAuthority =
-    firstForwardedValue(request.headers.get('x-forwarded-host')) ??
-    request.headers.get('host') ??
-    url.host;
-  const proto =
-    firstForwardedValue(request.headers.get('x-forwarded-proto')) ?? url.protocol.replace(':', '');
+    firstForwardedValue(request.headers.get('x-forwarded-host')) ?? request.headers.get('host') ?? url.host;
+  const proto = firstForwardedValue(request.headers.get('x-forwarded-proto')) ?? url.protocol.replace(':', '');
 
   try {
     return new URL(`${proto}://${hostAuthority}`).origin;

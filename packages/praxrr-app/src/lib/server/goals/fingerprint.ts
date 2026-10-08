@@ -27,7 +27,7 @@ export async function computeIntentFingerprint(plan: GoalPlan): Promise<string> 
       upgradeUntil: item.upgradeUntil,
       position: item.position,
       resolution: item.resolution,
-      mapped: item.mapped
+      mapped: item.mapped,
     }));
 
   const canonical = JSON.stringify({
@@ -36,12 +36,12 @@ export async function computeIntentFingerprint(plan: GoalPlan): Promise<string> 
     thresholds: {
       minimumScore: plan.thresholds.minimumScore,
       upgradeUntilScore: plan.thresholds.upgradeUntilScore,
-      upgradeScoreIncrement: plan.thresholds.upgradeScoreIncrement
+      upgradeScoreIncrement: plan.thresholds.upgradeScoreIncrement,
     },
     customFormatScores,
     ceiling: plan.qualityLadder.ceiling,
     cutoff: plan.qualityLadder.cutoff,
-    ladderItems
+    ladderItems,
   });
 
   return sha256Hex(canonical);

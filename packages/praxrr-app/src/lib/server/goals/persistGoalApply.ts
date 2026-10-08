@@ -38,6 +38,6 @@ export async function persistGoalApply(options: PersistGoalApplyOptions): Promis
     layer: options.layer,
     description: `apply-goal-${options.profileName}`,
     operations: built.operations,
-    runValueGuardGate: true
+    runValueGuardGate: true,
   });
 }

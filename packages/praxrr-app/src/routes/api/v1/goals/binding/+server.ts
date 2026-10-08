@@ -32,6 +32,6 @@ export const GET: RequestHandler = ({ url }) => {
 
   return json({
     binding: row ? toWireBinding(row) : null,
-    applyStatus: journal ? mapJournalRowToApplyStatus(journal) : null
+    applyStatus: journal ? mapJournalRowToApplyStatus(journal) : null,
   } satisfies GoalBindingResponse);
 };

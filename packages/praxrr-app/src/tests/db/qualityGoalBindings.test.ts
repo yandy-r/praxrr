@@ -31,7 +31,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         config.setBasePath(originalBasePath);
         await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
       }
-    }
+    },
   });
 }
 
@@ -41,7 +41,7 @@ function seedDatabase(): number {
     uuid: crypto.randomUUID(),
     name: 'Goals Test DB',
     repositoryUrl: 'https://example.invalid/repo.git',
-    localPath: '/tmp/goals-test-db-does-not-exist'
+    localPath: '/tmp/goals-test-db-does-not-exist',
   });
 }
 
@@ -50,7 +50,7 @@ const WEIGHTS_JSON = JSON.stringify({
   compatibility: 30,
   hdrPreference: 70,
   unwantedStrictness: 85,
-  resolutionCeiling: '2160p'
+  resolutionCeiling: '2160p',
 });
 
 migratedTest('quality_goal_bindings: upsert then get round-trips', () => {
@@ -62,7 +62,7 @@ migratedTest('quality_goal_bindings: upsert then get round-trips', () => {
     presetId: 'best-quality',
     weightsJson: WEIGHTS_JSON,
     engineVersion: '1',
-    appliedAt: '2026-07-09T00:00:00.000Z'
+    appliedAt: '2026-07-09T00:00:00.000Z',
   });
   assertEquals(row.preset_id, 'best-quality');
   assertEquals(row.engine_version, '1');
@@ -81,7 +81,7 @@ migratedTest('quality_goal_bindings: upsert overwrites on conflict', () => {
     presetId: 'best-quality',
     weightsJson: WEIGHTS_JSON,
     engineVersion: '1',
-    appliedAt: '2026-07-09T00:00:00.000Z'
+    appliedAt: '2026-07-09T00:00:00.000Z',
   });
   const updated = qualityGoalBindingQueries.upsert({
     databaseId,
@@ -90,7 +90,7 @@ migratedTest('quality_goal_bindings: upsert overwrites on conflict', () => {
     presetId: 'balanced',
     weightsJson: '{}',
     engineVersion: '1',
-    appliedAt: '2026-07-09T01:00:00.000Z'
+    appliedAt: '2026-07-09T01:00:00.000Z',
   });
   assertEquals(updated.preset_id, 'balanced');
 
@@ -102,7 +102,7 @@ migratedTest('quality_goal_bindings: upsert overwrites on conflict', () => {
     presetId: 'smallest-size',
     weightsJson: '{}',
     engineVersion: '1',
-    appliedAt: '2026-07-09T02:00:00.000Z'
+    appliedAt: '2026-07-09T02:00:00.000Z',
   });
   assertEquals(qualityGoalBindingQueries.get(databaseId, 'Movies', 'radarr')?.preset_id, 'balanced');
   assertEquals(qualityGoalBindingQueries.get(databaseId, 'Movies', 'sonarr')?.preset_id, 'smallest-size');
@@ -117,7 +117,7 @@ migratedTest('quality_goal_bindings: delete removes the row; missing get returns
     presetId: 'best-quality',
     weightsJson: WEIGHTS_JSON,
     engineVersion: '1',
-    appliedAt: '2026-07-09T00:00:00.000Z'
+    appliedAt: '2026-07-09T00:00:00.000Z',
   });
   assert(qualityGoalBindingQueries.delete(databaseId, 'Movies', 'radarr'));
   assertEquals(qualityGoalBindingQueries.get(databaseId, 'Movies', 'radarr'), undefined);
@@ -133,7 +133,7 @@ migratedTest('quality_goal_bindings: ON DELETE CASCADE reaps rows with their dat
     presetId: 'best-quality',
     weightsJson: WEIGHTS_JSON,
     engineVersion: '1',
-    appliedAt: '2026-07-09T00:00:00.000Z'
+    appliedAt: '2026-07-09T00:00:00.000Z',
   });
   databaseInstancesQueries.delete(databaseId);
   assertEquals(qualityGoalBindingQueries.get(databaseId, 'Movies', 'radarr'), undefined);

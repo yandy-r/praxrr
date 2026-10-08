@@ -21,28 +21,28 @@ interface FailureCopy {
 const FAILURE_COPY: Record<TrashGuideSyncFailureCode, FailureCopy> = {
   source_missing: {
     message: 'The TRaSH source no longer exists.',
-    recoveryAction: 'Re-add the TRaSH source, then run the sync again.'
+    recoveryAction: 'Re-add the TRaSH source, then run the sync again.',
   },
   source_disabled: {
     message: 'The TRaSH source is disabled.',
-    recoveryAction: 'Enable the source in its settings, then run the sync again.'
+    recoveryAction: 'Enable the source in its settings, then run the sync again.',
   },
   network: {
     message: 'Could not reach the TRaSH repository.',
-    recoveryAction: 'Check network connectivity to the repository host, then retry the sync.'
+    recoveryAction: 'Check network connectivity to the repository host, then retry the sync.',
   },
   parser_failed: {
     message: 'The TRaSH guide data failed parser or schema validation.',
-    recoveryAction: 'Wait for the upstream guide to be corrected, then retry the sync.'
+    recoveryAction: 'Wait for the upstream guide to be corrected, then retry the sync.',
   },
   sync_failed: {
     message: 'The TRaSH sync did not complete successfully.',
-    recoveryAction: 'Retry the sync; if it keeps failing, check the server logs for details.'
+    recoveryAction: 'Retry the sync; if it keeps failing, check the server logs for details.',
   },
   internal: {
     message: 'An unexpected error occurred while syncing the TRaSH source.',
-    recoveryAction: 'Retry the sync; if the problem persists, check the server logs for details.'
-  }
+    recoveryAction: 'Retry the sync; if the problem persists, check the server logs for details.',
+  },
 };
 
 /** Codes a user can meaningfully retry by re-running the sync (drives transported `retry.retryable`). */
@@ -50,7 +50,7 @@ const RETRYABLE_CODES: ReadonlySet<TrashGuideSyncFailureCode> = new Set<TrashGui
   'network',
   'parser_failed',
   'sync_failed',
-  'internal'
+  'internal',
 ]);
 
 /** Build a typed, safe failure reason for a known code. */

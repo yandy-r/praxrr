@@ -119,12 +119,7 @@ export const webauthnCredentialsQueries = {
    * Rename a credential (scoped to its owner). Returns rows affected.
    */
   rename(id: string, userId: number, name: string): number {
-    return db.execute(
-      'UPDATE webauthn_credentials SET name = ? WHERE id = ? AND user_id = ?',
-      name,
-      id,
-      userId
-    );
+    return db.execute('UPDATE webauthn_credentials SET name = ? WHERE id = ? AND user_id = ?', name, id, userId);
   },
 
   /**

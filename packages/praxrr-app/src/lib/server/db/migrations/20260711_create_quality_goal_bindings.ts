@@ -33,5 +33,5 @@ export const migration: Migration = {
 
   down: `
 		DROP TABLE IF EXISTS quality_goal_bindings;
-	`
+	`,
 };

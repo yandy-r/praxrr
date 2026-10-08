@@ -218,7 +218,7 @@ export function createLineageObserver(index: LineageIndex): {
         identity = null;
       }
     },
-    after(op, db) {
+    after(_op, db) {
       const id = identity;
       if (!id) {
         pending = [];

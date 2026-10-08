@@ -81,7 +81,8 @@ export async function verifySnapshot(snapshot: PcdSnapshotDetail): Promise<Verif
 
   return {
     reconstructable: false,
-    reason: 'Reconstructed state fingerprint does not match the snapshot; op content changed since capture (fail-closed)',
+    reason:
+      'Reconstructed state fingerprint does not match the snapshot; op content changed since capture (fail-closed)',
     recomputedHash,
   };
 }

@@ -49,7 +49,7 @@ export const POST: RequestHandler = async ({ params }) => {
           deduped: true,
           runToken: result.runToken,
           statusUrl,
-          view: result.view
+          view: result.view,
         },
         { status: 409 }
       );
@@ -60,7 +60,7 @@ export const POST: RequestHandler = async ({ params }) => {
       queued: true,
       runToken: result.runToken,
       statusUrl,
-      view: result.view
+      view: result.view,
     });
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to enqueue TRaSH source sync id=${sourceId}`);

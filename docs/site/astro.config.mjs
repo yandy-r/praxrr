@@ -11,8 +11,7 @@ import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 // Resolve the documentation version being built from DOCS_VERSION (set per build by
 // scripts/build-versions.mjs). See src/content/docs/app/docs-versioning.md.
 const versions = JSON.parse(readFileSync(fileURLToPath(new URL('./versions.json', import.meta.url)), 'utf8'));
-const activeVersion =
-  versions.find((v) => v.id === process.env.DOCS_VERSION) ?? versions.find((v) => v.default);
+const activeVersion = versions.find((v) => v.id === process.env.DOCS_VERSION) ?? versions.find((v) => v.default);
 if (!activeVersion) {
   throw new Error(`Unknown DOCS_VERSION "${process.env.DOCS_VERSION}" and no default in versions.json`);
 }
@@ -32,9 +31,7 @@ export default defineConfig({
       customCss: ['./src/styles/global.css'],
       // In-development versions render the same content as the stable root, so keep them
       // out of search indexes to avoid duplicate-content competition with the canonical docs.
-      head: activeVersion.development
-        ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex' } }]
-        : [],
+      head: activeVersion.development ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex' } }] : [],
       components: {
         Sidebar: './src/components/VersionedSidebar.astro',
         Banner: './src/components/VersionBanner.astro',

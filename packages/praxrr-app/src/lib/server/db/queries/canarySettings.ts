@@ -21,7 +21,7 @@ function rowToSettings(row: CanarySettingsRow): CanarySettings {
     autoSelect: row.auto_select === 1,
     defaultCanaryInstanceId: row.default_canary_instance_id,
     defaultPartialPolicy: row.default_partial_policy as CanaryPartialPolicy,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
@@ -77,5 +77,5 @@ export const canarySettingsQueries = {
     }
 
     return this.get();
-  }
+  },
 };

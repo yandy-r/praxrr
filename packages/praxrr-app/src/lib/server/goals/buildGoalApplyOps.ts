@@ -55,9 +55,9 @@ export async function buildGoalApplyOps(
       changedFields: op.changedFields,
       summary: op.summary,
       title: op.title,
-      ...(op.dependsOn ? { dependsOn: op.dependsOn } : {})
+      ...(op.dependsOn ? { dependsOn: op.dependsOn } : {}),
     },
-    desiredState: op.desiredState
+    desiredState: op.desiredState,
   }));
 
   if (plan.ladderInput !== null) {
@@ -67,7 +67,7 @@ export async function buildGoalApplyOps(
       layer,
       profileName,
       input: plan.ladderInput,
-      forbidRemovals: true
+      forbidRemovals: true,
     });
     if ('error' in ladderBuilt) {
       return { error: ladderBuilt.error };
@@ -82,9 +82,9 @@ export async function buildGoalApplyOps(
           stableKey: { key: 'quality_profile_name', value: profileName },
           changedFields: ladderBuilt.batched.changedFields,
           summary: 'Update quality profile qualities',
-          title: `Update qualities on quality profile "${profileName}"`
+          title: `Update qualities on quality profile "${profileName}"`,
         },
-        desiredState: ladderBuilt.batched.desiredState
+        desiredState: ladderBuilt.batched.desiredState,
       });
     }
   }

@@ -7,7 +7,12 @@
 
 import { error } from '@sveltejs/kit';
 import { pcdManager, type PCDCache } from '$pcd/index.ts';
-import { computeGoalPlan, resolvePreset, GOAL_RESOLUTION_CEILINGS, GoalLadderMappingError } from '$shared/goals/index.ts';
+import {
+  computeGoalPlan,
+  resolvePreset,
+  GOAL_RESOLUTION_CEILINGS,
+  GoalLadderMappingError,
+} from '$shared/goals/index.ts';
 import type { GoalArrType, GoalPlan, GoalResolutionCeiling, GoalWeights } from '$shared/goals/index.ts';
 import { qualities } from '$pcd/entities/qualityProfiles/qualities/index.ts';
 import { materializeCfFacts } from './materializeCfFacts.ts';

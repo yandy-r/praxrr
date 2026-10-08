@@ -1,9 +1,6 @@
 import { config } from '$config';
 import type { SessionRequestContext } from '$shared/security/types.ts';
-import {
-  resolveCookieSecure,
-  resolveSessionTransport
-} from '$lib/server/security/sessionTransport.ts';
+import { resolveCookieSecure, resolveSessionTransport } from '$lib/server/security/sessionTransport.ts';
 
 export const SESSION_COOKIE_HTTPONLY = true;
 export const SESSION_COOKIE_SAMESITE = 'lax' as const;
@@ -23,6 +20,6 @@ export function sessionCookieOptions(ctx: CookieRequestContext | undefined, expi
     httpOnly: SESSION_COOKIE_HTTPONLY,
     sameSite: SESSION_COOKIE_SAMESITE,
     secure,
-    expires
+    expires,
   };
 }

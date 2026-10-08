@@ -7,5 +7,13 @@
 export * from './types.ts';
 export { DEFAULT_CRITERIA, CRITERION_CATALOG } from './catalog.ts';
 export { ALL_CRITERIA } from './criteria.ts';
-export { bandFor, clamp0100, rollUp, HEALTHY_THRESHOLD, ATTENTION_THRESHOLD, type WeightedScore, type RollupResult } from './policy.ts';
+export {
+  bandFor,
+  clamp0100,
+  rollUp,
+  HEALTHY_THRESHOLD,
+  ATTENTION_THRESHOLD,
+  type WeightedScore,
+  type RollupResult,
+} from './policy.ts';
 export { computeHealthReport } from './engine.ts';

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { config } from '$config';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
-import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
+import type { AuthenticatorTransport } from '@simplewebauthn/server';
 import { resolveWebAuthnRp } from '$lib/server/webauthn/rp.ts';
 import { webauthnChallengesQueries } from '$db/queries/webauthnChallenges.ts';
 import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
@@ -52,7 +52,7 @@ export const POST: RequestHandler = async (event) => {
     attestationType: 'none',
     excludeCredentials: existing.map((c) => ({
       id: c.id,
-      transports: c.transports ? (JSON.parse(c.transports) as AuthenticatorTransportFuture[]) : undefined,
+      transports: c.transports ? (JSON.parse(c.transports) as AuthenticatorTransport[]) : undefined,
     })),
     authenticatorSelection: {
       residentKey: 'preferred',

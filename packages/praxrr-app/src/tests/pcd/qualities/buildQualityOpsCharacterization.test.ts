@@ -50,7 +50,7 @@ function createFixture(): Fixture {
     destroy: async () => {
       await kb.destroy();
       sqlite.close();
-    }
+    },
   };
 }
 
@@ -63,7 +63,7 @@ const CURRENT: OrderedItem[] = [
   q('Bluray-2160p', 1, false, false),
   q('Bluray-1080p', 2, true, true),
   q('Bluray-720p', 3, false, false),
-  q('DVD-R', 4, true, false)
+  q('DVD-R', 4, true, false),
 ];
 
 async function build(cache: PCDCache, input: UpdateQualitiesInput, forbidRemovals = false) {
@@ -82,8 +82,8 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
           q('Bluray-2160p', 1, false, false),
           q('Bluray-1080p', 2, true, false), // clear the old cutoff
           q('Bluray-720p', 3, true, true), // enable + set the new cutoff
-          q('DVD-R', 4, true, false)
-        ]
+          q('DVD-R', 4, true, false),
+        ],
       };
       const built = await build(cache, desired);
       assert(!('error' in built), 'expected ops');
@@ -92,7 +92,7 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
       const descriptions = built.ops.map((op) => op.description);
       assertEquals(descriptions, [
         'update-quality-profile-row-Primary-quality-Bluray-1080p',
-        'update-quality-profile-row-Primary-quality-Bluray-720p'
+        'update-quality-profile-row-Primary-quality-Bluray-720p',
       ]);
 
       const clearSql = built.ops[0].queries[0].sql;
@@ -114,8 +114,8 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
           q('Bluray-2160p', 1, false, false),
           q('Bluray-1080p', 2, true, false),
           q('Bluray-720p', 3, true, true),
-          q('DVD-R', 4, true, false)
-        ]
+          q('DVD-R', 4, true, false),
+        ],
       };
       const built = await build(cache, desired);
       assert(!('error' in built) && built.batched !== null);
@@ -140,8 +140,8 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
               q('Bluray-2160p', 1, false, true),
               q('Bluray-1080p', 2, true, true),
               q('Bluray-720p', 3, false, false),
-              q('DVD-R', 4, true, false)
-            ]
+              q('DVD-R', 4, true, false),
+            ],
           }),
         Error,
         'Only one quality can be marked as "upgrade until"'
@@ -155,8 +155,8 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
           q('Bluray-2160p', 1, true, false),
           q('Bluray-1080p', 2, true, true),
           q('Bluray-720p', 3, true, false),
-          q('DVD-R', 4, true, false) // preserved verbatim
-        ]
+          q('DVD-R', 4, true, false), // preserved verbatim
+        ],
       };
       const built = await build(cache, desired, true);
       assert(!('error' in built), 'expected ops, not an error');
@@ -171,9 +171,9 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
         orderedItems: [
           q('Bluray-2160p', 1, false, false),
           q('Bluray-1080p', 2, true, true),
-          q('Bluray-720p', 3, false, false)
+          q('Bluray-720p', 3, false, false),
           // DVD-R omitted → would be a removal
-        ]
+        ],
       };
       const built = await build(cache, desired, true);
       assert('error' in built, 'expected an error result');

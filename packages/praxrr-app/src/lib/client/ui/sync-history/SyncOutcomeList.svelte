@@ -22,7 +22,7 @@
     qualityProfiles: 'Quality Profiles',
     delayProfiles: 'Delay Profiles',
     mediaManagement: 'Media Management',
-    metadataProfiles: 'Metadata Profiles'
+    metadataProfiles: 'Metadata Profiles',
   };
 
   function groupBySection(input: SyncEntityOutcome[]): SectionGroup[] {
@@ -55,7 +55,9 @@
             <li
               class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
             >
-              <Badge variant={syncOutcomeVariant(outcome.status)}>{syncOutcomeLabel(outcome.action, outcome.status)}</Badge>
+              <Badge variant={syncOutcomeVariant(outcome.status)}
+                >{syncOutcomeLabel(outcome.action, outcome.status)}</Badge
+              >
               <span class="font-medium text-neutral-900 dark:text-neutral-100">{outcome.name}</span>
               <span class="text-xs text-neutral-500 dark:text-neutral-400">{outcome.entityType}</span>
               {#if outcome.remoteId}

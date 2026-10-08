@@ -3,7 +3,7 @@ import { readJsonObjectBody } from '$lib/server/goals/planRequest.ts';
 import {
   reconcileGoalApply,
   DEFAULT_RECONCILE_DEPENDENCIES,
-  type GoalReconcileDependencies
+  type GoalReconcileDependencies,
 } from '$lib/server/goals/reconcileGoalApply.ts';
 
 /**

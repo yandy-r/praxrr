@@ -104,8 +104,7 @@
       placeholder="Movie.2024.2160p.WEB-DL.DDP5.1.H.265-GROUP&#10;Movie.2024.1080p.BluRay.x264.DTS-GROUP&#10;Movie.2024.720p.WEBRip.x265-GROUP"
       value={rawText}
       on:input={handleInput}
-      on:keydown={handleKeydown}
-    ></textarea>
+      on:keydown={handleKeydown}></textarea>
   </div>
 
   {#if hasLongLines}
