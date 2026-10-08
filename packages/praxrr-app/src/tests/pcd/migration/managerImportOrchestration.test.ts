@@ -123,6 +123,8 @@ Deno.test('pcdManager: import orchestration surfaces import failures directly', 
     );
     restores.push(__testOnly_resetBuildImportCache);
     patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patch(pcdOpsQueries, 'listByDatabase', () => [], restores);
+    patch(pcdOpsQueries, 'restoreImportSnapshot', () => {}, restores);
     __testOnly_setWithRepoImportWriteContext(
       async (
         _context: {
@@ -195,6 +197,8 @@ Deno.test('pcdManager: successful migration import still continues orchestration
     );
     restores.push(__testOnly_resetBuildImportCache);
     patch(pcdOpsQueries, 'listByDatabaseAndOrigin', () => [], restores);
+    patch(pcdOpsQueries, 'listByDatabase', () => [], restores);
+    patch(pcdOpsQueries, 'restoreImportSnapshot', () => {}, restores);
     __testOnly_setWithRepoImportWriteContext(
       async (
         _context: {

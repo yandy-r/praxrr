@@ -513,7 +513,8 @@ class PCDManager {
     context: string,
     failOnError = true
   ): Promise<CacheBuildStats> {
-    if (!instance.enabled) {
+    // Re-read: a failed import rollback may have disabled the instance since `instance` was loaded.
+    if (!instance.enabled || !databaseInstancesQueries.getById(instance.id)?.enabled) {
       return {
         schema: 0,
         base: 0,

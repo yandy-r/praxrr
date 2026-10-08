@@ -1,5 +1,7 @@
 import { logger } from '$logger/logger.ts';
 import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
+import { withOpCreationRecorder, type CreatedOpRecord } from '$db/opCreationRecorder.ts';
+import { disableDatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import { PCDCache as PCDCacheImpl } from '../database/cache.ts';
 import { getRegisteredCache, withScopedCache } from '../database/registry.ts';
@@ -399,38 +401,31 @@ export function __testOnly_resetBuildImportCache(): void {
 }
 
 /**
- * Restore repo base ops to the pre-import snapshot after a failed import
- * (partial imports must never persist — YAN-466). Rows that existed before the
- * import get every field written back from the snapshot; rows created during
- * the failed run are orphaned (inert: only published/draft rows ever replay).
- * Deliberately does NOT compile: the registered cache was never swapped during
- * the import, so it still matches the restored rows exactly.
+ * Roll a failed import back (partial imports must never persist — YAN-466): every
+ * pre-import `pcd_ops` row of the database (both layers — the final compile's
+ * auto-override can mutate user ops) is restored column-for-column, and only the
+ * ops/history rows created inside the import's async context are deleted. If the
+ * restore itself fails the rows may be a hybrid, so the database is disabled (same
+ * signal as a failed cache build) and the original import error still surfaces.
  */
-function restoreBaseRepoOpsFromSnapshot(databaseId: number, snapshot: ReadonlyArray<PcdOp>): void {
-  const snapshotById = new Map(snapshot.map((op) => [op.id, op]));
-  const currentRepoOps = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base').filter((op) => op.source === 'repo');
-
-  for (const op of currentRepoOps) {
-    const prior = snapshotById.get(op.id);
-    if (prior) {
-      pcdOpsQueries.update(op.id, {
-        state: prior.state,
-        source: prior.source,
-        filename: prior.filename,
-        opNumber: prior.op_number,
-        sequence: prior.sequence,
-        sql: prior.sql,
-        metadata: prior.metadata,
-        desiredState: prior.desired_state,
-        contentHash: prior.content_hash,
-        lastSeenInRepoAt: prior.last_seen_in_repo_at,
-        supersededByOpId: prior.superseded_by_op_id,
-        pushedAt: prior.pushed_at,
-        pushedCommit: prior.pushed_commit,
-      });
-    } else {
-      pcdOpsQueries.update(op.id, { state: 'orphaned' });
+async function rollbackFailedImport(
+  databaseId: number,
+  snapshot: ReadonlyArray<PcdOp>,
+  created: CreatedOpRecord
+): Promise<void> {
+  try {
+    pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, created);
+  } catch (restoreError) {
+    let disabled = false;
+    try {
+      disabled = disableDatabaseInstance(databaseId);
+    } catch {
+      // Best effort: never let this replace the original import error.
     }
+    await logger.error('Failed to roll back base op import', {
+      source: 'PCDImporter',
+      meta: { databaseId, disabled, error: String(restoreError) },
+    });
   }
 }
 
@@ -459,86 +454,90 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
       }
     }
 
-    // Rollback snapshot: every repo-sourced base row, in every state. Rows stay
-    // published during the import — the writer rewrites them in place by
-    // filename, so nothing is orphaned before the single final compile.
-    const baseRepoSnapshot = pcdOpsQueries
-      .listByDatabaseAndOrigin(databaseId, 'base')
-      .filter((op) => op.source === 'repo');
+    // Rollback snapshot: every row of this database, both layers, every state.
+    // Rows stay published during the import — the writer rewrites them in place
+    // by filename, so nothing is orphaned before the single final compile.
+    const snapshot = pcdOpsQueries.listByDatabase(databaseId);
+    const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
 
     const importCache = await buildImportCacheForTests(pcdPath, databaseId, repoOpIdsToRefresh);
     const registeredCache = getRegisteredCacheForTests(databaseId);
 
     try {
       const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationCandidates);
-      await withScopedCache(databaseId, importCache, async () => {
-        for (let i = 0; i < sortedCandidates.length; i++) {
-          const candidate = sortedCandidates[i];
-          const cache = getCacheForTests(databaseId);
-          if (!cache) {
-            throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
-          }
-
-          // Refresh candidates (matching published repo ops) are rewritten in place
-          // and must never skip on the stale registered cache. New entities skip when
-          // the name already exists in the registered cache (covers user-created
-          // entities and base drafts) or in the import cache.
-          const isRefresh = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate).length > 0;
-          const presenceCache = isRefresh ? cache : (registeredCache ?? cache);
-          if (hasBaseEntityByStableIdentity(presenceCache, candidate.stableIdentity)) {
-            await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
-              source: 'PCDImporter',
-              meta: {
-                databaseId,
-                entityType: candidate.entityType,
-                stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
-              },
-            });
-            continue;
-          }
-
-          await withRepoImportWriteContextForTests(
-            {
-              filenamePrefix: `${ENTITY_OP_FILENAME_PREFIX}${candidate.relativePath}`,
-              sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
-              maxOperations: YAML_SEQUENCE_STRIDE,
-              lastSeenInRepoAt: seenAt,
-            },
-            async () => {
-              const result = await candidate.deserialize({
-                databaseId,
-                cache,
-                layer: 'base',
-                data: candidate.portable,
-              });
-
-              if (!isDeserializeResult(result)) {
-                throw new Error(
-                  `Failed to import migration entity "${candidate.relativePath}": invalid deserialize result`
-                );
-              }
-
-              if (result.success === false) {
-                const error = result.error ?? 'unknown write failure';
-                throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
-              }
+      // Record every op/history row this import's async context inserts (including
+      // the final compile's auto-override writes) so a failure deletes exactly those;
+      // pre-existing rows are covered by `snapshot`.
+      await withOpCreationRecorder(created, async () => {
+        await withScopedCache(databaseId, importCache, async () => {
+          for (let i = 0; i < sortedCandidates.length; i++) {
+            const candidate = sortedCandidates[i];
+            const cache = getCacheForTests(databaseId);
+            if (!cache) {
+              throw new Error(`Cache not available while importing migration entity "${candidate.relativePath}"`);
             }
-          );
 
-          imported += 1;
-        }
+            // Refresh candidates (matching published repo ops) are rewritten in place
+            // and must never skip on the stale registered cache. New entities skip when
+            // the name already exists in the registered cache (covers user-created
+            // entities and base drafts) or in the import cache.
+            const isRefresh = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate).length > 0;
+            const presenceCache = isRefresh ? cache : (registeredCache ?? cache);
+            if (hasBaseEntityByStableIdentity(presenceCache, candidate.stableIdentity)) {
+              await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
+                source: 'PCDImporter',
+                meta: {
+                  databaseId,
+                  entityType: candidate.entityType,
+                  stableIdentity: `${candidate.stableIdentity.key}=${candidate.stableIdentity.value}`,
+                },
+              });
+              continue;
+            }
+
+            await withRepoImportWriteContextForTests(
+              {
+                filenamePrefix: `${ENTITY_OP_FILENAME_PREFIX}${candidate.relativePath}`,
+                sequenceStart: YAML_SEQUENCE_BASE + i * YAML_SEQUENCE_STRIDE,
+                maxOperations: YAML_SEQUENCE_STRIDE,
+                lastSeenInRepoAt: seenAt,
+              },
+              async () => {
+                const result = await candidate.deserialize({
+                  databaseId,
+                  cache,
+                  layer: 'base',
+                  data: candidate.portable,
+                });
+
+                if (!isDeserializeResult(result)) {
+                  throw new Error(
+                    `Failed to import migration entity "${candidate.relativePath}": invalid deserialize result`
+                  );
+                }
+
+                if (result.success === false) {
+                  const error = result.error ?? 'unknown write failure';
+                  throw new Error(`Failed to import migration entity "${candidate.relativePath}": ${error}`);
+                }
+              }
+            );
+
+            imported += 1;
+          }
+        });
+
+        // Orphan repo base ops that no longer exist upstream BEFORE the final
+        // compile so the cache swap reflects removals immediately. Refresh ops
+        // rewritten above carry the new seenAt and stay published.
+        orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);
+
+        // Single full compile after the import completes: user ops are only ever
+        // evaluated against the complete refreshed base layer (YAN-461).
+        await compileForTests(pcdPath, databaseId);
       });
-
-      // Orphan repo base ops that no longer exist upstream BEFORE the final
-      // compile so the cache swap reflects removals immediately. Refresh ops
-      // rewritten above carry the new seenAt and stay published.
-      orphaned = pcdOpsQueries.markBaseOrphaned(databaseId, seenAt);
-
-      // Single full compile after the import completes: user ops are only ever
-      // evaluated against the complete refreshed base layer (YAN-461).
-      await compileForTests(pcdPath, databaseId);
     } catch (error) {
-      restoreBaseRepoOpsFromSnapshot(databaseId, baseRepoSnapshot);
+      await rollbackFailedImport(databaseId, snapshot, created);
       // If the final compile had already swapped the registered cache in (it can throw
       // after setCache, e.g. in auto-override resolution), the swap now diverges from
       // the restored rows. Invalidate so the next read rebuilds instead of serving a
