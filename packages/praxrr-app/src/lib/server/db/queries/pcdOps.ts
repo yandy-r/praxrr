@@ -1,5 +1,5 @@
 import { db } from '../db.ts';
-import { recordCreatedOpId, type CreatedOpRecord } from '../opCreationRecorder.ts';
+import { recordCreatedOpId, recordUpdatedOpIds, type CreatedOpRecord } from '../opCreationRecorder.ts';
 
 export type PcdOpOrigin = 'base' | 'user';
 export type PcdOpState = 'published' | 'draft' | 'superseded' | 'dropped' | 'orphaned';
@@ -225,6 +225,7 @@ export const pcdOpsQueries = {
     params.push(id);
 
     const affected = db.execute(`UPDATE pcd_ops SET ${updates.join(', ')} WHERE id = ?`, ...params);
+    if (affected > 0) recordUpdatedOpIds([id]);
     return affected > 0;
   },
 
@@ -234,29 +235,32 @@ export const pcdOpsQueries = {
    * sweepable and the `json_valid` guard keeps it from throwing.
    */
   markBaseOrphaned(databaseId: number, seenAt: string): number {
-    return db.execute(
+    const orphaned = db.query<{ id: number }>(
       `UPDATE pcd_ops
        SET state = 'orphaned', updated_at = CURRENT_TIMESTAMP
        WHERE database_id = ?
          AND origin = 'base'
          AND source = 'repo'
          AND (last_seen_in_repo_at IS NULL OR last_seen_in_repo_at < ?)
-         AND (CASE WHEN json_valid(metadata) THEN json_extract(metadata, ?) ELSE NULL END) IS NOT 1`,
+         AND (CASE WHEN json_valid(metadata) THEN json_extract(metadata, ?) ELSE NULL END) IS NOT 1
+       RETURNING id`,
       databaseId,
       seenAt,
       `$.${EXPORT_BATCH_METADATA_KEY}`
     );
+    recordUpdatedOpIds(orphaned.map((row) => row.id));
+    return orphaned.length;
   },
 
   /**
    * Roll back a failed import (YAN-463/YAN-466). Fully synchronous, one SAVEPOINT.
    *
-   * Guarantee: every pre-import row of `databaseId` in `snapshot` is restored column-for-column
-   * (including `updated_at`; `created_at` is never touched), and only the ops/history rows that
-   * were created inside the import's async context (recorded in `created`) are deleted.
-   * Unrelated concurrent inserts survive; concurrent updates to snapshot rows made while the
-   * import ran are reverted (per-PCD mutex follow-up: YAN-747). Throws (after rolling the
-   * savepoint back) if a snapshot row no longer exists. The caller must invalidate the PCD cache.
+   * Guarantee: every pre-import row the import's async context updated (`created.updatedOpIds`)
+   * is restored column-for-column from `snapshot` (including `updated_at`; `created_at` is never
+   * touched), and only the ops/history rows it created are deleted. Writes from other async
+   * contexts survive, except an update to a row the import also updated, which is reverted
+   * (per-PCD mutex follow-up: YAN-747). Throws (after rolling the savepoint back) if a row to
+   * restore no longer exists. The caller must invalidate the PCD cache.
    */
   restoreImportSnapshot(databaseId: number, snapshot: ReadonlyArray<PcdOp>, created: CreatedOpRecord): void {
     const opChunks = chunkIds(created.opIds);
@@ -274,9 +278,10 @@ export const pcdOpsQueries = {
            updated_at = ?
          WHERE id = ? AND database_id = ?`
       );
+      const touched = new Set(created.updatedOpIds);
       try {
         for (const row of snapshot) {
-          if (row.database_id !== databaseId) continue;
+          if (row.database_id !== databaseId || !touched.has(row.id)) continue;
           const restored = restoreRow.run(
             row.origin,
             row.state,

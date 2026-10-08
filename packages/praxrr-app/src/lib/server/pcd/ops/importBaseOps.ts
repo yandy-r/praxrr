@@ -458,7 +458,7 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
     // Rows stay published during the import — the writer rewrites them in place
     // by filename, so nothing is orphaned before the single final compile.
     const snapshot = pcdOpsQueries.listByDatabase(databaseId);
-    const created: CreatedOpRecord = { opIds: [], historyIds: [] };
+    const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
 
     const importCache = await buildImportCacheForTests(pcdPath, databaseId, repoOpIdsToRefresh);
     const registeredCache = getRegisteredCacheForTests(databaseId);

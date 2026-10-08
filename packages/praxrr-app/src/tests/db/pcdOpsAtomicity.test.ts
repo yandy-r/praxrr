@@ -65,12 +65,20 @@ migratedTest('restoreImportSnapshot restores pre-import rows exactly and deletes
     sequence: 2,
     sql: 'SELECT 2',
   });
+  const bystanderId = pcdOpsQueries.create({
+    databaseId,
+    origin: 'user',
+    state: 'published',
+    source: 'local',
+    sequence: 3,
+    sql: 'SELECT bystander',
+  });
   // Pin updated_at so a stamped CURRENT_TIMESTAMP would be detectable.
   db.execute("UPDATE pcd_ops SET updated_at = '2020-01-01 00:00:00' WHERE database_id = ?", databaseId);
   const preHistoryId = pcdOpHistoryQueries.create({ opId: baseId, databaseId, batchId: 'pre', status: 'applied' });
 
   const snapshot = pcdOpsQueries.listByDatabase(databaseId);
-  const created: CreatedOpRecord = { opIds: [], historyIds: [] };
+  const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
 
   const { createdId, createdHistoryId, survivingHistoryId } = await withOpCreationRecorder(created, async () => {
     await Promise.resolve();
@@ -101,13 +109,19 @@ migratedTest('restoreImportSnapshot restores pre-import rows exactly and deletes
     supersededByOpId: createdId,
   });
 
+  // Unrelated concurrent update (outside the recorder) to a row the import never touched.
+  pcdOpsQueries.update(bystanderId, { state: 'dropped' });
+
   assert(created.opIds.includes(createdId));
   assert(created.historyIds.includes(createdHistoryId) && created.historyIds.includes(survivingHistoryId));
   assert(!created.opIds.includes(unrelatedId));
+  assertEquals([...new Set(created.updatedOpIds)].sort(), [baseId, userId].sort());
 
   pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, created);
 
-  for (const row of snapshot) assertEquals(pcdOpsQueries.getById(row.id), row);
+  for (const row of snapshot.filter((r) => r.id !== bystanderId)) assertEquals(pcdOpsQueries.getById(row.id), row);
+  // Concurrent update to an untouched row survives the rollback (YAN-747 scope narrowed).
+  assertEquals(pcdOpsQueries.getById(bystanderId)?.state, 'dropped');
   assertEquals(pcdOpsQueries.getById(createdId), undefined);
   assertEquals(pcdOpHistoryQueries.listByOp(createdId), []);
   assertEquals(
@@ -122,7 +136,7 @@ migratedTest('restoreImportSnapshot restores pre-import rows exactly and deletes
 migratedTest('restoreImportSnapshot deletes >600 chained created ops within SQLite variable limits', async () => {
   const databaseId = createTestDatabase();
   const snapshot = pcdOpsQueries.listByDatabase(databaseId);
-  const created: CreatedOpRecord = { opIds: [], historyIds: [] };
+  const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
 
   await withOpCreationRecorder(created, async () => {
     let previous: number | undefined;
@@ -156,7 +170,11 @@ migratedTest('restoreImportSnapshot throws and rolls back when a snapshot row va
 
   let threw = false;
   try {
-    pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, { opIds: [], historyIds: [] });
+    pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, {
+      opIds: [],
+      historyIds: [],
+      updatedOpIds: [keptId, goneId],
+    });
   } catch {
     threw = true;
   }
@@ -173,7 +191,7 @@ migratedTest('restoreImportSnapshot never deletes ids belonging to another datab
   const snapshot = pcdOpsQueries.listByDatabase(dbA);
 
   // Foreign-db id in the record must not be deleted (database_id guard).
-  pcdOpsQueries.restoreImportSnapshot(dbA, snapshot, { opIds: [bId], historyIds: [] });
+  pcdOpsQueries.restoreImportSnapshot(dbA, snapshot, { opIds: [bId], historyIds: [], updatedOpIds: [] });
 
   assertEquals(pcdOpsQueries.getById(aId), snapshot[0]);
   assertExists(pcdOpsQueries.getById(bId));
