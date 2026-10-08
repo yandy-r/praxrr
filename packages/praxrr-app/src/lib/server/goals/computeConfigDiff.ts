@@ -36,6 +36,6 @@ export function computeGoalConfigDiff(
   return withSandboxCache(databaseId, edits, async (sandboxCache, report) => ({
     configDiff: await buildQualityProfileConfigDiff(cache, sandboxCache, arrType, [profileName]),
     appliedChanges: report.appliedChanges,
-    skippedChanges: report.skippedChanges
+    skippedChanges: report.skippedChanges,
   }));
 }

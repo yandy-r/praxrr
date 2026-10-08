@@ -15,7 +15,7 @@ export const DEFAULT_CRITERIA: readonly CriterionConfig[] = [
   { id: 'drift', enabled: true, weight: 30 },
   { id: 'coherence', enabled: true, weight: 20 },
   { id: 'compatibility', enabled: true, weight: 20 },
-  { id: 'trash_alignment', enabled: false, weight: 0 }
+  { id: 'trash_alignment', enabled: false, weight: 0 },
 ] as const;
 
 /** Human-facing catalog (id/label/description), served by the settings endpoint. */
@@ -23,27 +23,28 @@ export const CRITERION_CATALOG: readonly CriterionMeta[] = [
   {
     id: 'completeness',
     label: 'Completeness',
-    description: 'How much of the recommended custom-format set is assigned, plus upgrade-cutoff and enabled-quality coverage.'
+    description:
+      'How much of the recommended custom-format set is assigned, plus upgrade-cutoff and enabled-quality coverage.',
   },
   {
     id: 'drift',
     label: 'Drift',
-    description: 'Whether the live Arr configuration still matches the desired state, using drift detection results.'
+    description: 'Whether the live Arr configuration still matches the desired state, using drift detection results.',
   },
   {
     id: 'coherence',
     label: 'Coherence',
-    description: "Internal consistency of each quality profile's score thresholds and custom-format scores."
+    description: "Internal consistency of each quality profile's score thresholds and custom-format scores.",
   },
   {
     id: 'compatibility',
     label: 'Compatibility',
-    description: 'Whether quality profiles and the detected app version are compatible with this Arr type.'
+    description: 'Whether quality profiles and the detected app version are compatible with this Arr type.',
   },
   {
     id: 'trash_alignment',
     label: 'TRaSH Alignment',
     description:
-      'Instance-level overlap between the custom formats you opted into from a linked TRaSH source and those actually assigned across your quality profiles. Optional and disabled by default.'
-  }
+      'Instance-level overlap between the custom formats you opted into from a linked TRaSH source and those actually assigned across your quality profiles. Optional and disabled by default.',
+  },
 ] as const;

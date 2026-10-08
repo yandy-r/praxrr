@@ -4,7 +4,12 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { configHealthSnapshotsQueries } from '$db/queries/configHealthSnapshots.ts';
-import { CONFIG_HEALTH_ENGINE_VERSION, type HealthArrType, type HealthBand, type HealthReport } from '$shared/health/index.ts';
+import {
+  CONFIG_HEALTH_ENGINE_VERSION,
+  type HealthArrType,
+  type HealthBand,
+  type HealthReport,
+} from '$shared/health/index.ts';
 import { recomputeAndPersistInstance } from '$lib/server/health/recompute.ts';
 import {
   CONFIG_HEALTH_RECOMPUTE_RATE_LIMIT_MAX_REQUESTS,
@@ -82,16 +87,19 @@ migratedTest('recomputeAndPersistInstance: ok persists exactly one snapshot and 
   assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
 });
 
-migratedTest('recomputeAndPersistInstance: a degraded (unknown-band) report is still ok and persisted, not an error', async () => {
-  const id = seedInstance('sonarr');
-  const instance = arrInstancesQueries.getById(id)!;
-  const degraded = makeReport(id, 'sonarr', 0, 'unknown');
+migratedTest(
+  'recomputeAndPersistInstance: a degraded (unknown-band) report is still ok and persisted, not an error',
+  async () => {
+    const id = seedInstance('sonarr');
+    const instance = arrInstancesQueries.getById(id)!;
+    const degraded = makeReport(id, 'sonarr', 0, 'unknown');
 
-  const outcome = await recomputeAndPersistInstance(instance, { scoreInstance: () => Promise.resolve(degraded) });
+    const outcome = await recomputeAndPersistInstance(instance, { scoreInstance: () => Promise.resolve(degraded) });
 
-  assertEquals(outcome.kind, 'ok');
-  assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
-});
+    assertEquals(outcome.kind, 'ok');
+    assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
+  }
+);
 
 migratedTest('recomputeAndPersistInstance: skipped persists nothing when the scorer yields null', async () => {
   const id = seedInstance('radarr');
@@ -115,32 +123,35 @@ migratedTest('recomputeAndPersistInstance: never throws and returns error when s
   assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 0);
 });
 
-migratedTest('recomputeAndPersistInstance: a concurrent recompute for the same instance returns in_flight', async () => {
-  const id = seedInstance('radarr');
-  const instance = arrInstancesQueries.getById(id)!;
-  const report = makeReport(id, 'radarr', 70, 'attention');
+migratedTest(
+  'recomputeAndPersistInstance: a concurrent recompute for the same instance returns in_flight',
+  async () => {
+    const id = seedInstance('radarr');
+    const instance = arrInstancesQueries.getById(id)!;
+    const report = makeReport(id, 'radarr', 70, 'attention');
 
-  let release: () => void = () => {};
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const gatedScorer = async () => {
-    await gate;
-    return report;
-  };
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const gatedScorer = async () => {
+      await gate;
+      return report;
+    };
 
-  // The first call registers the instance in the in-flight set synchronously (before awaiting the
-  // gate), so a second call while it is pending is rejected as in_flight.
-  const first = recomputeAndPersistInstance(instance, { scoreInstance: gatedScorer });
-  const second = await recomputeAndPersistInstance(instance, { scoreInstance: gatedScorer });
-  assertEquals(second.kind, 'in_flight');
+    // The first call registers the instance in the in-flight set synchronously (before awaiting the
+    // gate), so a second call while it is pending is rejected as in_flight.
+    const first = recomputeAndPersistInstance(instance, { scoreInstance: gatedScorer });
+    const second = await recomputeAndPersistInstance(instance, { scoreInstance: gatedScorer });
+    assertEquals(second.kind, 'in_flight');
 
-  release();
-  const firstOutcome = await first;
-  assertEquals(firstOutcome.kind, 'ok');
-  // Only the first (non-skipped) recompute persisted a point.
-  assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
-});
+    release();
+    const firstOutcome = await first;
+    assertEquals(firstOutcome.kind, 'ok');
+    // Only the first (non-skipped) recompute persisted a point.
+    assertEquals(configHealthSnapshotsQueries.getTrend(id).length, 1);
+  }
+);
 
 // ============================================================================
 // registerConfigHealthRecomputeAttempt -- per-instance sliding-window limiter

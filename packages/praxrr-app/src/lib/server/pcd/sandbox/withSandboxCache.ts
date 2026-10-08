@@ -140,7 +140,7 @@ export async function withSandboxCache<T>(
           layer: 'user',
           profileName,
           input: edit.ladderInput,
-          forbidRemovals: true
+          forbidRemovals: true,
         });
         if ('error' in ladderBuilt) {
           failReason = ladderBuilt.error;

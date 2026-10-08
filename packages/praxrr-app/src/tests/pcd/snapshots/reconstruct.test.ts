@@ -90,7 +90,15 @@ migratedTest('verifySnapshot fails when a manifest op no longer exists', async (
 
 migratedTest('verifySnapshot: NULL content_hash op verifies true (fallback hash reproduced)', async () => {
   const dbId = createTestDatabase();
-  insertOp({ id: 1, databaseId: dbId, origin: 'base', state: 'published', contentHash: null, sql: 'SEED', metadata: null });
+  insertOp({
+    id: 1,
+    databaseId: dbId,
+    origin: 'base',
+    state: 'published',
+    contentHash: null,
+    sql: 'SEED',
+    metadata: null,
+  });
   insertOp({ id: 2, databaseId: dbId, origin: 'user', state: 'published', contentHash: 'c2' });
   const snapshot = await captureSnapshot(dbId);
 

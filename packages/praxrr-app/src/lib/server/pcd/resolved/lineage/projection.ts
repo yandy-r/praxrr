@@ -151,7 +151,7 @@ function collectConditionTypeData(
     });
   }
   if (cond.languages) {
-    cond.languages.forEach((lang, i) => {
+    cond.languages.forEach((_lang, i) => {
       const itemBase = indexPath(dot(base, 'languages'), i);
       c.scalar(dot(itemBase, 'name'), 'condition_languages', condRow, 'language_name');
       c.scalar(dot(itemBase, 'except'), 'condition_languages', condRow, 'except_language');

@@ -124,5 +124,5 @@ export const qualityGoalApplyJournalQueries = {
   /** Fetch a single attempt by id, or `undefined` if unknown. */
   getById(id: number): QualityGoalApplyJournalRow | undefined {
     return db.queryFirst<QualityGoalApplyJournalRow>('SELECT * FROM quality_goal_apply_journal WHERE id = ?', id);
-  }
+  },
 };

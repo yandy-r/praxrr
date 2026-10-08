@@ -73,7 +73,7 @@ function cloneItem(item: OrderedItem): OrderedItem {
     name: item.name,
     position: item.position,
     enabled: item.enabled,
-    upgradeUntil: item.upgradeUntil
+    upgradeUntil: item.upgradeUntil,
   };
   if (item.type === 'group') {
     cloned.members = getMembers(item).map((name) => ({ name }));
@@ -115,7 +115,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND enabled = ${item.enabled ? 1 : 0}
   AND upgrade_until = ${item.upgradeUntil ? 1 : 0}`,
       parameters: [],
-      query: {} as never
+      query: {} as never,
     });
     return queries;
   }
@@ -129,7 +129,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND enabled = ${item.enabled ? 1 : 0}
   AND upgrade_until = ${item.upgradeUntil ? 1 : 0}`,
     parameters: [],
-    query: {} as never
+    query: {} as never,
   });
 
   for (const member of getMembers(item)) {
@@ -139,7 +139,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND quality_group_name = '${esc(item.name)}'
   AND quality_name = '${esc(member)}'`,
       parameters: [],
-      query: {} as never
+      query: {} as never,
     });
   }
 
@@ -148,7 +148,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
 WHERE quality_profile_name = '${esc(profileName)}'
   AND name = '${esc(item.name)}'`,
     parameters: [],
-    query: {} as never
+    query: {} as never,
   });
 
   return queries;
@@ -169,7 +169,7 @@ WHERE NOT EXISTS (
     AND name = '${esc(item.name)}'
 )`,
       parameters: [],
-      query: {} as never
+      query: {} as never,
     });
 
     for (const member of getMembers(item)) {
@@ -183,7 +183,7 @@ WHERE NOT EXISTS (
     AND quality_name = '${esc(member)}'
 )`,
         parameters: [],
-        query: {} as never
+        query: {} as never,
       });
     }
 
@@ -197,7 +197,7 @@ WHERE NOT EXISTS (
     AND quality_group_name = '${esc(item.name)}'
 )`,
       parameters: [],
-      query: {} as never
+      query: {} as never,
     });
 
     return queries;
@@ -213,7 +213,7 @@ WHERE NOT EXISTS (
     AND quality_group_name IS NULL
 )`,
     parameters: [],
-    query: {} as never
+    query: {} as never,
   });
 
   return queries;
@@ -245,7 +245,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND enabled = ${current.enabled ? 1 : 0}
   AND upgrade_until = ${current.upgradeUntil ? 1 : 0}`,
         parameters: [],
-        query: {} as never
+        query: {} as never,
       });
     } else {
       queries.push({
@@ -258,7 +258,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND enabled = ${current.enabled ? 1 : 0}
   AND upgrade_until = ${current.upgradeUntil ? 1 : 0}`,
         parameters: [],
-        query: {} as never
+        query: {} as never,
       });
     }
   }
@@ -276,7 +276,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND quality_group_name = '${esc(current.name)}'
   AND quality_name = '${esc(member)}'`,
         parameters: [],
-        query: {} as never
+        query: {} as never,
       });
     }
 
@@ -291,7 +291,7 @@ WHERE NOT EXISTS (
     AND quality_name = '${esc(member)}'
 )`,
         parameters: [],
-        query: {} as never
+        query: {} as never,
       });
     }
   }
@@ -310,8 +310,8 @@ function rowDesiredState(
       mode,
       key,
       from: fromItem ? [cloneItem(fromItem)] : [],
-      to: toItem ? [cloneItem(toItem)] : []
-    }
+      to: toItem ? [cloneItem(toItem)] : [],
+    },
   };
 }
 
@@ -322,7 +322,9 @@ function rowDesiredState(
  * `{ error }` when `forbidRemovals` is set and the desired list would drop a current row. Returns
  * `batched: null` when there is nothing to change.
  */
-export async function buildQualityLadderOps(options: BuildQualityLadderOptions): Promise<BuiltQualityLadder | { error: string }> {
+export async function buildQualityLadderOps(
+  options: BuildQualityLadderOptions
+): Promise<BuiltQualityLadder | { error: string }> {
   const { databaseId, cache, profileName, input, forbidRemovals } = options;
 
   const upgradeUntilCount = input.orderedItems.filter((item) => item.upgradeUntil).length;
@@ -348,7 +350,7 @@ export async function buildQualityLadderOps(options: BuildQualityLadderOptions):
 
   if (forbidRemovals && removedItems.length > 0) {
     return {
-      error: `Quality ladder for "${profileName}" would remove ${removedItems.length} row(s); goal ladders must preserve every existing quality row.`
+      error: `Quality ladder for "${profileName}" would remove ${removedItems.length} row(s); goal ladders must preserve every existing quality row.`,
     };
   }
 
@@ -361,7 +363,7 @@ export async function buildQualityLadderOps(options: BuildQualityLadderOptions):
       desiredState: rowDesiredState('remove', rowKey(item), item, null),
       changedFields: [rowFieldKey(item)],
       summary: 'Remove quality profile quality row',
-      title: `Remove ${item.type} "${item.name}" from quality profile "${profileName}"`
+      title: `Remove ${item.type} "${item.name}" from quality profile "${profileName}"`,
     });
   }
 
@@ -372,7 +374,7 @@ export async function buildQualityLadderOps(options: BuildQualityLadderOptions):
       desiredState: rowDesiredState('add', rowKey(item), null, item),
       changedFields: [rowFieldKey(item)],
       summary: 'Add quality profile quality row',
-      title: `Add ${item.type} "${item.name}" to quality profile "${profileName}"`
+      title: `Add ${item.type} "${item.name}" to quality profile "${profileName}"`,
     });
   }
 
@@ -394,7 +396,7 @@ export async function buildQualityLadderOps(options: BuildQualityLadderOptions):
       desiredState: rowDesiredState('update', rowKey(change.next), change.current, change.next),
       changedFields: [rowFieldKey(change.next)],
       summary: 'Update quality profile quality row',
-      title: `Update ${change.next.type} "${change.next.name}" on quality profile "${profileName}"`
+      title: `Update ${change.next.type} "${change.next.name}" on quality profile "${profileName}"`,
     });
   }
 
@@ -410,9 +412,9 @@ export async function buildQualityLadderOps(options: BuildQualityLadderOptions):
     desiredState: {
       ordered_items: {
         from: currentData.orderedItems.map(cloneItem),
-        to: input.orderedItems.map(cloneItem)
-      }
-    }
+        to: input.orderedItems.map(cloneItem),
+      },
+    },
   };
 
   return { ops, batched };

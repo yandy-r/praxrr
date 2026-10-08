@@ -28,6 +28,6 @@ export const POST: RequestHandler = async ({ request }) => {
     plan: toWirePlan(plan),
     configDiff,
     appliedChanges,
-    skippedChanges
+    skippedChanges,
   } satisfies GoalPreviewResponse);
 };

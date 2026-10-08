@@ -38,8 +38,8 @@ export async function updateQualities(options: UpdateQualitiesOptions) {
     source: 'QualityProfile',
     meta: {
       profileName,
-      rowOps: built.ops.length
-    }
+      rowOps: built.ops.length,
+    },
   });
 
   return writeOperation({
@@ -55,7 +55,7 @@ export async function updateQualities(options: UpdateQualitiesOptions) {
       stableKey: { key: 'quality_profile_name', value: profileName },
       changedFields: built.batched.changedFields,
       summary: 'Update quality profile qualities',
-      title: `Update qualities on quality profile "${profileName}"`
-    }
+      title: `Update qualities on quality profile "${profileName}"`,
+    },
   });
 }

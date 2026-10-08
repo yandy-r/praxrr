@@ -36,7 +36,10 @@
         alertStore.add('error', 'Passkey login failed');
       }
     } catch (e) {
-      alertStore.add('error', e instanceof WebAuthnError ? e.message : e instanceof Error ? e.message : 'Passkey login failed');
+      alertStore.add(
+        'error',
+        e instanceof WebAuthnError ? e.message : e instanceof Error ? e.message : 'Passkey login failed'
+      );
     }
   }
 </script>

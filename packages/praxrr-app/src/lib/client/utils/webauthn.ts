@@ -1,5 +1,10 @@
 import { browser } from '$app/environment';
-import { startRegistration, startAuthentication, browserSupportsWebAuthn, WebAuthnError } from '@simplewebauthn/browser';
+import {
+  startRegistration,
+  startAuthentication,
+  browserSupportsWebAuthn,
+  WebAuthnError,
+} from '@simplewebauthn/browser';
 
 /**
  * Client-safe view of a registered passkey (mirrors the server WebAuthnCredentialSummary).

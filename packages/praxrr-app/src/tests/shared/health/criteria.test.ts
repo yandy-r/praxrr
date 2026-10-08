@@ -257,7 +257,9 @@ Deno.test('trash_alignment: a recommended CF assigned with score===null is repor
   assert(r.suggestions[0].headline.startsWith('TRaSH alignment:'));
   assert(r.suggestions[0].detail.includes('CF-B'));
   assert(
-    r.suggestions[0].detail.includes('Assign these custom formats in a quality profile to align with your linked TRaSH guide.')
+    r.suggestions[0].detail.includes(
+      'Assign these custom formats in a quality profile to align with your linked TRaSH guide.'
+    )
   );
   assertEquals(r.suggestions[0].tone, 'info');
 });

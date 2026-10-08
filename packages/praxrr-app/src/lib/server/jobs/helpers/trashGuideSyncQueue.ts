@@ -3,11 +3,7 @@ import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { coerceTrashGuideSourceArrType } from '$shared/trashguide/types.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
-import type {
-  TrashGuideSyncJobPayload,
-  TrashGuideSyncRunEvidence,
-  TrashGuideSyncStatusView
-} from '../queueTypes.ts';
+import type { TrashGuideSyncJobPayload, TrashGuideSyncRunEvidence, TrashGuideSyncStatusView } from '../queueTypes.ts';
 
 const TRASHGUIDE_SYNC_DEDUPE_KEY_PREFIX = 'trashguide.sync:';
 
@@ -83,7 +79,7 @@ export function getTrashGuideSyncStatus(sourceId: number): TrashGuideSyncStatusV
           runAt: slot.runAt,
           startedAt: slot.startedAt,
           attempts: slot.attempts,
-          runToken: readRunToken(slot.payload) ?? null
+          runToken: readRunToken(slot.payload) ?? null,
         }
       : null,
     latestRun: latest
@@ -93,9 +89,9 @@ export function getTrashGuideSyncStatus(sourceId: number): TrashGuideSyncStatusV
           startedAt: latest.startedAt,
           finishedAt: latest.finishedAt,
           durationMs: latest.durationMs,
-          evidence
+          evidence,
         }
-      : null
+      : null,
   };
 }
 
@@ -124,12 +120,11 @@ export function enqueueTrashGuideSourceSync(input: {
     return {
       status: 'already_running',
       runToken: readRunToken(existing.payload) ?? '',
-      view: getTrashGuideSyncStatus(sourceId)
+      view: getTrashGuideSyncStatus(sourceId),
     };
   }
 
-  const runToken =
-    (existing?.status === 'queued' ? readRunToken(existing.payload) : undefined) ?? crypto.randomUUID();
+  const runToken = (existing?.status === 'queued' ? readRunToken(existing.payload) : undefined) ?? crypto.randomUUID();
 
   const source = trashGuideSourcesQueries.getById(sourceId);
   const sourceName = source?.name;
@@ -143,7 +138,7 @@ export function enqueueTrashGuideSourceSync(input: {
     requestedAt,
     runToken,
     ...(sourceName !== undefined ? { sourceName } : {}),
-    ...(sourceArrType !== undefined ? { sourceArrType } : {})
+    ...(sourceArrType !== undefined ? { sourceArrType } : {}),
   };
 
   const job = jobQueueQueries.upsertScheduled({
@@ -151,7 +146,7 @@ export function enqueueTrashGuideSourceSync(input: {
     runAt,
     payload,
     source: trigger === 'manual' ? 'manual' : 'schedule',
-    dedupeKey
+    dedupeKey,
   });
 
   // The slot may have started running between the read and the upsert; treat that as already-running.
@@ -159,7 +154,7 @@ export function enqueueTrashGuideSourceSync(input: {
     return {
       status: 'already_running',
       runToken: readRunToken(job.payload) ?? runToken,
-      view: getTrashGuideSyncStatus(sourceId)
+      view: getTrashGuideSyncStatus(sourceId),
     };
   }
 

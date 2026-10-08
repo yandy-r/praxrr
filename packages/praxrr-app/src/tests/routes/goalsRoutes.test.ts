@@ -992,7 +992,8 @@ Deno.test('goals binding: empty or missing databaseId query param -> 400 (not a 
 Deno.test('goals reconcile: re-drives the recorded intent and logs once when residual ops persist (#236)', async () => {
   const logs: ApplyLogCall[] = [];
   const response = await reconcileRoute._handleGoalReconcileRequest(
-    postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' }).request,
+    postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' })
+      .request,
     buildReconcileDependencies(logs)
   );
   assertEquals(response.status, 200);
@@ -1004,20 +1005,24 @@ Deno.test('goals reconcile: re-drives the recorded intent and logs once when res
   assertEquals(logs.length, 1);
 });
 
-Deno.test('goals reconcile: a no-op (live already matches intent) does not log and reports alreadyApplied (#236)', async () => {
-  const logs: ApplyLogCall[] = [];
-  const response = await reconcileRoute._handleGoalReconcileRequest(
-    postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' }).request,
-    // No residual ops (live already matches) → persistGoalApply returns success with no filepath.
-    buildReconcileDependencies(logs, { persistGoalApply: () => Promise.resolve({ success: true }) })
-  );
-  assertEquals(response.status, 200);
-  const body = (await response.json()) as components['schemas']['GoalReconcileResponse'];
-  assertEquals(body.reconciled, false);
-  assertEquals(body.alreadyApplied, true);
-  assertEquals(body.applyStatus.scoringChanged, false);
-  assertEquals(logs, []);
-});
+Deno.test(
+  'goals reconcile: a no-op (live already matches intent) does not log and reports alreadyApplied (#236)',
+  async () => {
+    const logs: ApplyLogCall[] = [];
+    const response = await reconcileRoute._handleGoalReconcileRequest(
+      postEvent({ databaseId: DATABASE_ID, arrType: 'radarr', profileName: 'Movies', expectedEngineVersion: '2' })
+        .request,
+      // No residual ops (live already matches) → persistGoalApply returns success with no filepath.
+      buildReconcileDependencies(logs, { persistGoalApply: () => Promise.resolve({ success: true }) })
+    );
+    assertEquals(response.status, 200);
+    const body = (await response.json()) as components['schemas']['GoalReconcileResponse'];
+    assertEquals(body.reconciled, false);
+    assertEquals(body.alreadyApplied, true);
+    assertEquals(body.applyStatus.scoringChanged, false);
+    assertEquals(logs, []);
+  }
+);
 
 Deno.test('goals reconcile: 404 when nothing has ever been applied to the profile (#236)', async () => {
   const logs: ApplyLogCall[] = [];

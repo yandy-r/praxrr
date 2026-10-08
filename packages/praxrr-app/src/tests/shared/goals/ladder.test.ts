@@ -40,7 +40,7 @@ const RADARR_FACTS: Record<string, number> = {
   TELESYNC: 0,
   TELECINE: 0,
   DVDSCR: 480,
-  REGIONAL: 480
+  REGIONAL: 480,
 };
 
 const SONARR_FACTS: Record<string, number> = {
@@ -65,7 +65,7 @@ const SONARR_FACTS: Record<string, number> = {
   'WEBDL-2160p': 2160,
   'WEBRip-2160p': 2160,
   'Bluray-2160p': 2160,
-  'Remux-2160p': 2160
+  'Remux-2160p': 2160,
 };
 
 function factsFrom(map: Record<string, number>): GoalQualityFact[] {
@@ -79,7 +79,7 @@ function ladderFrom(map: Record<string, number>): OrderedItem[] {
     name,
     position: index + 1,
     enabled: false,
-    upgradeUntil: false
+    upgradeUntil: false,
   }));
 }
 
@@ -89,15 +89,114 @@ function enabledQualityNames(ladder: OrderedItem[]): Set<string> {
 
 const EXPECTED: Record<'radarr' | 'sonarr', Record<GoalResolutionCeiling, string[]>> = {
   radarr: {
-    '720p': ['SDTV', 'DVD', 'DVD-R', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p'],
-    '1080p': ['SDTV', 'DVD', 'DVD-R', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p', 'HDTV-1080p', 'WEBDL-1080p', 'WEBRip-1080p', 'Bluray-1080p', 'Remux-1080p'],
-    '2160p': ['SDTV', 'DVD', 'DVD-R', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p', 'HDTV-1080p', 'WEBDL-1080p', 'WEBRip-1080p', 'Bluray-1080p', 'Remux-1080p', 'HDTV-2160p', 'WEBDL-2160p', 'WEBRip-2160p', 'Bluray-2160p', 'Remux-2160p']
+    '720p': [
+      'SDTV',
+      'DVD',
+      'DVD-R',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+    ],
+    '1080p': [
+      'SDTV',
+      'DVD',
+      'DVD-R',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+      'HDTV-1080p',
+      'WEBDL-1080p',
+      'WEBRip-1080p',
+      'Bluray-1080p',
+      'Remux-1080p',
+    ],
+    '2160p': [
+      'SDTV',
+      'DVD',
+      'DVD-R',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+      'HDTV-1080p',
+      'WEBDL-1080p',
+      'WEBRip-1080p',
+      'Bluray-1080p',
+      'Remux-1080p',
+      'HDTV-2160p',
+      'WEBDL-2160p',
+      'WEBRip-2160p',
+      'Bluray-2160p',
+      'Remux-2160p',
+    ],
   },
   sonarr: {
-    '720p': ['SDTV', 'DVD', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p'],
-    '1080p': ['SDTV', 'DVD', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p', 'HDTV-1080p', 'WEBDL-1080p', 'WEBRip-1080p', 'Bluray-1080p', 'Remux-1080p'],
-    '2160p': ['SDTV', 'DVD', 'WEBDL-480p', 'WEBRip-480p', 'Bluray-480p', 'Bluray-576p', 'HDTV-720p', 'WEBDL-720p', 'WEBRip-720p', 'Bluray-720p', 'HDTV-1080p', 'WEBDL-1080p', 'WEBRip-1080p', 'Bluray-1080p', 'Remux-1080p', 'HDTV-2160p', 'WEBDL-2160p', 'WEBRip-2160p', 'Bluray-2160p', 'Remux-2160p']
-  }
+    '720p': [
+      'SDTV',
+      'DVD',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+    ],
+    '1080p': [
+      'SDTV',
+      'DVD',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+      'HDTV-1080p',
+      'WEBDL-1080p',
+      'WEBRip-1080p',
+      'Bluray-1080p',
+      'Remux-1080p',
+    ],
+    '2160p': [
+      'SDTV',
+      'DVD',
+      'WEBDL-480p',
+      'WEBRip-480p',
+      'Bluray-480p',
+      'Bluray-576p',
+      'HDTV-720p',
+      'WEBDL-720p',
+      'WEBRip-720p',
+      'Bluray-720p',
+      'HDTV-1080p',
+      'WEBDL-1080p',
+      'WEBRip-1080p',
+      'Bluray-1080p',
+      'Remux-1080p',
+      'HDTV-2160p',
+      'WEBDL-2160p',
+      'WEBRip-2160p',
+      'Bluray-2160p',
+      'Remux-2160p',
+    ],
+  },
 };
 
 const CEILINGS: GoalResolutionCeiling[] = ['720p', '1080p', '2160p'];
@@ -128,28 +227,41 @@ Deno.test('ladder: junk qualities are never enabled and are preserved verbatim',
   const { ladderInput } = buildCeilingLadder('2160p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), false);
   assert(ladderInput !== null);
   const enabled = enabledQualityNames(ladderInput.orderedItems);
-  for (const junk of ['Unknown', 'CAM', 'WORKPRINT', 'TELESYNC', 'TELECINE', 'DVDSCR', 'REGIONAL', 'BR-DISK', 'Raw-HD']) {
+  for (const junk of [
+    'Unknown',
+    'CAM',
+    'WORKPRINT',
+    'TELESYNC',
+    'TELECINE',
+    'DVDSCR',
+    'REGIONAL',
+    'BR-DISK',
+    'Raw-HD',
+  ]) {
     assert(!enabled.has(junk), `${junk} must not be enabled by a ceiling`);
   }
 });
 
-Deno.test('ladder: unmapped-for-arr qualities are left unchanged (no removals) — Sonarr goal keeps Radarr-only rows', () => {
-  // A shared ladder populated with Radarr-only qualities; apply a Sonarr goal.
-  const ladder = ladderFrom(RADARR_FACTS).map((item) =>
-    // seed DVD-R as currently enabled to prove verbatim preservation
-    item.name === 'DVD-R' ? { ...item, enabled: true } : item
-  );
-  const { ladderInput } = buildCeilingLadder('1080p', ladder, factsFrom(SONARR_FACTS), false);
-  assert(ladderInput !== null);
+Deno.test(
+  'ladder: unmapped-for-arr qualities are left unchanged (no removals) — Sonarr goal keeps Radarr-only rows',
+  () => {
+    // A shared ladder populated with Radarr-only qualities; apply a Sonarr goal.
+    const ladder = ladderFrom(RADARR_FACTS).map((item) =>
+      // seed DVD-R as currently enabled to prove verbatim preservation
+      item.name === 'DVD-R' ? { ...item, enabled: true } : item
+    );
+    const { ladderInput } = buildCeilingLadder('1080p', ladder, factsFrom(SONARR_FACTS), false);
+    assert(ladderInput !== null);
 
-  // Radarr-only rows are unmapped for Sonarr → preserved with their original enabled state, never dropped.
-  const byName = new Map(ladderInput.orderedItems.map((item) => [item.name, item]));
-  for (const radarrOnly of ['DVD-R', 'DVDSCR', 'REGIONAL', 'WORKPRINT', 'CAM', 'TELESYNC', 'TELECINE', 'BR-DISK']) {
-    assert(byName.has(radarrOnly), `${radarrOnly} row must be preserved`);
+    // Radarr-only rows are unmapped for Sonarr → preserved with their original enabled state, never dropped.
+    const byName = new Map(ladderInput.orderedItems.map((item) => [item.name, item]));
+    for (const radarrOnly of ['DVD-R', 'DVDSCR', 'REGIONAL', 'WORKPRINT', 'CAM', 'TELESYNC', 'TELECINE', 'BR-DISK']) {
+      assert(byName.has(radarrOnly), `${radarrOnly} row must be preserved`);
+    }
+    assertEquals(byName.get('DVD-R')!.enabled, true, 'Radarr-only DVD-R keeps its enabled state under a Sonarr goal');
+    assertEquals(ladderInput.orderedItems.length, ladder.length, 'zero removals');
   }
-  assertEquals(byName.get('DVD-R')!.enabled, true, 'Radarr-only DVD-R keeps its enabled state under a Sonarr goal');
-  assertEquals(ladderInput.orderedItems.length, ladder.length, 'zero removals');
-});
+);
 
 /** The exact default profile groups from create.ts (individual Remux-1080p/Bluray-1080p, three groups). */
 function defaultProfileLadder(): OrderedItem[] {
@@ -158,7 +270,7 @@ function defaultProfileLadder(): OrderedItem[] {
     name,
     position,
     enabled,
-    upgradeUntil
+    upgradeUntil,
   });
   const group = (name: string, members: string[], position: number): OrderedItem => ({
     type: 'group',
@@ -166,7 +278,7 @@ function defaultProfileLadder(): OrderedItem[] {
     position,
     enabled: false,
     upgradeUntil: false,
-    members: members.map((m) => ({ name: m }))
+    members: members.map((m) => ({ name: m })),
   });
   return [
     individual('Remux-2160p', 1),
@@ -191,7 +303,7 @@ function defaultProfileLadder(): OrderedItem[] {
     individual('DVD', 20),
     individual('SDTV', 21),
     group('Pre-releases', ['REGIONAL', 'DVDSCR', 'TELECINE', 'TELESYNC', 'CAM', 'WORKPRINT'], 22),
-    group('Unwanted', ['Unknown', 'Raw-HD', 'BR-DISK'], 23)
+    group('Unwanted', ['Unknown', 'Raw-HD', 'BR-DISK'], 23),
   ];
 }
 
@@ -225,7 +337,7 @@ Deno.test('ladder: no Bluray-<ceiling> cutoff row present → ladderInput null (
   // Ladder with only 2160p qualities; a 720p ceiling has no Bluray-720p row → no derivable ladder.
   const ladder: OrderedItem[] = [
     { type: 'quality', name: 'Bluray-2160p', position: 1, enabled: true, upgradeUntil: true },
-    { type: 'quality', name: 'WEBDL-2160p', position: 2, enabled: true, upgradeUntil: false }
+    { type: 'quality', name: 'WEBDL-2160p', position: 2, enabled: true, upgradeUntil: false },
   ];
   const facts = factsFrom({ 'Bluray-2160p': 2160, 'WEBDL-2160p': 2160 });
   const { ladderInput, ladder: result } = buildCeilingLadder('720p', ladder, facts, false);
@@ -242,45 +354,51 @@ Deno.test('ladder: straddling group throws GoalLadderMappingError (genuine ambig
       position: 2,
       enabled: false,
       upgradeUntil: false,
-      members: [{ name: 'Bluray-1080p' }, { name: 'Bluray-2160p' }]
-    }
+      members: [{ name: 'Bluray-1080p' }, { name: 'Bluray-2160p' }],
+    },
   ];
   const facts = factsFrom({ 'Bluray-1080p': 1080, 'Bluray-2160p': 2160 });
   assertThrows(() => buildCeilingLadder('1080p', ladder, facts, false), GoalLadderMappingError);
 });
 
-Deno.test('ladder: lidarr audio (resolution-0) profiles never derive a ladder — no cutoff, groups stay disabled (#222 integration)', () => {
-  // Every QUALITIES.lidarr entry has resolution 0 (audio has no video resolution). The ceiling must
-  // stay fully inert: no Bluray-<ceiling> cutoff row can exist, the resolution-0 floor keeps standalone
-  // AND grouped audio disabled, and no group can straddle (max resolution is always 0).
-  const audioFacts = factsFrom({ FLAC: 0, 'MP3-320': 0, 'AAC-256': 0 });
-  const audioLadder: OrderedItem[] = [
-    { type: 'quality', name: 'FLAC', position: 1, enabled: true, upgradeUntil: true },
-    { type: 'quality', name: 'MP3-320', position: 2, enabled: true, upgradeUntil: false },
-    {
-      type: 'group',
-      name: 'Lossy',
-      position: 3,
-      enabled: true,
-      upgradeUntil: false,
-      members: [{ name: 'AAC-256' }]
+Deno.test(
+  'ladder: lidarr audio (resolution-0) profiles never derive a ladder — no cutoff, groups stay disabled (#222 integration)',
+  () => {
+    // Every QUALITIES.lidarr entry has resolution 0 (audio has no video resolution). The ceiling must
+    // stay fully inert: no Bluray-<ceiling> cutoff row can exist, the resolution-0 floor keeps standalone
+    // AND grouped audio disabled, and no group can straddle (max resolution is always 0).
+    const audioFacts = factsFrom({ FLAC: 0, 'MP3-320': 0, 'AAC-256': 0 });
+    const audioLadder: OrderedItem[] = [
+      { type: 'quality', name: 'FLAC', position: 1, enabled: true, upgradeUntil: true },
+      { type: 'quality', name: 'MP3-320', position: 2, enabled: true, upgradeUntil: false },
+      {
+        type: 'group',
+        name: 'Lossy',
+        position: 3,
+        enabled: true,
+        upgradeUntil: false,
+        members: [{ name: 'AAC-256' }],
+      },
+    ];
+    for (const ceiling of CEILINGS) {
+      const { ladderInput, ladder } = buildCeilingLadder(ceiling, audioLadder, audioFacts, false);
+      assertEquals(ladderInput, null, `lidarr @${ceiling} must produce no ladder change`);
+      assertEquals(ladder.cutoff, null);
+      // The audio group's resolution-0 member must NOT enable it, even though 0 <= ceiling numerically.
+      const group = ladder.items.find((item) => item.name === 'Lossy');
+      assertEquals(group?.enabled, false, 'resolution-0 group is not enabled by a ceiling');
     }
-  ];
-  for (const ceiling of CEILINGS) {
-    const { ladderInput, ladder } = buildCeilingLadder(ceiling, audioLadder, audioFacts, false);
-    assertEquals(ladderInput, null, `lidarr @${ceiling} must produce no ladder change`);
-    assertEquals(ladder.cutoff, null);
-    // The audio group's resolution-0 member must NOT enable it, even though 0 <= ceiling numerically.
-    const group = ladder.items.find((item) => item.name === 'Lossy');
-    assertEquals(group?.enabled, false, 'resolution-0 group is not enabled by a ceiling');
   }
-});
+);
 
-Deno.test('ladder: sharedLadderNote is set only when a change is produced and the profile is sibling-compatible', () => {
-  const withSibling = buildCeilingLadder('1080p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), true);
-  assert(withSibling.ladder.sharedLadderNote !== null);
-  assertEquals(withSibling.ladder.reshapesSiblingArrs, true);
+Deno.test(
+  'ladder: sharedLadderNote is set only when a change is produced and the profile is sibling-compatible',
+  () => {
+    const withSibling = buildCeilingLadder('1080p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), true);
+    assert(withSibling.ladder.sharedLadderNote !== null);
+    assertEquals(withSibling.ladder.reshapesSiblingArrs, true);
 
-  const withoutSibling = buildCeilingLadder('1080p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), false);
-  assertEquals(withoutSibling.ladder.sharedLadderNote, null);
-});
+    const withoutSibling = buildCeilingLadder('1080p', ladderFrom(RADARR_FACTS), factsFrom(RADARR_FACTS), false);
+    assertEquals(withoutSibling.ladder.sharedLadderNote, null);
+  }
+);

@@ -1,11 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { abortRollout } from '$sync/canary/coordinator.ts';
-import {
-  isCanaryNotFoundError,
-  isCanaryStaleTokenError,
-  isCanaryStateError,
-} from '$sync/canary/errors.ts';
+import { isCanaryNotFoundError, isCanaryStaleTokenError, isCanaryStateError } from '$sync/canary/errors.ts';
 import { logger } from '$logger/logger.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;

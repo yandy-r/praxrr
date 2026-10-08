@@ -18,7 +18,7 @@ import {
   type HealthReport,
   type HealthScope,
   type ProfileHealth,
-  type ScoredUnit
+  type ScoredUnit,
 } from './types.ts';
 
 /** Severity ranking used to order suggestions (most severe first). */
@@ -70,7 +70,10 @@ export function computeHealthReport(inputs: HealthInputs): HealthReport {
   const overall = scoreScope(inputs, { kind: 'instance' });
 
   const names = [...new Set(inputs.profiles.map((p) => p.name))].sort((a, b) => a.localeCompare(b));
-  const profiles: ProfileHealth[] = names.map((name) => ({ name, ...scoreScope(inputs, { kind: 'profile', profileName: name }) }));
+  const profiles: ProfileHealth[] = names.map((name) => ({
+    name,
+    ...scoreScope(inputs, { kind: 'profile', profileName: name }),
+  }));
 
   return {
     engineVersion: CONFIG_HEALTH_ENGINE_VERSION,
@@ -79,6 +82,6 @@ export function computeHealthReport(inputs: HealthInputs): HealthReport {
     arrType: inputs.arrType,
     generatedAt: inputs.nowIso,
     overall,
-    profiles
+    profiles,
   };
 }

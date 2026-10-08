@@ -55,7 +55,7 @@ export const DEFAULT_RECONCILE_DEPENDENCIES: GoalReconcileDependencies = {
   insertPendingJournal: (input) => qualityGoalApplyJournalQueries.insertPending(input),
   markJournalSucceeded: (id, scoringPersisted) => qualityGoalApplyJournalQueries.markSucceeded(id, scoringPersisted),
   markJournalFailed: (id, input) => qualityGoalApplyJournalQueries.markFailed(id, input),
-  logInfo: (message, options) => logger.info(message, options)
+  logInfo: (message, options) => logger.info(message, options),
 };
 
 function parseReconcileRequest(body: Record<string, unknown>): GoalReconcileRequestInput {
@@ -81,7 +81,7 @@ function parseReconcileRequest(body: Record<string, unknown>): GoalReconcileRequ
     databaseId: body.databaseId,
     arrType: body.arrType,
     profileName: body.profileName,
-    expectedEngineVersion: body.expectedEngineVersion
+    expectedEngineVersion: body.expectedEngineVersion,
   };
 }
 
@@ -120,7 +120,7 @@ export async function reconcileGoalApply(
     arrType: request.arrType,
     profileName: request.profileName,
     presetId: recorded.preset_id,
-    weights: JSON.parse(recorded.weights_json) as GoalWeights
+    weights: JSON.parse(recorded.weights_json) as GoalWeights,
   };
 
   const { cache, plan } = await deps.buildGoalPlan(goalRequest);
@@ -143,7 +143,7 @@ export async function reconcileGoalApply(
     engineVersion: GOALS_ENGINE_VERSION,
     intentFingerprint,
     origin: 'reconcile',
-    startedAt
+    startedAt,
   });
 
   let scoringResult;
@@ -153,7 +153,7 @@ export async function reconcileGoalApply(
       cache,
       layer: 'user',
       profileName: request.profileName,
-      plan
+      plan,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -165,7 +165,7 @@ export async function reconcileGoalApply(
         scoringChanged: true,
         failureStage: 'scoring',
         intentFingerprint,
-        startedAt
+        startedAt,
       }),
       { status: 500 }
     );
@@ -182,7 +182,7 @@ export async function reconcileGoalApply(
         scoringChanged: false,
         failureStage: 'scoring',
         intentFingerprint,
-        startedAt
+        startedAt,
       }),
       { status: isGuardConflict ? 409 : 500 }
     );
@@ -200,7 +200,7 @@ export async function reconcileGoalApply(
       presetId: goalRequest.presetId,
       weightsJson: JSON.stringify(goalRequest.weights),
       engineVersion: GOALS_ENGINE_VERSION,
-      appliedAt: new Date().toISOString()
+      appliedAt: new Date().toISOString(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -208,7 +208,7 @@ export async function reconcileGoalApply(
       failureStage: 'binding',
       failureReason: message,
       scoringPersisted: opsPersisted ? 1 : 0,
-      bindingPersisted: 0
+      bindingPersisted: 0,
     });
     return json(
       buildApplyFailure({
@@ -217,7 +217,7 @@ export async function reconcileGoalApply(
         scoringChanged: opsPersisted,
         failureStage: 'binding',
         intentFingerprint,
-        startedAt
+        startedAt,
       }),
       { status: 500 }
     );
@@ -233,8 +233,8 @@ export async function reconcileGoalApply(
         databaseId: request.databaseId,
         profileName: request.profileName,
         presetId: goalRequest.presetId,
-        plan
-      })
+        plan,
+      }),
     });
   }
 
@@ -247,7 +247,7 @@ export async function reconcileGoalApply(
     failureReason: null,
     intentFingerprint,
     startedAt,
-    settledAt: new Date().toISOString()
+    settledAt: new Date().toISOString(),
   });
 
   return json({
@@ -257,6 +257,6 @@ export async function reconcileGoalApply(
     applyId: reconcileId,
     applyStatus,
     reconciled: opsPersisted,
-    alreadyApplied: !opsPersisted
+    alreadyApplied: !opsPersisted,
   } satisfies GoalReconcileResponse);
 }

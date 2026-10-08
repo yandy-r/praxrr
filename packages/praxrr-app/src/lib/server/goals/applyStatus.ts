@@ -17,7 +17,7 @@ type GoalRecoveryAction = components['schemas']['GoalRecoveryAction'];
 /** The safe recovery action for a failed/pending apply: re-drive the recorded intent idempotently. */
 export const RECONCILE_RECOVERY: GoalRecoveryAction = {
   action: 'reconcile',
-  endpoint: '/api/v1/goals/reconcile'
+  endpoint: '/api/v1/goals/reconcile',
 };
 
 /** No recovery needed — the apply reached its confirmed terminal state. */
@@ -54,7 +54,7 @@ export function buildApplyStatus(fields: ApplyStatusFields): GoalApplyStatus {
     intentFingerprint: fields.intentFingerprint,
     startedAt: fields.startedAt,
     settledAt: fields.settledAt,
-    recovery: fields.status === 'succeeded' ? NONE_RECOVERY : RECONCILE_RECOVERY
+    recovery: fields.status === 'succeeded' ? NONE_RECOVERY : RECONCILE_RECOVERY,
   };
 }
 
@@ -81,8 +81,8 @@ export function buildApplyFailure(fields: ApplyFailureFields): GoalApplyFailure 
       failureReason: fields.message,
       intentFingerprint: fields.intentFingerprint,
       startedAt: fields.startedAt,
-      settledAt: new Date().toISOString()
-    })
+      settledAt: new Date().toISOString(),
+    }),
   };
 }
 
@@ -97,6 +97,6 @@ export function mapJournalRowToApplyStatus(row: QualityGoalApplyJournalRow): Goa
     failureReason: row.failure_reason,
     intentFingerprint: row.intent_fingerprint,
     startedAt: row.started_at,
-    settledAt: row.settled_at
+    settledAt: row.settled_at,
   });
 }

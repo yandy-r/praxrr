@@ -22,6 +22,6 @@ export function toWireBinding(row: QualityGoalBindingRow): WireGoalBinding {
     presetId: row.preset_id,
     weights: JSON.parse(row.weights_json) as GoalWeights,
     engineVersion: row.engine_version,
-    appliedAt: row.applied_at
+    appliedAt: row.applied_at,
   };
 }

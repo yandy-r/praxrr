@@ -221,7 +221,8 @@
     <section class="space-y-3">
       <div class="space-y-1">
         <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-          Confirmed outcomes <span class="text-neutral-500 dark:text-neutral-400">({detail.entityOutcomes.length})</span>
+          Confirmed outcomes <span class="text-neutral-500 dark:text-neutral-400">({detail.entityOutcomes.length})</span
+          >
         </h2>
         <p class="text-xs text-neutral-500 dark:text-neutral-400">
           Per-entity results captured from the actual Arr writes — distinct from the planned changes below.

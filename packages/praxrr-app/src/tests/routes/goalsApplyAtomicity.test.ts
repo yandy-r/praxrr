@@ -78,7 +78,7 @@ const BEST_QUALITY_WEIGHTS = {
   compatibility: 30,
   hdrPreference: 70,
   unwantedStrictness: 85,
-  resolutionCeiling: '2160p'
+  resolutionCeiling: '2160p',
 };
 
 type Restore = () => void;
@@ -101,7 +101,7 @@ function applyPayload(databaseId: number): Record<string, unknown> {
     profileName: PROFILE_NAME,
     preset: 'best-quality',
     weights: BEST_QUALITY_WEIGHTS,
-    expectedEngineVersion: '2'
+    expectedEngineVersion: '2',
   };
 }
 
@@ -110,7 +110,7 @@ function reconcilePayload(databaseId: number): Record<string, unknown> {
     databaseId,
     arrType: ARR_TYPE,
     profileName: PROFILE_NAME,
-    expectedEngineVersion: '2'
+    expectedEngineVersion: '2',
   };
 }
 
@@ -118,7 +118,7 @@ function postRequest(payload: Record<string, unknown>): Request {
   return new Request('http://localhost/api/v1/goals', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 }
 
@@ -150,12 +150,9 @@ async function readCacheScores(databaseId: number): Promise<ScoreRow[]> {
     .map((row) => ({
       custom_format_name: row.custom_format_name,
       arr_type: row.arr_type,
-      score: Number(row.score)
+      score: Number(row.score),
     }))
-    .sort(
-      (a, b) =>
-        a.custom_format_name.localeCompare(b.custom_format_name) || a.arr_type.localeCompare(b.arr_type)
-    );
+    .sort((a, b) => a.custom_format_name.localeCompare(b.custom_format_name) || a.arr_type.localeCompare(b.arr_type));
 }
 
 /** Patch `logger.info` to record every 'Quality goal applied' decision-log emission (pass-through). */
@@ -201,7 +198,7 @@ async function withApplyFixture(fn: (ctx: ApplyFixtureContext) => Promise<void>)
       uuid: crypto.randomUUID(),
       name: 'Goals Apply Atomicity DB',
       repositoryUrl: 'https://example.invalid/repo.git',
-      localPath: pcdPath
+      localPath: pcdPath,
     });
 
     // Seed the profile/CFs/qualities as a published BASE op so `compile` rebuilds them into the cache.
@@ -210,7 +207,7 @@ async function withApplyFixture(fn: (ctx: ApplyFixtureContext) => Promise<void>)
       origin: 'base',
       state: 'published',
       source: 'repo',
-      sql: SEED_SQL
+      sql: SEED_SQL,
     });
     await compile(pcdPath, databaseId);
 

@@ -126,7 +126,8 @@ export function buildJobDisplayName(
 
     // Resolve identity live first, then fall back to the durable payload snapshot (#238) so a
     // since-deleted source still shows a name rather than a bare id.
-    const snapshotName = typeof payload.sourceName === 'string' && payload.sourceName !== '' ? payload.sourceName : null;
+    const snapshotName =
+      typeof payload.sourceName === 'string' && payload.sourceName !== '' ? payload.sourceName : null;
     const name = trashGuideSourcesQueries.getById(sourceId)?.name ?? snapshotName ?? `#${sourceId}`;
     return `${base} - ${name}`;
   }
