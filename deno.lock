@@ -51,6 +51,7 @@
     "npm:typescript-eslint@^8.44.1": "8.63.0_eslint@9.39.4_typescript@5.9.3_@typescript-eslint+parser@8.63.0__eslint@9.39.4__typescript@5.9.3",
     "npm:typescript@^5.9.2": "5.9.3",
     "npm:vite@^7.1.7": "7.3.6_@types+node@22.20.1_yaml@2.9.0_picomatch@4.0.5",
+    "npm:xss@1.0.15": "1.0.15",
     "npm:yaml@^2.8.2": "2.9.0"
   },
   "jsr": {
@@ -1334,6 +1335,9 @@
     "commander@15.0.0": {
       "integrity": "sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg=="
     },
+    "commander@2.20.3": {
+      "integrity": "sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ=="
+    },
     "commander@8.3.0": {
       "integrity": "sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww=="
     },
@@ -1357,6 +1361,9 @@
     "cssesc@3.0.0": {
       "integrity": "sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==",
       "bin": true
+    },
+    "cssfilter@0.0.10": {
+      "integrity": "sha512-FAaLDaplstoRsDR8XGYH51znUN0UY7nMc6Z9/fvE8EXGwvJE9hu7W2vHwx1+bd6gCYnln9nLbzxFTrcO9YQDZw=="
     },
     "debug@4.4.3": {
       "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
@@ -2826,6 +2833,14 @@
     "wrappy@1.0.2": {
       "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="
     },
+    "xss@1.0.15": {
+      "integrity": "sha512-FVdlVVC67WOIPvfOwhoMETV72f6GbW7aOabBC3WxN/oUdoEMDyLz4OgRv5/gck2ZeNqEQu+Tb0kloovXOfpYVg==",
+      "dependencies": [
+        "commander@2.20.3",
+        "cssfilter"
+      ],
+      "bin": true
+    },
     "yaml-ast-parser@0.0.43": {
       "integrity": "sha512-2PTINUwsRqSd+s8XxKaJWQlUuEMHJQyEuh2edBbW8KNJz0SJPwUSD2zRWqezFEdN7IzAgeuYHFUCF7o8zRdZ0A=="
     },
@@ -2856,7 +2871,8 @@
       "npm:croner@^9.1.0",
       "npm:highlight.js@^11.11.1",
       "npm:marked@^15.0.6",
-      "npm:simple-icons@^15.17.0"
+      "npm:simple-icons@^15.17.0",
+      "npm:xss@1.0.15"
     ],
     "packageJson": {
       "dependencies": [
@@ -2897,6 +2913,7 @@
         "npm:typescript-eslint@^8.44.1",
         "npm:typescript@^5.9.2",
         "npm:vite@^7.1.7",
+        "npm:xss@1.0.15",
         "npm:yaml@^2.8.2"
       ]
     }

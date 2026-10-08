@@ -11,6 +11,7 @@
   import Table from '$ui/table/Table.svelte';
   import type { Column } from '$ui/table/types';
   import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
+  import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
   import { Tag, CheckCircle2, CalendarClock, Plus, Copy, Download } from 'lucide-svelte';
@@ -82,7 +83,7 @@
       align: 'left',
       sortable: true,
       cell: (row: LidarrMetadataProfileListItem) => ({
-        html: `<div class="font-medium text-neutral-900 dark:text-neutral-100">${row.name}</div>`,
+        html: `<div class="font-medium text-neutral-900 dark:text-neutral-100">${escapeHtml(row.name)}</div>`,
       }),
     },
     {
@@ -90,7 +91,9 @@
       header: 'Description',
       align: 'left',
       cell: (row: LidarrMetadataProfileListItem) => ({
-        html: row.description ? String(row.description) : '<span class="text-neutral-400">No description</span>',
+        html: row.description
+          ? escapeHtml(String(row.description))
+          : '<span class="text-neutral-400">No description</span>',
       }),
     },
     {
@@ -126,7 +129,7 @@
       align: 'left',
       width: 'w-40',
       cell: (row: LidarrMetadataProfileListItem) => ({
-        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${row.updated_at || 'Never'}</span>`,
+        html: `<span class="text-xs text-neutral-500 dark:text-neutral-400">${escapeHtml(row.updated_at || 'Never')}</span>`,
       }),
     },
   ];

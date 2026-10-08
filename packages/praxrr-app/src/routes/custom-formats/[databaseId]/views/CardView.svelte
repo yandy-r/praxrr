@@ -3,7 +3,7 @@
   import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
   import { FlaskConical, Copy, Download } from 'lucide-svelte';
-  import { marked } from 'marked';
+  import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { sortConditions } from '$shared/pcd/conditions';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
@@ -68,11 +68,6 @@
     reset();
   }
   $: visibleFormats = formats.slice(0, $visibleCount);
-
-  function parseMarkdown(text: string | null): string {
-    if (!text) return '';
-    return marked.parseInline(text) as string;
-  }
 
   function getConditionVariant(
     condition: CustomFormatTableRow['conditions'][number]
@@ -192,7 +187,8 @@
         <!-- Description -->
         {#if format.description}
           <div class="prose-inline line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
-            {@html parseMarkdown(format.description)}
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
+            {@html parseMarkdownInline(format.description)}
           </div>
         {:else}
           <div class="text-xs text-neutral-400 italic dark:text-neutral-500">No description</div>

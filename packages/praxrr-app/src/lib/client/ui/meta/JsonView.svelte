@@ -30,9 +30,11 @@
 
 <div class="json-view space-y-4">
   <!-- JSON metadata -->
+  <!-- eslint-disable svelte/no-at-html-tags -- highlight.js output escapes source text -->
   <pre class="!m-0 !bg-transparent !p-0 font-mono whitespace-pre-wrap"><code class="hljs font-mono"
       >{@html highlightedJson}</code
     ></pre>
+  <!-- eslint-enable svelte/no-at-html-tags -->
 
   <!-- SQL Queries -->
   {#if queries.length > 0}
@@ -43,9 +45,11 @@
       <div class="space-y-2">
         {#each queries as query, i}
           <div class="rounded border border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-600 dark:bg-neutral-900">
+            <!-- eslint-disable svelte/no-at-html-tags -- highlight.js output escapes source text -->
             <pre class="!m-0 !bg-transparent !p-0 font-mono text-xs whitespace-pre-wrap"><code class="hljs font-mono"
                 >{@html highlightSql(query)}</code
               ></pre>
+            <!-- eslint-enable svelte/no-at-html-tags -->
           </div>
         {/each}
       </div>

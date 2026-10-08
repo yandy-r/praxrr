@@ -189,6 +189,7 @@
                 {#if typeof rendered === 'string'}
                   {rendered}
                 {:else if typeof rendered === 'object' && 'html' in rendered}
+                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- column cell html: producers must escapeHtml or use $shared/markdown -->
                   {@html rendered.html}
                 {:else}
                   <svelte:component this={rendered} {row} />
@@ -218,6 +219,7 @@
                       {#if typeof rendered === 'string'}
                         {rendered}
                       {:else if typeof rendered === 'object' && 'html' in rendered}
+                        <!-- eslint-disable-next-line svelte/no-at-html-tags -- column cell html: producers must escapeHtml or use $shared/markdown -->
                         {@html rendered.html}
                       {:else}
                         <svelte:component this={rendered} {row} />
@@ -340,6 +342,7 @@
                     {#if typeof rendered === 'string'}
                       {rendered}
                     {:else if typeof rendered === 'object' && 'html' in rendered}
+                      <!-- eslint-disable-next-line svelte/no-at-html-tags -- column cell html: producers must escapeHtml or use $shared/markdown -->
                       {@html rendered.html}
                     {:else}
                       <svelte:component this={rendered} {row} />

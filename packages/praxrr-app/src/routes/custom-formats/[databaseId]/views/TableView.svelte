@@ -8,7 +8,7 @@
   import type { SourceRef } from '$shared/sources/types.ts';
   import { getArrAppMetadata, type ArrAppType, type ArrConditionTargetType } from '$shared/arr/capabilities.ts';
   import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
-  import { marked } from 'marked';
+  import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { sortConditions } from '$shared/pcd/conditions';
 
   export let formats: CustomFormatTableRow[];
@@ -90,11 +90,6 @@
       .replace(/'/g, '&#039;');
   }
 
-  function parseMarkdown(text: string | null): string {
-    if (!text) return '';
-    return marked.parseInline(text) as string;
-  }
-
   function getArrTargetBadgeHtml(target: ArrConditionTargetType): string {
     if (target === 'all') {
       return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">All Apps</span>';
@@ -150,7 +145,7 @@
       align: 'left',
       cell: (row: CustomFormatTableRow) => ({
         html: row.description
-          ? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdown(row.description)}</span>`
+          ? `<span class="text-sm text-neutral-600 dark:text-neutral-400 prose-inline">${parseMarkdownInline(row.description)}</span>`
           : `<span class="text-neutral-400">-</span>`,
       }),
     },

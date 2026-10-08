@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { marked } from 'marked';
+  import { parseMarkdown, parseMarkdownInline } from '$shared/markdown/markdown.ts';
 
   export let content: string | null = null;
   export let inline: boolean = true;
   export let maxLines: number | undefined = undefined;
 
-  $: html = content ? (inline ? (marked.parseInline(content) as string) : (marked.parse(content) as string)) : '';
+  $: html = inline ? parseMarkdownInline(content) : parseMarkdown(content);
 </script>
 
 {#if html}
@@ -15,6 +15,7 @@
       ? `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${maxLines}; overflow: hidden;`
       : ''}
   >
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
     {@html html}
   </span>
 {/if}

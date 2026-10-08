@@ -9,6 +9,8 @@
   import { ARR_APP_TYPES, getArrAppMetadata } from '$shared/arr/capabilities.ts';
   import { Tag, FileText, Layers, BookOpenText, Gauge, Earth, Database, Copy, Download } from 'lucide-svelte';
   import { page } from '$app/stores';
+  import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
+  import { sanitizeHtml } from '$shared/markdown/markdown.ts';
 
   export let profiles: QualityProfileTableRow[];
   export let availableSources: SourceRef[] = [];
@@ -104,7 +106,7 @@
       cell: (row: QualityProfileTableRow) => ({
         html: `
 					<div>
-						<div class="font-medium">${row.name}</div>
+						<div class="font-medium">${escapeHtml(row.name)}</div>
 						${
               row.tags.length > 0
                 ? `
@@ -113,7 +115,7 @@
                   .map(
                     (tag) => `
 									<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-accent-100 text-accent-800 dark:bg-accent-900 dark:text-accent-200">
-										${tag.name}
+										${escapeHtml(tag.name)}
 									</span>
 								`
                   )
@@ -132,7 +134,7 @@
       headerIcon: FileText,
       align: 'left',
       cell: (row: QualityProfileTableRow) => ({
-        html: row.description || '<span class="text-neutral-400">No description</span>',
+        html: row.description ? sanitizeHtml(row.description) : '<span class="text-neutral-400">No description</span>',
       }),
     },
     {
@@ -148,7 +150,7 @@
 							${row.qualities
                 .map(
                   (q) => `
-								<span class="${q.is_upgrade_until ? qualitySuccess : qualitySecondary}">${q.name}</span>
+								<span class="${q.is_upgrade_until ? qualitySuccess : qualitySecondary}">${escapeHtml(q.name)}</span>
 							`
                 )
                 .join('')}
@@ -212,7 +214,7 @@
       width: 'w-40',
       cell: (row: QualityProfileTableRow) => {
         return {
-          html: `<span class="${labelSecondaryNoMono}">${row.language ? (row.language.name === 'Original' ? 'Any' : row.language.name) : 'Any'}</span>`,
+          html: `<span class="${labelSecondaryNoMono}">${row.language ? (row.language.name === 'Original' ? 'Any' : escapeHtml(row.language.name)) : 'Any'}</span>`,
         };
       },
     },

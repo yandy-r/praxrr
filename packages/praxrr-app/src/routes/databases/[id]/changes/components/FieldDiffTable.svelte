@@ -1,7 +1,7 @@
 <script lang="ts">
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
-  import { marked } from 'marked';
+  import { parseMarkdown } from '$shared/markdown/markdown.ts';
   import { ExternalLink } from 'lucide-svelte';
   import { getColonReplacementLabel, getMultiEpisodeStyleLabel } from '$shared/pcd/mediaManagement.ts';
   import type { Column } from '$ui/table/types';
@@ -11,10 +11,6 @@
   export let operation: OperationType = 'update';
 
   $: columns = getColumns(operation);
-
-  function parseMarkdown(text: string): string {
-    return marked.parse(text) as string;
-  }
 
   function isMarkdownField(field: string): boolean {
     return ['description', 'readme', 'notes'].includes(field);
@@ -191,6 +187,7 @@
         </Badge>
       {:else if isMarkdownField(row.field) && typeof beforeValue === 'string'}
         <div class="prose prose-sm prose-neutral dark:prose-invert text-sm">
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
           {@html parseMarkdown(beforeValue)}
         </div>
       {:else if typeof beforeValue === 'number'}
@@ -245,6 +242,7 @@
         </Badge>
       {:else if isMarkdownField(row.field) && typeof afterValue === 'string'}
         <div class="prose prose-sm prose-neutral dark:prose-invert text-sm">
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
           {@html parseMarkdown(afterValue)}
         </div>
       {:else if typeof afterValue === 'number'}

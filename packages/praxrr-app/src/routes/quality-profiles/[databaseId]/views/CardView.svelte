@@ -10,6 +10,7 @@
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
+  import { sanitizeHtml } from '$shared/markdown/markdown.ts';
 
   export let profiles: QualityProfileTableRow[];
   export let availableSources: SourceRef[] = [];
@@ -138,7 +139,8 @@
 
         {#if profile.description}
           <div class="description text-xs text-neutral-600 dark:text-neutral-400">
-            {@html profile.description}
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized via $shared/markdown -->
+            {@html sanitizeHtml(profile.description)}
           </div>
         {/if}
 

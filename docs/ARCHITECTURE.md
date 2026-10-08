@@ -1200,8 +1200,10 @@ Arr integration is an object‑oriented stack:
 
 ### 21.6 Markdown
 
-`utils/markdown/markdown.ts` renders markdown to sanitized HTML and provides a
-plain‑text `stripMarkdown()` helper for previews.
+`utils/markdown/markdown.ts` re-exports the shared renderer in
+`$shared/markdown/markdown.ts` (`parseMarkdown`, `parseMarkdownInline`,
+`sanitizeHtml`): marked plus an allowlist `xss` sanitizer used by both server and
+client. It is the only module that imports `marked`.
 
 ### 21.7 TMDB
 
