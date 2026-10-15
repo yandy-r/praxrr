@@ -59,7 +59,7 @@ RUN for i in 1 2 3; do \
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
 # -----------------------------------------------------------------------------
-FROM debian:12-slim
+FROM debian:13-slim
 
 # Labels for container metadata
 LABEL org.opencontainers.image.title="Praxrr"
