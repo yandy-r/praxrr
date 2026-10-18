@@ -72,6 +72,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/metrics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Prometheus metrics
+     * @description Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config
+     *     health, security posture, parser availability, notification delivery, PCD cache state and
+     *     build info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`
+     *     header (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.
+     */
+    get: operations['getMetrics'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/system/startup-pull/latest': {
     parameters: {
       query?: never;
@@ -524,7 +547,13 @@ export interface paths {
      *
      *     Two actions are supported via the `action` field in the request body:
      *     - `scan`: Scans for stale items and returns what would be deleted.
-     *     - `execute`: Deletes the stale items from a previous scan result.
+     *     - `execute`: Re-scans server-side and deletes only the requested items whose `id` and
+     *       `name` both match a currently stale item of the same kind. Requested items that are no
+     *       longer stale are not deleted; they are reported with reason `No longer stale; not deleted`
+     *       (custom formats in `failedCustomFormats`, quality profiles in `skippedQualityProfiles`).
+     *
+     *     Namespaces whose expected contents cannot currently be determined (missing PCD cache, or a
+     *     selected TRaSH source with no cached data or a transform failure) are kept, never reported stale.
      *
      *     Quality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 "in use").
      */
@@ -5642,6 +5671,45 @@ export interface operations {
       };
     };
   };
+  getMetrics: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Praxrr API key. Required for non-browser clients under AUTH=on. */
+        'X-Api-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Metrics in Prometheus text exposition format. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/plain': string;
+        };
+      };
+      /** @description Unauthenticated (missing or invalid API key). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The metrics endpoint is disabled (METRICS_ENABLED is off). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   getLatestStartupPull: {
     parameters: {
       query?: never;
@@ -6764,7 +6832,7 @@ export interface operations {
           'application/json': components['schemas']['CleanupScanResult'] | components['schemas']['CleanupDeleteResult'];
         };
       };
-      /** @description Invalid request (missing instanceId, invalid action) */
+      /** @description Invalid request (malformed JSON or non-object body, missing instanceId, invalid action, or missing/malformed scanResult for execute) */
       400: {
         headers: {
           [name: string]: unknown;

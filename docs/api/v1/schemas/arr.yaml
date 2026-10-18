@@ -601,7 +601,9 @@ SkippedItem:
       $ref: '#/StaleItem'
     reason:
       type: string
-      description: Why the item was skipped (e.g. "Profile is assigned to media")
+      description: >-
+        Why the item was not deleted (e.g. "Profile is assigned to media", "No longer stale; not deleted",
+        or the Arr delete error message)
 
 CleanupDeleteResult:
   type: object
@@ -609,6 +611,7 @@ CleanupDeleteResult:
     - deletedCustomFormats
     - deletedQualityProfiles
     - skippedQualityProfiles
+    - failedCustomFormats
   properties:
     deletedCustomFormats:
       type: array
@@ -624,4 +627,11 @@ CleanupDeleteResult:
       type: array
       items:
         $ref: '#/SkippedItem'
-      description: Quality profiles that were skipped (assigned to media)
+      description: >-
+        Quality profiles that were not deleted: assigned to media, no longer stale at execute time,
+        or the delete failed
+    failedCustomFormats:
+      type: array
+      items:
+        $ref: '#/SkippedItem'
+      description: Custom formats that were not deleted (no longer stale at execute time, or the delete failed)

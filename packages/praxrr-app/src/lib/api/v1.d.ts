@@ -546,7 +546,13 @@ export interface paths {
      *
      *     Two actions are supported via the `action` field in the request body:
      *     - `scan`: Scans for stale items and returns what would be deleted.
-     *     - `execute`: Deletes the stale items from a previous scan result.
+     *     - `execute`: Re-scans server-side and deletes only the requested items whose `id` and
+     *       `name` both match a currently stale item of the same kind. Requested items that are no
+     *       longer stale are not deleted; they are reported with reason `No longer stale; not deleted`
+     *       (custom formats in `failedCustomFormats`, quality profiles in `skippedQualityProfiles`).
+     *
+     *     Namespaces whose expected contents cannot currently be determined (missing PCD cache, or a
+     *     selected TRaSH source with no cached data or a transform failure) are kept, never reported stale.
      *
      *     Quality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 "in use").
      */
@@ -2544,8 +2550,10 @@ export interface components {
       deletedCustomFormats: components['schemas']['StaleItem'][];
       /** @description Quality profiles that were successfully deleted */
       deletedQualityProfiles: components['schemas']['StaleItem'][];
-      /** @description Quality profiles that were skipped (assigned to media) */
+      /** @description Quality profiles that were not deleted: assigned to media, no longer stale at execute time, or the delete failed */
       skippedQualityProfiles: components['schemas']['SkippedItem'][];
+      /** @description Custom formats that were not deleted (no longer stale at execute time, or the delete failed) */
+      failedCustomFormats: components['schemas']['SkippedItem'][];
     };
     SyncPreviewCreateRequest: {
       /** @description Arr instance ID to preview */
@@ -5348,7 +5356,7 @@ export interface components {
     };
     SkippedItem: {
       item: components['schemas']['StaleItem'];
-      /** @description Why the item was skipped (e.g. "Profile is assigned to media") */
+      /** @description Why the item was not deleted (e.g. "Profile is assigned to media", "No longer stale; not deleted", or the Arr delete error message) */
       reason: string;
     };
     /**
@@ -6821,7 +6829,7 @@ export interface operations {
           'application/json': components['schemas']['CleanupScanResult'] | components['schemas']['CleanupDeleteResult'];
         };
       };
-      /** @description Invalid request (missing instanceId, invalid action) */
+      /** @description Invalid request (malformed JSON or non-object body, missing instanceId, invalid action, or missing/malformed scanResult for execute) */
       400: {
         headers: {
           [name: string]: unknown;
