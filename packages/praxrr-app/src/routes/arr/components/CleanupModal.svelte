@@ -218,11 +218,13 @@
                 Skipped {deleteResult.skippedQualityProfiles.length} profile{deleteResult.skippedQualityProfiles
                   .length === 1
                   ? ''
-                  : 's'} assigned to media
+                  : 's'}
               </p>
             </div>
             {#each deleteResult.skippedQualityProfiles as skipped}
-              <p class="pl-6 text-sm text-neutral-500 dark:text-neutral-400">{skipped.item.strippedName}</p>
+              <p class="pl-6 text-sm text-neutral-500 dark:text-neutral-400">
+                {skipped.item.strippedName}: {skipped.reason}
+              </p>
             {/each}
           </div>
         {/if}

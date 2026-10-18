@@ -51,6 +51,20 @@ export function hasNamespaceSuffix(name: string): boolean {
 }
 
 /**
+ * Returns the full trailing run of namespace characters on a name ('' when none).
+ * Use for exact namespace identity checks; `endsWith` is unsafe because TRaSH
+ * suffixes also end in U+200B (the DB index-1 suffix).
+ */
+export function getTrailingNamespaceSuffix(name: string): string {
+  return name.match(SUFFIX_PATTERN)?.[0] ?? '';
+}
+
+/** Returns true if a full trailing suffix run has the TRaSH Guide shape: U+200C then one or more U+200B. */
+export function isTrashGuideNamespaceSuffix(suffix: string): boolean {
+  return /^\u200C\u200B+$/.test(suffix);
+}
+
+/**
  * Extracts the namespace index from a suffixed name.
  * Returns null if the name has no namespace suffix.
  */

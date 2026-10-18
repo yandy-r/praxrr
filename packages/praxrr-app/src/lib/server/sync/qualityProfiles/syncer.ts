@@ -22,30 +22,19 @@ import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { type TrashGuideSyncQualityProfileSourceHydration, trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
-import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
-import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
 import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { getAllQualities, type SyncArrType } from '../mappings.ts';
-import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
+import { getNamespaceSuffix } from '../namespace.ts';
+import { createTrashNamespaceAllocator, resolveTrashSourceProfiles } from '../trashSourceProfiles.ts';
 import type {
   QualityProfilesPreview,
   SyncPreviewPreparedExecutionContext,
   SyncPreviewSectionResult,
 } from '../preview/types.ts';
-import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
-import type {
-  TrashGuideCfGroupEntity,
-  TrashGuideCustomFormatEntity,
-  TrashGuideNamingEntity,
-  TrashGuideParsedEntity,
-  TrashGuideParseResult,
-  TrashGuideQualityProfileEntity,
-  TrashGuideQualitySizeEntity,
-} from '$lib/server/trashguide/types.ts';
 import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import {
   CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
@@ -903,7 +892,7 @@ export class QualityProfileSyncer extends BaseSyncer {
   ): Promise<DatabaseSyncBatch[]> {
     const batches: DatabaseSyncBatch[] = [];
     const sourceInputs: unknown[] = [];
-    let trashNamespaceIndex = 0;
+    const allocateTrashSuffix = createTrashNamespaceAllocator();
     this.recordPreviewEvidence('qualityProfiles', 'pcd', 'trashSelections', sourceHydrations);
 
     // Emit one skipped outcome per user-selected TRaSH profile that never reaches a write
@@ -932,11 +921,19 @@ export class QualityProfileSyncer extends BaseSyncer {
         continue;
       }
 
-      const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
-      if (!source || source.arr_type !== this.instanceType) {
+      const resolution = await resolveTrashSourceProfiles(sourceHydration, this.instanceType, {
+        logSource: 'Sync:QualityProfiles',
+        instanceId: this.instanceId,
+        rowParseFailedMessage: 'Failed to parse TRaSH cache row while building quality profile sync batches',
+        allRowsMalformedMessage: (sourceName) =>
+          `Failed to parse all TRaSH cache rows for source "${sourceName}" during quality profile batch build`,
+        someRowsMalformedMessage: 'Some TRaSH cache rows were malformed while building quality profile sync batches',
+      });
+
+      if (resolution.status === 'unavailable') {
         sourceInputs.push({
           sourceHydration,
-          source: source ?? null,
+          source: resolution.source,
           cachedRows: [],
         });
         recordTrashSkips(
@@ -946,7 +943,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         continue;
       }
 
-      const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
+      const { source, cachedRows } = resolution;
       sourceInputs.push({
         sourceHydration,
         source: {
@@ -966,101 +963,11 @@ export class QualityProfileSyncer extends BaseSyncer {
           contentHash: row.contentHash,
         })),
       });
-      if (cachedRows.length === 0) {
+      if (resolution.status === 'no_cache') {
         recordTrashSkips(sourceHydration.selectedQualityProfiles, `TRaSH source "${source.name}" has no cached data.`);
         continue;
       }
-
-      const parsedEntities: TrashGuideParsedEntity[] = [];
-      let malformedRows = 0;
-      for (const row of cachedRows) {
-        try {
-          const parsed = JSON.parse(row.jsonData) as TrashGuideParsedEntity;
-          parsedEntities.push(parsed);
-        } catch (error) {
-          malformedRows += 1;
-          await logger.warn('Failed to parse TRaSH cache row while building quality profile sync batches', {
-            source: 'Sync:QualityProfiles',
-            meta: {
-              instanceId: this.instanceId,
-              sourceId: source.id,
-              sourceName: source.name,
-              trashId: row.trashId,
-              filePath: row.filePath,
-              error: error instanceof Error ? error.message : String(error),
-            },
-          });
-        }
-      }
-
-      if (parsedEntities.length === 0) {
-        const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during quality profile batch build`;
-        await logger.error(message, {
-          source: 'Sync:QualityProfiles',
-          meta: {
-            instanceId: this.instanceId,
-            sourceId: source.id,
-            sourceName: source.name,
-            totalRows: cachedRows.length,
-            malformedRows,
-          },
-        });
-        throw new Error(message);
-      }
-      if (malformedRows > 0) {
-        await logger.warn('Some TRaSH cache rows were malformed while building quality profile sync batches', {
-          source: 'Sync:QualityProfiles',
-          meta: {
-            instanceId: this.instanceId,
-            sourceId: source.id,
-            sourceName: source.name,
-            totalRows: cachedRows.length,
-            malformedRows,
-          },
-        });
-      }
-
-      const parsedResult: TrashGuideParseResult = {
-        arr_type: source.arr_type,
-        status: 'success',
-        entities: {
-          custom_formats: parsedEntities.filter(
-            (entity): entity is TrashGuideCustomFormatEntity => entity.entity_type === 'custom_format'
-          ),
-          custom_format_groups: parsedEntities.filter(
-            (entity): entity is TrashGuideCfGroupEntity => entity.entity_type === 'custom_format_group'
-          ),
-          quality_profiles: parsedEntities.filter(
-            (entity): entity is TrashGuideQualityProfileEntity => entity.entity_type === 'quality_profile'
-          ),
-          quality_sizes: parsedEntities.filter(
-            (entity): entity is TrashGuideQualitySizeEntity => entity.entity_type === 'quality_size'
-          ),
-          naming: parsedEntities.filter((entity): entity is TrashGuideNamingEntity => entity.entity_type === 'naming'),
-        },
-        ordered_entities: parsedEntities,
-        issues: [],
-        parsed_files: parsedEntities.length,
-        failed_files: 0,
-      };
-
-      let transformed;
-      try {
-        transformed = transformTrashGuideEntities({
-          sourceId: source.id,
-          arrType: source.arr_type,
-          parsed: parsedResult,
-        });
-      } catch (error) {
-        await logger.warn(`Skipping TRaSH quality profiles due to transform failure for source "${source.name}"`, {
-          source: 'Sync:QualityProfiles',
-          meta: {
-            instanceId: this.instanceId,
-            sourceId: source.id,
-            sourceName: source.name,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
+      if (resolution.status === 'transform_failed') {
         recordTrashSkips(
           sourceHydration.selectedQualityProfiles,
           `TRaSH source "${source.name}" could not be processed.`
@@ -1068,26 +975,18 @@ export class QualityProfileSyncer extends BaseSyncer {
         continue;
       }
 
-      const rawProfilesByName = new Map(
-        parsedResult.entities.quality_profiles.map((profile) => [profile.name, profile])
-      );
-      const portableProfilesByName = new Map<string, PortableQualityProfile>();
-      const portableFormatsByName = new Map<string, PortableCustomFormat>();
-
-      for (const operation of transformed.activeOperations) {
-        if (operation.portableEntityType === 'quality_profile') {
-          portableProfilesByName.set(operation.data.name, operation.data);
-        } else if (operation.portableEntityType === 'custom_format') {
-          portableFormatsByName.set(operation.data.name, operation.data);
-        }
+      for (const profileName of resolution.missingProfileNames) {
+        recordTrashSkips([profileName], `TRaSH quality profile "${profileName}" was not found in its source.`);
       }
 
+      const rawProfilesByName = new Map(
+        resolution.parsed.entities.quality_profiles.map((profile) => [profile.name, profile])
+      );
       const selectedProfiles: ProfileSyncData[] = [];
       const selectedFormatNames = new Set<string>();
-      for (const profileName of sourceHydration.selectedQualityProfiles) {
-        const portable = portableProfilesByName.get(profileName);
+      for (const profileName of resolution.resolvedProfileNames) {
+        const portable = resolution.portableProfilesByName.get(profileName);
         if (!portable) {
-          recordTrashSkips([profileName], `TRaSH quality profile "${profileName}" was not found in its source.`);
           continue;
         }
 
@@ -1104,13 +1003,15 @@ export class QualityProfileSyncer extends BaseSyncer {
         });
       }
 
-      if (selectedProfiles.length === 0) {
+      // Shared allocator: cleanup computes the same positional suffix for this source.
+      const suffix = allocateTrashSuffix(resolution);
+      if (suffix === null) {
         continue;
       }
 
       const customFormats = new Map<string, PcdCustomFormat>();
       for (const formatName of selectedFormatNames) {
-        const portableFormat = portableFormatsByName.get(formatName);
+        const portableFormat = resolution.portableFormatsByName.get(formatName);
         if (!portableFormat) {
           continue;
         }
@@ -1118,13 +1019,12 @@ export class QualityProfileSyncer extends BaseSyncer {
         customFormats.set(formatName, this.mapTrashPortableCustomFormatToPcd(portableFormat));
       }
 
-      trashNamespaceIndex += 1;
       batches.push({
         sourceKind: 'trash',
         sourceLabel: source.name,
         databaseId: -source.id,
         // Keep TRaSH namespaces disjoint from DB namespaces while still using strip-compatible chars.
-        suffix: getTrashGuideNamespaceSuffix(trashNamespaceIndex),
+        suffix,
         profiles: selectedProfiles,
         customFormats,
         pcdFormatIdMap: new Map(),

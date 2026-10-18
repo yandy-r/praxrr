@@ -3,7 +3,8 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { BaseArrClient } from '$utils/arr/base.ts';
-import { scanForStaleItems, deleteStaleItems } from '$lib/server/sync/cleanup.ts';
+import { executeCleanup, scanForStaleItems } from '$lib/server/sync/cleanup.ts';
+import { parseCleanupRequest } from '$lib/server/sync/cleanupRequest.ts';
 import type { ArrType } from '$utils/arr/types.ts';
 
 /**
@@ -13,20 +14,24 @@ import type { ArrType } from '$utils/arr/types.ts';
  *
  * Body (scan):    { instanceId: number, action: 'scan' }
  * Body (execute): { instanceId: number, action: 'execute', scanResult: CleanupScanResult }
+ *
+ * Execute re-scans server-side and deletes only requested items that are still stale.
  */
 export const POST: RequestHandler = async ({ request }) => {
-  const body = await request.json();
-  const { instanceId, action } = body;
-
-  if (!instanceId || typeof instanceId !== 'number') {
-    return json({ error: 'instanceId is required' }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Request body must be valid JSON' }, { status: 400 });
   }
 
-  if (action !== 'scan' && action !== 'execute') {
-    return json({ error: 'action must be "scan" or "execute"' }, { status: 400 });
+  const parsed = parseCleanupRequest(body);
+  if (!parsed.ok) {
+    return json({ error: parsed.error }, { status: 400 });
   }
+  const cleanupRequest = parsed.request;
 
-  const instance = arrInstancesQueries.getById(instanceId);
+  const instance = arrInstancesQueries.getById(cleanupRequest.instanceId);
   if (!instance) {
     return json({ error: 'Instance not found' }, { status: 404 });
   }
@@ -38,19 +43,11 @@ export const POST: RequestHandler = async ({ request }) => {
       retries: 0,
     });
 
-    if (action === 'scan') {
-      const result = await scanForStaleItems(client, instanceId);
-      return json(result);
+    if (cleanupRequest.action === 'scan') {
+      return json(await scanForStaleItems(client, cleanupRequest.instanceId));
     }
 
-    // action === 'execute'
-    const { scanResult } = body;
-    if (!scanResult) {
-      return json({ error: 'scanResult is required for execute action' }, { status: 400 });
-    }
-
-    const result = await deleteStaleItems(client, scanResult);
-    return json(result);
+    return json(await executeCleanup(client, cleanupRequest.instanceId, cleanupRequest.scanResult));
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Cleanup failed';
     return json({ error: message }, { status: 500 });

@@ -2,35 +2,27 @@
  * Config cleanup: delete all QPs and CFs from an Arr instance
  * that are not in the current sync selections.
  *
- * Simple rule: if it's not expected, it's stale.
+ * Rule: if it's not expected, it's stale — except when a selected namespace's
+ * expected names cannot be determined right now. Those namespaces are kept
+ * (fail-safe) so a missing cache never deletes live configs.
  * QPs assigned to media will be skipped (arr returns HTTP 500).
  */
 
 import type { BaseArrClient } from '$utils/arr/base.ts';
 import {
-  getTrashGuideNamespaceSuffix,
   getNamespaceSuffix,
+  getTrailingNamespaceSuffix,
   hasNamespaceSuffix,
+  isTrashGuideNamespaceSuffix,
   stripNamespaceSuffix,
 } from './namespace.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
-import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
-import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { getCache } from '$pcd/index.ts';
 import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
-import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
-import type {
-  TrashGuideCfGroupEntity,
-  TrashGuideCustomFormatEntity,
-  TrashGuideNamingEntity,
-  TrashGuideParsedEntity,
-  TrashGuideQualityProfileEntity,
-  TrashGuideQualitySizeEntity,
-} from '$lib/server/trashguide/types.ts';
-import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
+import { createTrashNamespaceAllocator, resolveTrashSourceProfiles } from './trashSourceProfiles.ts';
 import type { SyncArrType } from './mappings.ts';
 import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -57,7 +49,8 @@ export interface CleanupDeleteResult {
 
 /**
  * Scan an Arr instance for stale configs.
- * Stale = not in the current sync selections.
+ * Stale = not in the current sync selections and not in a namespace whose
+ * expected contents are currently undeterminable.
  */
 export async function scanForStaleItems(client: BaseArrClient, instanceId: number): Promise<CleanupScanResult> {
   const instance = arrInstancesQueries.getById(instanceId);
@@ -69,6 +62,8 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   const expectedQPNames = new Set<string>();
   const expectedCFNames = new Set<string>();
   const expectedProfiles: { profileName: string; databaseId: number; namespaceIndex: number }[] = [];
+  // Exact trailing suffix runs whose items must be kept because their DB cache is unavailable.
+  const keepPcdSuffixes = new Set<string>();
 
   for (const sel of selections) {
     const nsIndex = arrNamespaceQueries.get(instanceId, sel.databaseId);
@@ -80,131 +75,61 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
 
     // Get CF names from PCD cache for this profile
     const cache = getCache(sel.databaseId);
-    if (cache) {
-      const cfNames = await getReferencedCustomFormatNames(cache, sel.profileName, arrType);
-      for (const name of cfNames) {
-        expectedCFNames.add(name + suffix);
+    if (!cache) {
+      if (!keepPcdSuffixes.has(suffix)) {
+        keepPcdSuffixes.add(suffix);
+        await logger.warn('PCD cache unavailable during cleanup scan; keeping all items in its namespace', {
+          source: SOURCE,
+          meta: { instanceId, databaseId: sel.databaseId, namespaceIndex: nsIndex },
+        });
       }
+      continue;
+    }
+    const cfNames = await getReferencedCustomFormatNames(cache, sel.profileName, arrType);
+    for (const name of cfNames) {
+      expectedCFNames.add(name + suffix);
     }
   }
 
-  // 1b. Also include expected names from TRaSH Guide selections
+  // 1b. Also include expected names from TRaSH Guide selections. Suffixes come from the
+  // same allocator the syncer uses, so positional indexes cannot drift.
   const trashSourceHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(instanceId);
-  let trashNamespaceIndex = 0;
+  const allocateTrashSuffix = createTrashNamespaceAllocator();
+  let keepAllTrashSuffixed = false;
 
   for (const sourceHydration of trashSourceHydrations) {
     if (sourceHydration.selectedQualityProfiles.length === 0) continue;
 
-    const source = trashGuideSourcesQueries.getById(sourceHydration.sourceId);
-    if (!source || source.arr_type !== arrType) continue;
+    const resolution = await resolveTrashSourceProfiles(sourceHydration, arrType, {
+      logSource: SOURCE,
+      instanceId,
+      rowParseFailedMessage: 'Failed to parse TRaSH cache row during cleanup scan',
+      allRowsMalformedMessage: (sourceName) =>
+        `Failed to parse all TRaSH cache rows for source "${sourceName}" during cleanup scan`,
+      someRowsMalformedMessage:
+        'Some TRaSH cache rows were malformed during cleanup scan; using successfully parsed rows',
+    });
 
-    const cachedRows = trashGuideEntityCacheQueries.getBySource(source.id);
-    if (cachedRows.length === 0) continue;
-
-    const parsedEntities: TrashGuideParsedEntity[] = [];
-    let malformedRows = 0;
-    for (const row of cachedRows) {
-      try {
-        parsedEntities.push(JSON.parse(row.jsonData) as TrashGuideParsedEntity);
-      } catch (error) {
-        malformedRows += 1;
-        await logger.warn('Failed to parse TRaSH cache row during cleanup scan', {
-          source: SOURCE,
-          meta: {
-            instanceId,
-            sourceId: source.id,
-            sourceName: source.name,
-            trashId: row.trashId,
-            filePath: row.filePath,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
-      }
-    }
-    if (parsedEntities.length === 0) {
-      const message = `Failed to parse all TRaSH cache rows for source "${source.name}" during cleanup scan`;
-      await logger.error(message, {
+    if (resolution.status === 'no_cache' || resolution.status === 'transform_failed') {
+      // This source's positional index is unknowable, so no TRaSH namespace can be trusted.
+      keepAllTrashSuffixed = true;
+      await logger.warn('TRaSH source undeterminable during cleanup scan; keeping all TRaSH-suffixed items', {
         source: SOURCE,
         meta: {
           instanceId,
-          sourceId: source.id,
-          sourceName: source.name,
-          totalRows: cachedRows.length,
-          malformedRows,
-        },
-      });
-      throw new Error(message);
-    }
-    if (malformedRows > 0) {
-      await logger.warn('Some TRaSH cache rows were malformed during cleanup scan; using successfully parsed rows', {
-        source: SOURCE,
-        meta: {
-          instanceId,
-          sourceId: source.id,
-          sourceName: source.name,
-          totalRows: cachedRows.length,
-          malformedRows,
-        },
-      });
-    }
-
-    let transformed;
-    try {
-      transformed = transformTrashGuideEntities({
-        sourceId: source.id,
-        arrType: source.arr_type,
-        parsed: {
-          arr_type: source.arr_type,
-          status: 'success',
-          entities: {
-            custom_formats: parsedEntities.filter(
-              (e): e is TrashGuideCustomFormatEntity => e.entity_type === 'custom_format'
-            ),
-            custom_format_groups: parsedEntities.filter(
-              (e): e is TrashGuideCfGroupEntity => e.entity_type === 'custom_format_group'
-            ),
-            quality_profiles: parsedEntities.filter(
-              (e): e is TrashGuideQualityProfileEntity => e.entity_type === 'quality_profile'
-            ),
-            quality_sizes: parsedEntities.filter(
-              (e): e is TrashGuideQualitySizeEntity => e.entity_type === 'quality_size'
-            ),
-            naming: parsedEntities.filter((e): e is TrashGuideNamingEntity => e.entity_type === 'naming'),
-          },
-          ordered_entities: parsedEntities,
-          issues: [],
-          parsed_files: parsedEntities.length,
-          failed_files: 0,
-        },
-      });
-    } catch (error) {
-      await logger.warn(`Skipping TRaSH quality profiles due to transform failure for source "${source.name}"`, {
-        source: SOURCE,
-        meta: {
-          instanceId,
-          sourceId: source.id,
-          sourceName: source.name,
-          error: error instanceof Error ? error.message : String(error),
+          sourceId: resolution.source.id,
+          sourceName: resolution.source.name,
+          reason: resolution.status,
         },
       });
       continue;
     }
 
-    const portableProfilesByName = new Map<string, PortableQualityProfile>();
-    const portableFormatsByName = new Map<string, PortableCustomFormat>();
-    for (const op of transformed.activeOperations) {
-      if (op.portableEntityType === 'quality_profile') {
-        portableProfilesByName.set(op.data.name, op.data);
-      } else if (op.portableEntityType === 'custom_format') {
-        portableFormatsByName.set(op.data.name, op.data);
-      }
-    }
+    const trashSuffix = allocateTrashSuffix(resolution);
+    if (resolution.status !== 'resolved' || trashSuffix === null) continue;
 
-    trashNamespaceIndex += 1;
-    const trashSuffix = getTrashGuideNamespaceSuffix(trashNamespaceIndex);
-
-    for (const profileName of sourceHydration.selectedQualityProfiles) {
-      const portable = portableProfilesByName.get(profileName);
+    for (const profileName of resolution.resolvedProfileNames) {
+      const portable = resolution.portableProfilesByName.get(profileName);
       if (!portable) continue;
 
       expectedQPNames.add(profileName + trashSuffix);
@@ -217,15 +142,21 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     }
   }
 
+  // Exact trailing-run comparison: `endsWith` would wrongly match TRaSH suffixes (which end in U+200B).
+  const inKeptNamespace = (name: string): boolean => {
+    const suffix = getTrailingNamespaceSuffix(name);
+    return keepPcdSuffixes.has(suffix) || (keepAllTrashSuffixed && isTrashGuideNamespaceSuffix(suffix));
+  };
+
   // 2. Fetch all CFs and QPs from the arr
   const [remoteCFs, remoteQPs] = await Promise.all([client.getCustomFormats(), client.getQualityProfiles()]);
 
-  // 3. Stale QPs = everything not in the expected set
+  // 3. Stale QPs = everything not expected and not in a kept namespace
   const staleQualityProfiles: StaleItem[] = [];
   const qpDecisions: { name: string; id: number; decision: string }[] = [];
 
   for (const qp of remoteQPs) {
-    if (expectedQPNames.has(qp.name)) {
+    if (expectedQPNames.has(qp.name) || inKeptNamespace(qp.name)) {
       qpDecisions.push({ name: stripNamespaceSuffix(qp.name), id: qp.id, decision: 'keep' });
     } else {
       const displayName = hasNamespaceSuffix(qp.name) ? stripNamespaceSuffix(qp.name) : qp.name;
@@ -234,11 +165,11 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     }
   }
 
-  // 4. Stale CFs = everything not in the expected CF set
+  // 4. Stale CFs = everything not expected and not in a kept namespace
   const staleCustomFormats: StaleItem[] = [];
   for (const cf of remoteCFs) {
     if (cf.id == null) continue;
-    if (expectedCFNames.has(cf.name)) continue;
+    if (expectedCFNames.has(cf.name) || inKeptNamespace(cf.name)) continue;
     const displayName = hasNamespaceSuffix(cf.name) ? stripNamespaceSuffix(cf.name) : cf.name;
     staleCustomFormats.push({ id: cf.id, name: cf.name, strippedName: displayName });
   }
@@ -249,6 +180,8 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
       instanceId,
       expectedProfiles,
       expectedCFs: expectedCFNames.size,
+      keptPcdNamespaces: keepPcdSuffixes.size,
+      keptAllTrashNamespaces: keepAllTrashSuffixed,
       qualityProfiles: qpDecisions,
       staleCFs: staleCustomFormats.length,
       staleQPs: staleQualityProfiles.length,
@@ -258,9 +191,80 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   return { staleCustomFormats, staleQualityProfiles };
 }
 
+/** Reason reported for requested items that a fresh server-side scan no longer considers stale. */
+export const NO_LONGER_STALE_REASON = 'No longer stale; not deleted';
+
+/** Rejected items included in the warning log (the full count is always logged). */
+const REJECTED_LOG_SAMPLE_SIZE = 20;
+
+/**
+ * Execute a cleanup request safely: re-scan server-side and delete only requested
+ * items whose `id` AND `name` match a currently stale item of the same kind.
+ * Requested items that are not currently stale are reported (CFs in
+ * `failedCustomFormats`, QPs in `skippedQualityProfiles`) and never deleted.
+ */
+export async function executeCleanup(
+  client: BaseArrClient,
+  instanceId: number,
+  requested: CleanupScanResult
+): Promise<CleanupDeleteResult> {
+  const fresh = await scanForStaleItems(client, instanceId);
+
+  const partition = (requestedItems: StaleItem[], freshItems: StaleItem[]) => {
+    const freshById = new Map(freshItems.map((item) => [item.id, item]));
+    const confirmed: StaleItem[] = [];
+    const rejected: StaleItem[] = [];
+    // Only the first request per id counts; later duplicates are neither deleted twice nor reported.
+    const seenIds = new Set<number>();
+    for (const item of requestedItems) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+      const freshItem = freshById.get(item.id);
+      if (freshItem && freshItem.name === item.name) {
+        // Delete the server-side item so client-supplied display names are never trusted.
+        confirmed.push(freshItem);
+      } else {
+        rejected.push(item);
+      }
+    }
+    return { confirmed, rejected };
+  };
+
+  const cfs = partition(requested.staleCustomFormats, fresh.staleCustomFormats);
+  const qps = partition(requested.staleQualityProfiles, fresh.staleQualityProfiles);
+
+  if (cfs.rejected.length > 0 || qps.rejected.length > 0) {
+    const summarize = (items: StaleItem[]) => ({
+      count: items.length,
+      sample: items.slice(0, REJECTED_LOG_SAMPLE_SIZE).map((item) => ({ id: item.id, name: item.strippedName })),
+    });
+    await logger.warn('Cleanup request contained items that are no longer stale; they were not deleted', {
+      source: SOURCE,
+      meta: {
+        instanceId,
+        customFormats: summarize(cfs.rejected),
+        qualityProfiles: summarize(qps.rejected),
+      },
+    });
+  }
+
+  const result = await deleteStaleItems(client, {
+    staleCustomFormats: cfs.confirmed,
+    staleQualityProfiles: qps.confirmed,
+  });
+  for (const item of cfs.rejected) {
+    result.failedCustomFormats.push({ item, reason: NO_LONGER_STALE_REASON });
+  }
+  for (const item of qps.rejected) {
+    result.skippedQualityProfiles.push({ item, reason: NO_LONGER_STALE_REASON });
+  }
+  return result;
+}
+
 /**
  * Delete stale items from an Arr instance. Deletes CFs first, then QPs.
  * QPs that are assigned to media (HTTP 500) are skipped with a warning.
+ * Callers must pass server-verified items; API requests go through `executeCleanup`.
  */
 export async function deleteStaleItems(
   client: BaseArrClient,

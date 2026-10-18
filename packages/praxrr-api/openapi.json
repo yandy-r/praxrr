@@ -192,6 +192,50 @@
         }
       }
     },
+    "/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "summary": "Prometheus metrics",
+        "description": "Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config\nhealth, security posture, parser availability, notification delivery, PCD cache state and\nbuild info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`\nheader (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.\n",
+        "tags": ["System"],
+        "parameters": [
+          {
+            "name": "X-Api-Key",
+            "in": "header",
+            "required": false,
+            "description": "Praxrr API key. Required for non-browser clients under AUTH=on.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics in Prometheus text exposition format.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated (missing or invalid API key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The metrics endpoint is disabled (METRICS_ENABLED is off)."
+          }
+        }
+      }
+    },
     "/system/startup-pull/latest": {
       "get": {
         "operationId": "getLatestStartupPull",
@@ -1533,7 +1577,7 @@
       "post": {
         "operationId": "arrCleanup",
         "summary": "Scan or execute cleanup of stale configs",
-        "description": "Detects and deletes stale namespace-suffixed custom formats and quality profiles\nfrom an Arr instance that are no longer in the current sync selections.\n\nTwo actions are supported via the `action` field in the request body:\n- `scan`: Scans for stale items and returns what would be deleted.\n- `execute`: Deletes the stale items from a previous scan result.\n\nQuality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 \"in use\").\n",
+        "description": "Detects and deletes stale namespace-suffixed custom formats and quality profiles\nfrom an Arr instance that are no longer in the current sync selections.\n\nTwo actions are supported via the `action` field in the request body:\n- `scan`: Scans for stale items and returns what would be deleted.\n- `execute`: Re-scans server-side and deletes only the requested items whose `id` and\n  `name` both match a currently stale item of the same kind. Requested items that are no\n  longer stale are not deleted; they are reported with reason `No longer stale; not deleted`\n  (custom formats in `failedCustomFormats`, quality profiles in `skippedQualityProfiles`).\n\nNamespaces whose expected contents cannot currently be determined (missing PCD cache, or a\nselected TRaSH source with no cached data or a transform failure) are kept, never reported stale.\n\nQuality profiles assigned to media will be skipped with a warning (Arr returns HTTP 500 \"in use\").\n",
         "tags": ["Arr"],
         "requestBody": {
           "required": true,
@@ -1571,7 +1615,7 @@
             }
           },
           "400": {
-            "description": "Invalid request (missing instanceId, invalid action)",
+            "description": "Invalid request (malformed JSON or non-object body, missing instanceId, invalid action, or missing/malformed scanResult for execute)",
             "content": {
               "application/json": {
                 "schema": {
@@ -8308,13 +8352,13 @@
           },
           "reason": {
             "type": "string",
-            "description": "Why the item was skipped (e.g. \"Profile is assigned to media\")"
+            "description": "Why the item was not deleted (e.g. \"Profile is assigned to media\", \"No longer stale; not deleted\", or the Arr delete error message)"
           }
         }
       },
       "CleanupDeleteResult": {
         "type": "object",
-        "required": ["deletedCustomFormats", "deletedQualityProfiles", "skippedQualityProfiles"],
+        "required": ["deletedCustomFormats", "deletedQualityProfiles", "skippedQualityProfiles", "failedCustomFormats"],
         "properties": {
           "deletedCustomFormats": {
             "type": "array",
@@ -8335,7 +8379,14 @@
             "items": {
               "$ref": "#/components/schemas/SkippedItem"
             },
-            "description": "Quality profiles that were skipped (assigned to media)"
+            "description": "Quality profiles that were not deleted: assigned to media, no longer stale at execute time, or the delete failed"
+          },
+          "failedCustomFormats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkippedItem"
+            },
+            "description": "Custom formats that were not deleted (no longer stale at execute time, or the delete failed)"
           }
         }
       },
