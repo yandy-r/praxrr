@@ -62,8 +62,9 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   const expectedQPNames = new Set<string>();
   const expectedCFNames = new Set<string>();
   const expectedProfiles: { profileName: string; databaseId: number; namespaceIndex: number }[] = [];
-  // Exact trailing suffix runs whose items must be kept because their DB cache is unavailable.
-  const keepPcdSuffixes = new Set<string>();
+  // Exact trailing suffix runs whose items must all be kept: a selected DB whose cache is
+  // unavailable, or a TRaSH source with a selected profile that no longer resolves.
+  const keepSuffixes = new Set<string>();
 
   for (const sel of selections) {
     const nsIndex = arrNamespaceQueries.get(instanceId, sel.databaseId);
@@ -76,8 +77,8 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     // Get CF names from PCD cache for this profile
     const cache = getCache(sel.databaseId);
     if (!cache) {
-      if (!keepPcdSuffixes.has(suffix)) {
-        keepPcdSuffixes.add(suffix);
+      if (!keepSuffixes.has(suffix)) {
+        keepSuffixes.add(suffix);
         await logger.warn('PCD cache unavailable during cleanup scan; keeping all items in its namespace', {
           source: SOURCE,
           meta: { instanceId, databaseId: sel.databaseId, namespaceIndex: nsIndex },
@@ -128,6 +129,21 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     const trashSuffix = allocateTrashSuffix(resolution);
     if (resolution.status !== 'resolved' || trashSuffix === null) continue;
 
+    if (resolution.missingProfileNames.length > 0) {
+      // Previously synced copies of the missing profiles (and their CFs) still carry this
+      // suffix; their expected contents are unknown, so keep the whole namespace.
+      keepSuffixes.add(trashSuffix);
+      await logger.warn('TRaSH selected profiles missing from source during cleanup scan; keeping its namespace', {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          sourceId: resolution.source.id,
+          sourceName: resolution.source.name,
+          missingProfiles: resolution.missingProfileNames,
+        },
+      });
+    }
+
     for (const profileName of resolution.resolvedProfileNames) {
       const portable = resolution.portableProfilesByName.get(profileName);
       if (!portable) continue;
@@ -145,7 +161,7 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   // Exact trailing-run comparison: `endsWith` would wrongly match TRaSH suffixes (which end in U+200B).
   const inKeptNamespace = (name: string): boolean => {
     const suffix = getTrailingNamespaceSuffix(name);
-    return keepPcdSuffixes.has(suffix) || (keepAllTrashSuffixed && isTrashGuideNamespaceSuffix(suffix));
+    return keepSuffixes.has(suffix) || (keepAllTrashSuffixed && isTrashGuideNamespaceSuffix(suffix));
   };
 
   // 2. Fetch all CFs and QPs from the arr
@@ -180,7 +196,7 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
       instanceId,
       expectedProfiles,
       expectedCFs: expectedCFNames.size,
-      keptPcdNamespaces: keepPcdSuffixes.size,
+      keptNamespaces: keepSuffixes.size,
       keptAllTrashNamespaces: keepAllTrashSuffixed,
       qualityProfiles: qpDecisions,
       staleCFs: staleCustomFormats.length,

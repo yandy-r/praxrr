@@ -519,6 +519,52 @@ Deno.test('scanForStaleItems: TRaSH suffix indexes match the syncer when a sourc
   }
 });
 
+Deno.test('scanForStaleItems: keeps the namespace of a TRaSH source with a selected profile missing', async () => {
+  const SOURCE_X = 23;
+  const restore = withCleanupQueryStubs(() => {
+    stubInstance();
+    stubPcdSelections([]);
+    arrNamespaceQueries.get = () => null;
+    stubTrashHydrations([{ sourceId: SOURCE_X, selectedQualityProfiles: ['P1', 'P2'] }]);
+    trashGuideSourcesQueries.getById = (id: number) => makeTrashSource(id, `Source ${id}`);
+    // P2 was synced earlier but no longer exists in the source.
+    trashGuideEntityCacheQueries.getBySource = () => [makeTrashProfileRow(SOURCE_X, 'c'.repeat(32), 'P1', 'CF P1')];
+  });
+
+  const suffix = getTrashGuideNamespaceSuffix(1);
+  try {
+    const result = await scanForStaleItems(
+      remoteClient(
+        [
+          { id: 501, name: `CF P1${suffix}` },
+          { id: 502, name: `CF Only P2 Used${suffix}` },
+          { id: 503, name: `CF Other Trash${getTrashGuideNamespaceSuffix(2)}` },
+          { id: 504, name: `DB CF${ZWSP}` },
+          { id: 505, name: 'Unrelated CF' },
+        ],
+        [
+          { id: 601, name: `P1${suffix}` },
+          { id: 602, name: `P2${suffix}` },
+          { id: 603, name: `P2${getTrashGuideNamespaceSuffix(2)}` },
+          { id: 604, name: 'Unrelated Profile' },
+        ]
+      ),
+      INSTANCE_ID
+    );
+
+    assertEquals(
+      result.staleCustomFormats.map((item) => item.id),
+      [503, 504, 505]
+    );
+    assertEquals(
+      result.staleQualityProfiles.map((item) => item.id),
+      [603, 604]
+    );
+  } finally {
+    restore();
+  }
+});
+
 Deno.test('scanForStaleItems: TRaSH source with empty cache keeps every TRaSH-suffixed item', async () => {
   const restore = withCleanupQueryStubs(() => {
     stubInstance();
