@@ -754,11 +754,17 @@ export const arrSyncQueries = {
    * Atomically replace an instance's quality profile selections and config.
    * Selections are validated and deduped before any write.
    */
-  saveQualityProfilesSync(instanceId: number, selections: readonly unknown[], config: SyncConfig): void {
+  saveQualityProfilesSync(instanceId: number, selections: readonly unknown[], config: SyncConfig): number {
     const normalized = normalizeProfileSelections(selections);
 
     db.beginTransaction();
     try {
+      for (const databaseId of new Set(normalized.map((sel) => sel.databaseId))) {
+        if (!db.queryFirst('SELECT 1 FROM database_instances WHERE id = ?', databaseId)) {
+          throw new InvalidProfileSelectionError(`Database ${databaseId} does not exist`);
+        }
+      }
+
       db.execute('DELETE FROM arr_sync_quality_profiles WHERE instance_id = ?', instanceId);
 
       for (const sel of normalized) {
@@ -784,6 +790,7 @@ export const arrSyncQueries = {
       );
 
       db.commit();
+      return normalized.length;
     } catch (error) {
       db.rollback();
       throw error;

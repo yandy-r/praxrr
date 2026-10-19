@@ -166,15 +166,17 @@ Deno.test({
           cron: '0 * * * *',
         });
 
-        assertThrows(() =>
-          arrSyncQueries.saveQualityProfilesSync(
-            6,
-            [
-              { databaseId: DB_B, profileName: 'Fine' },
-              { databaseId: MISSING_DB, profileName: 'Orphan' },
-            ],
-            { trigger: 'manual', cron: null }
-          )
+        assertThrows(
+          () =>
+            arrSyncQueries.saveQualityProfilesSync(
+              6,
+              [
+                { databaseId: DB_B, profileName: 'Fine' },
+                { databaseId: MISSING_DB, profileName: 'Orphan' },
+              ],
+              { trigger: 'manual', cron: null }
+            ),
+          InvalidProfileSelectionError
         );
 
         assertEquals(getSelections(6), [{ databaseId: DB_A, profileName: 'Keep' }]);

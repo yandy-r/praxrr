@@ -429,7 +429,7 @@ export const actions: Actions = {
     try {
       const effectiveTrigger = trigger || 'manual';
       const effectiveCron = cron || null;
-      arrSyncQueries.saveQualityProfilesSync(id, rawSelections, {
+      const profileCount = arrSyncQueries.saveQualityProfilesSync(id, rawSelections, {
         trigger: effectiveTrigger,
         cron: effectiveCron,
         nextRunAt: effectiveTrigger === 'schedule' ? calculateNextRun(effectiveCron) : null,
@@ -437,7 +437,7 @@ export const actions: Actions = {
 
       await logger.info(`Quality profiles sync config saved for "${instance?.name}"`, {
         source: 'sync',
-        meta: { instanceId: id, profileCount: rawSelections.length, trigger },
+        meta: { instanceId: id, profileCount, trigger },
       });
 
       scheduleArrSyncForInstance(id);
