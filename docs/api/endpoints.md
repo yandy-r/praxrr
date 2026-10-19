@@ -446,6 +446,8 @@ Request variants:
 - Scan: `{ "instanceId": 1, "action": "scan" }`
 - Execute: `{ "instanceId": 1, "action": "execute", "scanResult": { ... } }`
 
+Execute scans the instance again. It deletes a requested custom format or quality profile only when its `id` and `name` still match a stale item of the same kind. Requested items missing from that fresh stale list stay on the instance. Custom formats are reported in `failedCustomFormats`, and quality profiles in `skippedQualityProfiles`, with reason `No longer stale; not deleted`.
+
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \

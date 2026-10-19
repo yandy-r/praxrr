@@ -264,16 +264,16 @@ Welcome to the praxrr documentation for Arr-family workflows and implementation 
 
 ## Recently Updated
 
+- [Link, Bridge, Sync](features/link-bridge-sync.md) - _2026-10-19_
+- [Endpoint Reference (`/api/v1`)](api/endpoints.md) - _2026-10-19_
+- [praxrr Documentation](README.md) - _2026-10-19_
 - [Plugin Management](features/plugin-management.md) - _2026-07-12_
 - [Plugin System Architecture](architecture/plugins.md) - _2026-07-12_
 - [TRaSH Guide Sync](features/trash-guide-sync.md) - _2026-02-27_
-- [praxrr Documentation](README.md) - _2026-02-20_
 - [Portable Import/Export](features/portable-import-export.md) - _2026-02-20_
 - [Entity Testing](features/entity-testing.md) - _2026-02-20_
-- [Link, Bridge, Sync](features/link-bridge-sync.md) - _2026-02-20_
 - [Error Semantics](api/errors.md) - _2026-02-20_
 - [Feature Guides](features/README.md) - _2026-02-20_
 - [Authentication](api/authentication.md) - _2026-02-20_
-- [Endpoint Reference (`/api/v1`)](api/endpoints.md) - _2026-02-20_
 - [Architecture Data Flow](architecture/data-flow.md) - _2026-02-20_
 - [API Documentation](api/README.md) - _2026-02-20_
