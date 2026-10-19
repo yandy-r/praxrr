@@ -1,4 +1,4 @@
-import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
+import { arrSyncQueries, normalizeProfileSelections, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { logger } from '$logger/logger.ts';
 import type {
   StartupPullArrType,
@@ -50,10 +50,10 @@ function selectionsEqual(a: readonly ProfileSelection[], b: readonly ProfileSele
 function applyQualityProfiles(instanceId: number, matched: readonly StartupPullMatchedResult[]): ApplySectionOutcome {
   if (matched.length === 0) return NO_MATCHES;
 
-  const newSelections: ProfileSelection[] = matched.map((m) => ({
-    databaseId: m.databaseId,
-    profileName: m.matchedEntityName,
-  }));
+  // Dedupe so duplicate matches compare equal to the stored (deduped) selections.
+  const newSelections = normalizeProfileSelections(
+    matched.map((m) => ({ databaseId: m.databaseId, profileName: m.matchedEntityName }))
+  );
 
   const current = arrSyncQueries.getQualityProfilesSync(instanceId);
 

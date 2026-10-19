@@ -1,7 +1,7 @@
 import { error, fail } from '@sveltejs/kit';
 import type { ServerLoad, Actions } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { arrSyncQueries, type SyncTrigger, type ProfileSelection } from '$db/queries/arrSync.ts';
+import { arrSyncQueries, InvalidProfileSelectionError, type SyncTrigger } from '$db/queries/arrSync.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import {
@@ -416,11 +416,20 @@ export const actions: Actions = {
     const trigger = formData.get('trigger') as SyncTrigger;
     const cron = formData.get('cron') as string | null;
 
+    let rawSelections: unknown;
     try {
-      const selections: ProfileSelection[] = JSON.parse(selectionsJson || '[]');
+      rawSelections = JSON.parse(selectionsJson || '[]');
+    } catch {
+      return fail(400, { error: 'Invalid quality profile selections payload' });
+    }
+    if (!Array.isArray(rawSelections)) {
+      return fail(400, { error: 'Quality profile selections must be an array' });
+    }
+
+    try {
       const effectiveTrigger = trigger || 'manual';
       const effectiveCron = cron || null;
-      arrSyncQueries.saveQualityProfilesSync(id, selections, {
+      arrSyncQueries.saveQualityProfilesSync(id, rawSelections, {
         trigger: effectiveTrigger,
         cron: effectiveCron,
         nextRunAt: effectiveTrigger === 'schedule' ? calculateNextRun(effectiveCron) : null,
@@ -428,13 +437,16 @@ export const actions: Actions = {
 
       await logger.info(`Quality profiles sync config saved for "${instance?.name}"`, {
         source: 'sync',
-        meta: { instanceId: id, profileCount: selections.length, trigger },
+        meta: { instanceId: id, profileCount: rawSelections.length, trigger },
       });
 
       scheduleArrSyncForInstance(id);
 
       return { success: true };
     } catch (e) {
+      if (e instanceof InvalidProfileSelectionError) {
+        return fail(400, { error: e.message });
+      }
       await logger.error('Failed to save quality profiles sync config', {
         source: 'sync',
         meta: { instanceId: id, error: e },

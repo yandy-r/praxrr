@@ -19,6 +19,42 @@ export interface ProfileSelection {
   profileName: string;
 }
 
+export class InvalidProfileSelectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidProfileSelectionError';
+  }
+}
+
+/**
+ * Validate quality profile selections and dedupe exact (databaseId, profileName) pairs,
+ * preserving first-seen order. Profile names are persisted exactly as given (never trimmed).
+ */
+export function normalizeProfileSelections(selections: readonly unknown[]): ProfileSelection[] {
+  const seen = new Set<string>();
+  const normalized: ProfileSelection[] = [];
+
+  for (const [index, raw] of selections.entries()) {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new InvalidProfileSelectionError(`Selection ${index} must be an object`);
+    }
+    const { databaseId, profileName } = raw as Record<string, unknown>;
+    if (typeof databaseId !== 'number' || !Number.isSafeInteger(databaseId) || databaseId <= 0) {
+      throw new InvalidProfileSelectionError(`Selection ${index} has an invalid databaseId`);
+    }
+    if (typeof profileName !== 'string' || profileName.trim() === '') {
+      throw new InvalidProfileSelectionError(`Selection ${index} has an empty profileName`);
+    }
+
+    const key = JSON.stringify([databaseId, profileName]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({ databaseId, profileName });
+  }
+
+  return normalized;
+}
+
 export interface SyncConfig {
   trigger: SyncTrigger;
   cron: string | null;
@@ -714,33 +750,44 @@ export const arrSyncQueries = {
     };
   },
 
-  saveQualityProfilesSync(instanceId: number, selections: ProfileSelection[], config: SyncConfig): void {
-    // Clear existing selections
-    db.execute('DELETE FROM arr_sync_quality_profiles WHERE instance_id = ?', instanceId);
+  /**
+   * Atomically replace an instance's quality profile selections and config.
+   * Selections are validated and deduped before any write.
+   */
+  saveQualityProfilesSync(instanceId: number, selections: readonly unknown[], config: SyncConfig): void {
+    const normalized = normalizeProfileSelections(selections);
 
-    // Insert new selections
-    for (const sel of selections) {
+    db.beginTransaction();
+    try {
+      db.execute('DELETE FROM arr_sync_quality_profiles WHERE instance_id = ?', instanceId);
+
+      for (const sel of normalized) {
+        db.execute(
+          'INSERT INTO arr_sync_quality_profiles (instance_id, database_id, profile_name) VALUES (?, ?, ?)',
+          instanceId,
+          sel.databaseId,
+          sel.profileName
+        );
+      }
+
       db.execute(
-        'INSERT INTO arr_sync_quality_profiles (instance_id, database_id, profile_name) VALUES (?, ?, ?)',
-        instanceId,
-        sel.databaseId,
-        sel.profileName
-      );
-    }
-
-    // Upsert config
-    db.execute(
-      `INSERT INTO arr_sync_quality_profiles_config (instance_id, trigger, cron, next_run_at)
+        `INSERT INTO arr_sync_quality_profiles_config (instance_id, trigger, cron, next_run_at)
 			 VALUES (?, ?, ?, ?)
 			 ON CONFLICT(instance_id) DO UPDATE SET trigger = ?, cron = ?, next_run_at = ?, last_synced_at = NULL`,
-      instanceId,
-      config.trigger,
-      config.cron,
-      config.nextRunAt ?? null,
-      config.trigger,
-      config.cron,
-      config.nextRunAt ?? null
-    );
+        instanceId,
+        config.trigger,
+        config.cron,
+        config.nextRunAt ?? null,
+        config.trigger,
+        config.cron,
+        config.nextRunAt ?? null
+      );
+
+      db.commit();
+    } catch (error) {
+      db.rollback();
+      throw error;
+    }
   },
 
   // ========== Delay Profiles ==========
@@ -910,27 +957,38 @@ export const arrSyncQueries = {
   // ========== Cleanup ==========
 
   /**
-   * Remove orphaned profile references when a profile is deleted
+   * Propagate a quality profile rename to sync selections of the owning database only.
+   * Instances that already select `newName` in that database are merged (old row dropped).
    */
-  removeQualityProfileReference(profileName: string): number {
-    return db.execute('DELETE FROM arr_sync_quality_profiles WHERE profile_name = ?', profileName);
+  updateQualityProfileName(databaseId: number, oldName: string, newName: string): number {
+    if (oldName === newName) return 0;
+
+    db.beginTransaction();
+    try {
+      const renamed = db.execute(
+        'UPDATE OR IGNORE arr_sync_quality_profiles SET profile_name = ? WHERE database_id = ? AND profile_name = ?',
+        newName,
+        databaseId,
+        oldName
+      );
+      const merged = db.execute(
+        'DELETE FROM arr_sync_quality_profiles WHERE database_id = ? AND profile_name = ?',
+        databaseId,
+        oldName
+      );
+      db.commit();
+      return renamed + merged;
+    } catch (error) {
+      db.rollback();
+      throw error;
+    }
   },
 
-  updateQualityProfileName(oldName: string, newName: string): number {
-    return db.execute('UPDATE arr_sync_quality_profiles SET profile_name = ? WHERE profile_name = ?', newName, oldName);
-  },
-
-  removeDelayProfileReference(profileName: string): number {
+  updateDelayProfileName(databaseId: number, oldName: string, newName: string): number {
     return db.execute(
-      'UPDATE arr_sync_delay_profiles_config SET database_id = NULL, profile_name = NULL WHERE profile_name = ?',
-      profileName
-    );
-  },
-
-  updateDelayProfileName(oldName: string, newName: string): number {
-    return db.execute(
-      'UPDATE arr_sync_delay_profiles_config SET profile_name = ? WHERE profile_name = ?',
+      'UPDATE arr_sync_delay_profiles_config SET profile_name = ? WHERE database_id = ? AND profile_name = ?',
       newName,
+      databaseId,
       oldName
     );
   },

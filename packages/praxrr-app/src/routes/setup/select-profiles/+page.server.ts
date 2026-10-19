@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
+import { arrSyncQueries, InvalidProfileSelectionError, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { pcdManager } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
@@ -96,6 +96,9 @@ export const actions: Actions = {
         meta: { instanceId: instance.id, databaseId: database.id, profileCount: selections.length },
       });
     } catch (e) {
+      if (e instanceof InvalidProfileSelectionError) {
+        return fail(400, { error: e.message });
+      }
       await logger.error('Failed to save quality profile selections during setup', {
         source: 'setup',
         meta: { instanceId: instance.id, error: e },

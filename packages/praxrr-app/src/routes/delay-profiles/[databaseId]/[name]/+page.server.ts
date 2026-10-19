@@ -129,8 +129,17 @@ export const actions: Actions = {
       return fail(500, { error: result.error || 'Failed to update delay profile' });
     }
 
-    if (name.trim() !== current.name) {
-      arrSyncQueries.updateDelayProfileName(current.name, name.trim());
+    const newName = name.trim();
+    if (newName !== current.name) {
+      // The PCD rename is already committed; a selection-propagation failure must not surface as a 500.
+      try {
+        arrSyncQueries.updateDelayProfileName(currentDatabaseId, current.name, newName);
+      } catch (err) {
+        await logger.error('Failed to propagate delay profile rename to sync selections', {
+          source: 'DelayProfileEdit',
+          meta: { databaseId: currentDatabaseId, oldName: current.name, newName, error: err },
+        });
+      }
     }
 
     throw redirect(303, `/delay-profiles/${databaseId}`);
