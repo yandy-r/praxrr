@@ -6,6 +6,7 @@ import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { getRadarrLanguages } from '$lib/server/sync/mappings.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { logger } from '$logger/logger.ts';
 
 export const load: ServerLoad = async ({ params }) => {
   const { databaseId, id } = params;
@@ -143,8 +144,17 @@ export const actions: Actions = {
       return fail(500, { error: result.error || 'Failed to update quality profile' });
     }
 
-    if (name.trim() !== current.name) {
-      arrSyncQueries.updateQualityProfileName(current.name, name.trim());
+    const newName = name.trim();
+    if (newName !== current.name) {
+      // The PCD rename is already committed; a selection-propagation failure must not surface as a 500.
+      try {
+        arrSyncQueries.updateQualityProfileName(currentDatabaseId, current.name, newName);
+      } catch (err) {
+        await logger.error('Failed to propagate quality profile rename to sync selections', {
+          source: 'QualityProfileGeneral',
+          meta: { databaseId: currentDatabaseId, oldName: current.name, newName, error: err },
+        });
+      }
     }
 
     throw redirect(303, `/quality-profiles/${databaseId}/${id}/general`);

@@ -177,6 +177,7 @@ Deno.test({
       'saveQualityProfilesSync',
       (() => {
         saveQualityProfilesCalls += 1;
+        return 0;
       }) as typeof arrSyncQueries.saveQualityProfilesSync,
       restores
     );
@@ -232,6 +233,7 @@ Deno.test({
       'saveQualityProfilesSync',
       (() => {
         saveCallCount += 1;
+        return 0;
       }) as typeof arrSyncQueries.saveQualityProfilesSync,
       restores
     );
@@ -290,6 +292,7 @@ Deno.test({
       'saveQualityProfilesSync',
       (() => {
         saveCalled = true;
+        return 0;
       }) as typeof arrSyncQueries.saveQualityProfilesSync,
       restores
     );
@@ -884,7 +887,10 @@ Deno.test('edge case: single instance with all sections returning no_matches', a
   patchTarget(
     arrSyncQueries,
     'saveQualityProfilesSync',
-    noopSave as typeof arrSyncQueries.saveQualityProfilesSync,
+    (() => {
+      anySaveCalled = true;
+      return 0;
+    }) as typeof arrSyncQueries.saveQualityProfilesSync,
     restores
   );
   patchTarget(
@@ -988,6 +994,7 @@ Deno.test({
       'saveQualityProfilesSync',
       (() => {
         saveCalled = true;
+        return 0;
       }) as typeof arrSyncQueries.saveQualityProfilesSync,
       restores
     );
