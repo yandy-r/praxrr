@@ -21,6 +21,12 @@ const MCP_ROUTE = /^\/api\/v1\/mcp\/?$/;
 
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
+/**
+ * GET/HEAD routes that still need `admin`: `arr/releases` triggers a live indexer search through
+ * the Arr instance, so it is not a read-only lookup despite the safe method.
+ */
+const ADMIN_SAFE_METHOD_ROUTES: readonly RegExp[] = [/^\/api\/v1\/arr\/releases\/?$/];
+
 /** POST routes that change Arr instances or PCD state through a reviewed apply/sync flow. */
 const SYNC_APPLY_ROUTES: readonly RegExp[] = [
   new RegExp(`^/api/v1/sync/preview/${SEGMENT}/apply/?$`),
@@ -32,22 +38,19 @@ const SYNC_APPLY_ROUTES: readonly RegExp[] = [
 ];
 
 /**
- * Dry-run POST routes, verified side-effect free on Arr instances, PCD ops, and settings: sync
- * preview create stores only an ephemeral in-memory preview; goals preview and impact simulation
- * compile into a throwaway sandbox cache; score simulation and entity evaluation only parse/match.
+ * Dry-run POST routes that change no Arr instance, PCD op, or setting: sync preview create stores
+ * only an ephemeral in-memory preview; goals preview compiles into a throwaway sandbox cache.
  */
-const READ_POST_ROUTES: readonly RegExp[] = [
-  /^\/api\/v1\/sync\/preview\/?$/,
-  /^\/api\/v1\/goals\/preview\/?$/,
-  /^\/api\/v1\/simulate\/(?:score|impact)\/?$/,
-  /^\/api\/v1\/entity-testing\/evaluate\/?$/,
-];
+const READ_POST_ROUTES: readonly RegExp[] = [/^\/api\/v1\/sync\/preview\/?$/, /^\/api\/v1\/goals\/preview\/?$/];
 
 /** Scope a token needs for this request. Fail-closed: unknown mutating routes need `admin`. */
 export function requiredScopeFor(method: string, pathname: string): ApiTokenScope {
   if (MCP_ROUTE.test(pathname)) return 'mcp';
 
   const verb = method.toUpperCase();
+  if ((verb === 'GET' || verb === 'HEAD') && ADMIN_SAFE_METHOD_ROUTES.some((route) => route.test(pathname))) {
+    return 'admin';
+  }
   if (SAFE_METHODS.includes(verb)) return 'read';
 
   if (verb === 'POST') {

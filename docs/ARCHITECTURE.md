@@ -975,7 +975,9 @@ Details and flow diagrams live in `packages/praxrr-app/src/lib/server/utils/auth
   shown once at creation.
 - **Principal:** middleware resolves each request to an `AuthPrincipal` (session, bypass or
   token) on `locals.principal`. `auth/scopePolicy.ts` maps method + path to the required scope
-  (fail-closed to `admin`); a token lacking it gets `403 { error: 'Forbidden', requiredScope }`.
+  (fail-closed to `admin`): `read` covers safe methods except `GET /api/v1/arr/releases` (live
+  indexer search, `admin`) plus the dry-run sync/goal preview POSTs; simulate and entity-testing
+  evaluate POSTs need `admin` because they write persistent caches. A token lacking it gets `403 { error: 'Forbidden', requiredScope }`.
   MCP tools declare their own `requiredScope`.
 - **Legacy key:** the former single global API key is migrated to a hashed `admin` token named
   "Legacy API key". It keeps working but is deprecated; Settings → Security and the Security

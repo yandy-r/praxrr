@@ -105,6 +105,16 @@ migratedTest('migrateLegacyApiKey without users clears the key and creates no to
   assertEquals(db.queryFirst<{ api_key: string | null }>('SELECT api_key FROM auth_settings')!.api_key, null);
 });
 
+migratedTest('migrateLegacyApiKey with only OIDC users clears the key and creates no token', async () => {
+  usersQueries.getOrCreateOidcUser('someone');
+  db.execute('UPDATE auth_settings SET api_key = ? WHERE id = 1', 'eeee0123456789abcdef0123456789ef');
+
+  await migrateLegacyApiKey();
+
+  assertEquals(apiTokensQueries.list().length, 0);
+  assertEquals(db.queryFirst<{ api_key: string | null }>('SELECT api_key FROM auth_settings')!.api_key, null);
+});
+
 // ---------------------------------------------------------------------------
 // Token creation
 // ---------------------------------------------------------------------------
@@ -227,13 +237,16 @@ Deno.test('requiredScopeFor maps routes to scopes and fails closed', () => {
   const cases: [string, string, string][] = [
     ['GET', '/api/v1/metrics', 'read'],
     ['HEAD', '/api/v1/arr/library', 'read'],
+    ['GET', '/api/v1/arr/library', 'read'],
+    ['GET', '/api/v1/arr/releases', 'admin'],
+    ['HEAD', '/api/v1/arr/releases', 'admin'],
     ['GET', '/api/v1/mcp', 'mcp'],
     ['POST', '/api/v1/mcp', 'mcp'],
     ['POST', '/api/v1/sync/preview', 'read'],
     ['POST', '/api/v1/goals/preview', 'read'],
-    ['POST', '/api/v1/simulate/score', 'read'],
-    ['POST', '/api/v1/simulate/impact', 'read'],
-    ['POST', '/api/v1/entity-testing/evaluate', 'read'],
+    ['POST', '/api/v1/simulate/score', 'admin'],
+    ['POST', '/api/v1/simulate/impact', 'admin'],
+    ['POST', '/api/v1/entity-testing/evaluate', 'admin'],
     ['POST', '/api/v1/sync/preview/preview_1_2_abc/apply', 'sync:apply'],
     ['POST', '/api/v1/trash-guide/sources/3/sync', 'sync:apply'],
     ['POST', '/api/v1/goals/apply', 'sync:apply'],

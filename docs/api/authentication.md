@@ -56,7 +56,7 @@ Example:
 ```bash
 curl -sS \
   -H 'X-Api-Key: prx_<token>' \
-  http://localhost:5173/api/v1/arr/releases?instanceId=1\&itemId=10 | jq
+  http://localhost:5173/api/v1/arr/library?instanceId=1 | jq
 ```
 
 Tokens only authenticate `/api/v1/*` requests. They never authenticate pages, form actions, or
@@ -76,18 +76,20 @@ Create, list and revoke tokens in **Settings → Security**:
 
 ### Scopes
 
-| Scope        | Grants                                                                         |
-| ------------ | ------------------------------------------------------------------------------ |
-| `read`       | Read-only access: every v1 `GET`/`HEAD`/`OPTIONS` request and dry-run previews |
-| `mcp`        | The MCP server at `/api/v1/mcp`                                                |
-| `sync:apply` | Applying reviewed changes and triggering syncs (see below)                     |
-| `admin`      | Full API access. Implies every other scope                                     |
+| Scope        | Grants                                                                              |
+| ------------ | ----------------------------------------------------------------------------------- |
+| `read`       | Read-only access: v1 `GET`/`HEAD`/`OPTIONS` requests and dry-run sync/goal previews |
+| `mcp`        | The MCP server at `/api/v1/mcp`                                                     |
+| `sync:apply` | Applying reviewed changes and triggering syncs (see below)                          |
+| `admin`      | Full API access. Implies every other scope                                          |
 
 Each `/api/v1/*` request needs one scope (tokens are not accepted on other paths). The policy is
 checked in this order, and an unmatched mutating request needs `admin`:
 
 - `mcp`: any request to `/api/v1/mcp`.
-- `read`: any `GET`, `HEAD` or `OPTIONS` request.
+- `admin`: `GET`/`HEAD` `/api/v1/arr/releases`, which triggers a live indexer search through the
+  Arr instance.
+- `read`: any other `GET`, `HEAD` or `OPTIONS` request.
 - `sync:apply`: these `POST` routes:
   - `/api/v1/sync/preview/{id}/apply`
   - `/api/v1/goals/apply`
@@ -98,9 +100,9 @@ checked in this order, and an unmatched mutating request needs `admin`:
 - `read`: these dry-run `POST` routes, which change no Arr, PCD or settings state:
   - `/api/v1/sync/preview`
   - `/api/v1/goals/preview`
-  - `/api/v1/simulate/score`, `/api/v1/simulate/impact`
-  - `/api/v1/entity-testing/evaluate`
-- `admin`: every other `POST`, `PUT`, `PATCH` or `DELETE`.
+- `admin`: every other `POST`, `PUT`, `PATCH` or `DELETE`, including `/api/v1/simulate/score`,
+  `/api/v1/simulate/impact` and `/api/v1/entity-testing/evaluate` (they write to the persistent
+  parser and pattern caches).
 
 A token without the required scope gets status `403`:
 

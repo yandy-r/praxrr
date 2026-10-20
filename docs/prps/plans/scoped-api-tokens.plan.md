@@ -243,8 +243,8 @@ answers HTTP 403 for that error.
   under `/api/v1/`; token principals never authenticate page routes or form actions. Migration
   `20261021` creates `api_tokens` (id, name, token_hash UNIQUE, prefix, scopes JSON, is_legacy,
   created_at, last_used_at, expires_at, revoked_at); `afterUp` converts a non-null
-  `auth_settings.api_key` into a hashed legacy `admin` token named "Legacy API key" only when the
-  `users` table has rows, then sets `api_key = NULL` unconditionally.
+  `auth_settings.api_key` into a hashed legacy `admin` token named "Legacy API key" only when a local
+  (non-`oidc:`) user exists (the key was ignored under oidc, so OIDC-only installs never used it), then sets `api_key = NULL` unconditionally.
 - **MIRROR**: Migration and queries patterns above.
 - **VALIDATE**: `deno task test` on new auth/migration/mcp/sanitizer tests; `deno task check:server`.
 
@@ -270,7 +270,7 @@ answers HTTP 403 for that error.
 ## Testing Strategy
 
 - Migration: legacy key → hashed admin legacy token and `api_key` NULL; fresh install (no users)
-  → no legacy token and `api_key` NULL.
+  → no legacy token and `api_key` NULL; only OIDC users → no legacy token and `api_key` NULL.
 - getAuthState: valid token authenticates under `on` and `oidc`; ignored on non-`/api/v1` paths;
   revoked and expired tokens rejected; `last_used_at` set on use.
 - Scope policy: read token → 403 on POST/PUT/PATCH/DELETE `/api/v1/*`, 200-path on GET; `mcp`
@@ -309,7 +309,9 @@ deno task build
   hardening; called out in the PR.
 - Fresh installs or installs without users lose the never-shown random key. Intended.
 - Read-classified POST routes must be verified side-effect free; unknown mutating routes fail
-  closed to `admin`.
+  closed to `admin`. Only sync preview (in-memory store) and goals preview (sandbox cache) are
+  `read`; simulate and entity-testing evaluate write persistent parser/pattern caches and need
+  `admin`, as does `GET /api/v1/arr/releases` (live indexer search through Arr).
 
 ## Notes
 

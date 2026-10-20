@@ -10,7 +10,7 @@ export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number];
 export const API_TOKEN_SCOPE_INFO: Record<ApiTokenScope, { label: string; description: string }> = {
   read: {
     label: 'Read',
-    description: 'Read-only access to /api/v1 (GET requests and dry-run previews).',
+    description: 'Read-only access to /api/v1 (GET requests and dry-run sync/goal previews).',
   },
   mcp: {
     label: 'MCP',

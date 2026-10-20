@@ -237,10 +237,10 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 
 | Scope        | Grants                                                                                                                                                                                                                        |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`       | GET/HEAD/OPTIONS on `/api/v1/*`; dry-run POSTs: `/api/v1/sync/preview`, `/api/v1/goals/preview`, `/api/v1/simulate/{score,impact}`, `/api/v1/entity-testing/evaluate`                                                         |
+| `read`       | GET/HEAD/OPTIONS on `/api/v1/*` except GET/HEAD `/api/v1/arr/releases` (live indexer search, `admin`); dry-run POSTs: `/api/v1/sync/preview`, `/api/v1/goals/preview`                                                         |
 | `mcp`        | `/api/v1/mcp` (any method); each MCP tool also declares `requiredScope` (JSON-RPC `-32003` + HTTP 403 when unmet)                                                                                                             |
 | `sync:apply` | POST `/api/v1/sync/preview/{id}/apply`, `/api/v1/trash-guide/sources/{id}/sync`, `/api/v1/goals/apply`, `/api/v1/pcd/{db}/snapshots/{id}/rollback`, `/api/v1/canary/rollouts`, `/api/v1/canary/rollouts/{id}/{proceed,abort}` |
-| `admin`      | Everything, including every other mutating `/api/v1/*` route                                                                                                                                                                  |
+| `admin`      | Everything, including every other mutating `/api/v1/*` route (e.g. `/api/v1/simulate/*`, `/api/v1/entity-testing/evaluate`, which write persistent caches) and GET `/api/v1/arr/releases`                                     |
 
 ## Session Management
 
