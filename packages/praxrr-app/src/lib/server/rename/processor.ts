@@ -9,6 +9,7 @@ import type { ArrInstance } from '$lib/server/db/queries/arrInstances.ts';
 import type { RenameSettings } from '$lib/server/db/queries/arrRenameSettings.ts';
 import type { RenameJobLog, RenameItem } from './types.ts';
 import { logRenameRun, logRenameStart, logRenameError, logRenameSkipped } from './logger.ts';
+import { groupSeriesByParentFolder } from './folderGroups.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
 import { notificationServicesQueries } from '$lib/server/db/queries/notificationServices.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
@@ -408,32 +409,19 @@ async function processSonarrRename(
   // Rename folders if enabled
   let foldersRenamed = 0;
   if (settings.renameFolders && renamedItems.length > 0) {
-    // Group series by root folder path for batch operation
     const seriesIds = renamedItems.map((item) => item.id);
-
-    // Get series to find their root folder paths
     const seriesToRename = series.filter((s) => seriesIds.includes(s.id));
-    const rootFolderPaths = [
-      ...new Set(
-        seriesToRename
-          .map((s) => {
-            // Extract root folder from path (path minus last segment)
-            if (s.path) {
-              const parts = s.path.split('/');
-              parts.pop();
-              return parts.join('/');
-            }
-            return null;
-          })
-          .filter(Boolean)
-      ),
-    ];
 
-    for (const rootPath of rootFolderPaths) {
-      const seriesIdsInPath = seriesToRename.filter((s) => s.path?.startsWith(rootPath!)).map((s) => s.id);
+    // Batch by exact parent folder: Sonarr moves every listed series into rootFolderPath.
+    const { groups, unresolved } = groupSeriesByParentFolder(seriesToRename);
 
+    for (const s of unresolved) {
+      errors.push(`Skipped folder rename for "${s.title}": cannot determine parent folder of path "${s.path ?? ''}"`);
+    }
+
+    for (const [rootPath, seriesIdsInPath] of groups) {
       try {
-        await client.renameSeriesFolders(seriesIdsInPath, rootPath!);
+        await client.renameSeriesFolders(seriesIdsInPath, rootPath);
         foldersRenamed += seriesIdsInPath.length;
 
         // Fire refresh without waiting - Sonarr processes in background
