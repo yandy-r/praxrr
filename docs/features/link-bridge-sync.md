@@ -59,8 +59,9 @@ Dependency rule:
 ## 5) Optional cleanup for stale configs
 
 - Scan stale Arr-side configs with `/api/v1/arr/cleanup` (`action=scan`).
-- Execute removal using prior scan output (`action=execute`).
-- Profiles currently assigned in Arr are skipped with reason `Profile is assigned to media`.
+- Execute (`action=execute`) sends that scan result. Praxrr scans the instance again. It deletes a requested custom format or quality profile only when its `id` and `name` still match a stale item of the same kind.
+- Requested items missing from the fresh stale list stay on the instance. Custom formats are reported in `failedCustomFormats`, and quality profiles in `skippedQualityProfiles`, with reason `No longer stale; not deleted`.
+- Quality profiles that Arr still assigns to media are skipped with reason `Profile is assigned to media`.
 
 ## Practical API examples
 
@@ -86,7 +87,7 @@ curl -sS -X POST "http://localhost:6868/api/v1/arr/cleanup" \
 - Sync jobs fail with credential errors and the instance disables itself:
   Re-check Arr credential key configuration and recreate API key material.
 - Cleanup keeps some quality profiles:
-  Arr rejected deletion because the profile is still assigned to media.
+  The profile is still assigned to media in Arr, or a fresh scan no longer marks it stale. The result includes the reason.
 - Library data looks stale:
   Invalidate cache with `DELETE /api/v1/arr/library?instanceId=...`.
 
