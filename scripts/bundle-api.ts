@@ -135,6 +135,8 @@ if (rootPaths) {
 // 3. Convert all $refs to internal format
 const resolvedSchemas = convertRefs(schemas);
 const resolvedPaths = convertRefs(paths);
+// Webhooks are defined inline in openapi.yaml (outbound requests Praxrr sends, e.g. notifications).
+const resolvedWebhooks = convertRefs(root.webhooks ?? {});
 
 // 4. Build final spec
 const bundled = {
@@ -143,6 +145,7 @@ const bundled = {
   servers: root.servers,
   tags: root.tags,
   paths: resolvedPaths,
+  webhooks: resolvedWebhooks,
   components: {
     schemas: resolvedSchemas,
   },
@@ -161,7 +164,8 @@ let typesContent = Deno.readTextFileSync(typesSource);
 const symbolDocs: Record<string, string> = {
   'export interface paths':
     '/** API endpoint path definitions mapping URL patterns to their HTTP methods and operations. */',
-  'export type webhooks': '/** Webhook event definitions. Currently unused. */',
+  'export interface webhooks':
+    '/** Outbound webhook definitions: requests Praxrr sends to user-configured endpoints (e.g. notifications). */',
   'export interface components':
     '/** API component schemas including all request bodies, response types, and shared models. */',
   'export type $defs': '/** JSON Schema definitions. Currently unused. */',

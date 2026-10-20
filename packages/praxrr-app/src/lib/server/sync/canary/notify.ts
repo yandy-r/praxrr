@@ -11,7 +11,7 @@
  */
 
 import { notify, createEmbed, Colors, getInstanceIcon } from '$notifications/builder.ts';
-import { NotificationTypes } from '$notifications/types.ts';
+import { NotificationTypes, type NotificationContext } from '$notifications/types.ts';
 import type { CanaryInstanceResult, CanaryRolloutDetail } from './types.ts';
 
 const MAX_EMBED_RESULT_LINES = 10;
@@ -23,6 +23,15 @@ function failedResultLines(results: readonly CanaryInstanceResult[]): string[] {
     return ['See details for the full outcome.'];
   }
   return failed.slice(0, MAX_EMBED_RESULT_LINES).map((result) => `• ${result.instanceName} — ${result.status}`);
+}
+
+/** Event context: the app plus the canary instance the rollout was gated on. */
+function canaryContext(rollout: CanaryRolloutDetail): NotificationContext {
+  return {
+    instanceId: rollout.canaryInstanceId ?? undefined,
+    instanceName: rollout.canaryInstanceName,
+    arrType: rollout.arrType,
+  };
 }
 
 /**
@@ -48,6 +57,7 @@ export function notifyCanaryFailed(rollout: CanaryRolloutDetail): void {
 
   // Strict fire-and-forget: a webhook failure must never affect the rollout outcome.
   void notify(NotificationTypes.CANARY_FAILED)
+    .context(canaryContext(rollout))
     .generic(title, message)
     .discord((discord) => discord.embed(embed))
     .send()
@@ -78,6 +88,7 @@ export function notifyCanaryPromoted(rollout: CanaryRolloutDetail): void {
 
   // Strict fire-and-forget: a webhook failure must never affect the rollout outcome.
   void notify(NotificationTypes.CANARY_PROMOTED)
+    .context(canaryContext(rollout))
     .generic(title, message)
     .discord((discord) => discord.embed(embed))
     .send()

@@ -12,6 +12,8 @@ export interface NotificationHistoryRecord {
   metadata: string | null; // JSON string
   status: 'success' | 'failed';
   error: string | null;
+  /** Highest delivery attempt reached (1 = first-try success) */
+  attempts: number;
   sent_at: string;
 }
 
@@ -23,6 +25,7 @@ export interface CreateNotificationHistoryInput {
   metadata?: Record<string, unknown>;
   status: 'success' | 'failed';
   error?: string;
+  attempts?: number;
 }
 
 export interface NotificationHistoryFilters {
@@ -43,18 +46,26 @@ export const notificationHistoryQueries = {
   create(input: CreateNotificationHistoryInput): boolean {
     const affected = db.execute(
       `INSERT INTO notification_history (
-				service_id, notification_type, title, message, metadata, status, error
-			) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				service_id, notification_type, title, message, metadata, status, error, attempts
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       input.serviceId,
       input.notificationType,
       input.title,
       input.message,
       input.metadata ? JSON.stringify(input.metadata) : null,
       input.status,
-      input.error ?? null
+      input.error ?? null,
+      input.attempts ?? 1
     );
 
     return affected > 0;
+  },
+
+  /**
+   * Get a single history record by id
+   */
+  getById(id: number): NotificationHistoryRecord | undefined {
+    return db.queryFirst<NotificationHistoryRecord>('SELECT * FROM notification_history WHERE id = ?', id);
   },
 
   /**

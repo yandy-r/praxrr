@@ -1,8 +1,9 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { alertStore } from '$alerts/store';
-  import DiscordConfiguration from './DiscordConfiguration.svelte';
-  import { siDiscord } from 'simple-icons';
+  import ProviderConfiguration from './ProviderConfiguration.svelte';
+  import { getProviderIcon } from './providerIcons';
+  import { getProviderDescriptor, notificationProviders } from '$shared/notifications/providers';
   import { groupNotificationTypesByCategory } from '$shared/notifications/types';
   import { Plus, Save, Check } from 'lucide-svelte';
   import IconCheckbox from '$ui/form/IconCheckbox.svelte';
@@ -14,11 +15,15 @@
     name?: string;
     serviceType?: string;
     config?: Record<string, unknown>;
+    secretsSet?: string[];
     enabledTypes?: string[];
   } = {};
 
-  let selectedType: 'discord' | 'slack' | 'email' = (initialData.serviceType as 'discord') || 'discord';
+  let selectedType: string = initialData.serviceType || notificationProviders[0].type;
   let serviceName = initialData.name || '';
+
+  $: selectedDescriptor = getProviderDescriptor(selectedType);
+  $: selectedIcon = getProviderIcon(selectedType);
 
   // Group notification types by category
   const groupedTypes = groupNotificationTypesByCategory();
@@ -66,15 +71,21 @@
         </label>
         <div class="relative mt-1">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            {#if selectedType === 'discord'}
+            {#if selectedIcon.kind === 'svg'}
               <svg
                 role="img"
                 viewBox="0 0 24 24"
                 class="h-4 w-4 text-neutral-600 dark:text-neutral-400"
                 fill="currentColor"
               >
-                <path d={siDiscord.path} />
+                <path d={selectedIcon.path} />
               </svg>
+            {:else}
+              <svelte:component
+                this={selectedIcon.component}
+                size={16}
+                class="text-neutral-600 dark:text-neutral-400"
+              />
             {/if}
           </div>
           <select
@@ -85,10 +96,14 @@
             disabled={mode === 'edit'}
             class="block w-full rounded-lg border border-neutral-300 bg-white py-2 pr-3 pl-10 text-sm text-neutral-900 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:focus:border-neutral-500 dark:focus:ring-neutral-500"
           >
-            <option value="discord">Discord</option>
+            {#each notificationProviders as provider (provider.type)}
+              <option value={provider.type}>{provider.label}</option>
+            {/each}
           </select>
         </div>
         {#if mode === 'edit'}
+          <!-- Disabled selects are not submitted; keep the type in the payload. -->
+          <input type="hidden" name="type" value={selectedType} />
           <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
             Service type cannot be changed after creation
           </p>
@@ -107,7 +122,7 @@
           name="name"
           bind:value={serviceName}
           required
-          placeholder="e.g., Main Discord Server"
+          placeholder="e.g., Ops alerts"
           class="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder-neutral-500 dark:focus:border-neutral-500 dark:focus:ring-neutral-500"
         />
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
@@ -118,9 +133,16 @@
   </div>
 
   <!-- Service Configuration -->
-  {#if selectedType === 'discord'}
-    <DiscordConfiguration config={initialData.config} {mode} />
-  {/if}
+  {#key selectedType}
+    {#if selectedDescriptor}
+      <ProviderConfiguration
+        descriptor={selectedDescriptor}
+        config={selectedType === initialData.serviceType ? (initialData.config ?? {}) : {}}
+        secretsSet={selectedType === initialData.serviceType ? (initialData.secretsSet ?? []) : []}
+        {mode}
+      />
+    {/if}
+  {/key}
 
   <!-- Notification Types -->
   <div class="rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">

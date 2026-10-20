@@ -1,13 +1,14 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { alertStore } from '$alerts/store';
-  import { Plus, Trash2, Bell, BellOff, MessageSquare, Send, Loader2, Pencil } from 'lucide-svelte';
+  import { Plus, Trash2, Bell, BellOff, Send, Loader2, Pencil } from 'lucide-svelte';
   import Modal from '$ui/modal/Modal.svelte';
   import NotificationHistory from './components/NotificationHistory.svelte';
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import type { Column } from '$ui/table/types';
-  import { siDiscord } from 'simple-icons';
+  import { getProviderIcon } from './components/providerIcons';
+  import { getProviderDescriptor } from '$shared/notifications/providers';
   import Button from '$ui/button/Button.svelte';
   import type { PageData } from './$types';
 
@@ -53,28 +54,6 @@
     selectedService = null;
     selectedServiceName = null;
     deleteFormRef = null;
-  }
-
-  function getServiceIcon(serviceType: string) {
-    switch (serviceType) {
-      case 'discord':
-        return MessageSquare;
-      default:
-        return Bell;
-    }
-  }
-
-  function getServiceTypeName(serviceType: string): string {
-    switch (serviceType) {
-      case 'discord':
-        return 'Discord';
-      case 'slack':
-        return 'Slack';
-      case 'email':
-        return 'Email';
-      default:
-        return serviceType;
-    }
   }
 
   function formatSuccessRate(rate: number): string {
@@ -136,23 +115,21 @@
         <span class="font-medium">{row.name}</span>
       {:else if column.key === 'service_type'}
         <div class="flex items-center gap-2">
-          {#if row.service_type === 'discord'}
-            <svg
-              role="img"
-              viewBox="0 0 24 24"
-              class="h-4 w-4 text-neutral-600 dark:text-neutral-400"
-              fill="currentColor"
-            >
-              <path d={siDiscord.path} />
-            </svg>
-          {:else}
-            <svelte:component
-              this={getServiceIcon(row.service_type)}
-              size={16}
-              class="text-neutral-600 dark:text-neutral-400"
-            />
-          {/if}
-          <span>{getServiceTypeName(row.service_type)}</span>
+          {#each [getProviderIcon(row.service_type)] as icon}
+            {#if icon.kind === 'svg'}
+              <svg
+                role="img"
+                viewBox="0 0 24 24"
+                class="h-4 w-4 text-neutral-600 dark:text-neutral-400"
+                fill="currentColor"
+              >
+                <path d={icon.path} />
+              </svg>
+            {:else}
+              <svelte:component this={icon.component} size={16} class="text-neutral-600 dark:text-neutral-400" />
+            {/if}
+          {/each}
+          <span>{getProviderDescriptor(row.service_type)?.label ?? row.service_type}</span>
         </div>
       {:else if column.key === 'enabled'}
         <Badge variant={row.enabled ? 'success' : 'neutral'} icon={row.enabled ? Bell : BellOff}>

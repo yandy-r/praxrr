@@ -3,6 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { logger } from '$logger/logger.ts';
 import { notificationServicesQueries } from '$db/queries/notificationServices.ts';
 import { getAllNotificationTypeIds } from '$shared/notifications/types.ts';
+import { parseProviderForm, toClientConfig } from '$notifications/registry.ts';
 
 export const load = ({ params }: { params: { id: string } }) => {
   const { id } = params;
@@ -17,12 +18,9 @@ export const load = ({ params }: { params: { id: string } }) => {
     throw error(404, 'Notification service not found');
   }
 
-  // Parse JSON fields for the component
-  const config = JSON.parse(service.config);
+  // Secrets are stripped server-side; the form only learns which ones are set.
+  const { config, secretsSet } = toClientConfig(service.service_type, JSON.parse(service.config));
   const enabledTypes = JSON.parse(service.enabled_types);
-
-  // Remove webhook_url from config (security - don't expose secrets)
-  const { webhook_url: _webhook_url, ...configWithoutWebhook } = config;
 
   return {
     service: {
@@ -30,7 +28,8 @@ export const load = ({ params }: { params: { id: string } }) => {
       name: service.name,
       serviceType: service.service_type,
       enabled: service.enabled === 1,
-      config: configWithoutWebhook,
+      config,
+      secretsSet,
       enabledTypes,
     },
   };
@@ -62,31 +61,13 @@ export const actions: Actions = {
       return fail(400, { error: 'A service with this name already exists' });
     }
 
-    // Build config based on service type (service type cannot be changed)
-    let config: Record<string, unknown> = {};
-    let enabledTypes: string[] = [];
-
-    if (service.service_type === 'discord') {
-      const webhookUrl = formData.get('webhook_url') as string;
-      const username = formData.get('username') as string;
-      const avatarUrl = formData.get('avatar_url') as string;
-      const enableMentions = formData.get('enable_mentions') === 'on';
-
-      // Parse existing config to preserve webhook if not provided
-      const existingConfig = JSON.parse(service.config);
-
-      config = {
-        // Keep existing webhook_url if new one not provided
-        webhook_url: webhookUrl || existingConfig.webhook_url,
-        ...(username && { username }),
-        ...(avatarUrl && { avatar_url: avatarUrl }),
-        enable_mentions: enableMentions,
-      };
-
-      // Get enabled notification types dynamically from all available types
-      const allTypeIds = getAllNotificationTypeIds();
-      enabledTypes = allTypeIds.filter((typeId) => formData.get(typeId) === 'on');
+    // Service type cannot be changed; blank secret fields keep their stored values.
+    const parsed = parseProviderForm(service.service_type, formData, JSON.parse(service.config));
+    if (!parsed.ok) {
+      return fail(400, { error: parsed.error });
     }
+    const config = parsed.config;
+    const enabledTypes = getAllNotificationTypeIds().filter((typeId) => formData.get(typeId) === 'on');
 
     // Update the service
     const success = notificationServicesQueries.update(id, {

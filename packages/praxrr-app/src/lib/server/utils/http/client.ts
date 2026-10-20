@@ -1,5 +1,5 @@
 import type { HttpClientOptions, RequestOptions } from './types.ts';
-import { HttpError } from './types.ts';
+import { HttpError, parseRetryAfter } from './types.ts';
 
 /**
  * Base HTTP client with connection pooling and generic request capabilities
@@ -35,7 +35,12 @@ export class BaseHttpClient {
   /**
    * Make an HTTP request with retry logic
    */
-  protected async request<T>(method: string, path: string, options?: RequestOptions & { body?: unknown }): Promise<T> {
+  protected async request<T>(
+    method: string,
+    path: string,
+    /** `bodyText` is sent verbatim (pre-serialized); otherwise `body` is JSON-stringified */
+    options?: RequestOptions & { body?: unknown; bodyText?: string }
+  ): Promise<T> {
     let lastError: HttpError | undefined;
 
     // Retry loop
@@ -57,7 +62,7 @@ export class BaseHttpClient {
           const response = await fetch(url, {
             method,
             headers,
-            body: options?.body ? JSON.stringify(options.body) : undefined,
+            body: options?.bodyText ?? (options?.body ? JSON.stringify(options.body) : undefined),
             signal: options?.signal ?? controller.signal,
             // Never auto-follow redirects: a malicious/compromised target could
             // redirect to an internal address, bypassing SSRF checks on the
@@ -89,7 +94,12 @@ export class BaseHttpClient {
                 ? `HTTP ${response.status}: ${response.statusText} | ${details}`
                 : `HTTP ${response.status}: ${response.statusText}`;
 
-            const error = new HttpError(errorMessage, response.status, data);
+            const error = new HttpError(
+              errorMessage,
+              response.status,
+              data,
+              parseRetryAfter(response.headers.get('retry-after'))
+            );
 
             // Retry on specific status codes
             if (this.retryStatusCodes.includes(response.status) && attempt < this.retries) {

@@ -4,10 +4,10 @@
 
 import { notify, createEmbed, Colors, type EmbedBuilder } from '../builder.ts';
 import type { RenameJobLog } from '$lib/server/rename/types.ts';
+import type { NotificationContext } from '../types.ts';
 
 interface RenameNotificationParams {
   log: RenameJobLog;
-  config: { username?: string; avatar_url?: string };
   summaryNotifications?: boolean;
 }
 
@@ -31,6 +31,13 @@ function getTitle(log: RenameJobLog): string {
   const prefix = log.config.manual ? 'Manual' : 'Automatic';
   const result = log.status === 'failed' ? 'Failed' : 'Complete';
   return `${prefix} Rename ${result}`;
+}
+
+/**
+ * Instance context attached to every rename notification
+ */
+function renameContext(log: RenameJobLog): NotificationContext {
+  return { instanceId: log.instanceId, instanceName: log.instanceName, arrType: log.instanceType };
 }
 
 /**
@@ -196,15 +203,10 @@ function getFieldCount(embed: EmbedBuilder): number {
 }
 
 /**
- * Start a new embed with author, title, and stats fields
+ * Start a new embed with title and stats fields (author is filled by DiscordNotifier)
  */
-function startNewEmbed(
-  log: RenameJobLog,
-  config: { username?: string; avatar_url?: string },
-  page: number
-): EmbedBuilder {
+function startNewEmbed(log: RenameJobLog, page: number): EmbedBuilder {
   const embed = createEmbed()
-    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -231,9 +233,8 @@ function startNewEmbed(
 /**
  * Build a summary notification (compact, single embed)
  */
-function buildSummaryNotification(log: RenameJobLog, config: { username?: string; avatar_url?: string }) {
+function buildSummaryNotification(log: RenameJobLog) {
   const embed = createEmbed()
-    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -271,6 +272,7 @@ function buildSummaryNotification(log: RenameJobLog, config: { username?: string
       : `Renamed ${log.results.filesRenamed} files for ${log.instanceName}`;
 
   return notify(`rename.${log.status}`)
+    .context(renameContext(log))
     .generic(getTitle(log), genericMessage)
     .discord((d) => d.embed(embed));
 }
@@ -278,16 +280,17 @@ function buildSummaryNotification(log: RenameJobLog, config: { username?: string
 /**
  * Build a rich notification (detailed, multiple embeds if needed)
  */
-function buildRichNotification(log: RenameJobLog, config: { username?: string; avatar_url?: string }) {
+function buildRichNotification(log: RenameJobLog) {
   const embeds: EmbedBuilder[] = [];
 
   // If no files to rename, single embed with just stats
   if (log.renamedItems.length === 0) {
-    const embed = startNewEmbed(log, config, 1);
+    const embed = startNewEmbed(log, 1);
     embed.field('Status', 'No files needed renaming', false);
     embeds.push(embed);
 
     return notify(`rename.${log.status}`)
+      .context(renameContext(log))
       .generic(getTitle(log), `No files needed renaming for ${log.instanceName}`)
       .discord((d) => {
         for (const e of embeds) d.embed(e);
@@ -305,7 +308,7 @@ function buildRichNotification(log: RenameJobLog, config: { username?: string; a
 
   // Build embeds, counting as we go
   let page = 1;
-  let embed = startNewEmbed(log, config, page);
+  let embed = startNewEmbed(log, page);
 
   for (const field of contentFields) {
     const fieldChars = field.name.length + field.value.length;
@@ -317,7 +320,7 @@ function buildRichNotification(log: RenameJobLog, config: { username?: string; a
       // Finish current embed and start a new one
       embeds.push(embed);
       page++;
-      embed = startNewEmbed(log, config, page);
+      embed = startNewEmbed(log, page);
     }
 
     embed.field(field.name, field.value, false);
@@ -332,6 +335,7 @@ function buildRichNotification(log: RenameJobLog, config: { username?: string; a
       : `Renamed ${log.results.filesRenamed} files for ${log.instanceName}`;
 
   return notify(`rename.${log.status}`)
+    .context(renameContext(log))
     .generic(getTitle(log), genericMessage)
     .discord((d) => {
       for (const e of embeds) d.embed(e);
@@ -342,11 +346,10 @@ function buildRichNotification(log: RenameJobLog, config: { username?: string; a
 /**
  * Notification for rename job completion
  */
-export const rename = ({ log, config, summaryNotifications = true }: RenameNotificationParams) => {
+export const rename = ({ log, summaryNotifications = true }: RenameNotificationParams) => {
   // If no files to rename, always use a simple notification
   if (log.renamedItems.length === 0) {
     const embed = createEmbed()
-      .author(config.username || 'Praxrr', config.avatar_url)
       .title(`${getTitle(log)} - ${log.instanceName}`)
       .color(Colors.INFO)
       .field('Status', 'No files needed renaming', false)
@@ -354,14 +357,15 @@ export const rename = ({ log, config, summaryNotifications = true }: RenameNotif
       .footer(`Type: rename.${log.status}`);
 
     return notify(`rename.${log.status}`)
+      .context(renameContext(log))
       .generic(getTitle(log), `No files needed renaming for ${log.instanceName}`)
       .discord((d) => d.embed(embed));
   }
 
   // Use summary or rich notification based on setting
   if (summaryNotifications) {
-    return buildSummaryNotification(log, config);
+    return buildSummaryNotification(log);
   }
 
-  return buildRichNotification(log, config);
+  return buildRichNotification(log);
 };

@@ -11,7 +11,6 @@ import type { RenameJobLog, RenameItem } from './types.ts';
 import { logRenameRun, logRenameStart, logRenameError, logRenameSkipped } from './logger.ts';
 import { groupSeriesByParentFolder } from './folderGroups.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
-import { notificationServicesQueries } from '$lib/server/db/queries/notificationServices.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 
 /**
@@ -60,35 +59,12 @@ function createSkippedLog(
 }
 
 /**
- * Send rename notification
+ * Send rename notification (manager handles service filtering, delivery and history)
  */
 async function sendRenameNotification(log: RenameJobLog, summaryNotifications: boolean): Promise<void> {
   // Only notify if there were files to rename
   if (log.results.filesNeedingRename > 0) {
-    const { DiscordNotifier } = await import('$lib/server/notifications/notifiers/discord/index.ts');
-
-    // Get all enabled services that have this notification type enabled
-    const services = notificationServicesQueries.getAllEnabled();
-    const notificationType = `rename.${log.status}`;
-
-    for (const service of services) {
-      try {
-        const enabledTypes = JSON.parse(service.enabled_types) as string[];
-        if (!enabledTypes.includes(notificationType)) {
-          continue;
-        }
-
-        const config = JSON.parse(service.config);
-
-        if (service.service_type === 'discord') {
-          const notifier = new DiscordNotifier(config);
-          const notification = notifications.rename({ log, config, summaryNotifications }).build();
-          await notifier.notify(notification);
-        }
-      } catch {
-        // Errors are logged by the notifier
-      }
-    }
+    await notifications.rename({ log, summaryNotifications }).send();
   }
 }
 

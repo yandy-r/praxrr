@@ -7,7 +7,6 @@ import type { UpgradeJobLog, UpgradeSelectionItem } from '$lib/server/upgrades/t
 
 interface UpgradeNotificationParams {
   log: UpgradeJobLog;
-  config: { username?: string; avatar_url?: string };
   manual?: boolean;
 }
 
@@ -133,14 +132,8 @@ function getFieldCount(embed: EmbedBuilder): number {
 /**
  * Start a new embed with header info
  */
-function startNewEmbed(
-  log: UpgradeJobLog,
-  config: { username?: string; avatar_url?: string },
-  page: number,
-  manual: boolean
-): EmbedBuilder {
+function startNewEmbed(log: UpgradeJobLog, page: number, manual: boolean): EmbedBuilder {
   const embed = createEmbed()
-    .author(config.username || 'Praxrr', config.avatar_url)
     .title(`${getTitle(log, manual)} - ${log.instanceName}`)
     .color(Colors.INFO)
     .timestamp()
@@ -194,13 +187,14 @@ function buildGenericMessage(log: UpgradeJobLog): string {
 /**
  * Notification for upgrade job completion
  */
-export const upgrade = ({ log, config, manual = false }: UpgradeNotificationParams) => {
+export const upgrade = ({ log, manual = false }: UpgradeNotificationParams) => {
+  // The upgrade processor only runs against Radarr instances (see upgrades/processor.ts).
+  const context = { instanceId: log.instanceId, instanceName: log.instanceName, arrType: 'radarr' };
   const embeds: EmbedBuilder[] = [];
 
   // If no items searched, single embed with just stats
   if (log.selection.items.length === 0) {
     const embed = createEmbed()
-      .author(config.username || 'Praxrr', config.avatar_url)
       .title(`${getTitle(log, manual)} - ${log.instanceName}`)
       .color(Colors.INFO)
       .field('Filter', log.filter.name || 'Unknown', true)
@@ -211,6 +205,7 @@ export const upgrade = ({ log, config, manual = false }: UpgradeNotificationPara
       .footer(`Type: upgrade.${log.status}`);
 
     return notify(`upgrade.${log.status}`)
+      .context(context)
       .generic(getTitle(log, manual), `No items to search for ${log.instanceName}`)
       .discord((d) => d.embed(embed));
   }
@@ -241,7 +236,7 @@ export const upgrade = ({ log, config, manual = false }: UpgradeNotificationPara
 
   // Build embeds, respecting limits
   let page = 1;
-  let embed = startNewEmbed(log, config, page, manual);
+  let embed = startNewEmbed(log, page, manual);
 
   for (const field of contentFields) {
     const fieldChars = field.name.length + field.value.length;
@@ -252,7 +247,7 @@ export const upgrade = ({ log, config, manual = false }: UpgradeNotificationPara
     if (currentSize + fieldChars > MAX_EMBED_SIZE || currentFieldCount >= MAX_FIELDS_PER_EMBED) {
       embeds.push(embed);
       page++;
-      embed = startNewEmbed(log, config, page, manual);
+      embed = startNewEmbed(log, page, manual);
     }
 
     embed.field(field.name, field.value, false);
@@ -264,6 +259,7 @@ export const upgrade = ({ log, config, manual = false }: UpgradeNotificationPara
   const genericMessage = buildGenericMessage(log);
 
   return notify(`upgrade.${log.status}`)
+    .context(context)
     .generic(getTitle(log, manual), genericMessage)
     .discord((d) => {
       for (const e of embeds) d.embed(e);

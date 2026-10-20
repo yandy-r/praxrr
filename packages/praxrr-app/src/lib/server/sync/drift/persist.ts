@@ -135,6 +135,7 @@ export async function checkAndPersistInstance(
       // Fire-and-forget: never awaited into the result; a notification failure must never
       // affect drift persistence. Advance notified_signature only after the emit attempt.
       void notify('drift.detected')
+        .context({ instanceId: next.instanceId, instanceName: next.instanceName, arrType: next.arrType })
         .generic(title, message)
         .discord((discord) => discord.embed(embed))
         .send()

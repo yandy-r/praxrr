@@ -3,6 +3,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import { logger } from '$logger/logger.ts';
 import { notificationServicesQueries } from '$db/queries/notificationServices.ts';
 import { getAllNotificationTypeIds } from '$shared/notifications/types.ts';
+import { isNotificationProviderType } from '$shared/notifications/providers.ts';
+import { parseProviderForm } from '$notifications/registry.ts';
 
 export const actions: Actions = {
   create: async ({ request }: RequestEvent) => {
@@ -19,31 +21,16 @@ export const actions: Actions = {
       return fail(400, { error: 'A service with this name already exists' });
     }
 
-    // Build config based on service type
-    let config: Record<string, unknown> = {};
-    let enabledTypes: string[] = [];
-
-    if (serviceType === 'discord') {
-      const webhookUrl = formData.get('webhook_url') as string;
-      const username = formData.get('username') as string;
-      const avatarUrl = formData.get('avatar_url') as string;
-      const enableMentions = formData.get('enable_mentions') === 'on';
-
-      if (!webhookUrl) {
-        return fail(400, { error: 'Webhook URL is required for Discord' });
-      }
-
-      config = {
-        webhook_url: webhookUrl,
-        ...(username && { username }),
-        ...(avatarUrl && { avatar_url: avatarUrl }),
-        enable_mentions: enableMentions,
-      };
-
-      // Get enabled notification types dynamically from all available types
-      const allTypeIds = getAllNotificationTypeIds();
-      enabledTypes = allTypeIds.filter((typeId) => formData.get(typeId) === 'on');
+    if (!isNotificationProviderType(serviceType)) {
+      return fail(400, { error: `Unknown service type: ${serviceType}` });
     }
+
+    const parsed = parseProviderForm(serviceType, formData);
+    if (!parsed.ok) {
+      return fail(400, { error: parsed.error });
+    }
+    const config = parsed.config;
+    const enabledTypes = getAllNotificationTypeIds().filter((typeId) => formData.get(typeId) === 'on');
 
     // Generate UUID for the service
     const id = crypto.randomUUID();

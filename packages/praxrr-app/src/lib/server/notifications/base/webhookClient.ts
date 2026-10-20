@@ -8,7 +8,7 @@ import { BaseHttpClient } from '../../utils/http/client.ts';
 /**
  * Webhook HTTP client
  * Extends BaseHttpClient with webhook-specific settings:
- * - No retries (webhooks should either work or not)
+ * - No retries (the notification delivery helper owns retry policy)
  * - 10 second timeout
  */
 class WebhookClient extends BaseHttpClient {
@@ -21,10 +21,15 @@ class WebhookClient extends BaseHttpClient {
   }
 
   /**
-   * POST to a webhook URL
+   * POST to a webhook URL.
+   * A string `payload` is sent verbatim as the JSON body (pre-serialized, e.g. for HMAC signing);
+   * any other value is JSON-serialized.
    */
-  sendWebhook<T = void>(url: string, payload: unknown): Promise<T> {
-    return this.post<T>(url, payload);
+  sendWebhook<T = void>(url: string, payload: unknown, headers?: Record<string, string>): Promise<T> {
+    if (typeof payload === 'string') {
+      return this.request<T>('POST', url, { headers, bodyText: payload });
+    }
+    return this.post<T>(url, payload, { headers });
   }
 }
 

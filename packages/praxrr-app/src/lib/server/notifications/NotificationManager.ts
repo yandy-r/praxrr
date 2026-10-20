@@ -1,33 +1,33 @@
 import { logger } from '$logger/logger.ts';
-import { notificationServicesQueries } from '$db/queries/notificationServices.ts';
+import { notificationServicesQueries, type NotificationService } from '$db/queries/notificationServices.ts';
 import { notificationHistoryQueries } from '$db/queries/notificationHistory.ts';
-import type { Notifier } from './base/Notifier.ts';
-import type { Notification, DiscordConfig } from './types.ts';
-import { DiscordNotifier } from './notifiers/discord/DiscordNotifier.ts';
+import type { Notification } from './types.ts';
+import { maskSecrets, NotificationDeliveryError } from './base/delivery.ts';
+import { resolveSeverity } from './content.ts';
+import { getProvider } from './registry.ts';
+
+export interface ServiceDeliveryOutcome {
+  success: boolean;
+  attempts: number;
+  /** Already masked of the provider's secret values */
+  error?: string;
+}
 
 /**
  * Central notification manager
- * Orchestrates sending notifications to all enabled services
+ * Orchestrates sending notifications to all enabled services through the provider registry
  */
 export class NotificationManager {
   /**
    * Send a notification to all enabled services that have this notification type enabled
-   * Fire-and-forget: Does not throw errors, failures are logged
+   * Fire-and-forget: Does not throw errors, failures are logged and recorded in history
    */
   async notify(notification: Notification): Promise<void> {
     try {
-      // Get all enabled services from database
-      const services = notificationServicesQueries.getAllEnabled();
-
-      if (services.length === 0) {
-        return;
-      }
-
-      // Filter services that have this notification type enabled
-      const relevantServices = services.filter((service) => {
+      const relevantServices = notificationServicesQueries.getAllEnabled().filter((service) => {
         try {
-          const enabledTypes = JSON.parse(service.enabled_types) as string[];
-          return enabledTypes.includes(notification.type);
+          const enabledTypes = JSON.parse(service.enabled_types) as unknown;
+          return Array.isArray(enabledTypes) && enabledTypes.includes(notification.type);
         } catch {
           return false;
         }
@@ -37,12 +37,7 @@ export class NotificationManager {
         return;
       }
 
-      // Send to each service in parallel (fire-and-forget)
-      await Promise.allSettled(
-        relevantServices.map((service) =>
-          this.sendToService(service.id, service.service_type, service.config, notification)
-        )
-      );
+      await Promise.allSettled(relevantServices.map((service) => this.sendToService(service, notification)));
     } catch (error) {
       await logger.error('Error in notification manager', {
         source: 'NotificationManager',
@@ -55,93 +50,95 @@ export class NotificationManager {
   }
 
   /**
-   * Send notification to a specific service
+   * Deliver a notification to one service (no enabled/subscription filtering).
+   * Never throws; errors are masked with the provider's secret values before being logged,
+   * recorded (unless `record: false`) or returned.
    */
-  private async sendToService(
-    serviceId: string,
-    serviceType: string,
-    configJson: string,
-    notification: Notification
-  ): Promise<void> {
-    let success = false;
-    let errorMessage: string | undefined;
+  async sendToService(
+    service: NotificationService,
+    notification: Notification,
+    options?: { maxAttempts?: number; record?: boolean }
+  ): Promise<ServiceDeliveryOutcome> {
+    const outcome = await this.deliver(service, notification, options?.maxAttempts);
 
-    try {
-      // Create the appropriate notifier instance
-      const notifier = this.createNotifier(serviceType, configJson);
-
-      if (!notifier) {
-        errorMessage = `Unknown service type: ${serviceType}`;
-        await logger.error(errorMessage, {
-          source: 'NotificationManager',
-          meta: { serviceId, serviceType },
-        });
-        return;
-      }
-
-      // Send the notification
-      await notifier.notify(notification);
-      success = true;
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
+    if (outcome.success) {
+      await logger.debug('Notification sent', {
+        source: 'NotificationManager',
+        meta: { serviceId: service.id, serviceType: service.service_type, type: notification.type },
+      });
+    } else {
       await logger.error('Failed to send notification to service', {
         source: 'NotificationManager',
         meta: {
-          serviceId,
-          serviceType,
-          error: errorMessage,
+          serviceId: service.id,
+          serviceType: service.service_type,
+          type: notification.type,
+          attempts: outcome.attempts,
+          error: outcome.error,
         },
       });
-    } finally {
-      // Record in history
+    }
+
+    if (options?.record !== false) {
       try {
         notificationHistoryQueries.create({
-          serviceId,
+          serviceId: service.id,
           notificationType: notification.type,
           title: notification.generic?.title ?? 'Notification',
           message: notification.generic?.message ?? '',
-          status: success ? 'success' : 'failed',
-          error: errorMessage,
+          metadata: { severity: resolveSeverity(notification), context: notification.context ?? null },
+          status: outcome.success ? 'success' : 'failed',
+          error: outcome.error,
+          attempts: outcome.attempts,
         });
       } catch (error) {
         await logger.error('Failed to record notification history', {
           source: 'NotificationManager',
           meta: {
-            serviceId,
+            serviceId: service.id,
             error: error instanceof Error ? error.message : String(error),
           },
         });
       }
     }
+
+    return outcome;
   }
 
-  /**
-   * Create a notifier instance based on service type and config
-   */
-  private createNotifier(serviceType: string, configJson: string): Notifier | null {
-    try {
-      const config = JSON.parse(configJson);
+  private async deliver(
+    service: NotificationService,
+    notification: Notification,
+    maxAttempts: number | undefined
+  ): Promise<ServiceDeliveryOutcome> {
+    const provider = getProvider(service.service_type);
+    if (!provider) {
+      return { success: false, attempts: 0, error: `Unknown service type: ${service.service_type}` };
+    }
 
-      switch (serviceType) {
-        case 'discord':
-          return new DiscordNotifier(config as DiscordConfig);
-        // Future services:
-        // case 'slack':
-        //   return new SlackNotifier(config as SlackConfig);
-        // case 'email':
-        //   return new EmailNotifier(config as EmailConfig);
-        default:
-          return null;
+    let config: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(service.config) as unknown;
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error('not an object');
       }
+      config = parsed as Record<string, unknown>;
+    } catch {
+      // Never echo the config: it holds secrets.
+      return { success: false, attempts: 0, error: 'Invalid notification service config' };
+    }
+
+    let secrets: string[] = [];
+    try {
+      secrets = provider.secretValues(config);
+      const result = await provider.create(config).notify(notification, { maxAttempts });
+      return { success: true, attempts: result.attempts };
     } catch (error) {
-      logger.error('Failed to parse notification service config', {
-        source: 'NotificationManager',
-        meta: {
-          serviceType,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
-      return null;
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        attempts: error instanceof NotificationDeliveryError ? error.attempts : 1,
+        error: maskSecrets(message, secrets),
+      };
     }
   }
 }

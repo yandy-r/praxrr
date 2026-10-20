@@ -1,0 +1,76 @@
+NotificationWebhookPayload:
+  type: object
+  description: |
+    Versioned JSON body POSTed by a Praxrr "Webhook" notification service for every subscribed event.
+
+    Headers sent with every request:
+    - `Content-Type: application/json`
+    - `X-Praxrr-Event: <type>` — the notification type (same as `type` in the body).
+
+    When the service has a signing secret configured, two more headers are sent:
+    - `X-Praxrr-Timestamp: <unix seconds>`
+    - `X-Praxrr-Signature: sha256=<hex>` — lowercase hex HMAC-SHA256 keyed with the secret over
+      `"<X-Praxrr-Timestamp>.<raw request body>"`. Verify against the exact received bytes and reject
+      stale timestamps to prevent replay.
+
+    Transient failures (network errors, 408, 429, 5xx) are retried with the same `id`, so receivers
+    can deduplicate on it.
+  required:
+    - version
+    - id
+    - type
+    - severity
+    - title
+    - message
+    - instanceId
+    - instanceName
+    - arrType
+    - occurredAt
+  additionalProperties: false
+  properties:
+    version:
+      type: integer
+      const: 1
+      description: Payload schema version. Incremented only on breaking changes.
+    id:
+      type: string
+      format: uuid
+      description: Unique delivery id, reused across retries of the same request.
+    type:
+      type: string
+      description: Notification event type, e.g. `sync.failed`, `drift.detected`, `upgrade.success`.
+      examples:
+        - sync.failed
+    severity:
+      type: string
+      enum:
+        - info
+        - success
+        - warning
+        - error
+      description: Severity derived from the event type (or set explicitly by the emitter).
+    title:
+      type: string
+      description: Short human-readable title.
+    message:
+      type: string
+      description: Human-readable message body (may be empty).
+    instanceId:
+      type:
+        - integer
+        - 'null'
+      description: Arr instance id the event relates to, or null when not instance-specific.
+    instanceName:
+      type:
+        - string
+        - 'null'
+      description: Arr instance name, or null when not instance-specific.
+    arrType:
+      type:
+        - string
+        - 'null'
+      description: Arr application type (e.g. `radarr`, `sonarr`), or null when not instance-specific.
+    occurredAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp of when the event occurred.

@@ -111,6 +111,10 @@
     {
       "name": "WebAuthn",
       "description": "Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)"
+    },
+    {
+      "name": "Notifications",
+      "description": "Outbound notification payloads sent by Praxrr to user-configured endpoints"
     }
   ],
   "paths": {
@@ -6913,6 +6917,63 @@
                 }
               }
             }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "notification": {
+      "post": {
+        "operationId": "notificationWebhook",
+        "summary": "Notification event delivered to a generic webhook service",
+        "description": "Sent by Praxrr (not served by it) to the URL of each enabled \"Webhook\" notification service\nsubscribed to the event type. The body is serialized once and the optional signature covers\nthose exact bytes. Any 2xx response acknowledges delivery; network errors, 408, 429 and 5xx are\nretried (up to 3 attempts total, honoring `Retry-After` up to 60 s). Custom headers configured\non the service are also sent; they cannot override the headers documented here.\n",
+        "tags": ["Notifications"],
+        "parameters": [
+          {
+            "name": "X-Praxrr-Event",
+            "in": "header",
+            "required": true,
+            "description": "Notification event type; equals `type` in the body.",
+            "schema": {
+              "type": "string",
+              "examples": ["sync.failed"]
+            }
+          },
+          {
+            "name": "X-Praxrr-Timestamp",
+            "in": "header",
+            "required": false,
+            "description": "Unix time in seconds when the request was signed. Present only when a signing secret is configured.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            }
+          },
+          {
+            "name": "X-Praxrr-Signature",
+            "in": "header",
+            "required": false,
+            "description": "`sha256=` followed by the lowercase hex HMAC-SHA256 of `\"<X-Praxrr-Timestamp>.<raw body>\"`, keyed\nwith the service's signing secret. Present only when a signing secret is configured.\n",
+            "schema": {
+              "type": "string",
+              "pattern": "^sha256=[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationWebhookPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery acknowledged. Any 2xx status is treated as success; the response body is ignored."
           }
         }
       }
@@ -15351,6 +15412,70 @@
         "properties": {
           "verified": {
             "type": "boolean"
+          }
+        }
+      },
+      "NotificationWebhookPayload": {
+        "type": "object",
+        "description": "Versioned JSON body POSTed by a Praxrr \"Webhook\" notification service for every subscribed event.\n\nHeaders sent with every request:\n- `Content-Type: application/json`\n- `X-Praxrr-Event: <type>` — the notification type (same as `type` in the body).\n\nWhen the service has a signing secret configured, two more headers are sent:\n- `X-Praxrr-Timestamp: <unix seconds>`\n- `X-Praxrr-Signature: sha256=<hex>` — lowercase hex HMAC-SHA256 keyed with the secret over\n  `\"<X-Praxrr-Timestamp>.<raw request body>\"`. Verify against the exact received bytes and reject\n  stale timestamps to prevent replay.\n\nTransient failures (network errors, 408, 429, 5xx) are retried with the same `id`, so receivers\ncan deduplicate on it.\n",
+        "required": [
+          "version",
+          "id",
+          "type",
+          "severity",
+          "title",
+          "message",
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "occurredAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Payload schema version. Incremented only on breaking changes."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique delivery id, reused across retries of the same request."
+          },
+          "type": {
+            "type": "string",
+            "description": "Notification event type, e.g. `sync.failed`, `drift.detected`, `upgrade.success`.",
+            "examples": ["sync.failed"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "success", "warning", "error"],
+            "description": "Severity derived from the event type (or set explicitly by the emitter)."
+          },
+          "title": {
+            "type": "string",
+            "description": "Short human-readable title."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message body (may be empty)."
+          },
+          "instanceId": {
+            "type": ["integer", "null"],
+            "description": "Arr instance id the event relates to, or null when not instance-specific."
+          },
+          "instanceName": {
+            "type": ["string", "null"],
+            "description": "Arr instance name, or null when not instance-specific."
+          },
+          "arrType": {
+            "type": ["string", "null"],
+            "description": "Arr application type (e.g. `radarr`, `sonarr`), or null when not instance-specific."
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of when the event occurred."
           }
         }
       }

@@ -70,24 +70,27 @@ function extractEmbeddedIPv4(hostname: string): string | null {
 }
 
 /**
- * Validate a user-supplied Arr base URL before it is used to construct an
- * HTTP client. Rejects unsupported schemes plus cloud metadata and
- * link-local hostnames; everything else (including RFC1918 and loopback) is
- * accepted.
+ * Validate a user-supplied outbound URL (Arr base URL, notification endpoint)
+ * before any request is made. Rejects unsupported schemes plus cloud metadata
+ * and link-local hostnames; everything else (including RFC1918 and loopback)
+ * is accepted.
+ *
+ * Error messages name the `label` and hostname only, never the full URL: URLs
+ * such as webhook endpoints can embed tokens in their path or query.
  *
  * @throws {Error} when the URL is malformed, uses an unsupported scheme, or
  * its hostname is a metadata or link-local address.
  */
-export function assertSafeArrUrl(url: string): void {
+export function assertSafeOutboundUrl(url: string, label: string): void {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error(`Invalid Arr URL: ${url}`);
+    throw new Error(`Invalid ${label} URL`);
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Unsupported URL scheme: ${parsed.protocol}`);
+    throw new Error(`Unsupported ${label} URL scheme: ${parsed.protocol}`);
   }
 
   const hostname = stripBrackets(parsed.hostname.toLowerCase());
@@ -97,7 +100,7 @@ export function assertSafeArrUrl(url: string): void {
   const embeddedIPv4 = extractEmbeddedIPv4(hostname);
 
   if (METADATA_HOSTNAMES.has(hostname) || (embeddedIPv4 !== null && METADATA_HOSTNAMES.has(embeddedIPv4))) {
-    throw new Error(`Refusing to connect to metadata address: ${hostname}`);
+    throw new Error(`Refusing to connect to metadata address for ${label} URL: ${hostname}`);
   }
 
   if (
@@ -105,10 +108,14 @@ export function assertSafeArrUrl(url: string): void {
     isLinkLocalIPv6(hostname) ||
     (embeddedIPv4 !== null && isLinkLocalIPv4(embeddedIPv4))
   ) {
-    throw new Error(`Refusing to connect to link-local address: ${hostname}`);
+    throw new Error(`Refusing to connect to link-local address for ${label} URL: ${hostname}`);
   }
 }
 
-// Sanity check (exercised properly by the unit test in task 7.1):
-// assertSafeArrUrl('http://169.254.169.254/') -> throws (metadata)
-// assertSafeArrUrl('http://10.0.0.5:7878/')   -> does not throw (LAN Radarr)
+/**
+ * Validate a user-supplied Arr base URL before it is used to construct an
+ * HTTP client. See {@link assertSafeOutboundUrl}.
+ */
+export function assertSafeArrUrl(url: string): void {
+  assertSafeOutboundUrl(url, 'Arr');
+}

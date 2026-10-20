@@ -606,7 +606,7 @@ migratedTest('snapshotInstance isolates real notification-history failure after 
   try {
     DiscordNotifier.prototype.notify = () => {
       providerCalls++;
-      return Promise.resolve();
+      return Promise.resolve({ attempts: 1 });
     };
     notificationHistoryQueries.create = () => {
       throw new Error('history unavailable');

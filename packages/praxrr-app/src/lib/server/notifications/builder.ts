@@ -4,7 +4,7 @@
  */
 
 import { notificationManager } from './NotificationManager.ts';
-import type { Notification } from './types.ts';
+import type { Notification, NotificationContext, NotificationSeverity } from './types.ts';
 import { EmbedBuilder, type DiscordEmbed } from './notifiers/discord/embed.ts';
 
 // Re-export Discord embed utilities for convenience
@@ -81,19 +81,35 @@ class NotificationBuilder {
   }
 
   /**
+   * Attach the Arr instance the event concerns (used by structured providers such as webhook)
+   */
+  context(ctx: NotificationContext): this {
+    this.data.context = ctx;
+    return this;
+  }
+
+  /**
+   * Override the severity otherwise derived from the notification type
+   */
+  severity(severity: NotificationSeverity): this {
+    this.data.severity = severity;
+    return this;
+  }
+
+  /**
    * Send the notification via the notification manager
    * Routes to all enabled services that have this notification type enabled
    */
   async send(): Promise<void> {
-    await notificationManager.notify(this.data);
+    await notificationManager.notify(this.build());
   }
 
   /**
-   * Build and return the raw notification object
-   * Use this when you need to send directly to a specific notifier
-   * (e.g., test notifications that bypass the notification manager)
+   * Build and return the raw notification object (stamps `occurredAt` if unset)
+   * Use this when sending to a single service via `notificationManager.sendToService`
    */
   build(): Notification {
+    this.data.occurredAt ??= new Date().toISOString();
     return this.data;
   }
 }
