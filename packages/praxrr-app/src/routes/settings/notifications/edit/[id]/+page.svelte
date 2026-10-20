@@ -30,6 +30,7 @@
       name: data.service.name,
       serviceType: data.service.serviceType,
       config: data.service.config,
+      secretsSet: data.service.secretsSet,
       enabledTypes: data.service.enabledTypes,
     }}
   />

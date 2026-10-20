@@ -174,6 +174,7 @@ function fireNotification(id: number, input: SyncHistoryInput): void {
 
   // Strict fire-and-forget: a webhook failure must never affect the audit write.
   void notify(type)
+    .context({ instanceId: input.arrInstanceId, instanceName: input.instanceName, arrType: input.arrType })
     .generic(title, message)
     .discord((discord) => discord.embed(embed))
     .send()

@@ -2082,8 +2082,33 @@ export interface paths {
     trace?: never;
   };
 }
-/** Webhook event definitions. Currently unused. */
-export type webhooks = Record<string, never>;
+/** Outbound webhook definitions: requests Praxrr sends to user-configured endpoints (e.g. notifications). */
+export interface webhooks {
+  notification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Notification event delivered to a generic webhook service
+     * @description Sent by Praxrr (not served by it) to the URL of each enabled "Webhook" notification service
+     *     subscribed to the event type. The body is serialized once and the optional signature covers
+     *     those exact bytes. Any 2xx response acknowledges delivery; network errors, 408, 429 and 5xx are
+     *     retried (up to 3 attempts total, honoring `Retry-After` up to 60 s). Custom headers configured
+     *     on the service are also sent; they cannot override the headers documented here.
+     */
+    post: operations['notificationWebhook'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+}
 /** API component schemas including all request bodies, response types, and shared models. */
 export interface components {
   schemas: {
@@ -5362,6 +5387,59 @@ export interface components {
     };
     WebAuthnAuthenticationVerifyResponse: {
       verified: boolean;
+    };
+    /**
+     * @description Versioned JSON body POSTed by a Praxrr "Webhook" notification service for every subscribed event.
+     *
+     *     Headers sent with every request:
+     *     - `Content-Type: application/json`
+     *     - `X-Praxrr-Event: <type>` — the notification type (same as `type` in the body).
+     *
+     *     When the service has a signing secret configured, two more headers are sent:
+     *     - `X-Praxrr-Timestamp: <unix seconds>`
+     *     - `X-Praxrr-Signature: sha256=<hex>` — lowercase hex HMAC-SHA256 keyed with the secret over
+     *       `"<X-Praxrr-Timestamp>.<raw request body>"`. Verify against the exact received bytes and reject
+     *       stale timestamps to prevent replay.
+     *
+     *     Transient failures (network errors, 408, 429, 5xx) are retried with the same `id`, so receivers
+     *     can deduplicate on it.
+     */
+    NotificationWebhookPayload: {
+      /**
+       * @description Payload schema version. Incremented only on breaking changes.
+       * @constant
+       */
+      version: 1;
+      /**
+       * Format: uuid
+       * @description Unique delivery id, reused across retries of the same request.
+       */
+      id: string;
+      /**
+       * @description Notification event type, e.g. `sync.failed`, `drift.detected`, `upgrade.success`.
+       * @example sync.failed
+       */
+      type: string;
+      /**
+       * @description Severity derived from the event type (or set explicitly by the emitter).
+       * @enum {string}
+       */
+      severity: 'info' | 'success' | 'warning' | 'error';
+      /** @description Short human-readable title. */
+      title: string;
+      /** @description Human-readable message body (may be empty). */
+      message: string;
+      /** @description Arr instance id the event relates to, or null when not instance-specific. */
+      instanceId: number | null;
+      /** @description Arr instance name, or null when not instance-specific. */
+      instanceName: string | null;
+      /** @description Arr application type (e.g. `radarr`, `sonarr`), or null when not instance-specific. */
+      arrType: string | null;
+      /**
+       * Format: date-time
+       * @description ISO 8601 timestamp of when the event occurred.
+       */
+      occurredAt: string;
     };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
@@ -10784,6 +10862,38 @@ export interface operations {
         content: {
           'application/json': components['schemas']['ErrorResponse'];
         };
+      };
+    };
+  };
+  notificationWebhook: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Notification event type; equals `type` in the body. */
+        'X-Praxrr-Event': string;
+        /** @description Unix time in seconds when the request was signed. Present only when a signing secret is configured. */
+        'X-Praxrr-Timestamp'?: string;
+        /**
+         * @description `sha256=` followed by the lowercase hex HMAC-SHA256 of `"<X-Praxrr-Timestamp>.<raw body>"`, keyed
+         *     with the service's signing secret. Present only when a signing secret is configured.
+         */
+        'X-Praxrr-Signature'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['NotificationWebhookPayload'];
+      };
+    };
+    responses: {
+      /** @description Delivery acknowledged. Any 2xx status is treated as success; the response body is ignored. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

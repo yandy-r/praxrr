@@ -60,6 +60,8 @@ tags:
     description: Durable plugin discovery and enablement management, feature-flagged independently from runtime execution
   - name: WebAuthn
     description: Passkey / WebAuthn authentication — register credentials while logged in and sign in passwordlessly (supplements password auth under AUTH=on)
+  - name: Notifications
+    description: Outbound notification payloads sent by Praxrr to user-configured endpoints
 
 paths:
   /health:
@@ -748,6 +750,54 @@ paths:
     $ref: './paths/webauthn.yaml#/authenticationOptions'
   /auth/webauthn/authentication/verify:
     $ref: './paths/webauthn.yaml#/authenticationVerify'
+
+webhooks:
+  notification:
+    post:
+      operationId: notificationWebhook
+      summary: Notification event delivered to a generic webhook service
+      description: |
+        Sent by Praxrr (not served by it) to the URL of each enabled "Webhook" notification service
+        subscribed to the event type. The body is serialized once and the optional signature covers
+        those exact bytes. Any 2xx response acknowledges delivery; network errors, 408, 429 and 5xx are
+        retried (up to 3 attempts total, honoring `Retry-After` up to 60 s). Custom headers configured
+        on the service are also sent; they cannot override the headers documented here.
+      tags:
+        - Notifications
+      parameters:
+        - name: X-Praxrr-Event
+          in: header
+          required: true
+          description: Notification event type; equals `type` in the body.
+          schema:
+            type: string
+            examples:
+              - sync.failed
+        - name: X-Praxrr-Timestamp
+          in: header
+          required: false
+          description: Unix time in seconds when the request was signed. Present only when a signing secret is configured.
+          schema:
+            type: string
+            pattern: '^\d+$'
+        - name: X-Praxrr-Signature
+          in: header
+          required: false
+          description: |
+            `sha256=` followed by the lowercase hex HMAC-SHA256 of `"<X-Praxrr-Timestamp>.<raw body>"`, keyed
+            with the service's signing secret. Present only when a signing secret is configured.
+          schema:
+            type: string
+            pattern: '^sha256=[0-9a-f]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationWebhookPayload'
+      responses:
+        '200':
+          description: Delivery acknowledged. Any 2xx status is treated as success; the response body is ignored.
 
 components:
   schemas:
@@ -1890,3 +1940,6 @@ components:
       $ref: './schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyRequest'
     WebAuthnAuthenticationVerifyResponse:
       $ref: './schemas/webauthn.yaml#/WebAuthnAuthenticationVerifyResponse'
+    # Notifications
+    NotificationWebhookPayload:
+      $ref: './schemas/notifications.yaml#/NotificationWebhookPayload'

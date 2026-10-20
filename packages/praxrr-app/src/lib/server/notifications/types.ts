@@ -2,7 +2,15 @@
  * Core notification types and interfaces
  */
 
+import type { NotificationProviderType } from '$shared/notifications/providers.ts';
 import type { DiscordEmbed } from './notifiers/discord/embed.ts';
+import type { WebhookConfig } from './notifiers/webhook/provider.ts';
+import type { NtfyConfig } from './notifiers/ntfy/provider.ts';
+import type { GotifyConfig } from './notifiers/gotify/provider.ts';
+import type { PushoverConfig } from './notifiers/pushover/provider.ts';
+import type { TelegramConfig } from './notifiers/telegram/provider.ts';
+import type { SlackConfig } from './notifiers/slack/provider.ts';
+import type { AppriseConfig } from './notifiers/apprise/provider.ts';
 
 /**
  * Type-safe notification type constants
@@ -59,6 +67,17 @@ export interface DiscordNotification {
   embeds: DiscordEmbed[];
 }
 
+export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+
+/**
+ * Optional event context (which Arr instance the event concerns)
+ */
+export interface NotificationContext {
+  instanceId?: number;
+  instanceName?: string;
+  arrType?: string;
+}
+
 /**
  * Notification payload sent to services
  */
@@ -68,14 +87,23 @@ export interface Notification {
   generic?: GenericNotification;
   /** Discord-specific content - used if present, otherwise falls back to generic */
   discord?: DiscordNotification;
+  /** Severity override; otherwise derived from `type` by `resolveSeverity` */
+  severity?: NotificationSeverity;
+  context?: NotificationContext;
+  /** ISO timestamp; stamped by the builder at build()/send() */
+  occurredAt?: string;
 }
 
 /**
- * Result of a notification attempt
+ * Outcome of a successful delivery
  */
-export interface NotificationResult {
-  success: boolean;
-  error?: string;
+export interface DeliveryResult {
+  /** Highest attempt number reached by any request in the delivery (1 = first-try success) */
+  attempts: number;
+}
+
+export interface DeliveryOptions {
+  maxAttempts?: number;
 }
 
 /**
@@ -87,12 +115,21 @@ export interface DiscordConfig {
   avatar_url?: string;
   enable_mentions?: boolean;
 }
+
 /**
  * Union type for all notification service configs
  */
-export type NotificationServiceConfig = DiscordConfig;
+export type NotificationServiceConfig =
+  | DiscordConfig
+  | WebhookConfig
+  | NtfyConfig
+  | GotifyConfig
+  | PushoverConfig
+  | TelegramConfig
+  | SlackConfig
+  | AppriseConfig;
 
 /**
  * Service types supported
  */
-export type NotificationServiceType = 'discord';
+export type NotificationServiceType = NotificationProviderType;

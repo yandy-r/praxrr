@@ -5,11 +5,11 @@
  * @example
  * import { notifications } from '$notifications/definitions/index.ts';
  *
- * // Via notification manager (normal flow)
- * await notifications.test(service).send();
+ * // Via notification manager (normal flow: enabled + subscribed services, history recorded)
+ * await notifications.rename({ log }).send();
  *
- * // Direct to notifier (bypass manager)
- * await notifier.notify(notifications.test(service).build());
+ * // To one specific service (e.g. the settings "Test" action)
+ * await notificationManager.sendToService(service, notifications.test().build(), { maxAttempts: 1, record: false });
  */
 
 import { test } from './test.ts';

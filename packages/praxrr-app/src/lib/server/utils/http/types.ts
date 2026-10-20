@@ -23,9 +23,27 @@ export class HttpError extends Error {
   constructor(
     message: string,
     public status: number,
-    public response?: unknown
+    public response?: unknown,
+    /** Delay requested by the server via the `Retry-After` header, in milliseconds */
+    public retryAfterMs?: number
   ) {
     super(message);
     this.name = 'HttpError';
   }
+}
+
+/**
+ * Parse a `Retry-After` header value (delta-seconds or HTTP-date) into milliseconds.
+ * Returns undefined when absent or unparseable; past dates clamp to 0.
+ */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number | undefined {
+  if (value === null) return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  if (/^\d+$/.test(trimmed)) {
+    return Number(trimmed) * 1000;
+  }
+  const date = Date.parse(trimmed);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, date - now);
 }

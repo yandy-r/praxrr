@@ -1,14 +1,14 @@
-import type { Notification } from '../types.ts';
+import type { DeliveryOptions, DeliveryResult, Notification } from '../types.ts';
 
 /**
- * Base interface that all notification service implementations must follow
+ * Interface every notification provider implementation follows
  */
 export interface Notifier {
   /**
-   * Send a notification
-   * This method should be fire-and-forget - errors should be logged but not thrown
+   * Deliver a notification.
+   * @throws {NotificationDeliveryError} on failure (message already masked of secrets)
    */
-  notify(notification: Notification): Promise<void>;
+  notify(notification: Notification, options?: DeliveryOptions): Promise<DeliveryResult>;
 
   /**
    * Get the service name for logging purposes

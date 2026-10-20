@@ -90,6 +90,7 @@ import { migration as migration20260725AddPluginsEnabledToGeneralSettings } from
 import { migration as migration20261006AddSessionPublicId } from './migrations/20261006_add_session_public_id.ts';
 import { migration as migration20261020AddSetupChecklistDismissedAt } from './migrations/20261020_add_setup_checklist_dismissed_at.ts';
 import { migration as migration20261021CreateApiTokens } from './migrations/20261021_create_api_tokens.ts';
+import { migration as migration20261022AddNotificationHistoryAttempts } from './migrations/20261022_add_notification_history_attempts.ts';
 
 export interface Migration {
   version: number;
@@ -414,6 +415,7 @@ export function loadMigrations(): Migration[] {
     migration20261006AddSessionPublicId,
     migration20261020AddSetupChecklistDismissedAt,
     migration20261021CreateApiTokens,
+    migration20261022AddNotificationHistoryAttempts,
   ];
 
   // Sort by version number

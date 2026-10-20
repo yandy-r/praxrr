@@ -46,6 +46,7 @@ export interface ConfigHealthSnapshotInstanceDeps {
 async function sendHealthDegradedDefault(event: HealthDegradedEvent): Promise<void> {
   const projection = buildHealthDegradedNotification(event);
   await notify(NotificationTypes.HEALTH_DEGRADED)
+    .context({ instanceId: event.instanceId, instanceName: event.instanceName, arrType: event.arrType })
     .generic(projection.title, projection.message)
     .discord((discord) => discord.embed(projection.embed))
     .send();

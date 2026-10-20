@@ -267,6 +267,7 @@ CREATE TABLE notification_history (
     -- Delivery status
     status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
     error TEXT,                                 -- Error message if status = 'failed'
+    attempts INTEGER NOT NULL DEFAULT 1,        -- Highest delivery attempt reached (Migration: 20261022)
 
     -- Timing
     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
