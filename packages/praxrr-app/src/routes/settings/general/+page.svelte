@@ -5,6 +5,7 @@
   import TMDBSettings from './components/TMDBSettings.svelte';
   import UISettings from './components/UISettings.svelte';
   import ArrDefaultsSettings from './components/ArrDefaultsSettings.svelte';
+  import SetupGuideSettings from './components/SetupGuideSettings.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
   import { SETTINGS_LOGGING, SETTINGS_AI, SETTINGS_TMDB, SETTINGS_BACKUP } from '$shared/disclosure/sectionKeys';
   import type { PageData } from './$types';
@@ -25,6 +26,9 @@
 
     <!-- Arr Instance Defaults -->
     <ArrDefaultsSettings settings={data.generalSettings} />
+
+    <!-- Setup Guide -->
+    <SetupGuideSettings />
 
     <!-- Backup Configuration -->
     <CollapsibleCard

@@ -5,9 +5,16 @@ import { assertSafeArrUrl } from '$arr/urlSafety.ts';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { setupStateQueries, type WizardStep } from '$db/queries/setupState.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { assertSetupInProgress, getSetupProgress, resolveWizardRedirect } from '$server/setup/progress.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { databaseInstancesQueries, type DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import { arrSyncQueries, type QualityProfilesSyncData } from '$db/queries/arrSync.ts';
+import {
+  assertSetupInProgress,
+  getSetupProgress,
+  resolveResumeStep,
+  resolveSetupChecklist,
+  resolveWizardRedirect,
+} from '$server/setup/progress.ts';
 
 type Restore = () => void;
 
@@ -46,7 +53,8 @@ class SetupProgressTest extends BaseTest {
 
   /**
    * Point the db singleton at a scratch SQLite file under the test's tempDir
-   * and bootstrap the setup_state table (mirrors migrations 039 + 20260707).
+   * and bootstrap the setup_state table (mirrors migrations 039 + 20260707 +
+   * 20261020).
    */
   private async withSetupStateDatabase(context: TestContext, fn: () => void | Promise<void>): Promise<void> {
     const originalBasePath = config.paths.base;
@@ -62,6 +70,7 @@ class SetupProgressTest extends BaseTest {
           wizard_completed INTEGER NOT NULL DEFAULT 0,
           wizard_dismissed_at TEXT,
           wizard_current_step TEXT NOT NULL DEFAULT 'welcome',
+          setup_checklist_dismissed_at TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -136,6 +145,119 @@ class SetupProgressTest extends BaseTest {
           dismissedAt: null,
           currentStep: 'welcome',
         });
+      });
+    });
+
+    this.test('reopenWizard clears completion, dismissal, and checklist dismissal idempotently', async (context) => {
+      await this.withSetupStateDatabase(context, () => {
+        setupStateQueries.markWizardDismissed();
+        setupStateQueries.markWizardCompleted();
+        setupStateQueries.markChecklistDismissed();
+
+        assertEquals(setupStateQueries.reopenWizard('link-database'), true);
+        const once = setupStateQueries.getWizardState();
+        assertEquals(setupStateQueries.reopenWizard('link-database'), true);
+
+        assertEquals(setupStateQueries.getWizardState(), once);
+        assertEquals(once, { completed: false, dismissedAt: null, currentStep: 'link-database' });
+        assertEquals(setupStateQueries.isChecklistDismissed(), false);
+        assertEquals(setupStateQueries.wizardShouldRun(), true);
+        assertThrows(() => setupStateQueries.reopenWizard('nope' as WizardStep), Error, 'Invalid wizard step');
+      });
+    });
+
+    this.test('markChecklistDismissed is idempotent and keeps the first timestamp', async (context) => {
+      await this.withSetupStateDatabase(context, () => {
+        assertEquals(setupStateQueries.isChecklistDismissed(), false);
+        db.execute("UPDATE setup_state SET setup_checklist_dismissed_at = '2026-01-01 00:00:00' WHERE id = 1");
+        assertEquals(setupStateQueries.markChecklistDismissed(), true);
+        assertEquals(setupStateQueries.get().setup_checklist_dismissed_at, '2026-01-01 00:00:00');
+        assertEquals(setupStateQueries.isChecklistDismissed(), true);
+      });
+    });
+
+    // ---- resolveResumeStep ----
+
+    this.test('resolveResumeStep returns the first incomplete step', () => {
+      assertEquals(
+        resolveResumeStep({ hasArrInstance: false, hasDatabase: true, hasProfileSelections: true }),
+        'connect-arr'
+      );
+      assertEquals(
+        resolveResumeStep({ hasArrInstance: true, hasDatabase: false, hasProfileSelections: true }),
+        'link-database'
+      );
+      assertEquals(
+        resolveResumeStep({ hasArrInstance: true, hasDatabase: true, hasProfileSelections: false }),
+        'select-profiles'
+      );
+      assertEquals(
+        resolveResumeStep({ hasArrInstance: true, hasDatabase: true, hasProfileSelections: true }),
+        'preview-sync'
+      );
+    });
+
+    // ---- resolveSetupChecklist ----
+
+    this.test('resolveSetupChecklist shows k/3 progress only after a skip, outside wizard/auth', async (context) => {
+      await this.withSetupStateDatabase(context, () => {
+        this.patch(arrInstancesQueries, 'getAll', () => []);
+        this.patch(arrInstancesQueries, 'getEnabled', () => []);
+        this.patch(databaseInstancesQueries, 'getAll', () => []);
+
+        assertEquals(resolveSetupChecklist('/'), null, 'hidden before the wizard is skipped');
+
+        setupStateQueries.markWizardDismissed();
+        assertEquals(resolveSetupChecklist('/'), {
+          progress: { hasArrInstance: false, hasDatabase: false, hasProfileSelections: false },
+          completedCount: 0,
+          total: 3,
+          primaryInstanceId: null,
+        });
+        assertEquals(resolveSetupChecklist('/setup/welcome'), null, 'hidden inside the wizard');
+        assertEquals(resolveSetupChecklist('/auth/login'), null, 'hidden on auth pages');
+      });
+    });
+
+    this.test('resolveSetupChecklist hides once dismissed or completed', async (context) => {
+      await this.withSetupStateDatabase(context, () => {
+        this.patch(arrInstancesQueries, 'getAll', () => []);
+        this.patch(arrInstancesQueries, 'getEnabled', () => []);
+        this.patch(databaseInstancesQueries, 'getAll', () => []);
+        setupStateQueries.markWizardDismissed();
+
+        setupStateQueries.markChecklistDismissed();
+        assertEquals(resolveSetupChecklist('/'), null, 'hidden after permanent dismissal');
+
+        setupStateQueries.reopenWizard('connect-arr');
+        setupStateQueries.markWizardDismissed();
+        setupStateQueries.markWizardCompleted();
+        assertEquals(resolveSetupChecklist('/'), null, 'hidden after completion');
+      });
+    });
+
+    this.test('resolveSetupChecklist hides when every prerequisite is met', async (context) => {
+      await this.withSetupStateDatabase(context, () => {
+        // Progress and primary-instance resolution only read `id` from these rows.
+        const instance = { id: 3 } as unknown as ArrInstance;
+        const database = { id: 1 } as unknown as DatabaseInstance;
+        let selections: QualityProfilesSyncData['selections'] = [];
+        this.patch(arrInstancesQueries, 'getAll', () => [instance]);
+        this.patch(arrInstancesQueries, 'getEnabled', () => [instance]);
+        this.patch(databaseInstancesQueries, 'getAll', () => [database]);
+        this.patch(
+          arrSyncQueries,
+          'getQualityProfilesSync',
+          () => ({ selections }) as unknown as QualityProfilesSyncData
+        );
+        setupStateQueries.markWizardDismissed();
+
+        const partial = resolveSetupChecklist('/');
+        assertEquals(partial?.completedCount, 2);
+        assertEquals(partial?.primaryInstanceId, 3);
+
+        selections = [{ databaseId: 1, profileName: 'HD' }];
+        assertEquals(resolveSetupChecklist('/'), null);
       });
     });
 

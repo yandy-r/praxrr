@@ -1334,6 +1334,56 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/setup/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reopen the setup wizard
+     * @description Reopens the setup wizard after it was skipped or completed. Clears the
+     *     dismissal, completion, and checklist-dismissal flags and sets the current
+     *     step to the first step whose prerequisite is still unmet
+     *     (`connect-arr`, `link-database`, `select-profiles`, else `preview-sync`).
+     *
+     *     Idempotent and deliberately not gated on the wizard still being in
+     *     progress: it exists to restart a wizard that is no longer running, and
+     *     repeated calls recompute the same step from the same entity state.
+     */
+    post: operations['resumeSetup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/setup/checklist/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Permanently dismiss the setup checklist
+     * @description Permanently hides the "Finish setup" checklist shown after the wizard is
+     *     skipped. Idempotent: repeat calls keep the first dismissal timestamp.
+     *     Not gated on the wizard being in progress, since the checklist only
+     *     exists once the wizard has been skipped.
+     */
+    post: operations['dismissSetupChecklist'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/compatibility/parity': {
     parameters: {
       query?: never;
@@ -4270,15 +4320,7 @@ export interface components {
     };
     SetupStateResponse: {
       wizard: components['schemas']['WizardState'];
-      /** @description Setup prerequisite progress derived from real entity state */
-      prerequisites: {
-        /** @description Whether at least one Arr instance has been connected */
-        hasArrInstance: boolean;
-        /** @description Whether at least one PCD database has been linked */
-        hasDatabase: boolean;
-        /** @description Whether at least one instance has quality profile selections synced */
-        hasProfileSelections: boolean;
-      };
+      prerequisites: components['schemas']['SetupPrerequisites'];
       /** @description Default database auto-link info used to render the link-database step */
       defaultDatabase: {
         /** @description Whether PRAXRR_DEFAULT_DB_URL resolves to a non-empty value */
@@ -4292,6 +4334,24 @@ export interface components {
     /** @description Advance the wizard to the given step */
     SetupStatePatchRequest: {
       currentStep: components['schemas']['WizardStep'];
+    };
+    /** @description Setup prerequisite progress derived from real entity state */
+    SetupPrerequisites: {
+      /** @description Whether at least one Arr instance has been connected */
+      hasArrInstance: boolean;
+      /** @description Whether at least one PCD database has been linked */
+      hasDatabase: boolean;
+      /** @description Whether at least one instance has quality profile selections synced */
+      hasProfileSelections: boolean;
+    };
+    /** @description Reopened wizard state and the prerequisite progress used to pick the resume step */
+    SetupResumeResponse: {
+      wizard: components['schemas']['WizardState'];
+      progress: components['schemas']['SetupPrerequisites'];
+    };
+    SetupChecklistDismissResponse: {
+      /** @description Whether the post-skip setup checklist is permanently dismissed (always true on success) */
+      checklistDismissed: boolean;
     };
     TestConnectionRequest: {
       /**
@@ -8902,6 +8962,46 @@ export interface operations {
           'application/json': {
             wizard: components['schemas']['WizardState'];
           };
+        };
+      };
+    };
+  };
+  resumeSetup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Wizard reopened at the first incomplete step */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SetupResumeResponse'];
+        };
+      };
+    };
+  };
+  dismissSetupChecklist: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Checklist dismissed */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SetupChecklistDismissResponse'];
         };
       };
     };

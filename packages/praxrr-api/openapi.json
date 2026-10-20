@@ -4447,6 +4447,46 @@
         }
       }
     },
+    "/setup/resume": {
+      "post": {
+        "operationId": "resumeSetup",
+        "summary": "Reopen the setup wizard",
+        "description": "Reopens the setup wizard after it was skipped or completed. Clears the\ndismissal, completion, and checklist-dismissal flags and sets the current\nstep to the first step whose prerequisite is still unmet\n(`connect-arr`, `link-database`, `select-profiles`, else `preview-sync`).\n\nIdempotent and deliberately not gated on the wizard still being in\nprogress: it exists to restart a wizard that is no longer running, and\nrepeated calls recompute the same step from the same entity state.\n",
+        "tags": ["Setup"],
+        "responses": {
+          "200": {
+            "description": "Wizard reopened at the first incomplete step",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupResumeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/setup/checklist/dismiss": {
+      "post": {
+        "operationId": "dismissSetupChecklist",
+        "summary": "Permanently dismiss the setup checklist",
+        "description": "Permanently hides the \"Finish setup\" checklist shown after the wizard is\nskipped. Idempotent: repeat calls keep the first dismissal timestamp.\nNot gated on the wizard being in progress, since the checklist only\nexists once the wizard has been skipped.\n",
+        "tags": ["Setup"],
+        "responses": {
+          "200": {
+            "description": "Checklist dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupChecklistDismissResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/compatibility/parity": {
       "get": {
         "operationId": "getCompatibilityParity",
@@ -12826,6 +12866,48 @@
           }
         }
       },
+      "SetupPrerequisites": {
+        "type": "object",
+        "required": ["hasArrInstance", "hasDatabase", "hasProfileSelections"],
+        "properties": {
+          "hasArrInstance": {
+            "type": "boolean",
+            "description": "Whether at least one Arr instance has been connected"
+          },
+          "hasDatabase": {
+            "type": "boolean",
+            "description": "Whether at least one PCD database has been linked"
+          },
+          "hasProfileSelections": {
+            "type": "boolean",
+            "description": "Whether at least one instance has quality profile selections synced"
+          }
+        },
+        "description": "Setup prerequisite progress derived from real entity state"
+      },
+      "SetupResumeResponse": {
+        "type": "object",
+        "required": ["wizard", "progress"],
+        "properties": {
+          "wizard": {
+            "$ref": "#/components/schemas/WizardState"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/SetupPrerequisites"
+          }
+        },
+        "description": "Reopened wizard state and the prerequisite progress used to pick the resume step"
+      },
+      "SetupChecklistDismissResponse": {
+        "type": "object",
+        "required": ["checklistDismissed"],
+        "properties": {
+          "checklistDismissed": {
+            "type": "boolean",
+            "description": "Whether the post-skip setup checklist is permanently dismissed (always true on success)"
+          }
+        }
+      },
       "SetupStateResponse": {
         "type": "object",
         "required": ["wizard", "prerequisites", "defaultDatabase"],
@@ -12834,23 +12916,7 @@
             "$ref": "#/components/schemas/WizardState"
           },
           "prerequisites": {
-            "type": "object",
-            "required": ["hasArrInstance", "hasDatabase", "hasProfileSelections"],
-            "properties": {
-              "hasArrInstance": {
-                "type": "boolean",
-                "description": "Whether at least one Arr instance has been connected"
-              },
-              "hasDatabase": {
-                "type": "boolean",
-                "description": "Whether at least one PCD database has been linked"
-              },
-              "hasProfileSelections": {
-                "type": "boolean",
-                "description": "Whether at least one instance has quality profile selections synced"
-              }
-            },
-            "description": "Setup prerequisite progress derived from real entity state"
+            "$ref": "#/components/schemas/SetupPrerequisites"
           },
           "defaultDatabase": {
             "type": "object",

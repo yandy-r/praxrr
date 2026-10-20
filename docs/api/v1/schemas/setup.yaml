@@ -27,6 +27,45 @@ WizardState:
     currentStep:
       $ref: '#/WizardStep'
 
+SetupPrerequisites:
+  type: object
+  required:
+    - hasArrInstance
+    - hasDatabase
+    - hasProfileSelections
+  properties:
+    hasArrInstance:
+      type: boolean
+      description: Whether at least one Arr instance has been connected
+    hasDatabase:
+      type: boolean
+      description: Whether at least one PCD database has been linked
+    hasProfileSelections:
+      type: boolean
+      description: Whether at least one instance has quality profile selections synced
+  description: Setup prerequisite progress derived from real entity state
+
+SetupResumeResponse:
+  type: object
+  required:
+    - wizard
+    - progress
+  properties:
+    wizard:
+      $ref: '#/WizardState'
+    progress:
+      $ref: '#/SetupPrerequisites'
+  description: Reopened wizard state and the prerequisite progress used to pick the resume step
+
+SetupChecklistDismissResponse:
+  type: object
+  required:
+    - checklistDismissed
+  properties:
+    checklistDismissed:
+      type: boolean
+      description: Whether the post-skip setup checklist is permanently dismissed (always true on success)
+
 SetupStateResponse:
   type: object
   required:
@@ -37,22 +76,7 @@ SetupStateResponse:
     wizard:
       $ref: '#/WizardState'
     prerequisites:
-      type: object
-      required:
-        - hasArrInstance
-        - hasDatabase
-        - hasProfileSelections
-      properties:
-        hasArrInstance:
-          type: boolean
-          description: Whether at least one Arr instance has been connected
-        hasDatabase:
-          type: boolean
-          description: Whether at least one PCD database has been linked
-        hasProfileSelections:
-          type: boolean
-          description: Whether at least one instance has quality profile selections synced
-      description: Setup prerequisite progress derived from real entity state
+      $ref: '#/SetupPrerequisites'
     defaultDatabase:
       type: object
       required:

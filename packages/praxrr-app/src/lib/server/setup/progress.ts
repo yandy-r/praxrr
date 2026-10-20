@@ -1,8 +1,8 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { setupStateQueries } from '$db/queries/setupState.ts';
+import { setupStateQueries, type WizardStep } from '$db/queries/setupState.ts';
 import { isPublicPath } from '$auth/middleware.ts';
 
 /**
@@ -34,7 +34,11 @@ export function resolvePrimaryInstance() {
  * pipeline.
  */
 export function getSetupProgress(): SetupProgress {
-  const instances = arrInstancesQueries.getAll();
+  return computeSetupProgress(arrInstancesQueries.getAll());
+}
+
+/** Progress from an already-loaded instance list, so callers needing both don't re-query. */
+function computeSetupProgress(instances: ArrInstance[]): SetupProgress {
   const databases = databaseInstancesQueries.getAll();
   const hasProfileSelections = instances.some(
     (instance) => arrSyncQueries.getQualityProfilesSync(instance.id).selections.length > 0
@@ -44,6 +48,70 @@ export function getSetupProgress(): SetupProgress {
     hasArrInstance: instances.length > 0,
     hasDatabase: databases.length > 0,
     hasProfileSelections,
+  };
+}
+
+/**
+ * The first wizard step whose prerequisite is still unmet, or `preview-sync`
+ * once every prerequisite is satisfied. Used by `POST /api/v1/setup/resume` to
+ * land a returning user exactly where they left off.
+ */
+export function resolveResumeStep(progress: SetupProgress): WizardStep {
+  if (!progress.hasArrInstance) return 'connect-arr';
+  if (!progress.hasDatabase) return 'link-database';
+  if (!progress.hasProfileSelections) return 'select-profiles';
+  return 'preview-sync';
+}
+
+/**
+ * Payload for the post-skip "Finish setup" checklist rendered in the app shell.
+ * `primaryInstanceId` targets the select-profiles row's sync link; null when no
+ * instance exists yet.
+ */
+export interface SetupChecklist {
+  progress: SetupProgress;
+  completedCount: number;
+  total: number;
+  primaryInstanceId: number | null;
+}
+
+/**
+ * Resolve the "Finish setup" checklist for a page navigation, or `null` when it
+ * must stay hidden: the wizard was never skipped, it was completed, the user
+ * dismissed the checklist, the page is part of the wizard/auth flow, or every
+ * prerequisite is already met.
+ *
+ * Runs on every root layout load, so the single `setup_state` row is checked
+ * before computing entity-derived progress, and the instance list is loaded
+ * once for both progress and the primary instance.
+ */
+export function resolveSetupChecklist(pathname: string): SetupChecklist | null {
+  if (pathname.startsWith('/setup') || pathname.startsWith('/auth/')) return null;
+
+  const state = setupStateQueries.get();
+  if (
+    state.wizard_completed === 1 ||
+    state.wizard_dismissed_at === null ||
+    state.setup_checklist_dismissed_at !== null
+  ) {
+    return null;
+  }
+
+  const instances = arrInstancesQueries.getAll();
+  const progress = computeSetupProgress(instances);
+  const completedCount = [progress.hasArrInstance, progress.hasDatabase, progress.hasProfileSelections].filter(
+    Boolean
+  ).length;
+  const total = 3;
+  if (completedCount === total) return null;
+
+  // Same choice as resolvePrimaryInstance(): both queries order by name.
+  const primaryInstance = instances.find((instance) => instance.enabled === 1) ?? instances[0];
+  return {
+    progress,
+    completedCount,
+    total,
+    primaryInstanceId: primaryInstance?.id ?? null,
   };
 }
 

@@ -13,6 +13,16 @@ Complete it once to confirm your install, credentials, and network paths.
 - At least one Arr app (Radarr, Sonarr, or Lidarr) reachable from Praxrr
 - An API key from the target Arr instance (Settings → General)
 
+## Guided setup
+
+On first run Praxrr opens a setup wizard that walks through the steps below. You can
+**Skip wizard** at any time: a **Finish setup (k/3)** checklist then appears at the top of
+the app, linking each unfinished step (connect an Arr instance, link a database, select
+profiles). **Resume guided setup** reopens the wizard at the first incomplete step;
+**Dismiss** hides the checklist permanently. The checklist also disappears once all three
+steps are done. To run the guide again later — even after finishing it — use **Restart
+setup guide** under **Settings → General**.
+
 ## Step 1 — Link a configuration database
 
 Praxrr reads quality profiles, custom formats, and related settings from a

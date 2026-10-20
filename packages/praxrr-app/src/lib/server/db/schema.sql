@@ -959,12 +959,17 @@ CREATE TABLE auth_settings (
 -- ==============================================================================
 -- TABLE: setup_state
 -- Purpose: Track one-time setup operations (singleton pattern with id=1)
--- Migration: 039_create_setup_state.ts
+-- Migrations: 039_create_setup_state.ts, 20260707_add_setup_wizard_state.ts,
+--             20261020_add_setup_checklist_dismissed_at.ts
 -- ==============================================================================
 
 CREATE TABLE setup_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     default_database_linked INTEGER NOT NULL DEFAULT 0,  -- 1=default db has been linked
+    wizard_completed INTEGER NOT NULL DEFAULT 0,         -- 1=setup wizard finished
+    wizard_dismissed_at TEXT,                            -- set when the wizard was skipped
+    wizard_current_step TEXT NOT NULL DEFAULT 'welcome', -- resume position
+    setup_checklist_dismissed_at TEXT,                   -- set when the post-skip checklist was dismissed
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

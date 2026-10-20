@@ -1,6 +1,22 @@
-import { redirect } from '@sveltejs/kit';
-import type { Actions } from '@sveltejs/kit';
+import { redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { createArrInstanceFromForm } from '$arr/createInstanceAction.ts';
+import type { User } from '$db/queries/users.ts';
+import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
+import { ARR_CONNECTION_DETAILS, type SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
+
+export interface ArrNewPageData {
+  arrSettingsSectionModes: SectionModeMap;
+}
+
+// The shared InstanceForm requires `arrSettingsSectionModes` in create mode too.
+export const load = (({ locals }): ArrNewPageData => {
+  // `deno test` type-checks without SvelteKit's App.Locals augmentation; narrow
+  // the same way the root layout does.
+  const { user } = locals as { user: User | null };
+  return {
+    arrSettingsSectionModes: loadSectionModes(user?.id, [ARR_CONNECTION_DETAILS]),
+  };
+}) satisfies ServerLoad;
 
 export const actions = {
   default: async ({ request }) => {

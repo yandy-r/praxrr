@@ -2,10 +2,14 @@ import { assertEquals } from '@std/assert';
 import { GET as stateGET, PATCH as statePATCH } from '../../routes/api/v1/setup/state/+server.ts';
 import { POST as completePost } from '../../routes/api/v1/setup/complete/+server.ts';
 import { POST as skipPost } from '../../routes/api/v1/setup/skip/+server.ts';
+import { POST as resumePost } from '../../routes/api/v1/setup/resume/+server.ts';
+import { POST as checklistDismissPost } from '../../routes/api/v1/setup/checklist/dismiss/+server.ts';
 import { POST as testConnectionPost } from '../../routes/api/v1/setup/test-connection/+server.ts';
 import { setupStateQueries, type WizardStep } from '$db/queries/setupState.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { databaseInstancesQueries, type DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import { arrSyncQueries, type QualityProfilesSyncData } from '$db/queries/arrSync.ts';
+import type { SetupProgress } from '$server/setup/progress.ts';
 import { DEFAULT_RATE_LIMIT_MAX_REQUESTS, resetRateLimitForTests } from '$utils/rateLimit.ts';
 import { BaseArrClient } from '$arr/base.ts';
 
@@ -15,6 +19,7 @@ interface FakeWizardState {
   completed: boolean;
   dismissedAt: string | null;
   currentStep: WizardStep;
+  checklistDismissedAt: string | null;
 }
 
 const WIZARD_STEPS: WizardStep[] = [
@@ -55,10 +60,16 @@ function installFakeSetupState(restores: Restore[], overrides: Partial<FakeWizar
     completed: false,
     dismissedAt: null,
     currentStep: 'welcome',
+    checklistDismissedAt: null,
     ...overrides,
   };
 
-  patchTarget(setupStateQueries, 'getWizardState', () => ({ ...state }), restores);
+  patchTarget(
+    setupStateQueries,
+    'getWizardState',
+    () => ({ completed: state.completed, dismissedAt: state.dismissedAt, currentStep: state.currentStep }),
+    restores
+  );
   patchTarget(setupStateQueries, 'wizardShouldRun', () => !state.completed && state.dismissedAt === null, restores);
   patchTarget(
     setupStateQueries,
@@ -86,6 +97,31 @@ function installFakeSetupState(restores: Restore[], overrides: Partial<FakeWizar
     'markWizardDismissed',
     () => {
       state.dismissedAt = new Date().toISOString();
+      return true;
+    },
+    restores
+  );
+  patchTarget(
+    setupStateQueries,
+    'reopenWizard',
+    (step: WizardStep) => {
+      if (!WIZARD_STEPS.includes(step)) {
+        throw new Error(`Invalid wizard step: ${step}`);
+      }
+      state.completed = false;
+      state.dismissedAt = null;
+      state.checklistDismissedAt = null;
+      state.currentStep = step;
+      return true;
+    },
+    restores
+  );
+  patchTarget(setupStateQueries, 'isChecklistDismissed', () => state.checklistDismissedAt !== null, restores);
+  patchTarget(
+    setupStateQueries,
+    'markChecklistDismissed',
+    () => {
+      state.checklistDismissedAt ??= new Date().toISOString();
       return true;
     },
     restores
@@ -223,6 +259,109 @@ Deno.test('POST /api/v1/setup/skip marks the wizard dismissed and is idempotent'
 
     const body = (await second.json()) as { wizard: { dismissedAt: string | null } };
     assertEquals(typeof body.wizard.dismissedAt, 'string');
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+/**
+ * Stub the entity queries behind `getSetupProgress()` so each resume test can
+ * pick which prerequisites are met without a real database.
+ */
+function installFakeProgress(restores: Restore[], progress: SetupProgress): void {
+  // Only `id` is read by getSetupProgress/resolvePrimaryInstance; the rest of
+  // the row shape is irrelevant to these tests.
+  const instances = (progress.hasArrInstance ? [{ id: 7 }] : []) as unknown as ArrInstance[];
+  const databases = (progress.hasDatabase ? [{ id: 1 }] : []) as unknown as DatabaseInstance[];
+  const profileSync = {
+    selections: progress.hasProfileSelections ? [{ databaseId: 1, profileName: 'HD' }] : [],
+  } as unknown as QualityProfilesSyncData;
+  patchTarget(arrInstancesQueries, 'getAll', () => instances, restores);
+  patchTarget(databaseInstancesQueries, 'getAll', () => databases, restores);
+  patchTarget(arrSyncQueries, 'getQualityProfilesSync', () => profileSync, restores);
+}
+
+const RESUME_CASES: { progress: SetupProgress; step: WizardStep }[] = [
+  { progress: { hasArrInstance: false, hasDatabase: false, hasProfileSelections: false }, step: 'connect-arr' },
+  { progress: { hasArrInstance: false, hasDatabase: true, hasProfileSelections: false }, step: 'connect-arr' },
+  { progress: { hasArrInstance: true, hasDatabase: false, hasProfileSelections: false }, step: 'link-database' },
+  { progress: { hasArrInstance: true, hasDatabase: true, hasProfileSelections: false }, step: 'select-profiles' },
+  { progress: { hasArrInstance: true, hasDatabase: true, hasProfileSelections: true }, step: 'preview-sync' },
+];
+
+for (const { progress, step } of RESUME_CASES) {
+  Deno.test(`POST /api/v1/setup/resume after skip lands on ${step} for ${JSON.stringify(progress)}`, async () => {
+    const restores: Restore[] = [];
+    const state = installFakeSetupState(restores, {
+      dismissedAt: '2026-10-01T00:00:00.000Z',
+      checklistDismissedAt: '2026-10-02T00:00:00.000Z',
+      currentStep: 'welcome',
+    });
+    installFakeProgress(restores, progress);
+
+    try {
+      const response = await resumePost({} as Parameters<typeof resumePost>[0]);
+      assertEquals(response.status, 200);
+      assertEquals(await response.json(), {
+        wizard: { completed: false, dismissedAt: null, currentStep: step },
+        progress,
+      });
+      assertEquals(state.checklistDismissedAt, null);
+      assertEquals(setupStateQueries.wizardShouldRun(), true);
+    } finally {
+      restoreAll(restores);
+    }
+  });
+}
+
+Deno.test('POST /api/v1/setup/resume is idempotent: repeat calls return 200 and the same state', async () => {
+  const restores: Restore[] = [];
+  installFakeSetupState(restores, { dismissedAt: '2026-10-01T00:00:00.000Z' });
+  installFakeProgress(restores, { hasArrInstance: true, hasDatabase: false, hasProfileSelections: false });
+
+  try {
+    const first = await resumePost({} as Parameters<typeof resumePost>[0]);
+    const second = await resumePost({} as Parameters<typeof resumePost>[0]);
+    assertEquals(first.status, 200);
+    assertEquals(second.status, 200);
+
+    const firstBody: unknown = await first.json();
+    assertEquals(await second.json(), firstBody);
+    assertEquals(firstBody, {
+      wizard: { completed: false, dismissedAt: null, currentStep: 'link-database' },
+      progress: { hasArrInstance: true, hasDatabase: false, hasProfileSelections: false },
+    });
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('POST /api/v1/setup/resume reopens a completed wizard', async () => {
+  const restores: Restore[] = [];
+  const state = installFakeSetupState(restores, { completed: true, currentStep: 'done' });
+  installFakeProgress(restores, { hasArrInstance: true, hasDatabase: true, hasProfileSelections: true });
+
+  try {
+    const response = await resumePost({} as Parameters<typeof resumePost>[0]);
+    assertEquals(response.status, 200);
+    assertEquals(state.completed, false);
+    assertEquals(state.currentStep, 'preview-sync');
+    assertEquals(setupStateQueries.wizardShouldRun(), true);
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('POST /api/v1/setup/checklist/dismiss is idempotent', async () => {
+  const restores: Restore[] = [];
+  installFakeSetupState(restores, { dismissedAt: '2026-10-01T00:00:00.000Z' });
+
+  try {
+    for (let call = 0; call < 2; call += 1) {
+      const response = await checklistDismissPost({} as Parameters<typeof checklistDismissPost>[0]);
+      assertEquals(response.status, 200);
+      assertEquals(await response.json(), { checklistDismissed: true });
+    }
   } finally {
     restoreAll(restores);
   }

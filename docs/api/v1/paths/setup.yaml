@@ -149,3 +149,45 @@ skip:
               properties:
                 wizard:
                   $ref: '../schemas/setup.yaml#/WizardState'
+
+resume:
+  post:
+    operationId: resumeSetup
+    summary: Reopen the setup wizard
+    description: |
+      Reopens the setup wizard after it was skipped or completed. Clears the
+      dismissal, completion, and checklist-dismissal flags and sets the current
+      step to the first step whose prerequisite is still unmet
+      (`connect-arr`, `link-database`, `select-profiles`, else `preview-sync`).
+
+      Idempotent and deliberately not gated on the wizard still being in
+      progress: it exists to restart a wizard that is no longer running, and
+      repeated calls recompute the same step from the same entity state.
+    tags:
+      - Setup
+    responses:
+      '200':
+        description: Wizard reopened at the first incomplete step
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/SetupResumeResponse'
+
+checklistDismiss:
+  post:
+    operationId: dismissSetupChecklist
+    summary: Permanently dismiss the setup checklist
+    description: |
+      Permanently hides the "Finish setup" checklist shown after the wizard is
+      skipped. Idempotent: repeat calls keep the first dismissal timestamp.
+      Not gated on the wizard being in progress, since the checklist only
+      exists once the wizard has been skipped.
+    tags:
+      - Setup
+    responses:
+      '200':
+        description: Checklist dismissed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/setup.yaml#/SetupChecklistDismissResponse'
