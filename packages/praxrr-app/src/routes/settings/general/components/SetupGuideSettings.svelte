@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto, invalidateAll } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { alertStore } from '$alerts/store';
   import Button from '$ui/button/Button.svelte';
   import { RotateCcw } from 'lucide-svelte';
@@ -11,7 +11,6 @@
     try {
       const res = await fetch('/api/v1/setup/resume', { method: 'POST' });
       if (!res.ok) throw new Error('Failed to restart setup');
-      await invalidateAll();
       await goto('/setup');
     } catch {
       alertStore.add('error', 'Could not restart the setup guide — please try again.');

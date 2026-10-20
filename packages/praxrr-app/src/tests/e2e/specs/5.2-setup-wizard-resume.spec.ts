@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { countArrInstances, getSetupState, type SetupStateRow } from '../helpers/db';
 
 const E2E_USERNAME = process.env.E2E_USERNAME;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
@@ -34,33 +33,59 @@ async function signIn(page: Page): Promise<void> {
 }
 
 /**
- * Put `setup_state` back to the flags recorded before the test, through the
- * public setup API: reopen (clears everything), restore the step while the
- * wizard is still running, then re-apply each terminal flag that was set
- * (skip and completion are independent) plus checklist dismissal.
- * Timestamps are re-stamped, not preserved.
+ * Wizard state observed through read-only HTTP (no DB file access):
+ * - `running`: `GET /api/v1/setup/state` answers 200 (wizard open at `step`).
+ * - `skipped`: the setup API is closed (403) and the "Finish setup" checklist
+ *   renders — skipped, not completed, checklist not dismissed.
+ * - `closed`: the setup API is closed and no checklist renders — completed,
+ *   checklist dismissed, or every prerequisite met. The HTTP surface cannot
+ *   tell these apart; restoring to "completed" keeps the only property later
+ *   specs depend on (no redirect into `/setup`).
  */
-async function restoreSetupState(page: Page, original: SetupStateRow): Promise<void> {
+type ObservedSetupState =
+  { kind: 'running'; step: string; hasArrInstance: boolean } | { kind: 'skipped' } | { kind: 'closed' };
+
+/** Subset of `GET /api/v1/setup/state` read by this spec. */
+interface SetupStateBody {
+  wizard: { currentStep: string };
+  prerequisites: { hasArrInstance: boolean };
+}
+
+async function hasArrInstance(page: Page): Promise<boolean> {
+  await page.goto('/arr');
+  await page.waitForLoadState('networkidle');
+  return (await page.getByRole('heading', { name: 'No Arr Instances' }).count()) === 0;
+}
+
+async function observeSetupState(page: Page): Promise<ObservedSetupState> {
+  const response = await page.request.get('/api/v1/setup/state');
+  if (response.status() === 200) {
+    const body: SetupStateBody = await response.json();
+    return { kind: 'running', step: body.wizard.currentStep, hasArrInstance: body.prerequisites.hasArrInstance };
+  }
+  expect(response.status(), 'GET /api/v1/setup/state must be 200 (running) or 403 (closed)').toBe(403);
+
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  const checklistVisible = (await page.getByRole('complementary', { name: /Finish setup/ }).count()) > 0;
+  return checklistVisible ? { kind: 'skipped' } : { kind: 'closed' };
+}
+
+/** Restore the observed state through the public setup API. */
+async function restoreSetupState(page: Page, original: ObservedSetupState): Promise<void> {
   const post = async (path: string) => {
     const response = await page.request.post(path);
     expect(response.ok(), `${path} failed during setup_state restore`).toBe(true);
   };
 
   await post('/api/v1/setup/resume');
-  if (original.wizard_completed === 0 && original.wizard_dismissed_at === null) {
-    const response = await page.request.patch('/api/v1/setup/state', {
-      data: { currentStep: original.wizard_current_step },
-    });
+  if (original.kind === 'running') {
+    const response = await page.request.patch('/api/v1/setup/state', { data: { currentStep: original.step } });
     expect(response.ok(), 'PATCH /api/v1/setup/state failed during setup_state restore').toBe(true);
-  }
-  if (original.wizard_dismissed_at !== null) {
+  } else if (original.kind === 'skipped') {
     await post('/api/v1/setup/skip');
-  }
-  if (original.wizard_completed === 1) {
+  } else {
     await post('/api/v1/setup/complete');
-  }
-  if (original.setup_checklist_dismissed_at !== null) {
-    await post('/api/v1/setup/checklist/dismiss');
   }
 }
 
@@ -71,11 +96,11 @@ async function restoreSetupState(page: Page, original: SetupStateRow): Promise<v
  * on the first incomplete wizard step → finishing the wizard hides the
  * checklist for good.
  *
- * This test never assumes a fresh data dir: it
- * checks preconditions read-only (no Arr instance connected, so Resume lands on
- * `/setup/connect-arr`, the create-mode InstanceForm), skips before mutating
- * anything when they do not hold, and restores the original `setup_state`
- * flags in `finally` so later specs are not redirected into `/setup`.
+ * This test never assumes a fresh data dir and never reads the app DB file: it
+ * checks preconditions over read-only HTTP (no Arr instance connected, so
+ * Resume lands on `/setup/connect-arr`, the create-mode InstanceForm), skips
+ * before mutating anything when they do not hold, and restores the observed
+ * wizard state in `finally` so later specs are not redirected into `/setup`.
  */
 test.describe('5.2 Setup wizard resume', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -83,11 +108,14 @@ test.describe('5.2 Setup wizard resume', () => {
   test('skip → checklist → resume → complete hides the checklist', async ({ page }) => {
     await signIn(page);
 
+    const original = await observeSetupState(page);
+    // While the wizard runs, the forward gate redirects `/arr` into `/setup`, so
+    // only probe the instance list once the setup API reports it closed.
+    const instanceConnected = original.kind === 'running' ? original.hasArrInstance : await hasArrInstance(page);
     test.skip(
-      countArrInstances() > 0,
+      instanceConnected,
       'An Arr instance is already connected on this server; Resume would not land on connect-arr.'
     );
-    const original = getSetupState();
 
     try {
       // Normalise: reopen the wizard (clears any prior skip/completion/dismissal).
@@ -142,7 +170,7 @@ test.describe('5.2 Setup wizard resume', () => {
         .click();
       await page.waitForLoadState('networkidle');
       await expect(page).toHaveURL(/\/setup\/connect-arr$/);
-      await expect(page.getByRole('heading', { name: 'Connect' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Connect', exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Add Instance' })).toBeVisible();
 
       // Complete the wizard via the same endpoint the preview step's "Finish" calls,

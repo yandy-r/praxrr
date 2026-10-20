@@ -38,7 +38,6 @@
     try {
       const res = await fetch('/api/v1/setup/resume', { method: 'POST' });
       if (!res.ok) throw new Error('Failed to resume setup');
-      await invalidateAll();
       await goto('/setup');
     } catch {
       alertStore.add('error', 'Could not resume setup — please try again.');

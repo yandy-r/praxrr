@@ -1,8 +1,6 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@db/sqlite@*": "0.13.0",
-    "jsr:@denosaurs/plug@1": "1.1.0",
     "jsr:@denosaurs/plug@^1.1.0": "1.1.0",
     "jsr:@felix/bcrypt@^1.0.8": "1.0.8",
     "jsr:@soapbox/kysely-deno-sqlite@^2.2.0": "2.2.0",
@@ -13,7 +11,6 @@
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@1": "1.1.6",
-    "jsr:@std/path@1.0": "1.0.9",
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/yaml@^1.0.10": "1.1.2",
     "npm:@deno/vite-plugin@^1.0.5": "1.0.6_vite@7.3.7",
@@ -63,13 +60,6 @@
     "npm:yaml@^2.9.1": "2.9.1"
   },
   "jsr": {
-    "@db/sqlite@0.13.0": {
-      "integrity": "4545c635e0b3d4ddfdc0f2240f932f24b8ad0178e9c2e3a0f9403e7b18ae2fb5",
-      "dependencies": [
-        "jsr:@denosaurs/plug@1",
-        "jsr:@std/path@1.0"
-      ]
-    },
     "@denosaurs/plug@1.1.0": {
       "integrity": "eb2f0b7546c7bca2000d8b0282c54d50d91cf6d75cb26a80df25a6de8c4bc044",
       "dependencies": [
@@ -82,7 +72,7 @@
     "@felix/bcrypt@1.0.8": {
       "integrity": "59c41160fc027882479c512db5d53792c4d91aadcd49467c85caa2f1679046f2",
       "dependencies": [
-        "jsr:@denosaurs/plug@^1.1.0"
+        "jsr:@denosaurs/plug"
       ]
     },
     "@soapbox/kysely-deno-sqlite@2.2.0": {
@@ -112,9 +102,6 @@
     },
     "@std/internal@1.0.14": {
       "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
-    },
-    "@std/path@1.0.9": {
-      "integrity": "260a49f11edd3db93dd38350bf9cd1b4d1366afa98e81b86167b4e3dd750129e"
     },
     "@std/path@1.1.6": {
       "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",

@@ -1,16 +1,21 @@
 import { redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { createArrInstanceFromForm } from '$arr/createInstanceAction.ts';
 import type { User } from '$db/queries/users.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
-import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
+import { ARR_CONNECTION_DETAILS, type SectionModeMap } from '$shared/disclosure/sectionKeys.ts';
+
+export interface ConnectArrPageData {
+  instances: ArrInstance[];
+  arrSettingsSectionModes: SectionModeMap;
+}
 
 // Returning `instances` here so an env-reconciled instance from startup shows as
 // already connected instead of asking the user to add a duplicate.
 // `arrSettingsSectionModes` is required by the shared InstanceForm.
-export const load: ServerLoad = ({ locals }) => {
+export const load = (({ locals }): ConnectArrPageData => {
   // `deno test` type-checks without SvelteKit's App.Locals augmentation; narrow
   // the same way the root layout does.
   const { user } = locals as { user: User | null };
@@ -18,7 +23,7 @@ export const load: ServerLoad = ({ locals }) => {
     instances: arrInstancesQueries.getAll(),
     arrSettingsSectionModes: loadSectionModes(user?.id, [ARR_CONNECTION_DETAILS]),
   };
-};
+}) satisfies ServerLoad;
 
 export const actions = {
   default: async ({ request }) => {

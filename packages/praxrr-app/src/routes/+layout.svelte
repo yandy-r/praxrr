@@ -27,7 +27,7 @@
 <AlertContainer />
 
 <main class={isAuthPage ? '' : 'pt-16 pb-16 md:pt-0 md:pb-0 md:pl-80'}>
-  {#if !isAuthPage && data.setupChecklist}
+  {#if data.setupChecklist}
     <SetupChecklist checklist={data.setupChecklist} />
   {/if}
   <slot />
