@@ -2,8 +2,9 @@
   import { onDestroy } from 'svelte';
   import { enhance } from '$app/forms';
   import { alertStore } from '$alerts/store';
-  import { Save, RotateCcw, Eye, EyeOff, FlaskConical, Loader2 } from 'lucide-svelte';
+  import { Save, RotateCcw, Eye, EyeOff, FlaskConical, Loader2, Trash2 } from 'lucide-svelte';
   import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
+  import Modal from '$ui/modal/Modal.svelte';
   import type { TMDBSettings } from './types';
 
   export let settings: TMDBSettings;
@@ -20,6 +21,9 @@
   let revealRequestToken = 0;
   let pendingRevealRequestToken = 0;
   let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+  let showClearModal = false;
+  let clearInProgress = false;
+  let clearSubmitButton: HTMLButtonElement | null = null;
   const revealTimeoutMs = 30_000;
   $: hasStoredKey = settings.has_api_key || Boolean(settings.api_key_masked);
 
@@ -67,6 +71,10 @@
   function resetToDefaults() {
     apiKeyInput = DEFAULTS.apiKey;
     setRevealedApiKey('');
+    // The default is "no token"; clearing a stored token is explicit and confirmed.
+    if (settings.has_api_key) {
+      showClearModal = true;
+    }
   }
 
   function handleRevealChange(event: CustomEvent<{ revealed: boolean; reason: 'manual' | 'timeout' }>) {
@@ -109,6 +117,16 @@
   onDestroy(() => {
     clearAutoHideTimer();
   });
+
+  function confirmClearApiKey() {
+    showClearModal = false;
+    if (!clearSubmitButton) {
+      alertStore.add('error', 'Failed to clear TMDB token');
+      return;
+    }
+    clearInProgress = true;
+    clearSubmitButton.click();
+  }
 
   async function testConnection() {
     if (!apiKeyInput) {
@@ -173,15 +191,28 @@
           on:copyFeedback={handleCopyFeedback}
         />
       {/key}
-      <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-        Use the API Read Access Token (not API Key) from
-        <a
-          href="https://www.themoviedb.org/settings/api"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-accent-600 dark:text-accent-400 hover:underline">themoviedb.org</a
-        >
-      </p>
+      <div class="mt-1 flex items-start justify-between gap-3">
+        <p class="text-xs text-neutral-500 dark:text-neutral-400">
+          Use the API Read Access Token (not API Key) from
+          <a
+            href="https://www.themoviedb.org/settings/api"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-accent-600 dark:text-accent-400 hover:underline">themoviedb.org</a
+          >
+        </p>
+        {#if settings.has_api_key}
+          <button
+            type="button"
+            on:click={() => (showClearModal = true)}
+            disabled={clearInProgress}
+            class="flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+          >
+            <Trash2 size={12} />
+            Clear stored token
+          </button>
+        {/if}
+      </div>
     </div>
 
     <!-- Update API Read Access Token -->
@@ -210,6 +241,7 @@
           {/if}
         </button>
       </div>
+      <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Leave empty to keep the stored token.</p>
     </div>
   </div>
 
@@ -288,3 +320,35 @@
 >
   <button type="submit" class="hidden" aria-label="Reveal TMDB API key" bind:this={revealSubmitButton}></button>
 </form>
+
+<form
+  method="POST"
+  action="?/clearTMDBKey"
+  class="hidden"
+  use:enhance={() => {
+    return async ({ result, update }) => {
+      clearInProgress = false;
+      if (result.type === 'success') {
+        alertStore.add('success', 'TMDB token cleared');
+        setRevealedApiKey('');
+      } else {
+        const error = result.type === 'failure' ? (result.data as { error?: string } | undefined)?.error : undefined;
+        alertStore.add('error', error || 'Failed to clear TMDB token');
+      }
+      await update();
+    };
+  }}
+>
+  <button type="submit" class="hidden" aria-label="Clear TMDB token" bind:this={clearSubmitButton}></button>
+</form>
+
+<Modal
+  open={showClearModal}
+  header="Clear TMDB Token"
+  bodyMessage="Remove the stored TMDB API Read Access Token? TMDB lookups will stop working until a new token is saved."
+  confirmText="Clear Token"
+  cancelText="Cancel"
+  confirmDanger={true}
+  on:confirm={confirmClearApiKey}
+  on:cancel={() => (showClearModal = false)}
+/>

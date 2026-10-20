@@ -2,9 +2,10 @@
   import { onDestroy } from 'svelte';
   import { enhance } from '$app/forms';
   import { alertStore } from '$alerts/store';
-  import { Save, RotateCcw, Eye, EyeOff, Check } from 'lucide-svelte';
+  import { Save, RotateCcw, Eye, EyeOff, Check, Trash2 } from 'lucide-svelte';
   import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
   import IconCheckbox from '$ui/form/IconCheckbox.svelte';
+  import Modal from '$ui/modal/Modal.svelte';
   import type { AISettings } from './types';
 
   export let settings: AISettings;
@@ -20,6 +21,9 @@
   let revealRequestToken = 0;
   let pendingRevealRequestToken = 0;
   let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+  let showClearModal = false;
+  let clearInProgress = false;
+  let clearSubmitButton: HTMLButtonElement | null = null;
   const revealTimeoutMs = 30_000;
   $: hasStoredKey = settings.has_api_key || Boolean(settings.api_key_masked);
 
@@ -116,6 +120,16 @@
   onDestroy(() => {
     clearAutoHideTimer();
   });
+
+  function confirmClearApiKey() {
+    showClearModal = false;
+    if (!clearSubmitButton) {
+      alertStore.add('error', 'Failed to clear AI API key');
+      return;
+    }
+    clearInProgress = true;
+    clearSubmitButton.click();
+  }
 </script>
 
 <form
@@ -143,10 +157,48 @@
       </button>
     </div>
 
-    {#if settings.enabled}
-      <!-- Divider -->
-      <div class="border-t border-neutral-200 dark:border-neutral-800"></div>
+    <!-- Divider -->
+    <div class="border-t border-neutral-200 dark:border-neutral-800"></div>
 
+    <!-- Stored API Key -->
+    <div>
+      <label for="ai-stored-api-key" class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+        Stored API Key
+      </label>
+      {#key remaskSession}
+        <MaskedApiKey
+          id="ai-stored-api-key"
+          label="AI API Key"
+          maskedValue={maskedApiKeyValue}
+          value={plainApiKeyValue}
+          hasValue={settings.has_api_key}
+          revealLabel="Show"
+          hideLabel="Hide"
+          copyLabel="Copy"
+          disabled={revealInProgress}
+          on:revealChange={handleRevealChange}
+          on:copyFeedback={handleCopyFeedback}
+        />
+      {/key}
+      <div class="mt-1 flex items-start justify-between gap-3">
+        <p class="text-xs text-neutral-500 dark:text-neutral-400">
+          Stored key values are hidden by default for security.
+        </p>
+        {#if settings.has_api_key}
+          <button
+            type="button"
+            on:click={() => (showClearModal = true)}
+            disabled={clearInProgress}
+            class="flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+          >
+            <Trash2 size={12} />
+            Clear stored key
+          </button>
+        {/if}
+      </div>
+    </div>
+
+    {#if settings.enabled}
       <!-- API URL -->
       <div>
         <label for="api_url" class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50">
@@ -162,31 +214,6 @@
         />
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
           OpenAI-compatible endpoint. Examples: Ollama (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1)
-        </p>
-      </div>
-
-      <!-- Stored API Key -->
-      <div>
-        <label for="ai-stored-api-key" class="mb-2 block text-sm font-semibold text-neutral-900 dark:text-neutral-50">
-          Stored API Key
-        </label>
-        {#key remaskSession}
-          <MaskedApiKey
-            id="ai-stored-api-key"
-            label="AI API Key"
-            maskedValue={maskedApiKeyValue}
-            value={plainApiKeyValue}
-            hasValue={settings.has_api_key}
-            revealLabel="Show"
-            hideLabel="Hide"
-            copyLabel="Copy"
-            disabled={revealInProgress}
-            on:revealChange={handleRevealChange}
-            on:copyFeedback={handleCopyFeedback}
-          />
-        {/key}
-        <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          Stored key values are hidden by default for security.
         </p>
       </div>
 
@@ -217,7 +244,7 @@
           </button>
         </div>
         <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          Required for cloud providers. Leave empty for local APIs like Ollama.
+          Leave empty to keep the stored key. Required for cloud providers; not needed for local APIs like Ollama.
         </p>
       </div>
 
@@ -238,6 +265,10 @@
           Model name. Examples: gpt-4o-mini, llama3.2, claude-3-haiku
         </p>
       </div>
+    {:else}
+      <!-- Disabled: keep URL/model in the payload so disable-only saves keep them and Reset+Save persists defaults -->
+      <input type="hidden" name="api_url" value={settings.api_url} />
+      <input type="hidden" name="model" value={settings.model} />
     {/if}
   </div>
 
@@ -300,3 +331,35 @@
 >
   <button type="submit" class="hidden" aria-label="Reveal AI API key" bind:this={revealSubmitButton}></button>
 </form>
+
+<form
+  method="POST"
+  action="?/clearAIKey"
+  class="hidden"
+  use:enhance={() => {
+    return async ({ result, update }) => {
+      clearInProgress = false;
+      if (result.type === 'success') {
+        alertStore.add('success', 'AI API key cleared');
+        setRevealedApiKey('');
+      } else {
+        const error = result.type === 'failure' ? (result.data as { error?: string } | undefined)?.error : undefined;
+        alertStore.add('error', error || 'Failed to clear AI API key');
+      }
+      await update();
+    };
+  }}
+>
+  <button type="submit" class="hidden" aria-label="Clear AI API key" bind:this={clearSubmitButton}></button>
+</form>
+
+<Modal
+  open={showClearModal}
+  header="Clear AI API Key"
+  bodyMessage="Remove the stored AI API key? AI features using a cloud provider will stop working until a new key is saved."
+  confirmText="Clear Key"
+  cancelText="Cancel"
+  confirmDanger={true}
+  on:confirm={confirmClearApiKey}
+  on:cancel={() => (showClearModal = false)}
+/>

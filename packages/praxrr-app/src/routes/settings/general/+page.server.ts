@@ -195,29 +195,29 @@ export const actions: Actions = {
   updateAI: async ({ request }: RequestEvent) => {
     const formData = await request.formData();
 
-    // Parse form data
+    // Parse form data. URL/model inputs are only rendered while AI is enabled, so absent
+    // fields mean "keep the stored value" rather than "reset to defaults".
     const enabled = formData.get('enabled') === 'on';
-    const apiUrl = formData.get('api_url') as string;
-    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
-    const apiKey = apiKeyInput;
-    const model = formData.get('model') as string;
+    const apiUrl = formData.has('api_url') ? String(formData.get('api_url')) : undefined;
+    const model = formData.has('model') ? String(formData.get('model')) : undefined;
+    // The key input always starts empty; an empty submission keeps the stored key.
+    // Clearing the stored key is an explicit action (clearAIKey).
+    const apiKeyInput = String(formData.get('api_key') ?? '').trim();
+    const apiKey = apiKeyInput.length > 0 ? apiKeyInput : undefined;
 
-    // Validate
-    if (enabled && !apiUrl) {
-      return fail(400, { error: 'API URL is required when AI is enabled' });
-    }
-
-    if (enabled && !model) {
-      return fail(400, { error: 'Model is required when AI is enabled' });
+    // Validate against the effective (submitted or stored) values
+    if (enabled) {
+      const stored = aiSettingsQueries.get();
+      if (!(apiUrl ?? stored?.api_url)) {
+        return fail(400, { error: 'API URL is required when AI is enabled' });
+      }
+      if (!(model ?? stored?.model)) {
+        return fail(400, { error: 'Model is required when AI is enabled' });
+      }
     }
 
     // Update settings
-    const updated = aiSettingsQueries.update({
-      enabled,
-      apiUrl: apiUrl || 'https://api.openai.com/v1',
-      apiKey,
-      model: model || 'gpt-4o-mini',
-    });
+    const updated = aiSettingsQueries.update({ enabled, apiUrl, apiKey, model });
 
     if (!updated) {
       await logger.error('Failed to update AI settings', {
@@ -232,11 +232,27 @@ export const actions: Actions = {
         enabled,
         apiUrl,
         model,
-        // Note: Don't log apiKey for security
+        // Never log the key itself
+        apiKeyUpdated: apiKey !== undefined,
       },
     });
 
     return { success: true };
+  },
+
+  clearAIKey: async () => {
+    if (!aiSettingsQueries.update({ apiKey: '' })) {
+      await logger.error('Failed to clear AI API key', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to clear AI API key' });
+    }
+
+    await logger.info('AI API key cleared', {
+      source: 'settings/general',
+    });
+
+    return { success: true, cleared: true };
   },
 
   revealTMDB: async () => {
@@ -276,9 +292,12 @@ export const actions: Actions = {
   updateTMDB: async ({ request }: RequestEvent) => {
     const formData = await request.formData();
 
-    // Parse form data
-    const apiKeyInput = (formData.get('api_key') as string | null) ?? '';
-    const apiKey = apiKeyInput;
+    // The token input always starts empty; an empty submission keeps the stored token and
+    // succeeds without writing. Clearing the stored token is an explicit action (clearTMDBKey).
+    const apiKey = String(formData.get('api_key') ?? '').trim();
+    if (apiKey.length === 0) {
+      return { success: true };
+    }
 
     // Update settings
     const updated = tmdbSettingsQueries.update({
@@ -297,6 +316,21 @@ export const actions: Actions = {
     });
 
     return { success: true };
+  },
+
+  clearTMDBKey: async () => {
+    if (!tmdbSettingsQueries.update({ apiKey: '' })) {
+      await logger.error('Failed to clear TMDB API key', {
+        source: 'settings/general',
+      });
+      return fail(500, { error: 'Failed to clear TMDB API key' });
+    }
+
+    await logger.info('TMDB API key cleared', {
+      source: 'settings/general',
+    });
+
+    return { success: true, cleared: true };
   },
 
   updateArrDefaults: async ({ request }: RequestEvent) => {
