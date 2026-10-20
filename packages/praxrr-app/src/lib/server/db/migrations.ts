@@ -91,6 +91,7 @@ import { migration as migration20261006AddSessionPublicId } from './migrations/2
 import { migration as migration20261020AddSetupChecklistDismissedAt } from './migrations/20261020_add_setup_checklist_dismissed_at.ts';
 import { migration as migration20261021CreateApiTokens } from './migrations/20261021_create_api_tokens.ts';
 import { migration as migration20261022AddNotificationHistoryAttempts } from './migrations/20261022_add_notification_history_attempts.ts';
+import { migration as migration20261023CreateArrTrashGuideNamespaces } from './migrations/20261023_create_arr_trash_guide_namespaces.ts';
 
 export interface Migration {
   version: number;
@@ -416,6 +417,7 @@ export function loadMigrations(): Migration[] {
     migration20261020AddSetupChecklistDismissedAt,
     migration20261021CreateApiTokens,
     migration20261022AddNotificationHistoryAttempts,
+    migration20261023CreateArrTrashGuideNamespaces,
   ];
 
   // Sort by version number

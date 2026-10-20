@@ -28,8 +28,14 @@ import { logger } from '$logger/logger.ts';
 import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
 import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { getAllQualities, type SyncArrType } from '../mappings.ts';
-import { getNamespaceSuffix } from '../namespace.ts';
-import { createTrashNamespaceAllocator, resolveTrashSourceProfiles } from '../trashSourceProfiles.ts';
+import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
+import {
+  confirmTrashNamespace,
+  planTrashNamespaces,
+  resolveTrashSourceProfiles,
+  type TrashNamespaceAssignment,
+  type TrashSourceResolution,
+} from '../trashSourceProfiles.ts';
 import type {
   QualityProfilesPreview,
   SyncPreviewPreparedExecutionContext,
@@ -77,6 +83,8 @@ interface DatabaseSyncBatch {
   customFormats: Map<string, PcdCustomFormat>;
   /** Populated after CF sync: PCD format name (unsuffixed) → arr ID */
   pcdFormatIdMap: Map<string, number>;
+  /** TRaSH batches only: the namespace plan entry that produced `suffix`. */
+  trashNamespace?: TrashNamespaceAssignment;
 }
 
 interface SyncedProfileSummary {
@@ -129,6 +137,7 @@ interface PreparedQualityProfileBatch {
   readonly sourceLabel: string;
   readonly databaseId: number;
   readonly suffix: string;
+  readonly trashNamespace?: TrashNamespaceAssignment;
   readonly customFormats: readonly PreparedCustomFormatWrite[];
   readonly qualityProfiles: readonly PreparedQualityProfileWrite[];
 }
@@ -353,7 +362,7 @@ export class QualityProfileSyncer extends BaseSyncer {
       });
 
       // 1. Fetch profiles and CFs grouped by database (dropped selections → skipped outcomes)
-      const batches = await this.fetchSyncBatches(outcomes);
+      const batches = await this.fetchSyncBatches(outcomes, undefined, 'allocate');
 
       const totalProfiles = batches.reduce((sum, b) => sum + b.profiles.length, 0);
       if (totalProfiles === 0) {
@@ -455,7 +464,8 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       const effectiveConfig = this.getQualityProfilesSyncConfig();
       this.recordPreviewEvidence('qualityProfiles', 'pcd', 'effectiveConfig', effectiveConfig);
-      const batches = await this.fetchSyncBatches(undefined, effectiveConfig);
+      // Read-only: TRaSH namespaces are predicted, never persisted, while previewing.
+      const batches = await this.fetchSyncBatches(undefined, effectiveConfig, 'predict');
       this.recordPreviewEvidence('qualityProfiles', 'pcd', 'sourceBatches', batches.map(projectBatchEvidence));
       const totalProfiles = batches.reduce((sum, batch) => sum + batch.profiles.length, 0);
       if (totalProfiles === 0) {
@@ -533,6 +543,7 @@ export class QualityProfileSyncer extends BaseSyncer {
           sourceLabel: batch.sourceLabel,
           databaseId: batch.databaseId,
           suffix: batch.suffix,
+          trashNamespace: batch.trashNamespace,
           customFormats: preparedCustomFormatsByBatch[i]!,
           qualityProfiles: batchProfiles.map((payload, profileIndex) => ({
             pcdName: batch.profiles[profileIndex]!.pcdProfile.name,
@@ -648,6 +659,16 @@ export class QualityProfileSyncer extends BaseSyncer {
         throw new Error('Reviewed quality profile batch order does not match its material plan');
       }
 
+      // Persist reviewed TRaSH namespaces (in batch order) before any Arr write; a namespace that
+      // changed since review fails the whole run instead of writing under the wrong suffix.
+      for (const batch of context.desired.batches) {
+        if (batch.sourceKind !== 'trash') continue;
+        if (!batch.trashNamespace || batch.suffix !== getTrashGuideNamespaceSuffix(batch.trashNamespace.index)) {
+          throw new Error(`Reviewed TRaSH batch "${batch.sourceLabel}" has no verifiable namespace`);
+        }
+        confirmTrashNamespace(this.instanceId, batch.trashNamespace);
+      }
+
       const guardedCustomFormatIds = new Map(
         context.currentGuards.customFormats
           .filter((format) => typeof format.id === 'number')
@@ -741,8 +762,9 @@ export class QualityProfileSyncer extends BaseSyncer {
    * Fetch profiles and CFs grouped by database, each with a namespace suffix.
    */
   private async fetchSyncBatches(
-    skippedOutcomes?: SyncEntityOutcome[],
-    resolvedConfig?: QualityProfilesPreviewConfig
+    skippedOutcomes: SyncEntityOutcome[] | undefined,
+    resolvedConfig: QualityProfilesPreviewConfig | undefined,
+    trashNamespaceMode: 'allocate' | 'predict'
   ): Promise<DatabaseSyncBatch[]> {
     const syncConfig = resolvedConfig ?? this.getQualityProfilesSyncConfig();
     const batches: DatabaseSyncBatch[] = [];
@@ -879,6 +901,7 @@ export class QualityProfileSyncer extends BaseSyncer {
 
     const trashBatches = await this.fetchTrashSyncBatches(
       trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(this.instanceId),
+      trashNamespaceMode,
       skippedOutcomes
     );
     batches.push(...trashBatches);
@@ -888,11 +911,13 @@ export class QualityProfileSyncer extends BaseSyncer {
 
   private async fetchTrashSyncBatches(
     sourceHydrations: TrashGuideSyncQualityProfileSourceHydration[],
+    trashNamespaceMode: 'allocate' | 'predict',
     skippedOutcomes?: SyncEntityOutcome[]
   ): Promise<DatabaseSyncBatch[]> {
-    const batches: DatabaseSyncBatch[] = [];
     const sourceInputs: unknown[] = [];
-    const allocateTrashSuffix = createTrashNamespaceAllocator();
+    // Every hydrated source with selections, in hydration order (feeds the namespace plan).
+    const resolutions: TrashSourceResolution[] = [];
+    const pending: Omit<DatabaseSyncBatch, 'suffix' | 'trashNamespace'>[] = [];
     this.recordPreviewEvidence('qualityProfiles', 'pcd', 'trashSelections', sourceHydrations);
 
     // Emit one skipped outcome per user-selected TRaSH profile that never reaches a write
@@ -929,7 +954,7 @@ export class QualityProfileSyncer extends BaseSyncer {
           `Failed to parse all TRaSH cache rows for source "${sourceName}" during quality profile batch build`,
         someRowsMalformedMessage: 'Some TRaSH cache rows were malformed while building quality profile sync batches',
       });
-
+      resolutions.push(resolution);
       if (resolution.status === 'unavailable') {
         sourceInputs.push({
           sourceHydration,
@@ -1003,9 +1028,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         });
       }
 
-      // Shared allocator: cleanup computes the same positional suffix for this source.
-      const suffix = allocateTrashSuffix(resolution);
-      if (suffix === null) {
+      if (selectedProfiles.length === 0) {
         continue;
       }
 
@@ -1019,16 +1042,27 @@ export class QualityProfileSyncer extends BaseSyncer {
         customFormats.set(formatName, this.mapTrashPortableCustomFormatToPcd(portableFormat));
       }
 
-      batches.push({
+      pending.push({
         sourceKind: 'trash',
         sourceLabel: source.name,
-        databaseId: -source.id,
         // Keep TRaSH namespaces disjoint from DB namespaces while still using strip-compatible chars.
-        suffix,
+        databaseId: -source.id,
         profiles: selectedProfiles,
         customFormats,
         pcdFormatIdMap: new Map(),
       });
+    }
+
+    // Persisted per-(instance, source) namespace (YAN-443): `allocate` for real syncs, read-only
+    // `predict` for previews. Cleanup reads the same rows.
+    const plan = planTrashNamespaces(this.instanceId, resolutions, trashNamespaceMode);
+    const batches: DatabaseSyncBatch[] = [];
+    for (const batch of pending) {
+      const trashNamespace = plan.get(-batch.databaseId);
+      if (!trashNamespace) {
+        throw new Error(`TRaSH source "${batch.sourceLabel}" has no planned namespace`);
+      }
+      batches.push({ ...batch, suffix: getTrashGuideNamespaceSuffix(trashNamespace.index), trashNamespace });
     }
 
     this.recordPreviewEvidence('qualityProfiles', 'pcd', 'trashSourceMaterial', sourceInputs);
