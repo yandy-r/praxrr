@@ -195,8 +195,8 @@ export const actions: Actions = {
   updateAI: async ({ request }: RequestEvent) => {
     const formData = await request.formData();
 
-    // Parse form data. URL/model inputs are only rendered while AI is enabled, so absent
-    // fields mean "keep the stored value" rather than "reset to defaults".
+    // Parse form data. The UI always submits api_url/model (hidden inputs while AI is disabled);
+    // absent fields (non-UI clients) mean "keep the stored value", never "reset to defaults".
     const enabled = formData.get('enabled') === 'on';
     const apiUrl = formData.has('api_url') ? String(formData.get('api_url')) : undefined;
     const model = formData.has('model') ? String(formData.get('model')) : undefined;

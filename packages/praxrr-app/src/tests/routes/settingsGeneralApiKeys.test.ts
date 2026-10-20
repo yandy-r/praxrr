@@ -111,7 +111,7 @@ migratedTest('updateAI: non-empty api_key replaces stored key (trimmed)', async 
 migratedTest('updateAI: disabling without url/model/key fields preserves stored values', async () => {
   seedAI(true);
 
-  // AISettings.svelte does not render api_url/model/api_key when AI is disabled.
+  // Non-UI client omitting api_url/model/api_key: absent fields keep the stored values.
   const result = await run(
     'updateAI',
     formEvent(() => {})
