@@ -125,12 +125,12 @@ Rules:
 
 ```ts
 interface Alert {
-	id: string;
-	type: AlertType;
-	message: string;
-	duration?: number;
-	action?: { label: string; href: string }; // rendered as <a>, never {@html}
-	key?: string; // coalescing key, e.g. `job:${jobId}` or `burst`
+ id: string;
+ type: AlertType;
+ message: string;
+ duration?: number;
+ action?: { label: string; href: string }; // rendered as <a>, never {@html}
+ key?: string; // coalescing key, e.g. `job:${jobId}` or `burst`
 }
 add(type, message, duration?, options?: { action?; key? }): string
 upsert(key, alert): string // replace the existing alert with the same key instead of stacking

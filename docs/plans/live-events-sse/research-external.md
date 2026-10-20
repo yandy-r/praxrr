@@ -456,12 +456,12 @@ returned unsubscribe function is also what `onMount` returns.
 
 ```nginx
 location /api/v1/events {
-	proxy_pass http://praxrr:6868;
-	proxy_http_version 1.1;
-	proxy_set_header Connection '';
-	proxy_buffering off;        # or rely on X-Accel-Buffering: no from the app
-	proxy_read_timeout 1h;      # heartbeat keeps it alive anyway
-	gzip off;
+ proxy_pass http://praxrr:6868;
+ proxy_http_version 1.1;
+ proxy_set_header Connection '';
+ proxy_buffering off;        # or rely on X-Accel-Buffering: no from the app
+ proxy_read_timeout 1h;      # heartbeat keeps it alive anyway
+ gzip off;
 }
 ```
 

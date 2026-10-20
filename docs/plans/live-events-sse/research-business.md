@@ -221,7 +221,7 @@ Key decisions in this document:
 5. The handler completes or fails the section, which sets `idle` + `last_synced_at`, or `failed`
    - `last_error` (`arrSync.ts:1116,1129`; SQL `arrSync.ts:1357-1405`). It then records history
      (`arrSync.ts:1155`).
-   * Publish `sync.recorded{syncHistoryId, jobId, instanceId, arrType, status}` from inside
+   - Publish `sync.recorded{syncHistoryId, jobId, instanceId, arrType, status}` from inside
      `recordSyncHistory` after the insert (`record.ts:197`).
 6. The dispatcher writes `job_run_history` (`dispatcher.ts:123`), then calls `markFinished`
    (`dispatcher.ts:152`).

@@ -177,14 +177,14 @@ sidebar version card:  (nothing when healthy)  │ ● Reconnecting…  (>10 s d
 
 ## External Documentation
 
-| Topic                   | Source                                                                      | Key Takeaway                                                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| SSE framing             | https://html.spec.whatwg.org/multipage/server-sent-events.html              | A blank line dispatches; `id:` sets `Last-Event-ID`; frames without `id:` keep the previous one; `retry:` sets the reconnect delay |
-| EventSource             | https://developer.mozilla.org/en-US/docs/Web/API/EventSource                | Same-origin requests always send cookies; a non-200 response closes it permanently (`readyState` 2) and the status is unreadable   |
-| Deno streaming          | https://docs.deno.com/runtime/fundamentals/http_server/                     | You must implement `cancel()`, or chunks queue forever                                                                             |
-| Deno abort              | https://docs.deno.com/runtime/reference/deno_serve_legacy_abort/            | `request.signal` aborts when the request finishes or disconnects; both paths must call `close()`                                   |
-| SvelteKit server routes | https://svelte.dev/docs/kit/routing#server                                  | `+server.ts` may return any `Response`; when `HEAD` is not exported, Kit runs `GET`                                                |
-| nginx buffering         | http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout | Default timeout is 60 s, so a 20 s heartbeat is needed; `X-Accel-Buffering: no` disables buffering                                 |
+| Topic                   | Source                                                                        | Key Takeaway                                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| SSE framing             | <https://html.spec.whatwg.org/multipage/server-sent-events.html>              | A blank line dispatches; `id:` sets `Last-Event-ID`; frames without `id:` keep the previous one; `retry:` sets the reconnect delay |
+| EventSource             | <https://developer.mozilla.org/en-US/docs/Web/API/EventSource>                | Same-origin requests always send cookies; a non-200 response closes it permanently (`readyState` 2) and the status is unreadable   |
+| Deno streaming          | <https://docs.deno.com/runtime/fundamentals/http_server/>                     | You must implement `cancel()`, or chunks queue forever                                                                             |
+| Deno abort              | <https://docs.deno.com/runtime/reference/deno_serve_legacy_abort/>            | `request.signal` aborts when the request finishes or disconnects; both paths must call `close()`                                   |
+| SvelteKit server routes | <https://svelte.dev/docs/kit/routing#server>                                  | `+server.ts` may return any `Response`; when `HEAD` is not exported, Kit runs `GET`                                                |
+| nginx buffering         | <http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout> | Default timeout is 60 s, so a 20 s heartbeat is needed; `X-Accel-Buffering: no` disables buffering                                 |
 
 ---
 
@@ -569,7 +569,7 @@ the test suite inside a task; task 5.1 does that.
 
   - `apiTokensQueries.isActiveById(id: number): boolean`:
     `db.queryFirst<{ id: number }>(\`SELECT id FROM api_tokens WHERE id = ? AND ${ACTIVE_PREDICATE}\`, id) !== undefined`.
-Place it after `findActiveByHash` (line 108).
+Place it after`findActiveByHash` (line 108).
 - **MIRROR**: REPOSITORY_PATTERN.
 - **IMPORTS**: none new.
 - **GOTCHA**:
@@ -607,7 +607,7 @@ Place it after `findActiveByHash` (line 108).
   - `MobileNavAlert.svelte`:
     - Add the same `action` prop and migrate to `onclick` / `onkeydown`.
     - With `action`, the whole pill is `<a href={action.href} onclick={dismiss}>` with the same
-      classes, and the message text is followed by ` · {action.label}`.
+      classes, and the message text is followed by `· {action.label}`.
     - Add `aria-hidden="true"` as in `Alert.svelte`.
   - `navbar.svelte:34`: pass `action={latestAlert.action}`.
   - `AlertLiveRegion.svelte`:
@@ -800,7 +800,7 @@ Place it after `findActiveByHash` (line 108).
     - `encodeRetry(ms) → encoder.encode(\`retry: ${ms}\n\n\`)`
     - `encodeComment(text = 'ping') → \`: ${text}\n\n\``
     - `encodeEvent(event: LiveEvent, id?: string)` returns
-      `${id ? \`id: ${id}\n\` : ''}data: ${JSON.stringify(event)}\n\n`. It throws `TypeError`if`id`contains`\n`, `\r`or`\0`. `JSON.stringify` escapes newlines in values, which
+      `${id ? \`id: ${id}\n\` : ''}data: ${JSON.stringify(event)}\n\n`. It throws`TypeError`if`id`contains`\n`,`\r`or`\0`.`JSON.stringify` escapes newlines in values, which
       prevents frame injection.
     - `parseEventId(raw: string | null): { bootId: string; seq: number } | null`: the trimmed
       value must match `^([a-z0-9]{1,16})-(\d{1,15})$`; otherwise return `null`.
