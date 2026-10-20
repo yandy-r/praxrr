@@ -2,6 +2,7 @@ import type { ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { syncHistoryQueries, type SyncHistoryFilters, type SyncHistorySummary } from '$db/queries/syncHistory.ts';
 import { isSyncPreviewArrType, type SyncPreviewArrType } from '$sync/preview/types.ts';
+import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
 /** Eligible instance picker option (id/name/type only — never credentials). */
 interface SyncHistoryInstanceOption {
@@ -38,7 +39,9 @@ function parsePositiveInt(raw: string | null, fallback: number): number {
  * eligible instance picker list (id/name/type) — the same eligibility gate used by
  * the sync-preview and drift surfaces (`radarr|sonarr|lidarr`), never credentials.
  */
-export const load: ServerLoad = ({ url }) => {
+export const load: ServerLoad = ({ url, depends }) => {
+  depends(LIVE_DEPENDENCY_KEYS.syncHistory);
+
   const params = url.searchParams;
 
   const page = parsePositiveInt(params.get('page'), 1);

@@ -5,8 +5,11 @@ import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
+import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
-export const load = () => {
+export const load = ({ depends }: { depends: (...deps: string[]) => void }) => {
+  depends(LIVE_DEPENDENCY_KEYS.jobs);
+
   const arrInstances = arrInstancesQueries.getAll();
   const databases = databaseInstancesQueries.getAll();
   const lookups = {
@@ -35,6 +38,17 @@ export const load = () => {
     };
   });
 
+  const activeJobs = jobQueueQueries.listActive(50).map((job) => ({
+    id: job.id,
+    jobType: job.jobType,
+    displayName: buildJobDisplayName(job.jobType, job.payload, lookups),
+    status: job.status,
+    source: job.source,
+    runAt: job.runAt,
+    startedAt: job.startedAt,
+    attempts: job.attempts,
+  }));
+
   const recentRuns = jobRunHistoryQueries.getRecent(50);
   const queueIds = Array.from(
     new Set(recentRuns.map((run) => run.queueId).filter((id): id is number => typeof id === 'number'))
@@ -54,6 +68,7 @@ export const load = () => {
   return {
     jobs: jobsWithRuns,
     jobRuns: jobRunsWithNames,
+    activeJobs,
   };
 };
 

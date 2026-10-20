@@ -38,6 +38,7 @@ import {
   PREVIEW_STATUS_READY,
 } from '$sync/preview/store.ts';
 import type { SyncPreviewSummary } from '$sync/preview/types.ts';
+import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
@@ -244,7 +245,8 @@ function mapTrashGuideActionError(error: unknown): { status: number; message: st
   return { status: 500, message: 'TRaSH source sync request failed' };
 }
 
-export const load: ServerLoad = async ({ params, url }) => {
+export const load: ServerLoad = async ({ params, url, depends }) => {
+  depends(LIVE_DEPENDENCY_KEYS.sync);
   const id = parseInt(params.id || '', 10);
 
   if (isNaN(id)) {
@@ -392,6 +394,8 @@ export const load: ServerLoad = async ({ params, url }) => {
     )
     .sort((a, b) => a.sourceName.localeCompare(b.sourceName, undefined, { sensitivity: 'base' }));
 
+  const configStatus = arrSyncQueries.getSyncConfigStatus(id);
+
   return {
     instance,
     databases: databasesWithProfiles,
@@ -400,6 +404,12 @@ export const load: ServerLoad = async ({ params, url }) => {
     trashGuideMediaManagementBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
+    sectionStatus: {
+      qualityProfiles: configStatus.qualityProfiles.syncStatus,
+      delayProfiles: configStatus.delayProfiles.syncStatus,
+      mediaManagement: configStatus.mediaManagement.syncStatus,
+      metadataProfiles: configStatus.metadataProfiles.syncStatus,
+    },
   };
 };
 
@@ -791,7 +801,7 @@ export const actions: Actions = {
         },
       });
 
-      return { success: true, message: 'Delay profiles sync queued' };
+      return { success: true, message: 'Delay profiles sync queued', jobId: queued.id };
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       await logger.error(`Delay profiles sync enqueue failed for "${instance.name}"`, {
@@ -832,7 +842,7 @@ export const actions: Actions = {
         },
       });
 
-      return { success: true, message: 'Quality profiles sync queued' };
+      return { success: true, message: 'Quality profiles sync queued', jobId: queued.id };
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       await logger.error(`Quality profiles sync enqueue failed for "${instance.name}"`, {
@@ -873,7 +883,7 @@ export const actions: Actions = {
         },
       });
 
-      return { success: true, message: 'Media management sync queued' };
+      return { success: true, message: 'Media management sync queued', jobId: queued.id };
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       await logger.error(`Media management sync enqueue failed for "${instance.name}"`, {
@@ -919,7 +929,7 @@ export const actions: Actions = {
         },
       });
 
-      return { success: true, message: 'Metadata profiles sync queued' };
+      return { success: true, message: 'Metadata profiles sync queued', jobId: queued.id };
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       await logger.error(`Metadata profiles sync enqueue failed for "${instance.name}"`, {
