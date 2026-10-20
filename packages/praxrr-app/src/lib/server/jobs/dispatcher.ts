@@ -7,6 +7,13 @@ import type { JobHandlerResult, JobQueueRecord, JobStatus } from './queueTypes.t
 import { logger } from '$logger/logger.ts';
 import './handlers/index.ts';
 
+/**
+ * setTimeout stores its delay as a signed 32-bit int; anything larger (> ~24.8 days, reachable
+ * at MAX_SCHEDULE_INTERVAL_MINUTES) overflows and fires after ~1 ms, hot-looping the dispatcher.
+ * Waking at the cap is safe: runDueJobs finds nothing due and reschedules the next wake.
+ */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 class JobDispatcher {
   private timerId: number | null = null;
   private nextWakeAt: number | null = null;
@@ -39,7 +46,7 @@ class JobDispatcher {
     }
 
     const runAtMs = new Date(next.runAt).getTime();
-    const delay = Math.max(0, runAtMs - Date.now());
+    const delay = Math.min(Math.max(0, runAtMs - Date.now()), MAX_TIMER_DELAY_MS);
     this.nextWakeAt = runAtMs;
 
     if (this.timerId !== null) {

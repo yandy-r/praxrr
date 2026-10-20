@@ -968,14 +968,90 @@ Deno.test('trash guide source PUT rejects non-integer syncStrategy', async () =>
   const response = await invokePut('5', JSON.stringify({ syncStrategy: 1.5 }));
   assertEquals(response.status, 400);
   const payload = (await response.json()) as { error: string };
-  assertEquals(payload.error, 'syncStrategy must be an integer when provided');
+  assertEquals(payload.error, 'syncStrategy must be an integer between 0 and 525600');
 });
 
 Deno.test('trash guide source PUT rejects negative syncStrategy', async () => {
   const response = await invokePut('5', JSON.stringify({ syncStrategy: -1 }));
   assertEquals(response.status, 400);
   const payload = (await response.json()) as { error: string };
-  assertEquals(payload.error, 'syncStrategy must be greater than or equal to 0');
+  assertEquals(payload.error, 'syncStrategy must be an integer between 0 and 525600');
+});
+
+Deno.test({
+  name: 'trash guide source PUT rejects syncStrategy above the schedule cap without updating',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let updateCalls = 0;
+    patchTarget(
+      trashGuideManager,
+      'updateSource',
+      (() => {
+        updateCalls += 1;
+        return Promise.resolve(createSourceResponse(5, 'radarr'));
+      }) as typeof trashGuideManager.updateSource,
+      restores
+    );
+
+    try {
+      for (const syncStrategy of [525_601, 200_000_000_000]) {
+        const response = await invokePut('5', JSON.stringify({ syncStrategy }));
+        assertEquals(response.status, 400);
+        const payload = (await response.json()) as { error: string };
+        assertEquals(payload.error, 'syncStrategy must be an integer between 0 and 525600');
+      }
+      assertEquals(updateCalls, 0);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
+});
+
+Deno.test({
+  name: 'trash guide sources POST rejects syncStrategy above the schedule cap without creating',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let createCalls = 0;
+    patchTarget(
+      trashGuideManager,
+      'createSource',
+      (() => {
+        createCalls += 1;
+        return Promise.resolve(createSourceResponse(5, 'radarr'));
+      }) as typeof trashGuideManager.createSource,
+      restores
+    );
+
+    try {
+      for (const syncStrategy of [525_601, 200_000_000_000]) {
+        const response = await sourcesPost({
+          request: new Request('http://localhost/api/v1/trash-guide/sources', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              name: 'TRaSH Radarr',
+              repositoryUrl: 'https://example.com/radarr.git',
+              arrType: 'radarr',
+              syncStrategy,
+            }),
+          }),
+        } as unknown as Parameters<typeof sourcesPost>[0]);
+
+        assertEquals(response.status, 400);
+        const payload = (await response.json()) as { error: string };
+        assertEquals(payload.error, 'syncStrategy must be an integer between 0 and 525600');
+      }
+      assertEquals(createCalls, 0);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  },
 });
 
 Deno.test('trash guide source PUT validates numeric source id', async () => {

@@ -92,6 +92,7 @@ import { migration as migration20261020AddSetupChecklistDismissedAt } from './mi
 import { migration as migration20261021CreateApiTokens } from './migrations/20261021_create_api_tokens.ts';
 import { migration as migration20261022AddNotificationHistoryAttempts } from './migrations/20261022_add_notification_history_attempts.ts';
 import { migration as migration20261023CreateArrTrashGuideNamespaces } from './migrations/20261023_create_arr_trash_guide_namespaces.ts';
+import { migration as migration20261024BoundScheduleIntervals } from './migrations/20261024_bound_schedule_intervals.ts';
 
 export interface Migration {
   version: number;
@@ -418,6 +419,7 @@ export function loadMigrations(): Migration[] {
     migration20261021CreateApiTokens,
     migration20261022AddNotificationHistoryAttempts,
     migration20261023CreateArrTrashGuideNamespaces,
+    migration20261024BoundScheduleIntervals,
   ];
 
   // Sort by version number

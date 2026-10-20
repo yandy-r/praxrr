@@ -6,6 +6,7 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { checkAndPersistInstance } from '$sync/drift/persist.ts';
 import type { DriftEntityChange } from '$sync/drift/types.ts';
@@ -368,6 +369,35 @@ migratedTest('PUT /drift/settings: intervalMinutes below the minimum returns 400
 
   const body = (await response.json()) as ErrorResponse;
   assert(body.error.includes('intervalMinutes'));
+});
+
+for (const intervalMinutes of [525_601, 200_000_000_000]) {
+  migratedTest(`PUT /drift/settings: intervalMinutes ${intervalMinutes} above the cap returns 400`, async () => {
+    const before = driftSettingsQueries.get().interval_minutes;
+
+    const response = await PUT_SETTINGS(settingsPutEvent({ intervalMinutes }));
+    assertEquals(response.status, 400);
+
+    const body = (await response.json()) as ErrorResponse;
+    assertEquals(body.error, 'intervalMinutes must be an integer between 5 and 525600');
+    assertEquals(driftSettingsQueries.get().interval_minutes, before);
+  });
+}
+
+migratedTest('PUT /drift/settings: intervalMinutes at the cap returns 200', async () => {
+  const originalNotify = jobDispatcher.notifyJobEnqueued;
+  jobDispatcher.notifyJobEnqueued = () => {};
+
+  try {
+    const response = await PUT_SETTINGS(settingsPutEvent({ enabled: true, intervalMinutes: 525_600 }));
+    assertEquals(response.status, 200);
+
+    const body = (await response.json()) as DriftSettingsResponse;
+    assertEquals(body.intervalMinutes, 525_600);
+    assertEquals(driftSettingsQueries.get().interval_minutes, 525_600);
+  } finally {
+    jobDispatcher.notifyJobEnqueued = originalNotify;
+  }
 });
 
 migratedTest('PUT /drift/settings: non-boolean enabled returns 400', async () => {

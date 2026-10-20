@@ -678,7 +678,7 @@ Request fields:
 - `scoreProfile` (optional string)
 - `autoPull` (optional boolean)
 - `enabled` (optional boolean)
-- `syncStrategy` (optional integer, sync interval in minutes)
+- `syncStrategy` (optional integer, sync interval in minutes, `0`–`525600`; `0` disables the schedule)
 
 ```bash
 curl -sS \
@@ -786,7 +786,7 @@ Request fields (all optional, at least one required):
 - `scoreProfile` (string)
 - `autoPull` (boolean)
 - `enabled` (boolean)
-- `syncStrategy` (integer, sync interval in minutes)
+- `syncStrategy` (integer, sync interval in minutes, `0`–`525600`; `0` disables the schedule)
 
 Note: `arrType` cannot be changed after creation.
 

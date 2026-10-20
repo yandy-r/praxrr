@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { MAX_SCHEDULE_INTERVAL_MINUTES } from '$jobs/scheduleUtils.ts';
 import {
   trashGuideManager,
   TrashGuideSourceConflictError,
@@ -118,14 +119,14 @@ function parseCreatePayload(body: unknown): { value: TrashGuideSourceCreateInput
     return { error: 'enabled must be a boolean when provided' };
   }
 
-  if (payload.syncStrategy !== undefined) {
-    if (typeof payload.syncStrategy !== 'number' || !Number.isInteger(payload.syncStrategy)) {
-      return { error: 'syncStrategy must be an integer when provided' };
-    }
-
-    if (payload.syncStrategy < 0) {
-      return { error: 'syncStrategy must be greater than or equal to 0' };
-    }
+  if (
+    payload.syncStrategy !== undefined &&
+    (typeof payload.syncStrategy !== 'number' ||
+      !Number.isInteger(payload.syncStrategy) ||
+      payload.syncStrategy < 0 ||
+      payload.syncStrategy > MAX_SCHEDULE_INTERVAL_MINUTES)
+  ) {
+    return { error: `syncStrategy must be an integer between 0 and ${MAX_SCHEDULE_INTERVAL_MINUTES}` };
   }
 
   if (payload.autoPull !== undefined && typeof payload.autoPull !== 'boolean') {

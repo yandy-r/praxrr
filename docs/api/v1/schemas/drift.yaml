@@ -292,3 +292,4 @@ DriftSettingsUpdateRequest:
     intervalMinutes:
       type: integer
       minimum: 5
+      maximum: 525600

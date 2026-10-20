@@ -4,6 +4,7 @@ import { CONFIG_HEALTH_ENGINE_VERSION, type CriterionConfig } from '$shared/heal
 import { configHealthSettingsQueries, type UpdateConfigHealthSettingsInput } from '$db/queries/configHealthSettings.ts';
 import { toSettingsResponse } from '$lib/server/health/responses.ts';
 import { scheduleConfigHealthSnapshot, scheduleConfigHealthCleanup } from '$jobs/init.ts';
+import { MAX_SCHEDULE_INTERVAL_MINUTES } from '$jobs/scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
 import type { components } from '$api/v1.d.ts';
 
@@ -21,10 +22,8 @@ export const GET: RequestHandler = () => {
   return json(toSettingsResponse(settings) satisfies SettingsResponse);
 };
 
-// Upper bounds guard against absurd values that would overflow the Date arithmetic in the
-// scheduler (a huge interval makes `calculateNextRunFromMinutes` produce an invalid Date and throw,
-// which would 500 the request AND crash job init on the next startup). Mirrored by the table CHECKs.
-const MAX_INTERVAL_MINUTES = 525_600; // 1 year
+// Upper bounds guard against absurd values. The interval cap is shared with every scheduler-backed
+// interval (see MAX_SCHEDULE_INTERVAL_MINUTES) and mirrored by the table CHECKs.
 const MAX_RETENTION_DAYS = 3_650; // 10 years
 const MAX_RETENTION_MAX_ENTRIES = 1_000_000;
 
@@ -71,9 +70,11 @@ export const PUT: RequestHandler = async ({ request }) => {
     update.enabled = body.enabled;
   }
   if (body.intervalMinutes !== undefined) {
-    if (!isInt(body.intervalMinutes, 5, MAX_INTERVAL_MINUTES)) {
+    if (!isInt(body.intervalMinutes, 5, MAX_SCHEDULE_INTERVAL_MINUTES)) {
       return json(
-        { error: `intervalMinutes must be an integer between 5 and ${MAX_INTERVAL_MINUTES}` } satisfies ErrorResponse,
+        {
+          error: `intervalMinutes must be an integer between 5 and ${MAX_SCHEDULE_INTERVAL_MINUTES}`,
+        } satisfies ErrorResponse,
         { status: 400 }
       );
     }
