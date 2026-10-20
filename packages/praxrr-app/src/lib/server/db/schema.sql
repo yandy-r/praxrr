@@ -574,6 +574,22 @@ CREATE TABLE arr_database_namespaces (
 );
 
 -- ==============================================================================
+-- TABLE: arr_trash_guide_namespaces
+-- Purpose: Stable per-(Arr instance, TRaSH source) namespace index for TRaSH sync suffixes
+-- Migration: 20261023_create_arr_trash_guide_namespaces.ts
+-- ==============================================================================
+
+CREATE TABLE arr_trash_guide_namespaces (
+    instance_id     INTEGER NOT NULL,
+    source_id       INTEGER NOT NULL,       -- No FK: a deleted source keeps its index (never reassigned)
+    namespace_index INTEGER NOT NULL CHECK (namespace_index >= 1),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (instance_id, source_id),
+    UNIQUE (instance_id, namespace_index),
+    FOREIGN KEY (instance_id) REFERENCES arr_instances(id) ON DELETE CASCADE
+);
+
+-- ==============================================================================
 -- INDEXES
 -- Purpose: Improve query performance
 -- ==============================================================================

@@ -8,6 +8,7 @@
 
 import type { TrashGuideSyncQualityProfileSourceHydration } from '$db/queries/trashGuideSync.ts';
 import { type TrashGuideEntityCache, trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import { arrTrashNamespaceQueries } from '$db/queries/arrTrashNamespaces.ts';
 import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { transformTrashGuideEntities } from '$lib/server/trashguide/transformer.ts';
 import type {
@@ -21,7 +22,6 @@ import type {
 } from '$lib/server/trashguide/types.ts';
 import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
 import { logger } from '$logger/logger.ts';
-import { getTrashGuideNamespaceSuffix } from './namespace.ts';
 import type { SyncArrType } from './mappings.ts';
 
 /** Caller-specific log wording; messages are kept byte-identical to each caller's history. */
@@ -192,18 +192,79 @@ export async function resolveTrashSourceProfiles(
   };
 }
 
+/** Planned persisted TRaSH namespace for one source. */
+export interface TrashNamespaceAssignment {
+  sourceId: number;
+  index: number;
+}
+
 /**
- * Create the TRaSH namespace allocator for one pass over an instance's sources.
- * Call it once per source, in hydration order. A source consumes the next positional
- * index only when at least one selected profile resolved; otherwise it returns null.
+ * Result of planning one pass. `blockedSourceIds` is non-empty only when TRaSH writes must be
+ * withheld for this pass; `plan` is then empty.
  */
-export function createTrashNamespaceAllocator(): (resolution: TrashSourceResolution) => string | null {
-  let trashNamespaceIndex = 0;
-  return (resolution) => {
-    if (resolution.status !== 'resolved' || resolution.resolvedProfileNames.length === 0) {
-      return null;
-    }
-    trashNamespaceIndex += 1;
-    return getTrashGuideNamespaceSuffix(trashNamespaceIndex);
-  };
+export interface TrashNamespacePlan {
+  plan: Map<number, TrashNamespaceAssignment>;
+  blockedSourceIds: number[];
+}
+
+/**
+ * Plan stable TRaSH namespace indexes for one pass over an instance's sources (YAN-443).
+ *
+ * `resolutions` must cover every hydrated source with selections, in hydration order. Only
+ * sources with at least one resolved profile get a namespace. Indexes are persisted per
+ * (instance, source) and never shift when other sources come and go. New sources get
+ * `MAX + 1, MAX + 2, …` in hydration order: `allocate` (real sync) persists them via
+ * `getOrCreate`; `predict` (preview, drift, history, MCP) only computes them, read-only.
+ *
+ * Upgrade guard: while the instance has no rows yet, its Arr may still hold items written under
+ * the old positional scheme. Numbering then reproduces pre-upgrade indexes only if every source
+ * resolves, so when some source is unresolved and `hasPriorTrashSync()` reports such items, the
+ * pass is blocked (no TRaSH batch is written) instead of shifting later sources onto the
+ * unresolved source's items. Without prior items nothing can collide, so allocation proceeds.
+ */
+export async function planTrashNamespaces(
+  instanceId: number,
+  resolutions: readonly TrashSourceResolution[],
+  mode: 'allocate' | 'predict',
+  hasPriorTrashSync: () => Promise<boolean>
+): Promise<TrashNamespacePlan> {
+  const plan = new Map<number, TrashNamespaceAssignment>();
+  const maxIndex = arrTrashNamespaceQueries.getMaxIndex(instanceId);
+  const unresolvedSourceIds = resolutions.flatMap((resolution) =>
+    resolution.status !== 'resolved' && resolution.source ? [resolution.source.id] : []
+  );
+  const hasUnresolved = resolutions.some((resolution) => resolution.status !== 'resolved');
+
+  if (maxIndex === 0 && hasUnresolved && (await hasPriorTrashSync())) {
+    await logger.warn('TRaSH quality profile sync blocked until every TRaSH source resolves', {
+      source: 'TrashNamespaces',
+      meta: { instanceId, mode, unresolvedSourceIds },
+    });
+    return { plan, blockedSourceIds: unresolvedSourceIds };
+  }
+
+  let nextPredicted = maxIndex + 1;
+  for (const resolution of resolutions) {
+    if (resolution.status !== 'resolved' || resolution.resolvedProfileNames.length === 0) continue;
+    const sourceId = resolution.source.id;
+    const index =
+      arrTrashNamespaceQueries.get(instanceId, sourceId) ??
+      (mode === 'allocate' ? arrTrashNamespaceQueries.getOrCreate(instanceId, sourceId) : nextPredicted++);
+    plan.set(sourceId, { sourceId, index });
+  }
+  return { plan, blockedSourceIds: [] };
+}
+
+/**
+ * Persist a planned assignment at write time for a reviewed (prepared) sync and fail fast when
+ * the persisted state no longer matches the reviewed suffix. Call in hydration (batch) order.
+ */
+export function confirmTrashNamespace(instanceId: number, assignment: TrashNamespaceAssignment): void {
+  const current = arrTrashNamespaceQueries.getOrCreate(instanceId, assignment.sourceId);
+  if (current !== assignment.index) {
+    throw new Error(
+      `Reviewed TRaSH namespace for source ${assignment.sourceId} is stale ` +
+        `(reviewed index ${assignment.index}, current ${current}); preview again before syncing`
+    );
+  }
 }

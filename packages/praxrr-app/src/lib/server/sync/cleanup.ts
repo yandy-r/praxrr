@@ -13,16 +13,18 @@ import {
   getNamespaceSuffix,
   getTrailingNamespaceSuffix,
   hasNamespaceSuffix,
+  getTrashGuideNamespaceSuffix,
   isTrashGuideNamespaceSuffix,
   stripNamespaceSuffix,
 } from './namespace.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
+import { arrTrashNamespaceQueries } from '$db/queries/arrTrashNamespaces.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { getCache } from '$pcd/index.ts';
 import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
-import { createTrashNamespaceAllocator, resolveTrashSourceProfiles } from './trashSourceProfiles.ts';
+import { resolveTrashSourceProfiles } from './trashSourceProfiles.ts';
 import type { SyncArrType } from './mappings.ts';
 import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -92,11 +94,12 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     }
   }
 
-  // 1b. Also include expected names from TRaSH Guide selections. Suffixes come from the
-  // same allocator the syncer uses, so positional indexes cannot drift.
+  // 1b. Also include expected names from TRaSH Guide selections. Suffixes are read (never
+  // assigned) from the same persisted per-(instance, source) index the syncer uses.
   const trashSourceHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(instanceId);
-  const allocateTrashSuffix = createTrashNamespaceAllocator();
   let keepAllTrashSuffixed = false;
+  // Resolvable sources that have never been synced since persisted TRaSH namespaces shipped.
+  const unassignedTrashSources: { sourceId: number; sourceName: string }[] = [];
 
   for (const sourceHydration of trashSourceHydrations) {
     if (sourceHydration.selectedQualityProfiles.length === 0) continue;
@@ -112,7 +115,7 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
     });
 
     if (resolution.status === 'no_cache' || resolution.status === 'transform_failed') {
-      // This source's positional index is unknowable, so no TRaSH namespace can be trusted.
+      // This source's expected contents are unknowable, so no TRaSH namespace can be trusted.
       keepAllTrashSuffixed = true;
       await logger.warn('TRaSH source undeterminable during cleanup scan; keeping all TRaSH-suffixed items', {
         source: SOURCE,
@@ -126,8 +129,20 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
       continue;
     }
 
-    const trashSuffix = allocateTrashSuffix(resolution);
-    if (resolution.status !== 'resolved' || trashSuffix === null) continue;
+    if (resolution.status !== 'resolved') continue;
+
+    // Read-only: cleanup never assigns indexes (YAN-443).
+    const trashIndex = arrTrashNamespaceQueries.get(instanceId, resolution.source.id);
+    if (trashIndex === null) {
+      // Nothing to sync and never synced: this source owns no Arr items.
+      if (resolution.resolvedProfileNames.length === 0) continue;
+      // Resolvable but not yet synced since persisted namespaces shipped: items synced under the
+      // old positional scheme cannot be attributed yet, so keep them until the next sync.
+      keepAllTrashSuffixed = true;
+      unassignedTrashSources.push({ sourceId: resolution.source.id, sourceName: resolution.source.name });
+      continue;
+    }
+    const trashSuffix = getTrashGuideNamespaceSuffix(trashIndex);
 
     if (resolution.missingProfileNames.length > 0) {
       // Previously synced copies of the missing profiles (and their CFs) still carry this
@@ -156,6 +171,13 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
         }
       }
     }
+  }
+
+  if (unassignedTrashSources.length > 0) {
+    await logger.warn(
+      'TRaSH sources have no namespace assigned yet; keeping all TRaSH-suffixed items until they are synced',
+      { source: SOURCE, meta: { instanceId, sources: unassignedTrashSources } }
+    );
   }
 
   // Exact trailing-run comparison: `endsWith` would wrongly match TRaSH suffixes (which end in U+200B).

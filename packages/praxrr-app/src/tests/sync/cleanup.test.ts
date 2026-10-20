@@ -5,6 +5,7 @@ import type { BaseArrClient } from '$utils/arr/base.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
+import { arrTrashNamespaceQueries } from '$db/queries/arrTrashNamespaces.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -60,10 +61,13 @@ function withCleanupQueryStubs(setup: () => void): () => void {
   const originalInstanceById = arrInstancesQueries.getById;
   const originalQualitySyncSelections = arrSyncQueries.getQualityProfilesSync;
   const originalNamespaceIndex = arrNamespaceQueries.get;
+  const originalTrashNamespaceIndex = arrTrashNamespaceQueries.get;
   const originalTrashSources = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
   const originalTrashSourceById = trashGuideSourcesQueries.getById;
   const originalTrashCacheBySource = trashGuideEntityCacheQueries.getBySource;
   const restoreLogger = withNoopLogger();
+  // Default: every TRaSH source already holds persisted index 1; tests override per source.
+  arrTrashNamespaceQueries.get = () => 1;
 
   setup();
 
@@ -71,6 +75,7 @@ function withCleanupQueryStubs(setup: () => void): () => void {
     arrInstancesQueries.getById = originalInstanceById;
     arrSyncQueries.getQualityProfilesSync = originalQualitySyncSelections;
     arrNamespaceQueries.get = originalNamespaceIndex;
+    arrTrashNamespaceQueries.get = originalTrashNamespaceIndex;
     trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = originalTrashSources;
     trashGuideSourcesQueries.getById = originalTrashSourceById;
     trashGuideEntityCacheQueries.getBySource = originalTrashCacheBySource;
@@ -471,13 +476,15 @@ Deno.test('scanForStaleItems: keeps exact namespace of a PCD selection whose cac
   }
 });
 
-Deno.test('scanForStaleItems: TRaSH suffix indexes match the syncer when a source resolves no profiles', async () => {
+Deno.test('scanForStaleItems: TRaSH suffixes come from persisted per-source indexes, not position', async () => {
   const SOURCE_A = 21;
   const SOURCE_B = 22;
   const restore = withCleanupQueryStubs(() => {
     stubInstance();
     stubPcdSelections([]);
     arrNamespaceQueries.get = () => null;
+    // A was synced first (index 1); B holds index 2 even though A now resolves no profiles.
+    arrTrashNamespaceQueries.get = (_instanceId: number, sourceId: number) => (sourceId === SOURCE_A ? 1 : 2);
     stubTrashHydrations([
       { sourceId: SOURCE_A, selectedQualityProfiles: ['Removed Profile'] },
       { sourceId: SOURCE_B, selectedQualityProfiles: ['Profile B'] },
@@ -489,18 +496,21 @@ Deno.test('scanForStaleItems: TRaSH suffix indexes match the syncer when a sourc
         : [makeTrashProfileRow(SOURCE_B, 'b'.repeat(32), 'Profile B', 'CF B')];
   });
 
-  // The syncer gives index 1 to the first source with >=1 resolved profile: source B.
-  const sourceBSuffix = getTrashGuideNamespaceSuffix(1);
+  const sourceASuffix = getTrashGuideNamespaceSuffix(1);
+  const sourceBSuffix = getTrashGuideNamespaceSuffix(2);
   try {
     const result = await scanForStaleItems(
       remoteClient(
         [
           { id: 501, name: `CF B${sourceBSuffix}` },
-          { id: 502, name: `CF B${getTrashGuideNamespaceSuffix(2)}` },
+          { id: 502, name: `CF B${getTrashGuideNamespaceSuffix(3)}` },
+          // A's selected profile vanished from its source: its namespace is kept.
+          { id: 503, name: `CF A${sourceASuffix}` },
         ],
         [
           { id: 601, name: `Profile B${sourceBSuffix}` },
-          { id: 602, name: `Profile B${getTrashGuideNamespaceSuffix(2)}` },
+          { id: 602, name: `Profile B${getTrashGuideNamespaceSuffix(3)}` },
+          { id: 603, name: `Removed Profile${sourceASuffix}` },
         ]
       ),
       INSTANCE_ID
@@ -514,6 +524,42 @@ Deno.test('scanForStaleItems: TRaSH suffix indexes match the syncer when a sourc
       result.staleQualityProfiles.map((item) => item.id),
       [602]
     );
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('scanForStaleItems: resolvable TRaSH source with no persisted index keeps every TRaSH item', async () => {
+  const restore = withCleanupQueryStubs(() => {
+    stubInstance();
+    stubPcdSelections([]);
+    arrNamespaceQueries.get = () => null;
+    arrTrashNamespaceQueries.get = () => null;
+    stubTrashHydrations([{ sourceId: TRASH_SOURCE_ID, selectedQualityProfiles: ['P1'] }]);
+    trashGuideSourcesQueries.getById = (id: number) => makeTrashSource(id, 'Trash Source');
+    trashGuideEntityCacheQueries.getBySource = () => [
+      makeTrashProfileRow(TRASH_SOURCE_ID, 'd'.repeat(32), 'P1', 'CF P1'),
+    ];
+  });
+
+  try {
+    const result = await scanForStaleItems(
+      remoteClient(
+        [
+          { id: 501, name: `CF P1${getTrashGuideNamespaceSuffix(1)}` },
+          { id: 502, name: `Old Trash CF${getTrashGuideNamespaceSuffix(2)}` },
+          { id: 503, name: `DB CF${ZWSP}` },
+        ],
+        [{ id: 601, name: `P1${getTrashGuideNamespaceSuffix(1)}` }]
+      ),
+      INSTANCE_ID
+    );
+
+    assertEquals(
+      result.staleCustomFormats.map((item) => item.id),
+      [503]
+    );
+    assertEquals(result.staleQualityProfiles, []);
   } finally {
     restore();
   }
