@@ -576,7 +576,7 @@ CREATE TABLE arr_database_namespaces (
 -- ==============================================================================
 -- TABLE: arr_trash_guide_namespaces
 -- Purpose: Stable per-(Arr instance, TRaSH source) namespace index for TRaSH sync suffixes
--- Migration: 20261022_create_arr_trash_guide_namespaces.ts
+-- Migration: 20261023_create_arr_trash_guide_namespaces.ts
 -- ==============================================================================
 
 CREATE TABLE arr_trash_guide_namespaces (
