@@ -48,6 +48,8 @@ tags:
     description: Intent-to-implementation bridge — translate presets/sliders into custom-format scores
   - name: Canary
     description: Staged rollout orchestration — canary sync, verification gate, and batched fan-out
+  - name: Events
+    description: Live job, sync, canary and drift progress over Server-Sent Events
   - name: Config Health
     description: Score configuration quality/health per instance and profile, with suggestions and trends
   - name: Security Posture
@@ -72,6 +74,8 @@ paths:
     $ref: './paths/system.yaml#/parser-health'
   /metrics:
     $ref: './paths/system.yaml#/metrics'
+  /events:
+    $ref: './paths/events.yaml#/stream'
   /system/startup-pull/latest:
     $ref: './paths/system.yaml#/startup-pull-latest'
   /mcp:
@@ -1046,6 +1050,39 @@ components:
       $ref: './schemas/plugins.yaml#/PluginErrorCode'
     PluginErrorResponse:
       $ref: './schemas/plugins.yaml#/PluginErrorResponse'
+    # Live events
+    LiveJobType:
+      $ref: './schemas/events.yaml#/LiveJobType'
+    LiveJobStatus:
+      $ref: './schemas/events.yaml#/LiveJobStatus'
+    LiveJobRunStatus:
+      $ref: './schemas/events.yaml#/LiveJobRunStatus'
+    LiveJobSource:
+      $ref: './schemas/events.yaml#/LiveJobSource'
+    LiveJobFailureCode:
+      $ref: './schemas/events.yaml#/LiveJobFailureCode'
+    LiveArrType:
+      $ref: './schemas/events.yaml#/LiveArrType'
+    LiveHelloEvent:
+      $ref: './schemas/events.yaml#/LiveHelloEvent'
+    LiveResyncEvent:
+      $ref: './schemas/events.yaml#/LiveResyncEvent'
+    LiveJobQueuedEvent:
+      $ref: './schemas/events.yaml#/LiveJobQueuedEvent'
+    LiveJobRunningEvent:
+      $ref: './schemas/events.yaml#/LiveJobRunningEvent'
+    LiveJobFinishedEvent:
+      $ref: './schemas/events.yaml#/LiveJobFinishedEvent'
+    LiveSyncRecordedEvent:
+      $ref: './schemas/events.yaml#/LiveSyncRecordedEvent'
+    LiveCanaryUpdatedEvent:
+      $ref: './schemas/events.yaml#/LiveCanaryUpdatedEvent'
+    LiveDriftUpdatedEvent:
+      $ref: './schemas/events.yaml#/LiveDriftUpdatedEvent'
+    LiveSessionExpiredEvent:
+      $ref: './schemas/events.yaml#/LiveSessionExpiredEvent'
+    LiveEvent:
+      $ref: './schemas/events.yaml#/LiveEvent'
     # Canary
     CanaryArrType:
       $ref: './schemas/canary.yaml#/CanaryArrType'

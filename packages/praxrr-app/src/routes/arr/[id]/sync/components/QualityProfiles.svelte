@@ -467,7 +467,7 @@
         throw new Error(payload);
       }
 
-      alertStore.add('success', 'Quality profiles sync queued');
+      alertStore.add('info', 'Quality profiles sync queued');
       await invalidateAll().catch(() => undefined);
     } catch (error) {
       alertStore.add('error', error instanceof Error ? error.message : 'Sync failed');

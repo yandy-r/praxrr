@@ -97,6 +97,49 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Live event stream (SSE)
+     * @description Server-Sent Events stream of live job, sync, canary and drift progress.
+     *
+     *     Framing: the stream opens with `retry: 5000`, then emits `data: <LiveEvent JSON>` frames (see
+     *     `#/components/schemas/LiveEvent`). The first frame is always `hello`. Domain events
+     *     (`job.*`, `sync.recorded`, `canary.updated`, `drift.updated`) carry `id: <bootId>-<seq>`;
+     *     `hello`, `resync` and `session.expired` carry no id. A `: ping` comment is sent every 20 s.
+     *
+     *     Replay: send the last received id in the `Last-Event-ID` header (set automatically by
+     *     `EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are
+     *     replayed from a bounded in-memory buffer. When replay is impossible (server restarted or the
+     *     id fell out of the buffer) the server sends `resync` and the client must refetch its state.
+     *
+     *     Session checks: each heartbeat re-validates the session or API token; when it is no longer
+     *     valid the server sends `session.expired` and closes the stream. Streams are closed after a
+     *     maximum lifetime of 60 minutes; clients reconnect and resume via `Last-Event-ID`.
+     *
+     *     Authentication: browser session cookie, or an API token with the `read` scope. Prefer the
+     *     `X-Api-Key` header; the `?apikey=` query parameter is accepted for `EventSource` clients that
+     *     cannot set headers, but leaks into logs and history.
+     */
+    get: operations['streamEvents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    /**
+     * Probe the live event stream
+     * @description Runs the same authentication, scope and capacity checks as `GET` without opening a stream.
+     *     Clients use it to classify an `EventSource` error (auth failure vs capacity vs network).
+     */
+    head: operations['probeEvents'];
+    patch?: never;
+    trace?: never;
+  };
   '/system/startup-pull/latest': {
     parameters: {
       query?: never;
@@ -3287,6 +3330,223 @@ export interface components {
       error: string;
     };
     /**
+     * @description Job type of the queue row the event describes. Mirrors the server `JOB_TYPES` inventory.
+     * @enum {string}
+     */
+    LiveJobType:
+      | 'arr.upgrade'
+      | 'arr.rename'
+      | 'arr.sync'
+      | 'arr.sync.qualityProfiles'
+      | 'arr.sync.delayProfiles'
+      | 'arr.sync.mediaManagement'
+      | 'arr.sync.metadataProfiles'
+      | 'arr.pull.startup'
+      | 'pcd.sync'
+      | 'trashguide.sync'
+      | 'backup.create'
+      | 'backup.cleanup'
+      | 'logs.cleanup'
+      | 'drift.check'
+      | 'sync.history.cleanup'
+      | 'sync.canary.rollout'
+      | 'config-health.snapshot'
+      | 'config-health.cleanup';
+    /**
+     * @description Queue-row status after the event.
+     * @enum {string}
+     */
+    LiveJobStatus: 'queued' | 'running' | 'success' | 'failed' | 'cancelled';
+    /**
+     * @description Terminal status of the job run that just finished.
+     * @enum {string}
+     */
+    LiveJobRunStatus: 'success' | 'failure' | 'skipped' | 'cancelled';
+    /**
+     * @description How the job was enqueued.
+     * @enum {string}
+     */
+    LiveJobSource: 'schedule' | 'manual' | 'system';
+    /**
+     * @description Closed, safe failure classification of a failed job run. Never raw error text.
+     * @enum {string}
+     */
+    LiveJobFailureCode:
+      | 'invalidPayload'
+      | 'targetNotFound'
+      | 'unsupported'
+      | 'precondition'
+      | 'credential'
+      | 'upstream'
+      | 'timeout'
+      | 'gitNetwork'
+      | 'filesystem'
+      | 'database'
+      | 'validation'
+      | 'handlerNotFound'
+      | 'internalError';
+    /**
+     * @description Arr family the event is scoped to.
+     * @enum {string}
+     */
+    LiveArrType: 'radarr' | 'sonarr' | 'lidarr';
+    /** @description First frame of every stream. Not buffered for replay and carries no SSE `id`. */
+    LiveHelloEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'hello';
+      /** @description Identifier of the current server process. Changes on every restart. */
+      bootId: string;
+      /** @description Latest published event id when the stream opened, or an empty string when none exists yet. */
+      headId: string;
+      /** Format: date-time */
+      serverTime: string;
+      /** @description Interval between `: ping` heartbeat comments, in milliseconds. */
+      heartbeatMs: number;
+    };
+    /**
+     * @description Replay of missed events is impossible; the client must refetch all state. `boot` means the
+     *     server restarted since the client's last event id; `gap` means the id fell out of the replay
+     *     buffer.
+     */
+    LiveResyncEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'resync';
+      /** @enum {string} */
+      reason: 'boot' | 'gap';
+    };
+    /** @description A job was enqueued. */
+    LiveJobQueuedEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'job.queued';
+      jobId: number;
+      jobType: components['schemas']['LiveJobType'];
+      source: components['schemas']['LiveJobSource'];
+      displayName: string;
+      instanceId: number | null;
+      arrType: components['schemas']['LiveArrType'] | null;
+      databaseId: number | null;
+      /** Format: date-time */
+      runAt: string;
+    };
+    /** @description A job was claimed by the dispatcher and started running. */
+    LiveJobRunningEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'job.running';
+      jobId: number;
+      jobType: components['schemas']['LiveJobType'];
+      source: components['schemas']['LiveJobSource'];
+      displayName: string;
+      instanceId: number | null;
+      arrType: components['schemas']['LiveArrType'] | null;
+      databaseId: number | null;
+      /** Format: date-time */
+      startedAt: string;
+    };
+    /** @description A job run finished. `rescheduled` is true when a recurring job was re-queued. */
+    LiveJobFinishedEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'job.finished';
+      jobId: number;
+      jobType: components['schemas']['LiveJobType'];
+      source: components['schemas']['LiveJobSource'];
+      displayName: string;
+      instanceId: number | null;
+      arrType: components['schemas']['LiveArrType'] | null;
+      databaseId: number | null;
+      status: components['schemas']['LiveJobStatus'];
+      runStatus: components['schemas']['LiveJobRunStatus'];
+      rescheduled: boolean;
+      nextRunAt: string | null;
+      runId: number;
+      failureCode: components['schemas']['LiveJobFailureCode'] | null;
+      durationMs: number;
+      /** Format: date-time */
+      finishedAt: string;
+    };
+    /** @description A sync history row was recorded. Published before the owning job's `job.finished`. */
+    LiveSyncRecordedEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'sync.recorded';
+      syncHistoryId: number;
+      jobId: number | null;
+      instanceId: number;
+      arrType: components['schemas']['LiveArrType'];
+      status: components['schemas']['SyncOperationStatus'];
+      trigger: components['schemas']['SyncTrigger'];
+      /** Format: date-time */
+      finishedAt: string;
+    };
+    /** @description A canary rollout changed state or progressed. */
+    LiveCanaryUpdatedEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'canary.updated';
+      rolloutId: number;
+      arrType: components['schemas']['LiveArrType'];
+      status: components['schemas']['CanaryRolloutStatus'];
+      canaryStatus: components['schemas']['CanaryOutcomeStatus'] | null;
+      completedCount: number;
+      remainingCount: number;
+    };
+    /** @description A drift check result was persisted for an instance. */
+    LiveDriftUpdatedEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'drift.updated';
+      instanceId: number;
+      arrType: components['schemas']['LiveArrType'];
+      status: components['schemas']['DriftStatus'];
+      driftedCount: number;
+      missingCount: number;
+      unmanagedCount: number;
+      /** Format: date-time */
+      checkedAt: string;
+    };
+    /** @description The session or API token is no longer valid. The server closes the stream after this frame. */
+    LiveSessionExpiredEvent: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'session.expired';
+    };
+    /**
+     * @description JSON payload of one `data:` frame on `GET /api/v1/events`. Payloads are allow-listed summaries;
+     *     they never contain Arr URLs, API keys, job payloads, or raw error text.
+     */
+    LiveEvent:
+      | components['schemas']['LiveHelloEvent']
+      | components['schemas']['LiveResyncEvent']
+      | components['schemas']['LiveJobQueuedEvent']
+      | components['schemas']['LiveJobRunningEvent']
+      | components['schemas']['LiveJobFinishedEvent']
+      | components['schemas']['LiveSyncRecordedEvent']
+      | components['schemas']['LiveCanaryUpdatedEvent']
+      | components['schemas']['LiveDriftUpdatedEvent']
+      | components['schemas']['LiveSessionExpiredEvent'];
+    /**
      * @description Arr family a rollout is scoped to. A rollout never spans types.
      * @enum {string}
      */
@@ -5864,6 +6124,127 @@ export interface operations {
       };
       /** @description The metrics endpoint is disabled (METRICS_ENABLED is off). */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  streamEvents: {
+    parameters: {
+      query?: {
+        /** @description Query-string alternative to the `Last-Event-ID` header. */
+        lastEventId?: string;
+      };
+      header?: {
+        /**
+         * @description Praxrr API token (`prx_…`) with the `read` scope. Preferred over the `apikey` query
+         *     parameter.
+         */
+        'X-Api-Key'?: string;
+        /** @description Id of the last domain event the client received (`<bootId>-<seq>`), for replay. */
+        'Last-Event-ID'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /**
+       * @description `text/event-stream` of `LiveEvent` frames. Each `data:` line is a JSON
+       *     `#/components/schemas/LiveEvent`.
+       */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/event-stream': string;
+        };
+      };
+      /** @description Unauthenticated (no valid session, or missing, invalid, revoked, or expired API token). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
+      /** @description Too many concurrent streams for this principal. */
+      429: {
+        headers: {
+          'Retry-After'?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The server-wide stream limit is reached, or the server is shutting down. */
+      503: {
+        headers: {
+          'Retry-After'?: number;
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  probeEvents: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Praxrr API token (`prx_…`) with the `read` scope. */
+        'X-Api-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A stream would be accepted. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthenticated. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Too many concurrent streams for this principal. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description The server-wide stream limit is reached, or the server is shutting down. */
+      503: {
         headers: {
           [name: string]: unknown;
         };

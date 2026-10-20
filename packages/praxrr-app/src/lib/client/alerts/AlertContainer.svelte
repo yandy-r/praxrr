@@ -26,7 +26,7 @@
     <div class="pointer-events-none absolute flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 {position}">
       {#each $alertStore as alert (alert.id)}
         <div class="pointer-events-auto">
-          <Alert id={alert.id} type={alert.type} message={alert.message} />
+          <Alert id={alert.id} type={alert.type} message={alert.message} action={alert.action} />
         </div>
       {/each}
     </div>

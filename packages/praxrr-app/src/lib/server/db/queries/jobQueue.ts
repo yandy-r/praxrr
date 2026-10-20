@@ -140,6 +140,20 @@ export const jobQueueQueries = {
     return rows.map(rowToRecord);
   },
 
+  /** Running jobs plus queued jobs that are due now; future-dated schedule rows are excluded. */
+  listActive(limit: number = 50): JobQueueRecord[] {
+    const rows = db.query<JobQueueRow>(
+      `SELECT * FROM job_queue
+       WHERE status = 'running'
+	  OR (status = 'queued' AND (source != 'schedule'
+	      OR datetime(replace(replace(run_at, 'T', ' '), 'Z', '')) <= datetime('now')))
+       ORDER BY CASE status WHEN 'running' THEN 0 ELSE 1 END, run_at ASC
+       LIMIT ?`,
+      limit
+    );
+    return rows.map(rowToRecord);
+  },
+
   listScheduled(): JobQueueRecord[] {
     const rows = db.query<JobQueueRow>(
       `SELECT * FROM job_queue WHERE dedupe_key IS NOT NULL AND source = 'schedule' ORDER BY job_type`

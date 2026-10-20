@@ -109,7 +109,7 @@
 
       if (response.ok) {
         const data = await response.json();
-        alertStore.add('success', data?.message ?? 'Sync queued');
+	alertStore.add('info', data?.message ?? 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
         alertStore.add('error', 'Sync failed');

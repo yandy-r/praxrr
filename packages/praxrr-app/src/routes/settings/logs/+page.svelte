@@ -119,7 +119,7 @@
     if (result.type === 'failure' && result.data) {
       alertStore.add('error', (result.data as { error?: string }).error || 'Failed to run logs cleanup');
     } else if (result.type === 'success') {
-      alertStore.add('success', 'Logs cleanup queued');
+      alertStore.add('info', 'Logs cleanup queued');
     }
   }
 

@@ -19,6 +19,9 @@ const SEGMENT = '[^/]+';
 
 const MCP_ROUTE = /^\/api\/v1\/mcp\/?$/;
 
+/** Long-lived SSE stream (YAN-593): read-only hints; any token holding `read` may subscribe. */
+const EVENTS_ROUTE = /^\/api\/v1\/events\/?$/;
+
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 /**
@@ -45,9 +48,9 @@ const READ_POST_ROUTES: readonly RegExp[] = [/^\/api\/v1\/sync\/preview\/?$/, /^
 
 /** Scope a token needs for this request. Fail-closed: unknown mutating routes need `admin`. */
 export function requiredScopeFor(method: string, pathname: string): ApiTokenScope {
-  if (MCP_ROUTE.test(pathname)) return 'mcp';
-
   const verb = method.toUpperCase();
+  if (MCP_ROUTE.test(pathname)) return 'mcp';
+  if (EVENTS_ROUTE.test(pathname) && SAFE_METHODS.includes(verb)) return 'read';
   if ((verb === 'GET' || verb === 'HEAD') && ADMIN_SAFE_METHOD_ROUTES.some((route) => route.test(pathname))) {
     return 'admin';
   }

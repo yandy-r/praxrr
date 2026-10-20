@@ -1,12 +1,13 @@
 <script lang="ts">
   import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-svelte';
-  import type { AlertType } from './store';
+  import type { AlertAction, AlertType } from './store';
   import { alertStore } from './store';
   import { fade } from 'svelte/transition';
 
   export let id: string;
   export let type: AlertType;
   export let message: string;
+  export let action: AlertAction | undefined = undefined;
 
   const icons = {
     success: CheckCircle,
@@ -38,20 +39,35 @@
   }
 </script>
 
-<div
-  in:fade={{ duration: 150 }}
-  out:fade={{ duration: 100 }}
-  role="button"
-  tabindex="0"
-  on:click={dismiss}
-  on:keydown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      dismiss();
-    }
-  }}
-  class="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
->
-  <Icon size={14} class="flex-shrink-0 {iconColors[type]}" />
-  <span class="min-w-0 truncate">{message}</span>
-</div>
+{#if action}
+  <a
+    href={action.href}
+    in:fade={{ duration: 150 }}
+    out:fade={{ duration: 100 }}
+    aria-hidden="true"
+    onclick={dismiss}
+    class="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
+  >
+    <Icon size={14} class="flex-shrink-0 {iconColors[type]}" />
+    <span class="min-w-0 truncate">{message} · {action.label}</span>
+  </a>
+{:else}
+  <div
+    in:fade={{ duration: 150 }}
+    out:fade={{ duration: 100 }}
+    role="button"
+    aria-hidden="true"
+    tabindex="0"
+    onclick={dismiss}
+    onkeydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        dismiss();
+      }
+    }}
+    class="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
+  >
+    <Icon size={14} class="flex-shrink-0 {iconColors[type]}" />
+    <span class="min-w-0 truncate">{message}</span>
+  </div>
+{/if}
