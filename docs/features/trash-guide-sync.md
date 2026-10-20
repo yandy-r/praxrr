@@ -174,16 +174,16 @@ curl -sS "http://localhost:6868/api/v1/trash-guide/sources/1/entities?search=x26
 
 ### Create/Update fields
 
-| Field           | Type      | Required | Notes                                               |
-| --------------- | --------- | -------- | --------------------------------------------------- |
-| `name`          | `string`  | create   | Unique source name                                  |
-| `repositoryUrl` | `string`  | create   | HTTP/HTTPS git repository URL                       |
-| `arrType`       | `string`  | create   | `radarr` or `sonarr`. Immutable after creation      |
-| `branch`        | `string`  | no       | Git branch. Defaults to `master`                    |
-| `scoreProfile`  | `string`  | no       | Score set profile name                              |
-| `autoPull`      | `boolean` | no       | Auto-pull on scheduled sync. Defaults to `true`     |
-| `enabled`       | `boolean` | no       | Enable/disable the source. Defaults to `true`       |
-| `syncStrategy`  | `integer` | no       | Schedule interval in minutes. `0` disables schedule |
+| Field           | Type      | Required | Notes                                                                      |
+| --------------- | --------- | -------- | -------------------------------------------------------------------------- |
+| `name`          | `string`  | create   | Unique source name                                                         |
+| `repositoryUrl` | `string`  | create   | HTTP/HTTPS git repository URL                                              |
+| `arrType`       | `string`  | create   | `radarr` or `sonarr`. Immutable after creation                             |
+| `branch`        | `string`  | no       | Git branch. Defaults to `master`                                           |
+| `scoreProfile`  | `string`  | no       | Score set profile name                                                     |
+| `autoPull`      | `boolean` | no       | Auto-pull on scheduled sync. Defaults to `true`                            |
+| `enabled`       | `boolean` | no       | Enable/disable the source. Defaults to `true`                              |
+| `syncStrategy`  | `integer` | no       | Schedule interval in minutes, `0`–`525600` (1 year). `0` disables schedule |
 
 ### Entity query parameters
 

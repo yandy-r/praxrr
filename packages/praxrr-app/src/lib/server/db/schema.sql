@@ -1015,13 +1015,13 @@ CREATE TABLE setup_state (
 -- ==============================================================================
 -- TABLE: drift_check_settings
 -- Purpose: Singleton (id=1) driving the global recurring drift.check job
--- Migration: 20260709_create_drift_tables.ts
+-- Migration: 20260709_create_drift_tables.ts, 20261024_bound_schedule_intervals.ts (interval cap)
 -- ==============================================================================
 
 CREATE TABLE drift_check_settings (
     id               INTEGER PRIMARY KEY CHECK (id = 1),
     enabled          INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
-    interval_minutes INTEGER NOT NULL DEFAULT 360 CHECK (interval_minutes >= 5),
+    interval_minutes INTEGER NOT NULL DEFAULT 360 CHECK (interval_minutes >= 5 AND interval_minutes <= 525600),
     last_run_at      TEXT,
     error_count      INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
     backoff_until    TEXT,

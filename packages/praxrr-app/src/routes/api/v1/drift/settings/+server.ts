@@ -3,6 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { scheduleDriftCheck } from '$jobs/init.ts';
+import { MAX_SCHEDULE_INTERVAL_MINUTES } from '$jobs/scheduleUtils.ts';
 import { toDriftSettingsResponse } from '$sync/drift/responses.ts';
 import { logger } from '$logger/logger.ts';
 
@@ -46,11 +47,15 @@ export const PUT: RequestHandler = async ({ request }) => {
     if (
       typeof body.intervalMinutes !== 'number' ||
       !Number.isInteger(body.intervalMinutes) ||
-      body.intervalMinutes < MIN_INTERVAL_MINUTES
+      body.intervalMinutes < MIN_INTERVAL_MINUTES ||
+      body.intervalMinutes > MAX_SCHEDULE_INTERVAL_MINUTES
     ) {
-      return json({ error: `intervalMinutes must be an integer >= ${MIN_INTERVAL_MINUTES}` } satisfies ErrorResponse, {
-        status: 400,
-      });
+      return json(
+        {
+          error: `intervalMinutes must be an integer between ${MIN_INTERVAL_MINUTES} and ${MAX_SCHEDULE_INTERVAL_MINUTES}`,
+        } satisfies ErrorResponse,
+        { status: 400 }
+      );
     }
     update.intervalMinutes = body.intervalMinutes;
   }

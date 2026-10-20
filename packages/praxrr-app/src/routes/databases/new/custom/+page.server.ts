@@ -4,6 +4,7 @@ import { pcdManager } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
 import { schedulePcdSyncForDatabase } from '$lib/server/jobs/init.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 
 function getFirstNonEmptyFormValue(formData: FormData, key: string): string | undefined {
   const values = formData
@@ -59,6 +60,12 @@ export const actions = {
 
       return fail(400, {
         error: 'Name and repository URL are required',
+        values: { name, repository_url: repositoryUrl },
+      });
+    }
+    if (!isValidScheduleIntervalMinutes(syncStrategy)) {
+      return fail(400, {
+        error: SYNC_STRATEGY_RANGE_ERROR,
         values: { name, repository_url: repositoryUrl },
       });
     }

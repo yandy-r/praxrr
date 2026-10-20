@@ -7,6 +7,7 @@ import {
   TrashGuideSourceValidationError,
 } from '$lib/server/trashguide/manager.ts';
 import { logger } from '$logger/logger.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 
 export const actions = {
   update: async ({ params, request }) => {
@@ -18,7 +19,8 @@ export const actions = {
     const formData = await request.formData();
     const name = formData.get('name')?.toString().trim();
     const scoreProfile = formData.get('score_profile')?.toString().trim();
-    const syncStrategy = formData.get('sync_strategy')?.toString().trim();
+    const syncStrategyValue = formData.get('sync_strategy')?.toString().trim();
+    const syncStrategy = syncStrategyValue === undefined ? undefined : parseInt(syncStrategyValue, 10);
     const autoPullValue = formData.get('auto_pull')?.toString();
     const autoPull = autoPullValue === undefined ? undefined : autoPullValue === '1';
 
@@ -26,11 +28,15 @@ export const actions = {
       return fail(400, { error: 'Name is required' });
     }
 
+    if (syncStrategy !== undefined && !isValidScheduleIntervalMinutes(syncStrategy)) {
+      return fail(400, { error: SYNC_STRATEGY_RANGE_ERROR });
+    }
+
     try {
       await trashGuideManager.updateSource(id, {
         ...(name !== undefined ? { name } : {}),
         ...(scoreProfile !== undefined ? { scoreProfile } : {}),
-        ...(syncStrategy !== undefined ? { syncStrategy: parseInt(syncStrategy, 10) } : {}),
+        ...(syncStrategy !== undefined ? { syncStrategy } : {}),
         ...(autoPullValue !== undefined ? { autoPull } : {}),
       });
 

@@ -3,8 +3,23 @@ import {
   databaseInstanceCredentialsQueries,
   type DatabaseInstanceCredentialWriteInput,
 } from './databaseInstanceCredentials.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 
 export type ConflictStrategy = 'override' | 'align' | 'ask';
+
+/** Thrown when a database instance write carries an out-of-range `syncStrategy`. */
+export class DatabaseInstanceValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DatabaseInstanceValidationError';
+  }
+}
+
+function assertSyncStrategy(syncStrategy: number | undefined): void {
+  if (syncStrategy !== undefined && !isValidScheduleIntervalMinutes(syncStrategy)) {
+    throw new DatabaseInstanceValidationError(SYNC_STRATEGY_RANGE_ERROR);
+  }
+}
 
 /**
  * Types for database_instances table
@@ -133,6 +148,7 @@ export const databaseInstancesQueries = {
    * Create a new database instance
    */
   create(input: CreateDatabaseInstanceInput, credentialInput?: DatabaseInstanceCredentialWriteInput): number {
+    assertSyncStrategy(input.syncStrategy);
     const syncStrategy = input.syncStrategy ?? 0;
     const autoPull = toDbBoolean(input.autoPull !== false);
     const enabled = toDbBoolean(input.enabled !== false);
@@ -258,6 +274,7 @@ export const databaseInstancesQueries = {
     input: UpdateDatabaseInstanceInput,
     credentialInput?: DatabaseInstanceCredentialWriteInput
   ): boolean {
+    assertSyncStrategy(input.syncStrategy);
     const useCredentialTable = supportsDatabaseInstanceCredentials();
     const updates: string[] = [];
     const params: (string | number | null)[] = [];

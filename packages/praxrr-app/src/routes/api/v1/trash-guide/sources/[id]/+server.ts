@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 import {
   trashGuideManager,
   TrashGuideSourceConflictError,
@@ -174,14 +175,8 @@ function parseUpdatePayload(body: unknown): { value: TrashGuideSourceUpdateInput
     return { error: 'enabled must be a boolean when provided' };
   }
 
-  if (payload.syncStrategy !== undefined) {
-    if (typeof payload.syncStrategy !== 'number' || !Number.isInteger(payload.syncStrategy)) {
-      return { error: 'syncStrategy must be an integer when provided' };
-    }
-
-    if (payload.syncStrategy < 0) {
-      return { error: 'syncStrategy must be greater than or equal to 0' };
-    }
+  if (payload.syncStrategy !== undefined && !isValidScheduleIntervalMinutes(payload.syncStrategy)) {
+    return { error: SYNC_STRATEGY_RANGE_ERROR };
   }
 
   if (payload.autoPull !== undefined && typeof payload.autoPull !== 'boolean') {

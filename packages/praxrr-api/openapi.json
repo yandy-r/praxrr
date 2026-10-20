@@ -9510,7 +9510,8 @@
           },
           "intervalMinutes": {
             "type": "integer",
-            "minimum": 5
+            "minimum": 5,
+            "maximum": 525600
           },
           "lastRunAt": {
             "oneOf": [
@@ -9819,7 +9820,8 @@
           },
           "intervalMinutes": {
             "type": "integer",
-            "minimum": 5
+            "minimum": 5,
+            "maximum": 525600
           }
         }
       },
@@ -14159,7 +14161,8 @@
           },
           "intervalMinutes": {
             "type": "integer",
-            "minimum": 5
+            "minimum": 5,
+            "maximum": 525600
           }
         }
       },
@@ -14559,15 +14562,18 @@
           },
           "intervalMinutes": {
             "type": "integer",
-            "minimum": 5
+            "minimum": 5,
+            "maximum": 525600
           },
           "retentionDays": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 3650
           },
           "retentionMaxEntries": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 1000000
           },
           "criteria": {
             "type": "array",
@@ -14596,15 +14602,18 @@
           },
           "intervalMinutes": {
             "type": "integer",
-            "minimum": 5
+            "minimum": 5,
+            "maximum": 525600
           },
           "retentionDays": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 3650
           },
           "retentionMaxEntries": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 1000000
           },
           "criteria": {
             "type": "array",

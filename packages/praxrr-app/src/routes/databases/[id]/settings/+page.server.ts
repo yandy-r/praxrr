@@ -6,6 +6,7 @@ import { databaseInstanceCredentialsQueries } from '$db/queries/databaseInstance
 import { pcdManager } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import { schedulePcdSyncForDatabase } from '$lib/server/jobs/init.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 import {
   decryptDatabasePersonalAccessToken,
   encryptDatabasePersonalAccessToken,
@@ -181,6 +182,9 @@ export const actions: Actions = {
         error: 'Git author name and email are required when PAT is set and Local Ops Only is disabled',
         values: { name },
       });
+    }
+    if (!isValidScheduleIntervalMinutes(syncStrategy)) {
+      return fail(400, { error: SYNC_STRATEGY_RANGE_ERROR, values: { name } });
     }
 
     // Check if name already exists (excluding current instance)
