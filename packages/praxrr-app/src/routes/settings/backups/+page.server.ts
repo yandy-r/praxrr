@@ -4,6 +4,7 @@ import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 import { enqueueJob } from '$lib/server/jobs/queueService.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
+import { BackupRestoreError, isValidBackupFilename, stageRestore } from '$server/backups/restore.ts';
 
 interface BackupFile {
   filename: string;
@@ -132,7 +133,7 @@ export const actions: Actions = {
 
     try {
       const backupsDir = config.paths.backups;
-      const filename = file.name.startsWith('backup-') ? file.name : `backup-uploaded-${Date.now()}.tar.gz`;
+      const filename = isValidBackupFilename(file.name) ? file.name : `backup-uploaded-${Date.now()}.tar.gz`;
       const backupPath = `${backupsDir}/${filename}`;
 
       // Check if file already exists
@@ -167,7 +168,7 @@ export const actions: Actions = {
     const formData = await request.formData();
     const filename = formData.get('filename') as string;
 
-    if (!filename || !filename.startsWith('backup-') || !filename.endsWith('.tar.gz')) {
+    if (!filename || !isValidBackupFilename(filename)) {
       return fail(400, { error: 'Invalid filename' });
     }
 
@@ -195,7 +196,7 @@ export const actions: Actions = {
     const formData = await request.formData();
     const filename = formData.get('filename') as string;
 
-    if (!filename || !filename.startsWith('backup-') || !filename.endsWith('.tar.gz')) {
+    if (!filename || !isValidBackupFilename(filename)) {
       return fail(400, { error: 'Invalid filename' });
     }
 
@@ -204,44 +205,42 @@ export const actions: Actions = {
     try {
       // Verify backup exists
       await Deno.stat(backupPath);
+    } catch {
+      return fail(404, { error: 'Backup not found' });
+    }
 
-      await logger.warn(`Restoring from backup: ${filename}`, {
+    try {
+      await logger.warn(`Staging restore from backup: ${filename}`, {
         source: 'settings/backups',
         meta: { filename },
       });
 
-      // Extract backup to base directory (will overwrite data directory)
-      const command = new Deno.Command('tar', {
-        args: ['-xzf', backupPath, '-C', config.paths.base],
-        stdout: 'piped',
-        stderr: 'piped',
-      });
+      // Validate and stage only; the swap happens at next startup before the database opens
+      await stageRestore({ archivePath: backupPath, basePath: config.paths.base, filename });
 
-      const { code, stderr } = await command.output();
-
-      if (code !== 0) {
-        const errorMessage = new TextDecoder().decode(stderr);
-        await logger.error('Backup restoration failed', {
-          source: 'settings/backups',
-          meta: { filename, error: errorMessage, exitCode: code },
-        });
-        return fail(500, { error: `Restore failed: ${errorMessage}` });
-      }
-
-      await logger.info(`Successfully restored from backup: ${filename}`, {
+      await logger.info(`Backup staged for restore on next restart: ${filename}`, {
         source: 'settings/backups',
         meta: { filename },
       });
 
       return {
         success: true,
-        message: 'Backup restored successfully. Please restart the application.',
+        message: 'Backup staged. Restart Praxrr to apply the restore.',
       };
     } catch (err) {
-      await logger.error(`Failed to restore backup: ${filename}`, {
+      const restoreError = err instanceof BackupRestoreError ? err : null;
+      await logger.error(`Failed to stage backup restore: ${filename}`, {
         source: 'settings/backups',
-        meta: { filename, error: err },
+        meta: {
+          filename,
+          code: restoreError?.code,
+          detail: restoreError?.detail,
+          error: restoreError ? restoreError.message : err,
+        },
       });
+      if (restoreError && restoreError.code !== 'staging_failed') {
+        return fail(400, { error: `Restore failed: ${restoreError.message}` });
+      }
       return fail(500, { error: 'Failed to restore backup' });
     }
   },

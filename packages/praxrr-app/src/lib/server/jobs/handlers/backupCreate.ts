@@ -5,6 +5,7 @@ import { config } from '$config';
 import { createBackup } from '../logic/createBackup.ts';
 import { calculateNextRunFromSchedule } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
+import { db } from '$db/db.ts';
 
 const backupCreateHandler: JobHandler = async (job) => {
   const settings = backupSettingsQueries.get();
@@ -16,13 +17,27 @@ const backupCreateHandler: JobHandler = async (job) => {
   const backupsDir = config.paths.backups;
 
   try {
-    const result = await createBackup(sourceDir, backupsDir);
+    // Snapshot the live WAL database with VACUUM INTO so the archive holds a consistent copy
+    // instead of the raw praxrr.db/-wal/-shm files captured mid-write.
+    const result = await createBackup(sourceDir, backupsDir, undefined, {
+      databaseFilename: config.paths.database.split('/').pop(),
+      snapshotDatabase: (destPath) => {
+        db.execute('VACUUM INTO ?', destPath);
+      },
+    });
     if (!result.success) {
       await logger.error('Backup creation failed', {
         source: 'BackupCreateJob',
         meta: { jobId: job.id, error: result.error ?? 'Backup failed' },
       });
       return { status: 'failure', failureCode: 'filesystem' };
+    }
+
+    if (result.warning) {
+      await logger.warn('Backup created with tar warnings', {
+        source: 'BackupCreateJob',
+        meta: { jobId: job.id, filename: result.filename, warning: result.warning },
+      });
     }
 
     const sizeInMB = ((result.sizeBytes ?? 0) / (1024 * 1024)).toFixed(2);
