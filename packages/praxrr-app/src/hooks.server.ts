@@ -24,9 +24,30 @@ import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
 import { resolveWizardRedirect } from '$server/setup/progress.ts';
 import { resolveDefaultDatabaseConfig } from '$server/setup/defaultDatabase.ts';
+import { applyPendingRestoreAtStartup } from '$server/backups/applyRestore.ts';
 
 // Initialize configuration on server startup
 await config.init();
+
+// Apply a staged backup restore before the database is opened (never throws; keeps live data on failure).
+// Skipped when Vite HMR re-evaluates this module with the database still open.
+const restoreResult = await applyPendingRestoreAtStartup(config.paths.base, db.isInitialized(), {
+  info: (message, meta) => logger.info(message, { source: 'BackupRestore', meta }),
+  error: (message, meta) => logger.error(message, { source: 'BackupRestore', meta }),
+});
+if (restoreResult.status === 'failed' && 'dataMissing' in restoreResult) {
+  // Opening the database now would create an empty praxrr.db over a missing data directory
+  await logger.error(
+    `Aborting startup: data directory is missing after a failed restore. Move ${restoreResult.rollbackPath} back to ${config.paths.data} and restart.`,
+    {
+      source: 'BackupRestore',
+      meta: { rollbackPath: restoreResult.rollbackPath, error: restoreResult.error },
+    }
+  );
+  throw new Error(
+    `Data directory missing after failed restore; move ${restoreResult.rollbackPath} back to ${config.paths.data} and restart`
+  );
+}
 
 // Validate Arr credential key configuration before services that depend on it
 // to fail startup with a clear action path when encryption material is missing/invalid.

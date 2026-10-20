@@ -233,7 +233,11 @@
               if (result.type === 'failure' && result.data) {
                 alertStore.add('error', (result.data as { error?: string }).error || 'Failed to restore backup');
               } else if (result.type === 'success') {
-                alertStore.add('success', 'Backup restored successfully. Please restart the application.');
+                alertStore.add(
+                  'success',
+                  (result.data as { message?: string } | undefined)?.message ||
+                    'Backup staged. Restart Praxrr to apply the restore.'
+                );
               }
               await update();
             };
@@ -301,7 +305,7 @@
 <Modal
   open={showRestoreModal}
   header="Restore Backup"
-  bodyMessage="Restoring this backup will replace all current data with the data from the backup. This action cannot be undone. You will need to restart the application after restoring.{selectedBackup
+  bodyMessage="Restoring this backup will validate and stage it, then replace all current data with the data from the backup the next time Praxrr restarts. The current data directory is kept as a data.pre-restore-* copy.{selectedBackup
     ? `\n\nBackup: ${selectedBackup}`
     : ''}"
   confirmText="Restore Backup"
