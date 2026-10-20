@@ -8,6 +8,14 @@ import { parseUTC } from '$shared/utils/dates.ts';
  */
 export const MAX_SCHEDULE_INTERVAL_MINUTES = 525_600;
 
+/** User-facing rejection message for an out-of-range `syncStrategy` (TRaSH sources and PCDs). */
+export const SYNC_STRATEGY_RANGE_ERROR = `syncStrategy must be an integer between 0 and ${MAX_SCHEDULE_INTERVAL_MINUTES}`;
+
+/** True when `value` is an integer minute interval in [min, MAX_SCHEDULE_INTERVAL_MINUTES]. */
+export function isValidScheduleIntervalMinutes(value: unknown, min = 0): value is number {
+  return Number.isInteger(value) && (value as number) >= min && (value as number) <= MAX_SCHEDULE_INTERVAL_MINUTES;
+}
+
 const MS_PER_MINUTE = 60_000;
 // ECMAScript's maximum representable Date (±8.64e15 ms from the epoch).
 const MAX_DATE_MS = 8.64e15;

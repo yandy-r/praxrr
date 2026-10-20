@@ -13,8 +13,9 @@ import {
   pull,
   type UpdateInfo,
 } from '$utils/git/index.ts';
-import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { DatabaseInstanceValidationError, databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 import { loadManifest, type Manifest } from '../manifest/manifest.ts';
 import { getPCDPath } from '../utils/operations.ts';
 import { processDependencies, syncDependencies, validateDependencies } from '../git/dependencies.ts';
@@ -40,6 +41,11 @@ class PCDManager {
    * Link a new PCD repository
    */
   async link(options: LinkOptions): Promise<DatabaseInstance> {
+    // Reject before cloning; databaseInstancesQueries.create enforces the same bound.
+    if (options.syncStrategy !== undefined && !isValidScheduleIntervalMinutes(options.syncStrategy)) {
+      throw new DatabaseInstanceValidationError(SYNC_STRATEGY_RANGE_ERROR);
+    }
+
     await logger.debug('Starting database link operation', {
       source: 'PCDManager',
       meta: {

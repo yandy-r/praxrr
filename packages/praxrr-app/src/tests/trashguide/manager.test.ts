@@ -337,6 +337,83 @@ Deno.test('createSource invalid arrType throws Validation(arr_type_invalid)', as
   assertEquals(error.code, 'arr_type_invalid');
 });
 
+Deno.test(
+  'createSource out-of-range syncStrategy throws Validation(sync_strategy_invalid) before linking',
+  async () => {
+    const restores: Restore[] = [];
+    let linkCalls = 0;
+    patchTarget(
+      trashGuideManager,
+      'link',
+      (() => {
+        linkCalls += 1;
+        return Promise.reject(new Error('link should not be reached'));
+      }) as typeof trashGuideManager.link,
+      restores
+    );
+
+    try {
+      for (const syncStrategy of [525_601, 200_000_000_000, -1, Number.NaN]) {
+        const error = await assertRejects(
+          () =>
+            trashGuideManager.createSource({
+              name: 'x',
+              repositoryUrl: 'https://github.com/x/y.git',
+              arrType: 'radarr',
+              syncStrategy,
+            }),
+          TrashGuideSourceValidationError
+        );
+        assertEquals(error.code, 'sync_strategy_invalid');
+        assertEquals(error.message, 'syncStrategy must be an integer between 0 and 525600');
+      }
+      assertEquals(linkCalls, 0);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  }
+);
+
+Deno.test(
+  'updateSource out-of-range syncStrategy throws Validation(sync_strategy_invalid) without writing',
+  async () => {
+    const restores: Restore[] = [];
+    let updateCalls = 0;
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() => makeSource({ id: 9, arr_type: 'radarr' })) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideSourcesQueries,
+      'update',
+      (() => {
+        updateCalls += 1;
+        return true;
+      }) as typeof trashGuideSourcesQueries.update,
+      restores
+    );
+
+    try {
+      for (const syncStrategy of [525_601, Number.NaN]) {
+        const error = await assertRejects(
+          () => trashGuideManager.updateSource(9, { syncStrategy }),
+          TrashGuideSourceValidationError
+        );
+        assertEquals(error.code, 'sync_strategy_invalid');
+      }
+      assertEquals(updateCalls, 0);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  }
+);
+
 // -------------------------------------------------------------------------
 // updateSource conflict + validation gates (hermetic; no clone reached)
 // -------------------------------------------------------------------------

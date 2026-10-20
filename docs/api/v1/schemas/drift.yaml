@@ -69,6 +69,7 @@ DriftSettings:
     intervalMinutes:
       type: integer
       minimum: 5
+      maximum: 525600
     lastRunAt:
       oneOf:
         - type: string

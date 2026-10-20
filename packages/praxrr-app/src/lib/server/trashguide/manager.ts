@@ -6,6 +6,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
 import { triggerSyncs } from '$sync/processor.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 import {
   checkForUpdates as checkGitForUpdates,
   getCommits,
@@ -115,9 +116,9 @@ export class TrashGuideSourceConflictError extends Error {
 }
 
 export class TrashGuideSourceValidationError extends Error {
-  readonly code: 'arr_type_invalid' | 'arr_type_mismatch';
+  readonly code: 'arr_type_invalid' | 'arr_type_mismatch' | 'sync_strategy_invalid';
 
-  constructor(code: 'arr_type_invalid' | 'arr_type_mismatch', message: string) {
+  constructor(code: 'arr_type_invalid' | 'arr_type_mismatch' | 'sync_strategy_invalid', message: string) {
     super(message);
     this.name = 'TrashGuideSourceValidationError';
     this.code = code;
@@ -173,6 +174,7 @@ class TrashGuideManager {
 
   async createSource(input: TrashGuideSourceCreateInput): Promise<TrashGuideSourceResponse> {
     const arrType = this.parseArrType(input.arrType);
+    this.assertSyncStrategy(input.syncStrategy);
     this.assertCreateConflicts({
       name: input.name,
       repositoryUrl: input.repositoryUrl,
@@ -205,6 +207,7 @@ class TrashGuideManager {
 
   async updateSource(id: number, input: TrashGuideSourceUpdateInput): Promise<TrashGuideSourceResponse> {
     const current = this.getSourceOrThrow(id);
+    this.assertSyncStrategy(input.syncStrategy);
 
     if (input.arrType !== undefined) {
       const nextArrType = this.parseArrType(input.arrType);
@@ -511,6 +514,12 @@ class TrashGuideManager {
     }
 
     return arrType;
+  }
+
+  private assertSyncStrategy(syncStrategy: number | undefined): void {
+    if (syncStrategy !== undefined && !isValidScheduleIntervalMinutes(syncStrategy)) {
+      throw new TrashGuideSourceValidationError('sync_strategy_invalid', SYNC_STRATEGY_RANGE_ERROR);
+    }
   }
 
   private assertCreateConflicts(input: {

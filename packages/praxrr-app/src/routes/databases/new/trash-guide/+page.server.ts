@@ -3,6 +3,7 @@ import type { Actions } from '@sveltejs/kit';
 import { trashGuideManager } from '$lib/server/trashguide/index.ts';
 import { TrashGuideSourceConflictError, TrashGuideSourceValidationError } from '$lib/server/trashguide/manager.ts';
 import { logger } from '$logger/logger.ts';
+import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
 
 export const actions = {
   default: async ({ request }) => {
@@ -22,6 +23,10 @@ export const actions = {
 
     if (!arrType || (arrType !== 'radarr' && arrType !== 'sonarr')) {
       return fail(422, { error: 'Arr type must be radarr or sonarr' });
+    }
+
+    if (!isValidScheduleIntervalMinutes(syncStrategy)) {
+      return fail(400, { error: SYNC_STRATEGY_RANGE_ERROR });
     }
 
     try {
