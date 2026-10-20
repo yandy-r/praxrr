@@ -115,7 +115,7 @@ sequenceDiagram
         Eval-->>UI: parserAvailable=false
     else parser available
   Eval->>Client: parseWithCacheBatch + matchPatternsBatch
-  Client->>HTTP: /health, /parse, /match/batch
+  Client->>HTTP: /health, /parse, envelope-sized /match/batch chunks (concurrency-capped)
   HTTP->>Contract: decode and validate exact wire DTOs
   HTTP->>Parser: parse title / run .NET-compatible patterns
   Parser-->>HTTP: structured result within finite limits

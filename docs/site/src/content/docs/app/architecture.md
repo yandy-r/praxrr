@@ -69,7 +69,11 @@ lifecycle all have measured limits. Oversized supported-envelope requests return
 `413`; admission or matcher saturation returns retryable `503` with
 `Retry-After: 1`; malformed/invalid input returns `400`; unexpected internal failures
 return `500`. Logs contain stable classes and counts, never submitted titles, texts,
-patterns, bodies, or engine errors.
+patterns, bodies, or engine errors. The app client mirrors these limits in
+`$arr/parser/limits.ts`: it caps concurrent parser requests below the admission limit
+(and regex requests at one, the matcher's single-CPU admission), honors `Retry-After`,
+and splits batch matching into envelope-sized `/match/batch` requests, skipping
+oversized titles and patterns instead of sending them.
 
 Parsed-release and pattern-match caches are namespaced by the last successfully
 observed parser behavior version. During an outage, the app may read proven entries
