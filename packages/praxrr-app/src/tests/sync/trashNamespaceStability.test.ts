@@ -15,6 +15,7 @@ import { logger } from '$logger/logger.ts';
 import { getTrashGuideNamespaceSuffix } from '$sync/namespace.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import { confirmTrashNamespace } from '$sync/trashSourceProfiles.ts';
+import type { SyncEntityOutcome } from '$sync/types.ts';
 
 const SOURCE_A = 31; // sorts first ("Source A")
 const SOURCE_B = 32;
@@ -86,18 +87,31 @@ function hydration(sourceId: number): TrashGuideSyncQualityProfileSourceHydratio
 type TrashBatchFetcher = {
   fetchTrashSyncBatches: (
     hydrations: TrashGuideSyncQualityProfileSourceHydration[],
-    mode: 'allocate' | 'predict'
+    mode: 'allocate' | 'predict',
+    skippedOutcomes?: SyncEntityOutcome[]
   ) => Promise<{ sourceLabel: string; suffix: string }[]>;
 };
+
+/** Fake Arr whose existing CF/QP names decide `hasPriorTrashSync` (empty = fresh Arr). */
+function arrWithNames(names: string[] = []) {
+  const entities = names.map((name, index) => ({ id: index + 1, name }));
+  return { getQualityProfiles: async () => entities, getCustomFormats: async () => [] } as never;
+}
 
 /** Suffix per source label for one TRaSH batch pass over `hydrations` (default: a real sync). */
 async function trashSuffixes(
   instanceId: number,
   hydrations: TrashGuideSyncQualityProfileSourceHydration[],
-  mode: 'allocate' | 'predict' = 'allocate'
+  mode: 'allocate' | 'predict' = 'allocate',
+  client: never = arrWithNames(),
+  skippedOutcomes?: SyncEntityOutcome[]
 ): Promise<Record<string, string>> {
-  const syncer = new QualityProfileSyncer({} as never, instanceId, 'Test Radarr', 'radarr');
-  const batches = await (syncer as unknown as TrashBatchFetcher).fetchTrashSyncBatches(hydrations, mode);
+  const syncer = new QualityProfileSyncer(client, instanceId, 'Test Radarr', 'radarr');
+  const batches = await (syncer as unknown as TrashBatchFetcher).fetchTrashSyncBatches(
+    hydrations,
+    mode,
+    skippedOutcomes
+  );
   return Object.fromEntries(batches.map((batch) => [batch.sourceLabel, batch.suffix]));
 }
 
@@ -200,21 +214,95 @@ migratedTest('TRaSH namespace: a newly added earlier-sorting source takes a fres
 });
 
 migratedTest(
-  'TRaSH namespace: first run with an unresolvable source uses positional suffixes and persists nothing',
+  'TRaSH namespace: fresh instance with an unresolvable source persists resolved sources append-only',
   async (instanceId, emptyCacheSources) => {
-    // Pre-upgrade Arr state: A held positional index 1, B index 2. A's cache is briefly empty.
+    // No TRaSH items in Arr yet, so nothing can collide: no need to wait for A.
     emptyCacheSources.add(SOURCE_A);
     const first = await trashSuffixes(instanceId, [hydration(SOURCE_A), hydration(SOURCE_B)]);
     assertEquals(first[`Source ${SOURCE_A}`], undefined);
     assertEquals(first[`Source ${SOURCE_B}`], getTrashGuideNamespaceSuffix(1));
-    assertEquals(persistedIndexes(instanceId), {});
+    assertEquals(persistedIndexes(instanceId), { [SOURCE_B]: 1 });
 
-    // A recovers: the restored positional order is what gets locked in.
     emptyCacheSources.delete(SOURCE_A);
     const second = await trashSuffixes(instanceId, [hydration(SOURCE_A), hydration(SOURCE_B)]);
-    assertEquals(second[`Source ${SOURCE_A}`], getTrashGuideNamespaceSuffix(1));
-    assertEquals(second[`Source ${SOURCE_B}`], getTrashGuideNamespaceSuffix(2));
+    assertEquals(second[`Source ${SOURCE_A}`], getTrashGuideNamespaceSuffix(2));
+    assertEquals(second[`Source ${SOURCE_B}`], getTrashGuideNamespaceSuffix(1));
+  }
+);
+
+migratedTest(
+  'TRaSH namespace: prior TRaSH items + unresolvable source block TRaSH writes, then recover in order',
+  async (instanceId, emptyCacheSources) => {
+    // Pre-upgrade Arr state: A held positional index 1, B index 2. A's cache is briefly empty.
+    const preUpgradeArr = arrWithNames([
+      `Profile ${SOURCE_A}${getTrashGuideNamespaceSuffix(1)}`,
+      `Profile ${SOURCE_B}${getTrashGuideNamespaceSuffix(2)}`,
+      'PCD Profile\u200B',
+    ]);
+    emptyCacheSources.add(SOURCE_A);
+    for (const mode of ['predict', 'allocate'] as const) {
+      const skipped: SyncEntityOutcome[] = [];
+      const blocked = await trashSuffixes(
+        instanceId,
+        [hydration(SOURCE_A), hydration(SOURCE_B)],
+        mode,
+        preUpgradeArr,
+        skipped
+      );
+      assertEquals(blocked, {});
+      assertEquals(persistedIndexes(instanceId), {});
+      const blockedSkip = skipped.find((outcome) => outcome.name === `Profile ${SOURCE_B}`);
+      assertEquals(blockedSkip?.status, 'skipped');
+      assertEquals(blockedSkip?.reason?.includes(`"Source ${SOURCE_A}"`), true);
+      assertEquals(blockedSkip?.reason?.includes('Re-pull or disable'), true);
+    }
+
+    // A recovers: every source resolves, so the pre-upgrade positional order is persisted.
+    emptyCacheSources.delete(SOURCE_A);
+    const recovered = await trashSuffixes(
+      instanceId,
+      [hydration(SOURCE_A), hydration(SOURCE_B)],
+      'allocate',
+      preUpgradeArr
+    );
+    assertEquals(recovered[`Source ${SOURCE_A}`], getTrashGuideNamespaceSuffix(1));
+    assertEquals(recovered[`Source ${SOURCE_B}`], getTrashGuideNamespaceSuffix(2));
     assertEquals(persistedIndexes(instanceId), { [SOURCE_A]: 1, [SOURCE_B]: 2 });
+  }
+);
+
+migratedTest(
+  'TRaSH namespace: blocked TRaSH pass leaves PCD batches of the same pass intact',
+  async (instanceId, emptyCacheSources) => {
+    emptyCacheSources.add(SOURCE_A);
+    const syncer = new QualityProfileSyncer(
+      arrWithNames([`Profile ${SOURCE_B}${getTrashGuideNamespaceSuffix(2)}`]),
+      instanceId,
+      'Test Radarr',
+      'radarr'
+    );
+    const pcdBatch = { sourceKind: 'pcd', sourceLabel: 'PCD', databaseId: 7, suffix: '\u200B' };
+    const internals = syncer as unknown as TrashBatchFetcher & {
+      fetchSyncBatches: (
+        skipped: SyncEntityOutcome[],
+        config: unknown,
+        mode: 'allocate'
+      ) => Promise<{ sourceKind: string }[]>;
+    };
+    // Run the real (blocking) TRaSH pass inside the real batch composition; PCD is stubbed in.
+    const realTrash = internals.fetchTrashSyncBatches.bind(syncer);
+    internals.fetchTrashSyncBatches = async (_hydrations, mode, skipped) => [
+      pcdBatch,
+      ...(await realTrash([hydration(SOURCE_A), hydration(SOURCE_B)], mode, skipped)),
+    ];
+    const skipped: SyncEntityOutcome[] = [];
+    const batches = await internals.fetchSyncBatches(skipped, { selections: [] }, 'allocate');
+    assertEquals(batches, [pcdBatch]);
+    assertEquals(
+      skipped.some((outcome) => outcome.reason?.startsWith('TRaSH sync blocked')),
+      true
+    );
+    assertEquals(persistedIndexes(instanceId), {});
   }
 );
 
@@ -241,23 +329,13 @@ migratedTest(
 
 migratedTest('TRaSH namespace: reviewed replay persists or rejects a stale namespace', async (instanceId) => {
   // Reviewed on a fresh instance: A=1, B=2 predicted. Replay persists them in batch order.
-  confirmTrashNamespace(instanceId, { sourceId: SOURCE_A, index: 1, persisted: true });
-  confirmTrashNamespace(instanceId, { sourceId: SOURCE_B, index: 2, persisted: true });
+  confirmTrashNamespace(instanceId, { sourceId: SOURCE_A, index: 1 });
+  confirmTrashNamespace(instanceId, { sourceId: SOURCE_B, index: 2 });
   assertEquals(persistedIndexes(instanceId), { [SOURCE_A]: 1, [SOURCE_B]: 2 });
 
   // A review that predicted index 3 for EARLY, replayed after another source took 3, is stale.
   arrTrashNamespaceQueries.getOrCreate(instanceId, SOURCE_A + 100);
-  assertThrows(
-    () => confirmTrashNamespace(instanceId, { sourceId: SOURCE_EARLY, index: 3, persisted: true }),
-    Error,
-    'stale'
-  );
-  // An upgrade-fallback review is stale once any row exists.
-  assertThrows(
-    () => confirmTrashNamespace(instanceId, { sourceId: SOURCE_B + 100, index: 1, persisted: false }),
-    Error,
-    'stale'
-  );
+  assertThrows(() => confirmTrashNamespace(instanceId, { sourceId: SOURCE_EARLY, index: 3 }), Error, 'stale');
 });
 
 migratedTest('TRaSH namespace: a source resolving no selected profile consumes no index', async (instanceId) => {

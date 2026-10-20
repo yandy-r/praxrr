@@ -192,11 +192,19 @@ export async function resolveTrashSourceProfiles(
   };
 }
 
-/** Planned TRaSH namespace for one source; `persisted` is false only for the upgrade fallback. */
+/** Planned persisted TRaSH namespace for one source. */
 export interface TrashNamespaceAssignment {
   sourceId: number;
   index: number;
-  persisted: boolean;
+}
+
+/**
+ * Result of planning one pass. `blockedSourceIds` is non-empty only when TRaSH writes must be
+ * withheld for this pass; `plan` is then empty.
+ */
+export interface TrashNamespacePlan {
+  plan: Map<number, TrashNamespaceAssignment>;
+  blockedSourceIds: number[];
 }
 
 /**
@@ -204,49 +212,47 @@ export interface TrashNamespaceAssignment {
  *
  * `resolutions` must cover every hydrated source with selections, in hydration order. Only
  * sources with at least one resolved profile get a namespace. Indexes are persisted per
- * (instance, source) and never shift when other sources come and go:
+ * (instance, source) and never shift when other sources come and go. New sources get
+ * `MAX + 1, MAX + 2, …` in hydration order: `allocate` (real sync) persists them via
+ * `getOrCreate`; `predict` (preview, drift, history, MCP) only computes them, read-only.
  *
- * - Upgrade fallback: while the instance has no rows and some source is not `resolved`, assign
- *   the old in-memory positional numbering and persist nothing. Persisting now would lock in a
- *   shifted order (the failing source would later take a later index), so assignment waits for
- *   a pass where every source resolves; that pass reproduces the pre-upgrade positional indexes.
- * - `allocate` (real sync): `getOrCreate`, i.e. `MAX + 1` per new source in hydration order.
- * - `predict` (preview, drift, history, MCP): read-only; new sources get `MAX + 1, MAX + 2, …`
- *   in the same order, which is exactly what a following `allocate` pass assigns.
+ * Upgrade guard: while the instance has no rows yet, its Arr may still hold items written under
+ * the old positional scheme. Numbering then reproduces pre-upgrade indexes only if every source
+ * resolves, so when some source is unresolved and `hasPriorTrashSync()` reports such items, the
+ * pass is blocked (no TRaSH batch is written) instead of shifting later sources onto the
+ * unresolved source's items. Without prior items nothing can collide, so allocation proceeds.
  */
-export function planTrashNamespaces(
+export async function planTrashNamespaces(
   instanceId: number,
   resolutions: readonly TrashSourceResolution[],
-  mode: 'allocate' | 'predict'
-): Map<number, TrashNamespaceAssignment> {
+  mode: 'allocate' | 'predict',
+  hasPriorTrashSync: () => Promise<boolean>
+): Promise<TrashNamespacePlan> {
   const plan = new Map<number, TrashNamespaceAssignment>();
-  const owners = resolutions.flatMap((resolution) =>
-    resolution.status === 'resolved' && resolution.resolvedProfileNames.length > 0 ? [resolution.source.id] : []
-  );
   const maxIndex = arrTrashNamespaceQueries.getMaxIndex(instanceId);
+  const unresolvedSourceIds = resolutions.flatMap((resolution) =>
+    resolution.status !== 'resolved' && resolution.source ? [resolution.source.id] : []
+  );
+  const hasUnresolved = resolutions.some((resolution) => resolution.status !== 'resolved');
 
-  if (maxIndex === 0 && resolutions.some((resolution) => resolution.status !== 'resolved')) {
-    if (mode === 'allocate') {
-      const unresolvedSourceIds = resolutions.flatMap((resolution) =>
-        resolution.status !== 'resolved' && resolution.source ? [resolution.source.id] : []
-      );
-      void logger.warn('TRaSH namespaces not persisted: waiting for every source to resolve', {
-        source: 'TrashNamespaces',
-        meta: { instanceId, unresolvedSourceIds },
-      });
-    }
-    owners.forEach((sourceId, position) => plan.set(sourceId, { sourceId, index: position + 1, persisted: false }));
-    return plan;
+  if (maxIndex === 0 && hasUnresolved && (await hasPriorTrashSync())) {
+    await logger.warn('TRaSH quality profile sync blocked until every TRaSH source resolves', {
+      source: 'TrashNamespaces',
+      meta: { instanceId, mode, unresolvedSourceIds },
+    });
+    return { plan, blockedSourceIds: unresolvedSourceIds };
   }
 
   let nextPredicted = maxIndex + 1;
-  for (const sourceId of owners) {
+  for (const resolution of resolutions) {
+    if (resolution.status !== 'resolved' || resolution.resolvedProfileNames.length === 0) continue;
+    const sourceId = resolution.source.id;
     const index =
       arrTrashNamespaceQueries.get(instanceId, sourceId) ??
       (mode === 'allocate' ? arrTrashNamespaceQueries.getOrCreate(instanceId, sourceId) : nextPredicted++);
-    plan.set(sourceId, { sourceId, index, persisted: true });
+    plan.set(sourceId, { sourceId, index });
   }
-  return plan;
+  return { plan, blockedSourceIds: [] };
 }
 
 /**
@@ -254,20 +260,11 @@ export function planTrashNamespaces(
  * the persisted state no longer matches the reviewed suffix. Call in hydration (batch) order.
  */
 export function confirmTrashNamespace(instanceId: number, assignment: TrashNamespaceAssignment): void {
-  const existing = arrTrashNamespaceQueries.get(instanceId, assignment.sourceId);
-  let current: number | null;
-  if (existing !== null) {
-    current = existing;
-  } else if (assignment.persisted) {
-    current = arrTrashNamespaceQueries.getOrCreate(instanceId, assignment.sourceId);
-  } else {
-    // Upgrade fallback stays valid only while the instance still has no persisted rows.
-    current = arrTrashNamespaceQueries.getMaxIndex(instanceId) === 0 ? assignment.index : null;
-  }
+  const current = arrTrashNamespaceQueries.getOrCreate(instanceId, assignment.sourceId);
   if (current !== assignment.index) {
     throw new Error(
       `Reviewed TRaSH namespace for source ${assignment.sourceId} is stale ` +
-        `(reviewed index ${assignment.index}, current ${current ?? 'reassigned'}); preview again before syncing`
+        `(reviewed index ${assignment.index}, current ${current}); preview again before syncing`
     );
   }
 }

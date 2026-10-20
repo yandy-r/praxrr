@@ -28,7 +28,12 @@ import { logger } from '$logger/logger.ts';
 import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
 import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { getAllQualities, type SyncArrType } from '../mappings.ts';
-import { getNamespaceSuffix, getTrashGuideNamespaceSuffix } from '../namespace.ts';
+import {
+  getNamespaceSuffix,
+  getTrailingNamespaceSuffix,
+  getTrashGuideNamespaceSuffix,
+  isTrashGuideNamespaceSuffix,
+} from '../namespace.ts';
 import {
   confirmTrashNamespace,
   planTrashNamespaces,
@@ -1055,7 +1060,27 @@ export class QualityProfileSyncer extends BaseSyncer {
 
     // Persisted per-(instance, source) namespace (YAN-443): `allocate` for real syncs, read-only
     // `predict` for previews. Cleanup reads the same rows.
-    const plan = planTrashNamespaces(this.instanceId, resolutions, trashNamespaceMode);
+    const { plan, blockedSourceIds } = await planTrashNamespaces(this.instanceId, resolutions, trashNamespaceMode, () =>
+      this.hasPriorTrashSync()
+    );
+    if (blockedSourceIds.length > 0) {
+      const blockedNames = resolutions
+        .filter((resolution) => resolution.source && blockedSourceIds.includes(resolution.source.id))
+        .map((resolution) => `"${resolution.source!.name}"`)
+        .join(', ');
+      const reason =
+        `TRaSH sync blocked: source(s) ${blockedNames} could not be resolved. Re-pull or disable them ` +
+        'so TRaSH namespaces can be assigned safely.';
+      for (const batch of pending) {
+        recordTrashSkips(
+          batch.profiles.map((profile) => profile.pcdProfile.name),
+          reason
+        );
+      }
+      this.recordPreviewEvidence('qualityProfiles', 'pcd', 'trashSourceMaterial', sourceInputs);
+      return [];
+    }
+
     const batches: DatabaseSyncBatch[] = [];
     for (const batch of pending) {
       const trashNamespace = plan.get(-batch.databaseId);
@@ -1068,6 +1093,26 @@ export class QualityProfileSyncer extends BaseSyncer {
     this.recordPreviewEvidence('qualityProfiles', 'pcd', 'trashSourceMaterial', sourceInputs);
 
     return batches;
+  }
+
+  /**
+   * Whether this Arr already holds TRaSH-suffixed items, i.e. TRaSH profiles were synced here
+   * under the pre-YAN-443 positional scheme. The live Arr is the ground truth: the app DB has no
+   * reliable record (TRaSH per-source `last_synced_at` is never written by the sync path, the QP
+   * section `last_synced_at` is reset whenever selections are saved, and sync history is pruned by
+   * retention and does not record TRaSH sources). Only consulted when the instance has no
+   * persisted TRaSH namespaces and some source is unresolved. An unreadable Arr counts as "yes",
+   * which blocks TRaSH writes for the pass rather than risking a namespace collision.
+   */
+  private async hasPriorTrashSync(): Promise<boolean> {
+    try {
+      const [profiles, formats] = await Promise.all([this.client.getQualityProfiles(), this.client.getCustomFormats()]);
+      return [...profiles, ...formats].some((entity) =>
+        isTrashGuideNamespaceSuffix(getTrailingNamespaceSuffix(entity.name))
+      );
+    } catch {
+      return true;
+    }
   }
 
   private getQualityProfilesSyncConfig(): QualityProfilesPreviewConfig {
