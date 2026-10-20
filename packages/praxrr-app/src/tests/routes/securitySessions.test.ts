@@ -98,7 +98,12 @@ function localsOf(
   authBypass = false
 ): App.Locals {
   const session = sessionId ? ({ id: sessionId, user_id: userIdOverride ?? user?.id ?? 0 } as Session) : null;
-  return { user, session, authBypass };
+  const principal: App.Locals['principal'] = authBypass
+    ? { kind: 'bypass', scopes: ['admin'] }
+    : session
+      ? { kind: 'session', scopes: ['admin'] }
+      : null;
+  return { user, session, authBypass, principal };
 }
 
 async function loadPayload(locals: App.Locals) {

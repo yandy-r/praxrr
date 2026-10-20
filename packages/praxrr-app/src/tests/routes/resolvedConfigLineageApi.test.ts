@@ -10,6 +10,7 @@ import { assert, assertEquals } from '@std/assert';
 import { GET as GET_NAMED } from '../../routes/api/v1/pcd/[databaseId]/resolved/[entityType]/[name]/+server.ts';
 import { PCDCache } from '$pcd/index.ts';
 import { setCache, deleteCache } from '$pcd/database/registry.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import type { ListPcdOpsOptions, PcdOp, PcdOpOrigin } from '$db/queries/pcdOps.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
@@ -76,6 +77,7 @@ function buildEvent(query: string): NamedGetEvent {
       },
       session: null,
       authBypass: false,
+      principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
     },
   };
   return event as NamedGetEvent;

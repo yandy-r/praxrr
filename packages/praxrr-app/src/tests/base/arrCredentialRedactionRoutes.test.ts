@@ -10,7 +10,8 @@ import { BaseTest } from './BaseTest.ts';
 import { aiSettingsQueries } from '../../lib/server/db/queries/aiSettings.ts';
 import { arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '../../lib/server/db/queries/arrInstanceCredentials.ts';
-import { authSettingsQueries } from '../../lib/server/db/queries/authSettings.ts';
+import { apiTokensQueries } from '../../lib/server/db/queries/apiTokens.ts';
+import type { ApiTokenSummary } from '../../lib/shared/auth/apiTokenScopes.ts';
 import { backupSettingsQueries } from '../../lib/server/db/queries/backupSettings.ts';
 import { databaseInstancesQueries } from '../../lib/server/db/queries/databaseInstances.ts';
 import { generalSettingsQueries } from '../../lib/server/db/queries/generalSettings.ts';
@@ -244,8 +245,14 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
     );
   }
 
-  private patchSecuritySettingsLoadDependencies(apiKey: string | null): void {
-    this.installPatch(authSettingsQueries, 'getApiKey', () => apiKey, this.restoreStack);
+  private patchSecuritySettingsLoadDependencies(tokens: ApiTokenSummary[]): void {
+    this.installPatch(apiTokensQueries, 'list', () => tokens, this.restoreStack);
+    this.installPatch(
+      apiTokensQueries,
+      'hasActiveLegacy',
+      () => tokens.some((token) => token.isLegacy && token.status === 'active'),
+      this.restoreStack
+    );
   }
 
   private patchArrCredentialDecryptor(): void {
@@ -713,41 +720,55 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
     });
   }
 
-  private runSecuritySettingsLoadRedactionShortKeyTest(): void {
-    this.test('settings/security payload omits short plaintext api_key', async () => {
-      const apiKey = 'shortAuth';
-      this.patchSecuritySettingsLoadDependencies(apiKey);
+  private runSecuritySettingsLoadTokenSummaryTest(): void {
+    this.test('settings/security payload carries only token summaries, never secrets or hashes', async () => {
+      const legacy: ApiTokenSummary = {
+        id: 1,
+        name: 'Legacy API key',
+        prefix: 'abcd1234',
+        scopes: ['admin'],
+        isLegacy: true,
+        createdAt: FIXTURE_TIMESTAMP,
+        lastUsedAt: null,
+        expiresAt: null,
+        revokedAt: null,
+        status: 'active',
+      };
+      this.patchSecuritySettingsLoadDependencies([legacy]);
 
       const payload = (await settingsSecurityLoad({
         setHeaders: () => {},
-        locals: { user: null, session: null, authBypass: false },
-      } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
-        apiKeyMasked: string;
-        hasApiKey: boolean;
+        locals: { user: null, session: null, authBypass: false, principal: null },
+      } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as Record<string, unknown> & {
+        apiTokens: ApiTokenSummary[];
+        hasLegacyApiToken: boolean;
       };
 
-      this.assertPayloadNoLeak(payload, apiKey, 'security settings load payload');
-      assertEquals(payload.apiKeyMasked, maskApiKey(apiKey));
-      assertEquals(payload.hasApiKey, true);
+      const serialized = JSON.stringify(payload);
+      assertFalse(serialized.includes('token_hash'), 'security settings load payload exposes token_hash');
+      assertFalse(/prx_[0-9a-f]{64}/.test(serialized), 'security settings load payload exposes a token secret');
       assertFalse('api_key' in payload);
+      assertFalse('apiKeyMasked' in payload);
+      assertFalse('hasApiKey' in payload);
+      assertEquals(payload.apiTokens, [legacy]);
+      assertEquals(payload.hasLegacyApiToken, true);
     });
   }
 
-  private runSecuritySettingsLoadRedactionEmptyKeyTest(): void {
-    this.test('settings/security payload omits empty api_key', async () => {
-      const apiKey = '';
-      this.patchSecuritySettingsLoadDependencies(apiKey);
+  private runSecuritySettingsLoadEmptyTokensTest(): void {
+    this.test('settings/security payload with no tokens has an empty list and no legacy flag', async () => {
+      this.patchSecuritySettingsLoadDependencies([]);
 
       const payload = (await settingsSecurityLoad({
         setHeaders: () => {},
-        locals: { user: null, session: null, authBypass: false },
+        locals: { user: null, session: null, authBypass: false, principal: null },
       } as unknown as Parameters<typeof settingsSecurityLoad>[0])) as {
-        apiKeyMasked: string;
-        hasApiKey: boolean;
+        apiTokens: ApiTokenSummary[];
+        hasLegacyApiToken: boolean;
       };
 
-      assertEquals(payload.apiKeyMasked, '');
-      assertEquals(payload.hasApiKey, false);
+      assertEquals(payload.apiTokens, []);
+      assertEquals(payload.hasLegacyApiToken, false);
       assertFalse('api_key' in payload);
     });
   }
@@ -757,8 +778,8 @@ class ArrCredentialRedactionRoutesTest extends BaseTest {
     this.runEpisodesRouteRedactionTest();
     this.runGeneralSettingsLoadRedactionShortKeyTest();
     this.runGeneralSettingsLoadRedactionEmptyKeyTest();
-    this.runSecuritySettingsLoadRedactionShortKeyTest();
-    this.runSecuritySettingsLoadRedactionEmptyKeyTest();
+    this.runSecuritySettingsLoadTokenSummaryTest();
+    this.runSecuritySettingsLoadEmptyTokensTest();
     this.runResolvedConfigListRedactionTest();
     this.runResolvedConfigNamedRedactionTest();
     this.runResolvedConfigDiffRedactionTest();

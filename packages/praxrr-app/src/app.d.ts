@@ -2,6 +2,7 @@
 // for information about these interfaces
 import type { User } from '$db/queries/users.ts';
 import type { Session } from '$db/queries/sessions.ts';
+import type { AuthPrincipal } from '$auth/principal.ts';
 import type { NavShell } from '$shared/navigation/types.ts';
 
 declare global {
@@ -11,6 +12,7 @@ declare global {
       user: User | null;
       session: Session | null;
       authBypass: boolean;
+      principal: AuthPrincipal | null;
     }
     interface PageData {
       navShell?: NavShell;

@@ -9,6 +9,9 @@ import { usersQueries, type User } from '$db/queries/users.ts';
 import { sessionsQueries, type Session } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { isLocalAddress, getClientIp } from './network.ts';
+import { resolveApiToken } from './apiTokens.ts';
+import type { AuthPrincipal } from './principal.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import { logger } from '$logger/logger.ts';
 
 /**
@@ -19,7 +22,11 @@ export interface AuthState {
   user: User | null;
   session: Session | null;
   skipAuth: boolean; // true when AUTH=off or AUTH=local+local IP
+  principal: AuthPrincipal | null; // null when unauthenticated
 }
+
+const BYPASS_PRINCIPAL: AuthPrincipal = { kind: 'bypass', scopes: API_TOKEN_SCOPES };
+const SESSION_PRINCIPAL: AuthPrincipal = { kind: 'session', scopes: API_TOKEN_SCOPES };
 
 /**
  * Paths that don't require authentication
@@ -42,12 +49,56 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * Resolve an API token presented on an `/api/v1/` request (X-Api-Key header or `apikey` query
+ * param). Tokens never authenticate page routes, form actions, or legacy non-v1 `/api/*` routes
+ * (those include backup downloads, which carry session data). Returns null when no token was
+ * presented or it is invalid/revoked/expired (the caller then falls through to session auth).
+ */
+function authenticateApiToken(event: RequestEvent): AuthState | null {
+  if (!event.url.pathname.startsWith('/api/v1/')) return null;
+
+  const presented = event.request.headers.get('X-Api-Key') || event.url.searchParams.get('apikey');
+  if (!presented) return null;
+
+  const ip = getClientIp(event);
+  const endpoint = event.url.pathname;
+  const token = resolveApiToken(presented);
+  if (!token) {
+    // Mask API key - only show last 4 chars
+    const maskedKey = presented.length > 4 ? `****${presented.slice(-4)}` : '****';
+    void logger.warn('Invalid API token', {
+      source: 'Auth:APIKey',
+      meta: { ip, endpoint, key: maskedKey },
+    });
+    return null;
+  }
+
+  void logger.info('API token authenticated', {
+    source: 'Auth:APIKey',
+    meta: { ip, endpoint, tokenName: token.name, legacy: token.isLegacy },
+  });
+  return {
+    needsSetup: false,
+    // Synthetic API user: id 0 keeps existing `id <= 0` "not a real user" checks working.
+    user: { id: 0, username: 'api' } as User,
+    session: null,
+    skipAuth: false,
+    principal: {
+      kind: 'token',
+      tokenId: token.id,
+      tokenName: token.name,
+      isLegacy: token.isLegacy,
+      scopes: token.scopes,
+    },
+  };
+}
+
+/**
  * Get auth state from request
- * Checks auth mode, API key, and session cookie
+ * Order: AUTH=off bypass → AUTH=local local-IP bypass → API token (any authenticating mode,
+ * `/api/v1/` paths only) → session cookie (oidc or on/local-remote).
  */
 export function getAuthState(event: RequestEvent): AuthState {
-  const hasLocalUsers = usersQueries.existsLocal();
-
   // AUTH=off - skip all auth (trust external proxy like Authelia/Authentik)
   if (config.authMode === 'off') {
     return {
@@ -55,8 +106,11 @@ export function getAuthState(event: RequestEvent): AuthState {
       user: null,
       session: null,
       skipAuth: true,
+      principal: BYPASS_PRINCIPAL,
     };
   }
+
+  const hasLocalUsers = usersQueries.existsLocal();
 
   // AUTH=local - skip auth for local IPs
   if (config.authMode === 'local') {
@@ -71,63 +125,26 @@ export function getAuthState(event: RequestEvent): AuthState {
         user: null,
         session: null,
         skipAuth: true,
+        principal: BYPASS_PRINCIPAL,
       };
     }
   }
 
-  // AUTH=oidc - uses sessions but no local user/password
-  if (config.authMode === 'oidc') {
-    const sessionId = event.cookies.get('session');
-    const session = sessionId ? (sessionsQueries.getValidById(sessionId) ?? null) : null;
-    const user = session ? (usersQueries.getById(session.user_id) ?? null) : null;
+  // API token (header or query param) - every authenticating mode, including oidc (YAN-441)
+  const tokenState = authenticateApiToken(event);
+  if (tokenState) return tokenState;
 
-    return {
-      needsSetup: false, // No setup needed for OIDC
-      user,
-      session,
-      skipAuth: false,
-    };
-  }
-
-  // AUTH=on (default) - full username/password auth
-
-  // Check API key (header or query param)
-  const apiKey = event.request.headers.get('X-Api-Key') || event.url.searchParams.get('apikey');
-  if (apiKey) {
-    const ip = getClientIp(event);
-    const endpoint = event.url.pathname;
-
-    if (authSettingsQueries.validateApiKey(apiKey)) {
-      void logger.info('API key authenticated', {
-        source: 'Auth:APIKey',
-        meta: { ip, endpoint },
-      });
-      return {
-        needsSetup: false,
-        user: { id: 0, username: 'api' } as User,
-        session: null,
-        skipAuth: false,
-      };
-    } else {
-      // Mask API key - only show last 4 chars
-      const maskedKey = apiKey.length > 4 ? `****${apiKey.slice(-4)}` : '****';
-      void logger.warn('Invalid API key', {
-        source: 'Auth:APIKey',
-        meta: { ip, endpoint, key: maskedKey },
-      });
-    }
-  }
-
-  // Check session cookie
+  // Session cookie (oidc: no local user/password; on/local-remote: username/password)
   const sessionId = event.cookies.get('session');
   const session = sessionId ? (sessionsQueries.getValidById(sessionId) ?? null) : null;
   const user = session ? (usersQueries.getById(session.user_id) ?? null) : null;
 
   return {
-    needsSetup: !hasLocalUsers,
+    needsSetup: config.authMode === 'oidc' ? false : !hasLocalUsers, // No setup needed for OIDC
     user,
     session,
     skipAuth: false,
+    principal: user ? SESSION_PRINCIPAL : null,
   };
 }
 

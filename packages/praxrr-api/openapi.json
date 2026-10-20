@@ -196,14 +196,14 @@
       "get": {
         "operationId": "getMetrics",
         "summary": "Prometheus metrics",
-        "description": "Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config\nhealth, security posture, parser availability, notification delivery, PCD cache state and\nbuild info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`\nheader (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.\n",
+        "description": "Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config\nhealth, security posture, parser availability, notification delivery, PCD cache state and\nbuild info. Labels never include Arr URLs or API keys. Authenticate with an API token\n(`prx_…`) carrying the `read` scope in the `X-Api-Key` header; tokens work under AUTH=on,\nAUTH=oidc, and for remote clients under AUTH=local. A token without the `read` scope gets 403\n`{ \"error\": \"Forbidden\", \"requiredScope\": \"read\" }`. Disabled (404) unless `METRICS_ENABLED`\nis on.\n",
         "tags": ["System"],
         "parameters": [
           {
             "name": "X-Api-Key",
             "in": "header",
             "required": false,
-            "description": "Praxrr API key. Required for non-browser clients under AUTH=on.",
+            "description": "Praxrr API token (`prx_…`) with the `read` scope. Required for non-browser clients under\nAUTH=on and AUTH=oidc, and for remote clients under AUTH=local.\n",
             "schema": {
               "type": "string"
             }
@@ -221,11 +221,21 @@
             }
           },
           "401": {
-            "description": "Unauthenticated (missing or invalid API key).",
+            "description": "Unauthenticated (missing, invalid, revoked, or expired API token).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API token lacks the `read` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
                 }
               }
             }
@@ -280,14 +290,14 @@
       "post": {
         "operationId": "postMcp",
         "summary": "MCP Streamable HTTP endpoint",
-        "description": "Model Context Protocol (MCP) endpoint over Streamable HTTP, stateless. The request body is a\nsingle JSON-RPC 2.0 request or notification: a request returns a single JSON-RPC response, a\nnotification returns 202 with no body. The tool/resource/prompt surface is discovered at\nruntime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.\n\nRead-only: exposes Praxrr's configuration and observability surface (instances, drift, config\nhealth, security posture, PCD databases and resolved entities, sync history, and the redacted\nfeature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no\nplugin source directory, raw manifest, credential, or mutation handler. Authenticate with the\n`X-Api-Key` header (required under AUTH=on); there is no OAuth/Bearer support. Disabled (404)\nwhen `MCP_ENABLED` is off.\n",
+        "description": "Model Context Protocol (MCP) endpoint over Streamable HTTP, stateless. The request body is a\nsingle JSON-RPC 2.0 request or notification: a request returns a single JSON-RPC response, a\nnotification returns 202 with no body. The tool/resource/prompt surface is discovered at\nruntime via `tools/list`, `resources/list`, and `prompts/list` rather than modeled here.\n\nRead-only: exposes Praxrr's configuration and observability surface (instances, drift, config\nhealth, security posture, PCD databases and resolved entities, sync history, and the redacted\nfeature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no\nplugin source directory, raw manifest, credential, or mutation handler. Authenticate with an\nAPI token (`prx_…`) carrying the `mcp` scope (or `admin`) in the `X-Api-Key` header; tokens\nwork under AUTH=on, AUTH=oidc, and for remote clients under AUTH=local. There is no\nOAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.\n",
         "tags": ["MCP"],
         "parameters": [
           {
             "name": "X-Api-Key",
             "in": "header",
             "required": false,
-            "description": "Praxrr API key. Required for non-browser clients under AUTH=on.",
+            "description": "Praxrr API token (`prx_…`) with the `mcp` scope (or `admin`). Required for non-browser\nclients under AUTH=on and AUTH=oidc, and for remote clients under AUTH=local.\n",
             "schema": {
               "type": "string"
             }
@@ -341,10 +351,60 @@
             }
           },
           "401": {
-            "description": "Unauthenticated (missing or invalid API key)."
+            "description": "Unauthenticated (missing, invalid, revoked, or expired API token)."
           },
           "403": {
-            "description": "Rejected cross-origin request (DNS-rebinding defense)."
+            "description": "Rejected cross-origin request (DNS-rebinding defense), or the API token lacks the `mcp`\nscope (body `{ \"error\": \"Forbidden\", \"requiredScope\": \"mcp\" }`). A tool call whose\nrequired scope is not granted is a JSON-RPC `-32003` error, also returned with 403. The\ncross-origin rejection has no body.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["jsonrpc", "id", "error"],
+                      "description": "JSON-RPC 2.0 error response object whose `error.code` is `-32003` (the tool\nrequires a scope the token lacks).\n",
+                      "properties": {
+                        "jsonrpc": {
+                          "type": "string",
+                          "const": "2.0"
+                        },
+                        "id": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "error": {
+                          "type": "object",
+                          "required": ["code", "message"],
+                          "properties": {
+                            "code": {
+                              "type": "integer",
+                              "const": -32003
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "data": {}
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "description": "The MCP endpoint is disabled (MCP_ENABLED is off)."
@@ -6869,6 +6929,22 @@
         "type": "string",
         "enum": ["healthy", "degraded", "unhealthy"],
         "description": "Overall health status"
+      },
+      "ScopeForbiddenResponse": {
+        "type": "object",
+        "required": ["error", "requiredScope"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Always `Forbidden`."
+          },
+          "requiredScope": {
+            "type": "string",
+            "enum": ["read", "mcp", "sync:apply", "admin"],
+            "description": "The API token scope this request requires."
+          }
+        },
+        "description": "An authenticated API token lacks the scope the requested route requires."
       },
       "SqliteHealth": {
         "type": "object",

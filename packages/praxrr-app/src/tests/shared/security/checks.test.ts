@@ -25,8 +25,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     port: 6868,
     oidcConfigured: false,
     oidcPartiallyConfigured: false,
-    appApiKeyPresent: true,
-    appApiKeyStrong: true,
+    apiTokens: { activeCount: 1, legacyActive: true },
     instances: [],
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
     redactionVerified: true,
@@ -391,26 +390,47 @@ Deno.test('arr_transport: local and unavailable DNS stay attention without a ban
   assert(failedCopy.includes('does not mean the Arr service is down'));
 });
 
+const NO_TOKENS = { activeCount: 0, legacyActive: false };
+
 // --- app_key_at_rest --------------------------------------------------------------------------
 
-Deno.test('app_key_at_rest: only a live vector under on/local with a key set', () => {
-  assertEquals(
-    runCheck('app_key_at_rest', makeInputs({ authMode: 'on', appApiKeyPresent: true, appApiKeyStrong: true })).score,
-    70
-  );
-  assertEquals(
-    runCheck('app_key_at_rest', makeInputs({ authMode: 'local', appApiKeyPresent: true, appApiKeyStrong: true })).score,
-    70
-  );
-  const weak = runCheck(
-    'app_key_at_rest',
-    makeInputs({ authMode: 'on', appApiKeyPresent: true, appApiKeyStrong: false })
-  );
-  assertEquals(weak.score, 45);
-  assertEquals(weak.status, 'action');
-  assertEquals(runCheck('app_key_at_rest', makeInputs({ authMode: 'on', appApiKeyPresent: false })).score, null);
-  assertEquals(runCheck('app_key_at_rest', makeInputs({ authMode: 'oidc', appApiKeyPresent: true })).score, null);
-  assertEquals(runCheck('app_key_at_rest', makeInputs({ authMode: 'off', appApiKeyPresent: true })).score, null);
+Deno.test('app_key_at_rest: warns only while the legacy key is active; n/a under AUTH=off', () => {
+  const scoped = { activeCount: 2, legacyActive: false };
+  const legacy = { activeCount: 2, legacyActive: true };
+
+  for (const authMode of ['on', 'local', 'oidc'] as const) {
+    const none = runCheck('app_key_at_rest', makeInputs({ authMode, apiTokens: NO_TOKENS }));
+    assertEquals([none.score, none.status], [100, 'pass']);
+    assertEquals(none.detail, ['No API tokens are active.']);
+    assertEquals(none.recommendations, []);
+
+    const hashed = runCheck('app_key_at_rest', makeInputs({ authMode, apiTokens: scoped }));
+    assertEquals([hashed.score, hashed.status], [100, 'pass']);
+    assertEquals(hashed.recommendations, []);
+
+    const deprecated = runCheck('app_key_at_rest', makeInputs({ authMode, apiTokens: legacy }));
+    assertEquals([deprecated.score, deprecated.status], [70, 'attention']);
+    assertEquals(deprecated.critical, false);
+    assertEquals(deprecated.recommendations.length, 1);
+    assertEquals(deprecated.recommendations[0].line.tone, 'warning');
+    assertEquals(deprecated.recommendations[0].fix, {
+      kind: 'settings-link',
+      href: '/settings/security',
+      label: 'Revoke the legacy API key after moving integrations to scoped tokens in Settings → Security',
+    });
+  }
+
+  const off = runCheck('app_key_at_rest', makeInputs({ authMode: 'off', apiTokens: legacy }));
+  assertEquals([off.score, off.status], [null, 'na']);
+});
+
+Deno.test('app_key_at_rest: unreadable token state is not measurable, never a pass', () => {
+  for (const authMode of ['on', 'local', 'oidc'] as const) {
+    const unknown = runCheck('app_key_at_rest', makeInputs({ authMode, apiTokens: null }));
+    assertEquals([unknown.score, unknown.status], [null, 'na']);
+    assertEquals(unknown.detail, ['API token state could not be read; this check was not measured.']);
+    assertEquals(unknown.recommendations, []);
+  }
 });
 
 // --- credential_rotation ----------------------------------------------------------------------

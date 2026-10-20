@@ -948,7 +948,7 @@ Upgrade runs emit notifications (success/partial/failed) when enabled.
 
 ## 19) Auth & Security
 
-Praxrr supports local auth, OIDC, API keys, and session management. The
+Praxrr supports local auth, OIDC, scoped API tokens, and session management. The
 primary flow is enforced in `packages/praxrr-app/src/hooks.server.ts` via the auth middleware.
 
 **Auth module:** `packages/praxrr-app/src/lib/server/utils/auth/`
@@ -964,14 +964,27 @@ Controlled by `AUTH` env:
 
 Details and flow diagrams live in `packages/praxrr-app/src/lib/server/utils/auth/README.md`.
 
-### 19.2 Session & API Key
+### 19.2 Sessions & API Tokens
 
 - **Session cookie:** `session` (httpOnly, sameSite=lax).
 - **Sliding expiration:** sessions extend when past halfway.
-- **API key:** `X-Api-Key` header or `apikey` query param.
+- **API tokens:** `X-Api-Key` header or `apikey` query param, accepted only on `/api/v1/*`
+  requests in every authenticating mode (`on`, `local` for remote clients, `oidc`). Each token
+  is named, scoped (`read`, `mcp`, `sync:apply`, `admin`; `admin` implies all), revocable and
+  optionally expiring. Only a SHA-256 hash and a display prefix are stored; the `prx_…` secret is
+  shown once at creation.
+- **Principal:** middleware resolves each request to an `AuthPrincipal` (session, bypass or
+  token) on `locals.principal`. `auth/scopePolicy.ts` maps method + path to the required scope
+  (fail-closed to `admin`): `read` covers safe methods except `GET /api/v1/arr/releases` (live
+  indexer search, `admin`) plus the dry-run sync/goal preview POSTs; simulate and entity-testing
+  evaluate POSTs need `admin` because they write persistent caches. A token lacking it gets `403 { error: 'Forbidden', requiredScope }`.
+  MCP tools declare their own `requiredScope`.
+- **Legacy key:** the former single global API key is migrated to a hashed `admin` token named
+  "Legacy API key". It keeps working but is deprecated; Settings → Security and the Security
+  Posture `app_key_at_rest` check flag it until revoked.
 
-Session and API key settings are stored in `auth_settings` and `sessions`
-tables, managed via `authSettingsQueries` and `sessionsQueries`.
+Session settings live in `auth_settings` and `sessions` (`authSettingsQueries`,
+`sessionsQueries`); tokens live in `api_tokens` (`apiTokensQueries`, `auth/apiTokens.ts`).
 
 ### 19.3 OIDC
 
@@ -987,13 +1000,15 @@ Auth and security routes:
 
 - `/auth/setup`, `/auth/login`, `/auth/logout`
 - `/auth/oidc/login`, `/auth/oidc/callback`
-- `/settings/security` (password, API key, sessions)
+- `/settings/security` (password, API tokens, sessions)
 
 ### 19.5 Data Model
 
 - `users` — single local admin (OIDC users stored as `oidc:<sub>`)
 - `sessions` — multi‑session support + metadata
-- `auth_settings` — session duration + API key (singleton)
+- `auth_settings` — session duration (singleton; the old `api_key` column is always NULL)
+- `api_tokens` — named API tokens: hash, prefix, scopes, legacy flag, created/last-used/expiry/
+  revoked timestamps
 
 ## 20) Frontend Architecture
 

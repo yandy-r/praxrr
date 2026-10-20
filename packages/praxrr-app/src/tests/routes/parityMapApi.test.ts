@@ -6,6 +6,7 @@ import { Database } from '@jsr/db__sqlite';
 import { Kysely } from 'kysely';
 import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import { setCache, deleteCache } from '$pcd/database/registry.ts';
 import { GET } from '../../routes/api/v1/compatibility/parity/+server.ts';
@@ -29,11 +30,13 @@ function buildGetEvent(query: string, authenticated: boolean): GetEvent {
           },
           session: null,
           authBypass: false,
+          principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
         }
       : {
           user: null,
           session: null,
           authBypass: false,
+          principal: null,
         },
   };
 

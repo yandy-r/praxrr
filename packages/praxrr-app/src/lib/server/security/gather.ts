@@ -2,10 +2,10 @@
  * Security Posture input gatherer (issue #28).
  *
  * The ONLY config/DB-touching code on the read path. It materializes every fact the pure engine
- * needs — the auth mode + bind, per-instance connection URLs, the app-key-at-rest posture, and the
+ * needs — the auth mode + bind, per-instance connection URLs, API token state, and the
  * credential key-ring rotation state — into a {@link PostureInputs}, plus a runtime self-verify of the
  * log-redaction sanitizer and bounded DNS evidence for eligible stored Arr URLs. It NEVER reads out
- * a secret value (only presence, length, and host strings).
+ * a secret value (only counts, presence flags, and host strings).
  *
  * Degrade-never-throw: any reader failure (uninitialized DB, missing key ring) narrows the affected
  * fact to its inert/`null` state so one bad read can never 500 the summary route.
@@ -16,7 +16,7 @@ import { logger } from '$logger/logger.ts';
 import { sanitizeLogMeta } from '$logger/sanitizer.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
-import { authSettingsQueries } from '$db/queries/authSettings.ts';
+import { apiTokensQueries } from '$db/queries/apiTokens.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
@@ -27,13 +27,13 @@ import {
   type DnsTransportEvidence,
   type InstanceFact,
   type PostureInputs,
+  type ApiTokenFacts,
   type RotationFacts,
   type SessionRequestContext,
   type ShieldArrType,
 } from '$shared/security/index.ts';
 
 const SOURCE = 'SecurityPostureGather';
-const STRONG_APP_KEY_MIN_LENGTH = 32;
 const DNS_REPORT_DEADLINE_MS = 2_000;
 const MAX_DNS_CANDIDATES = 32;
 
@@ -71,15 +71,19 @@ function gatherOidcState(): { configured: boolean; partiallyConfigured: boolean 
   return { configured: present === 3, partiallyConfigured: present > 0 && present < 3 };
 }
 
-/** Presence + length of the app API key ONLY — the value itself is never carried into the engine. */
-function gatherAppKeyState(): { present: boolean; strong: boolean } {
+/**
+ * Active token count + legacy flag ONLY — no secret or hash is carried into the engine. `null` when
+ * the token table cannot be read, so the check reports "not measurable" instead of a false pass.
+ */
+function gatherApiTokenFacts(): ApiTokenFacts | null {
   try {
-    const key = authSettingsQueries.getApiKey();
-    if (!key || key.length === 0) return { present: false, strong: false };
-    return { present: true, strong: key.length >= STRONG_APP_KEY_MIN_LENGTH };
-  } catch {
-    // Auth settings unreadable (uninitialized DB): treat as "no key" rather than throwing.
-    return { present: false, strong: false };
+    return { activeCount: apiTokensQueries.countActive(), legacyActive: apiTokensQueries.hasActiveLegacy() };
+  } catch (error) {
+    void logger.warn('Security posture: API token read failed; token check not measurable', {
+      source: SOURCE,
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    });
+    return null;
   }
 }
 
@@ -197,7 +201,6 @@ export async function buildPostureInputs(
   const dependencies = resolveDependencies(dependencyOverrides);
   const startedAt = dependencies.now();
   const oidc = gatherOidcState();
-  const appKey = gatherAppKeyState();
   const instances = await gatherDnsEvidence(gatherInstances(), dependencies, startedAt + DNS_REPORT_DEADLINE_MS);
 
   const transport = resolveSessionTransport(event);
@@ -212,8 +215,7 @@ export async function buildPostureInputs(
     port: config.port,
     oidcConfigured: oidc.configured,
     oidcPartiallyConfigured: oidc.partiallyConfigured,
-    appApiKeyPresent: appKey.present,
-    appApiKeyStrong: appKey.strong,
+    apiTokens: gatherApiTokenFacts(),
     instances,
     rotation: gatherRotation(instances),
     redactionVerified: verifyLogRedaction(),

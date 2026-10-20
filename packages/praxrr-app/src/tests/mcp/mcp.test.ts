@@ -25,6 +25,9 @@ import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { PluginManifest } from '$shared/plugins/index.ts';
 import { DELETE, GET, POST } from '../../routes/api/v1/mcp/+server.ts';
+import { dispatch } from '$lib/server/mcp/dispatch.ts';
+import type { AuthPrincipal } from '$auth/principal.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 
 type PostEvent = Parameters<typeof POST>[0];
 
@@ -62,13 +65,17 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
 // A fake RequestEvent: the route only reads request.headers.get() + request.text(), event.url, and
 // event.locals. Using a plain object (not a real Request) lets us set the Origin header, which the
 // Fetch Request header guard would otherwise strip.
-function buildEvent(bodyText: string, headers: Record<string, string> = {}): PostEvent {
+function buildEvent(
+  bodyText: string,
+  headers: Record<string, string> = {},
+  principal: AuthPrincipal | null = { kind: 'bypass', scopes: API_TOKEN_SCOPES }
+): PostEvent {
   const request = {
     headers: new Headers({ 'content-type': 'application/json', ...headers }),
     text: () => Promise.resolve(bodyText),
   };
   const url = new URL('http://localhost/api/v1/mcp');
-  const locals = { user: { id: 0, username: 'api' }, session: null, authBypass: true };
+  const locals = { user: { id: 0, username: 'api' }, session: null, authBypass: true, principal };
   return { request, url, locals } as unknown as PostEvent;
 }
 
@@ -364,6 +371,37 @@ migratedTest('tools/call get_drift_status: unknown instance → isError result (
 migratedTest('tools/call unknown tool → -32602', async () => {
   const body = await rpcBody('tools/call', { name: 'does_not_exist', arguments: {} });
   assertEquals(body.error.code, -32602);
+});
+
+migratedTest('tools/call without the tool requiredScope → -32003; with mcp scope → result', async () => {
+  const request = {
+    jsonrpc: '2.0' as const,
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'list_instances', arguments: {} },
+  };
+  const user = { id: 0, username: 'api' };
+
+  const denied = (await dispatch(request, { user, authBypass: false, scopes: [] })) as JsonRpcBody;
+  assertEquals(denied.error.code, -32003);
+  assertEquals(denied.error.message, 'Forbidden: requires scope mcp');
+
+  const readOnly = (await dispatch(request, { user, authBypass: false, scopes: ['read'] })) as JsonRpcBody;
+  assertEquals(readOnly.error.code, -32003);
+
+  const allowed = (await dispatch(request, { user, authBypass: false, scopes: ['mcp'] })) as JsonRpcBody;
+  assertEquals(allowed.error, undefined);
+  assertEquals(allowed.result.isError, false);
+});
+
+migratedTest('tools/call forbidden by scope → HTTP 403 with the JSON-RPC error body', async () => {
+  const principal: AuthPrincipal = { kind: 'token', tokenId: 1, tokenName: 'ro', isLegacy: false, scopes: ['read'] };
+  const payload = { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'list_instances', arguments: {} } };
+  const response = await POST(buildEvent(JSON.stringify(payload), {}, principal));
+  assertEquals(response.status, 403);
+  const body = (await response.json()) as JsonRpcBody;
+  assertEquals(body.id, 7);
+  assertEquals(body.error.code, -32003);
 });
 
 migratedTest('tools/call schema-invalid args → -32602', async () => {

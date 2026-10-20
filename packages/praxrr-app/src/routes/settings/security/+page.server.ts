@@ -2,10 +2,11 @@ import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
 import { usersQueries } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
-import { authSettingsQueries } from '$db/queries/authSettings.ts';
+import { apiTokensQueries } from '$db/queries/apiTokens.ts';
+import { ApiTokenValidationError, createApiToken } from '$auth/apiTokens.ts';
+import type { ApiTokenSummary } from '$shared/auth/apiTokenScopes.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { logger } from '$logger/logger.ts';
-import { maskApiKey } from '$shared/utils/masking.ts';
 import { config } from '$config';
 import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
 import { toCredentialSummary } from '$lib/server/webauthn/ceremonies.ts';
@@ -31,6 +32,21 @@ function getSessionPrincipal(locals: App.Locals): { user: NonNullable<App.Locals
   return { user: locals.user, sessionId: locals.session.id };
 }
 
+/** Token management needs an interactive principal (a signed-in session or an auth bypass). */
+function canManageApiTokens(locals: App.Locals): boolean {
+  const kind = locals.principal?.kind;
+  return kind === 'session' || kind === 'bypass';
+}
+
+/** Parses a single positive integer form value; null when missing, repeated, or malformed. */
+function parsePositiveId(values: FormDataEntryValue[]): number | null {
+  if (values.length !== 1 || typeof values[0] !== 'string' || !/^[1-9][0-9]*$/.test(values[0])) {
+    return null;
+  }
+  const id = Number(values[0]);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 export const load: ServerLoad = async ({ locals, setHeaders }) => {
   setHeaders({ 'cache-control': 'no-store' });
 
@@ -44,12 +60,10 @@ export const load: ServerLoad = async ({ locals, setHeaders }) => {
       ? webauthnCredentialsQueries.listByUserId(authedUser.id).map(toCredentialSummary)
       : [];
 
-  const apiKey = authSettingsQueries.getApiKey();
-
   return {
     sessions: principal ? sessionsQueries.listSummariesByUserId(principal.user.id, principal.sessionId) : [],
-    apiKeyMasked: maskApiKey(apiKey),
-    hasApiKey: Boolean(apiKey),
+    apiTokens: apiTokensQueries.list(),
+    hasLegacyApiToken: apiTokensQueries.hasActiveLegacy(),
     canManageSessions: !!principal,
     passwordEnabled: !!principal && !principal.user.username.startsWith('oidc:'),
     passkeys,
@@ -127,32 +141,68 @@ export const actions: Actions = {
     return { passwordSuccess: true };
   },
 
-  regenerateApiKey: async () => {
-    const newKey = authSettingsQueries.regenerateApiKey();
+  createApiToken: async ({ request, locals }) => {
+    if (!canManageApiTokens(locals)) {
+      return fail(403, { apiTokenError: 'Not allowed' });
+    }
 
-    await logger.info('API key regenerated', {
-      source: 'Auth:APIKey',
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return fail(400, { apiTokenError: 'Invalid form submission' });
+    }
+
+    let token: ApiTokenSummary;
+    let secret: string;
+    try {
+      ({ token, secret } = createApiToken({
+        name: formData.get('name'),
+        scopes: formData.getAll('scopes'),
+        expiresInDays: formData.get('expiresInDays'),
+      }));
+    } catch (error) {
+      if (error instanceof ApiTokenValidationError) {
+        return fail(400, { apiTokenError: error.message });
+      }
+      throw error;
+    }
+
+    await logger.info(`API token '${token.name}' created`, {
+      source: 'Auth:APIToken',
+      meta: { id: token.id, name: token.name, scopes: token.scopes, expiresAt: token.expiresAt },
     });
 
-    return { apiKey: newKey, apiKeyRegenerated: true };
+    return { createdApiToken: { secret, token } };
   },
 
-  revealAuthKey: async () => {
-    try {
-      const apiKey = authSettingsQueries.getApiKey();
-
-      if (!apiKey) {
-        return fail(404, { error: 'Unable to retrieve API key' });
-      }
-
-      return { revealedAuthKey: apiKey };
-    } catch {
-      await logger.error('Failed to reveal auth API key', {
-        source: 'Auth:APIKey',
-      });
-
-      return fail(500, { error: 'Unable to retrieve API key' });
+  revokeApiToken: async ({ request, locals }) => {
+    if (!canManageApiTokens(locals)) {
+      return fail(403, { apiTokenError: 'Not allowed' });
     }
+
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return fail(400, { apiTokenError: 'Token ID required' });
+    }
+
+    const id = parsePositiveId(formData.getAll('id'));
+    if (id === null) {
+      return fail(400, { apiTokenError: 'Token ID required' });
+    }
+
+    if (!apiTokensQueries.revoke(id)) {
+      return fail(404, { apiTokenError: 'Token not found or already revoked' });
+    }
+
+    await logger.info('API token revoked', {
+      source: 'Auth:APIToken',
+      meta: { id },
+    });
+
+    return { apiTokenRevoked: true };
   },
 
   revokeSession: async ({ request, locals }) => {

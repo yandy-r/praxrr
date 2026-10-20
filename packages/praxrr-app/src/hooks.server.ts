@@ -20,6 +20,7 @@ import { trashGuideManager } from '$trashguide/index.ts';
 import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
+import { enforceTokenScope } from '$auth/scopePolicy.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
 import { resolveWizardRedirect } from '$server/setup/progress.ts';
@@ -252,6 +253,7 @@ const authHandle: Handle = async ({ event, resolve }) => {
   event.locals.user = auth.user;
   event.locals.session = auth.session;
   event.locals.authBypass = auth.skipAuth;
+  event.locals.principal = auth.principal;
 
   // First-run setup flow (applies to all auth modes except AUTH=off)
   if (auth.needsSetup) {
@@ -294,6 +296,9 @@ const authHandle: Handle = async ({ event, resolve }) => {
     }
     throw redirect(303, '/auth/login');
   }
+
+  const scopeDenied = enforceTokenScope(event, auth.principal);
+  if (scopeDenied) return scopeDenied;
 
   // Sliding expiration: extend session if past halfway point
   if (auth.session) {

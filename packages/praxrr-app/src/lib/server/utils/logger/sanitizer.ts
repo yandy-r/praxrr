@@ -15,12 +15,14 @@ const SENSITIVE_VALUE_PATTERNS = [
   /^[a-f0-9]{32}$/i,
   /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/,
   /^sk-[A-Za-z0-9]{20,}$/,
+  /^prx_[a-f0-9]{8,}$/,
 ];
 
 const EMBEDDED_SECRET_PATTERNS = [
   /\b[a-f0-9]{32}\b/gi,
   /\beyJ[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\b/g,
   /\bsk-[A-Za-z0-9]{20,}\b/g,
+  /\bprx_[a-f0-9]{8,}\b/g,
   /\bBearer\s+[^\s,;]+/gi,
 ];
 

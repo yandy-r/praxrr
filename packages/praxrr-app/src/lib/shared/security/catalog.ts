@@ -23,9 +23,9 @@ export const CHECK_CATALOG: readonly CheckMeta[] = [
   },
   {
     id: 'app_key_at_rest',
-    label: 'Praxrr API key at rest',
+    label: 'Praxrr API tokens at rest',
     description:
-      'Whether the plaintext-stored Praxrr API key is a live authentication vector in the current AUTH mode.',
+      'Whether the deprecated legacy API key is still an active token; scoped tokens are stored only as SHA-256 hashes.',
   },
   {
     id: 'credential_rotation',

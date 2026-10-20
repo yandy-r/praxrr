@@ -3,6 +3,7 @@
 
 import { assert, assertEquals } from '@std/assert';
 import { GET } from '../../routes/api/v1/compatibility/versions/+server.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import type { components } from '$api/v1.d.ts';
 
 type GetEvent = Parameters<typeof GET>[0];
@@ -27,6 +28,11 @@ function buildGetEvent(mode: AuthMode): GetEvent {
         : null,
       session: null,
       authBypass: mode === 'bypass',
+      principal: authenticated
+        ? { kind: 'session', scopes: API_TOKEN_SCOPES }
+        : mode === 'bypass'
+          ? { kind: 'bypass', scopes: API_TOKEN_SCOPES }
+          : null,
     },
   };
 

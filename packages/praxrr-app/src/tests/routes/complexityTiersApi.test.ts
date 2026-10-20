@@ -9,6 +9,7 @@ import {
 } from '$db/queries/user_complexity_tiers.ts';
 import { GET, PATCH } from '../../routes/api/v1/complexity-tiers/+server.ts';
 import type { ComplexityTier } from '$shared/complexity/tiers.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
 
 type Restore = () => void;
@@ -95,6 +96,7 @@ function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = 
       user: null,
       session: null,
       authBypass: false,
+      principal: null,
     },
   };
   if (typeof userId === 'number') {
@@ -108,6 +110,7 @@ function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = 
       },
       session: null,
       authBypass: false,
+      principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
     };
   }
 
@@ -136,6 +139,7 @@ function buildPatchRequest(
       user: null,
       session: null,
       authBypass: false,
+      principal: null,
     },
   };
 
@@ -150,6 +154,7 @@ function buildPatchRequest(
       },
       session: null,
       authBypass: false,
+      principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
     };
   }
 

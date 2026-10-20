@@ -11,6 +11,7 @@
  * - any other throw propagates → `-32603`.
  */
 
+import { hasScope, type ApiTokenScope } from '$shared/auth/apiTokenScopes.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
@@ -126,6 +127,8 @@ export interface McpTool {
   description: string;
   inputSchema: JsonSchema;
   annotations: ToolAnnotations;
+  /** Scope a token must hold to call this tool (enforced in callTool; `admin` implies all). */
+  requiredScope: ApiTokenScope;
   handler: (args: Record<string, unknown>, ctx: McpContext) => Promise<unknown>;
 }
 
@@ -142,6 +145,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: (args) => {
       const type = optArrType(args, 'type');
       const enabledOnly = optBoolean(args, 'enabledOnly');
@@ -158,6 +162,7 @@ export const TOOLS: readonly McpTool[] = [
     description: 'List durable plugin discovery and enablement state (local paths and raw manifests omitted).',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: () => {
       const outcome = listPlugins();
       if (outcome.kind === 'error') {
@@ -175,6 +180,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: async (args) => {
       const settings = configHealthSettingsQueries.get();
       const generatedAt = new Date().toISOString();
@@ -194,6 +200,7 @@ export const TOOLS: readonly McpTool[] = [
     description: 'The security shield report for this deployment (score, per-check breakdown, top actions).',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: async () => toSecuritySummary(await computeShield()),
   },
   {
@@ -205,6 +212,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: (args) => {
       const instanceId = optNumber(args, 'instanceId');
       if (instanceId === undefined) {
@@ -229,6 +237,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: (args) => {
       const rows = optBoolean(args, 'enabledOnly')
         ? databaseInstancesQueries.getEnabled()
@@ -246,6 +255,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: async (args) => {
       const databaseId = reqNumber(args, 'databaseId');
       const entityType = reqString(args, 'entityType');
@@ -279,6 +289,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: async (args) => {
       const databaseId = reqNumber(args, 'databaseId');
       const entityType = reqString(args, 'entityType');
@@ -323,6 +334,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: (args) => {
       const pageInput = optNumber(args, 'page');
       const page = pageInput !== undefined && pageInput >= 1 ? Math.floor(pageInput) : 1;
@@ -356,6 +368,7 @@ export const TOOLS: readonly McpTool[] = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true },
+    requiredScope: 'mcp',
     handler: async (args) => {
       const instanceId = reqNumber(args, 'instanceId');
       const instance = arrInstancesQueries.getById(instanceId);
@@ -422,13 +435,16 @@ function getTool(name: string): McpTool | undefined {
 
 /**
  * Run a tool. Unknown tool / invalid args → `JsonRpcError(-32602)` (dispatch maps to a protocol
- * error); an in-domain `McpDomainError` → `isError: true` result; any other throw propagates so
+ * error); an ungranted `requiredScope` → `JsonRpcError(-32003)` (route maps to HTTP 403); an in-domain `McpDomainError` → `isError: true` result; any other throw propagates so
  * dispatch maps it to `-32603`.
  */
 export async function callTool(name: string, args: unknown, ctx: McpContext): Promise<ToolCallResult> {
   const tool = getTool(name);
   if (!tool) {
     throw new JsonRpcError(ERROR_CODES.INVALID_PARAMS, `Unknown tool: ${name}`);
+  }
+  if (!hasScope(ctx.scopes, tool.requiredScope)) {
+    throw new JsonRpcError(ERROR_CODES.FORBIDDEN, `Forbidden: requires scope ${tool.requiredScope}`);
   }
   const validated = validateArgs(tool.inputSchema, args);
   try {

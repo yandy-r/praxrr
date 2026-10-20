@@ -15,6 +15,8 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: -32603,
   // MCP-specific: resources/read on a resolvable-but-missing resource.
   RESOURCE_NOT_FOUND: -32002,
+  // Praxrr-specific: the caller's token lacks the scope a tool requires (route answers HTTP 403).
+  FORBIDDEN: -32003,
 } as const;
 
 export type ParseResult =

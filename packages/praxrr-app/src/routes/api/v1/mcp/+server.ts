@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { config } from '$config';
 import { dispatch } from '$lib/server/mcp/dispatch.ts';
-import { isNotification, makeError, parseJsonRpc } from '$lib/server/mcp/jsonrpc.ts';
+import { ERROR_CODES, isNotification, makeError, parseJsonRpc } from '$lib/server/mcp/jsonrpc.ts';
 import { fromRequestEvent } from '$lib/server/mcp/context.ts';
 import { SUPPORTED_PROTOCOL_VERSIONS } from '$lib/server/mcp/types.ts';
 
@@ -12,7 +12,8 @@ import { SUPPORTED_PROTOCOL_VERSIONS } from '$lib/server/mcp/types.ts';
  * A single JSON-RPC 2.0 request yields a single `application/json` response; a notification yields
  * `202 Accepted` with no body. GET/DELETE return 405 (no SSE stream, no session lifecycle). This is
  * a thin transport edge only — all protocol logic lives in $lib/server/mcp/. Auth is enforced by the
- * central hook (this route is not in PUBLIC_PATHS); a programmatic client sends `X-Api-Key`.
+ * central hook (this route is not in PUBLIC_PATHS); a programmatic client sends `X-Api-Key` with a
+ * token holding the `mcp` scope.
  */
 
 const MCP_REQUEST_BODY_LIMIT_BYTES = 64 * 1024;
@@ -72,7 +73,9 @@ export const POST: RequestHandler = async (event) => {
   }
 
   const response = await dispatch(parsed.message, ctx);
-  return json(response);
+  // A tool whose requiredScope the caller lacks is a JSON-RPC -32003; surface it as HTTP 403 too.
+  const forbidden = response !== null && 'error' in response && response.error.code === ERROR_CODES.FORBIDDEN;
+  return json(response, { status: forbidden ? 403 : 200 });
 };
 
 export const GET: RequestHandler = () => new Response(null, { status: 405, headers: { Allow: 'POST' } });

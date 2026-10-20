@@ -83,8 +83,11 @@ export interface paths {
      * Prometheus metrics
      * @description Prometheus text exposition (format 0.0.4) covering job runs, sync outcomes, drift, config
      *     health, security posture, parser availability, notification delivery, PCD cache state and
-     *     build info. Labels never include Arr URLs or API keys. Authenticate with the `X-Api-Key`
-     *     header (required under AUTH=on). Disabled (404) unless `METRICS_ENABLED` is on.
+     *     build info. Labels never include Arr URLs or API keys. Authenticate with an API token
+     *     (`prx_…`) carrying the `read` scope in the `X-Api-Key` header; tokens work under AUTH=on,
+     *     AUTH=oidc, and for remote clients under AUTH=local. A token without the `read` scope gets 403
+     *     `{ "error": "Forbidden", "requiredScope": "read" }`. Disabled (404) unless `METRICS_ENABLED`
+     *     is on.
      */
     get: operations['getMetrics'];
     put?: never;
@@ -155,9 +158,10 @@ export interface paths {
      *     Read-only: exposes Praxrr's configuration and observability surface (instances, drift, config
      *     health, security posture, PCD databases and resolved entities, sync history, and the redacted
      *     feature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no
-     *     plugin source directory, raw manifest, credential, or mutation handler. Authenticate with the
-     *     `X-Api-Key` header (required under AUTH=on); there is no OAuth/Bearer support. Disabled (404)
-     *     when `MCP_ENABLED` is off.
+     *     plugin source directory, raw manifest, credential, or mutation handler. Authenticate with an
+     *     API token (`prx_…`) carrying the `mcp` scope (or `admin`) in the `X-Api-Key` header; tokens
+     *     work under AUTH=on, AUTH=oidc, and for remote clients under AUTH=local. There is no
+     *     OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.
      */
     post: operations['postMcp'];
     /**
@@ -2093,6 +2097,16 @@ export interface components {
      * @enum {string}
      */
     HealthStatus: 'healthy' | 'degraded' | 'unhealthy';
+    /** @description An authenticated API token lacks the scope the requested route requires. */
+    ScopeForbiddenResponse: {
+      /** @description Always `Forbidden`. */
+      error: string;
+      /**
+       * @description The API token scope this request requires.
+       * @enum {string}
+       */
+      requiredScope: 'read' | 'mcp' | 'sync:apply' | 'admin';
+    };
     HealthResponse: {
       status: components['schemas']['HealthStatus'];
       /**
@@ -5737,7 +5751,10 @@ export interface operations {
     parameters: {
       query?: never;
       header?: {
-        /** @description Praxrr API key. Required for non-browser clients under AUTH=on. */
+        /**
+         * @description Praxrr API token (`prx_…`) with the `read` scope. Required for non-browser clients under
+         *     AUTH=on and AUTH=oidc, and for remote clients under AUTH=local.
+         */
         'X-Api-Key'?: string;
       };
       path?: never;
@@ -5754,13 +5771,22 @@ export interface operations {
           'text/plain': string;
         };
       };
-      /** @description Unauthenticated (missing or invalid API key). */
+      /** @description Unauthenticated (missing, invalid, revoked, or expired API token). */
       401: {
         headers: {
           [name: string]: unknown;
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
         };
       };
       /** @description The metrics endpoint is disabled (METRICS_ENABLED is off). */
@@ -5832,7 +5858,10 @@ export interface operations {
     parameters: {
       query?: never;
       header?: {
-        /** @description Praxrr API key. Required for non-browser clients under AUTH=on. */
+        /**
+         * @description Praxrr API token (`prx_…`) with the `mcp` scope (or `admin`). Required for non-browser
+         *     clients under AUTH=on and AUTH=oidc, and for remote clients under AUTH=local.
+         */
         'X-Api-Key'?: string;
         /** @description Negotiated MCP protocol version. An unsupported value returns 400. */
         'MCP-Protocol-Version'?: string;
@@ -5875,19 +5904,38 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Unauthenticated (missing or invalid API key). */
+      /** @description Unauthenticated (missing, invalid, revoked, or expired API token). */
       401: {
         headers: {
           [name: string]: unknown;
         };
         content?: never;
       };
-      /** @description Rejected cross-origin request (DNS-rebinding defense). */
+      /**
+       * @description Rejected cross-origin request (DNS-rebinding defense), or the API token lacks the `mcp`
+       *     scope (body `{ "error": "Forbidden", "requiredScope": "mcp" }`). A tool call whose
+       *     required scope is not granted is a JSON-RPC `-32003` error, also returned with 403. The
+       *     cross-origin rejection has no body.
+       */
       403: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          'application/json':
+            | components['schemas']['ScopeForbiddenResponse']
+            | {
+                /** @constant */
+                jsonrpc: '2.0';
+                id: string | number | null;
+                error: {
+                  /** @constant */
+                  code: -32003;
+                  message: string;
+                  data?: unknown;
+                };
+              };
+        };
       };
       /** @description The MCP endpoint is disabled (MCP_ENABLED is off). */
       404: {

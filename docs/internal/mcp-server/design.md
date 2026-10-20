@@ -94,9 +94,10 @@ see §4 for the toggle rationale).
 ### Auth
 
 No per-route auth code. `/api/v1/mcp` is deliberately **not** added to `PUBLIC_PATHS`, so
-`hooks.server.ts` → `getAuthState()` gates it exactly like every other `/api/*` route. Clients
-authenticate with `X-Api-Key` (or `?apikey=`) under `AUTH=on`; under `AUTH=off`/`local` they are
-admitted via bypass. Full detail in §8.
+`hooks.server.ts` → `getAuthState()` gates it exactly like every other `/api/v1/*` route. Clients
+authenticate with an API token carrying the `mcp` scope via `X-Api-Key` (or `?apikey=`) under
+`AUTH=on`/`oidc` (and remote `local`); under `AUTH=off`/local-IP `local` they are admitted via
+bypass. Full detail in §8.
 
 ---
 
@@ -382,14 +383,21 @@ non-`readOnlyHint` tool. `readOnlyHint`/`destructiveHint` are hints a client may
 ### Auth
 
 - `/api/v1/mcp` is **not** in `PUBLIC_PATHS`, so `hooks.server.ts` + `$auth/middleware.ts` gate it
-  with **zero per-route auth code**. Unauthenticated `/api/*` → `401` before dispatch runs.
-- **`AUTH=on`:** client sends `X-Api-Key: <key>` (or `?apikey=`), validated against
-  `auth_settings.api_key`; success synthesizes `event.locals.user = { id: 0, username: 'api' }`.
-- **`AUTH=off` / `AUTH=local`:** admitted via `authBypass` (local-IP / trusted-proxy trust model).
+  with **zero per-route auth code**. Unauthenticated `/api/v1/*` → `401` before dispatch runs.
+- **`AUTH=on` / `AUTH=oidc` / remote `AUTH=local`:** client sends an API token
+  (`X-Api-Key: prx_…` or `?apikey=`), resolved by SHA-256 hash against `api_tokens` (YAN-534;
+  replaces the old plaintext `auth_settings.api_key` comparison). Success synthesizes
+  `event.locals.user = { id: 0, username: 'api' }` and a token `AuthPrincipal` with its scopes.
+- **Scopes:** `scopePolicy.ts` requires `mcp` for `/api/v1/mcp` (a token without it gets HTTP
+  `403 { error: 'Forbidden', requiredScope: 'mcp' }` before dispatch). Each `McpTool` also declares
+  `requiredScope` (all current tools `'mcp'`); `callTool` rejects an ungranted one with JSON-RPC
+  `-32003`, which the route maps to HTTP 403. Session and bypass principals hold every scope.
+- **`AUTH=off` / local-IP `AUTH=local`:** admitted via `authBypass` (local-IP / trusted-proxy trust
+  model).
 - **Deviations documented for users (§10):** Praxrr supports **no** Bearer/`Authorization` / OAuth
   path — MCP clients MUST send the custom `X-Api-Key` header (or sit behind a trusted proxy).
-  **`AUTH=oidc` has no api-key path at all** (session cookie only), so headless MCP clients cannot
-  authenticate in `oidc` mode.
+  `AUTH=oidc` now accepts tokens too (YAN-441), so headless MCP clients work in every authenticating
+  mode.
 - The `{ id: 0, username: 'api' }` identity is read only for **audit context** in PR #1, never for
   re-authorization.
 
@@ -487,11 +495,11 @@ prettier-gated, so run `prettier --write` on any hand-graft and regenerate types
 Add a short section to the user docs covering:
 
 - **Connecting a client (Streamable HTTP):** point the client at
-  `https://<praxrr-host>/api/v1/mcp` and configure it to send the header `X-Api-Key: <your key>`
-  (from Settings → auth). Requires `AUTH=on`. There is **no** OAuth/Bearer support; `AUTH=oidc` has
-  no headless api-key path.
+  `https://<praxrr-host>/api/v1/mcp` and configure it to send the header `X-Api-Key: <token>`
+  using a token with the `mcp` scope (Settings → Security). Works under `AUTH=on`, `AUTH=oidc` and
+  remote `AUTH=local`. There is **no** OAuth/Bearer support.
 - **stdio bridging via `mcp-remote`:** for clients that only speak stdio (e.g. Claude Desktop),
-  bridge with `npx mcp-remote https://<praxrr-host>/api/v1/mcp --header "X-Api-Key: <key>"` so the
+  bridge with `npx mcp-remote https://<praxrr-host>/api/v1/mcp --header "X-Api-Key: <token>"` so the
   desktop client spawns a stdio proxy that forwards to the HTTP endpoint. (A native stdio transport
   is deferred — §1.)
 - **What's exposed:** read-only config/observability (instances, drift, health, security posture,
@@ -506,10 +514,10 @@ Add a short section to the user docs covering:
    backing correctness. Mitigation: strict types + the conformance test suite; revisit the SDK if
    the spec churns.
 2. **Auth-model mismatch with the client ecosystem.** Most Streamable-HTTP MCP clients default to
-   OAuth `Authorization: Bearer`; Praxrr accepts only `X-Api-Key` and only under `AUTH=on`. Users
-   need custom-header config or a fronting proxy; `AUTH=oidc` offers no headless path. Under
-   `AUTH=off`/`local` the endpoint is effectively unauthenticated to any reachable/local caller,
-   exposing full config read + `preview_sync` with no per-tool scoping.
+   OAuth `Authorization: Bearer`; Praxrr accepts only `X-Api-Key` (an `mcp`-scoped token since
+   YAN-534, in every authenticating mode including `oidc`). Users need custom-header config or a
+   fronting proxy. Under `AUTH=off`/local-IP `local` the endpoint is effectively unauthenticated to
+   any reachable/local caller, exposing full config read + `preview_sync` with no per-tool scoping.
 3. **CI does not run `Deno.test`.** Only `deno task check` (type-checking) gates this code, so
    dispatch/redaction/conformance regressions won't block a merge until a test gate is added.
    Mitigation: strict types now, ship tests now, propose a test gate follow-up.

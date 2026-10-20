@@ -360,7 +360,7 @@ const controlPlaneAuth: SecurityCheck = {
           'pass',
           false,
           null,
-          ['Every request requires a signed-in user or the Praxrr API key.'],
+          ['Every page requires a signed-in user; API tokens authenticate only /api/v1/* requests.'],
           []
         );
       case 'oidc':
@@ -600,7 +600,7 @@ const arrTransport: SecurityCheck = {
 // --- app_key_at_rest --------------------------------------------------------------------------
 
 const ID_APP_KEY: SecurityCheckId = 'app_key_at_rest';
-const LABEL_APP_KEY = 'Praxrr API key at rest';
+const LABEL_APP_KEY = 'Praxrr API tokens at rest';
 
 const appKeyAtRest: SecurityCheck = {
   id: ID_APP_KEY,
@@ -608,8 +608,8 @@ const appKeyAtRest: SecurityCheck = {
   weight: APP_KEY_AT_REST_WEIGHT,
   score(inputs) {
     const W = APP_KEY_AT_REST_WEIGHT;
-    // In oidc/off modes the X-Api-Key path is inert, so a plaintext key is not a live auth vector.
-    if (inputs.authMode === 'oidc' || inputs.authMode === 'off') {
+    // AUTH=off bypasses token authentication entirely, so stored tokens are not a live auth vector.
+    if (inputs.authMode === 'off') {
       return result(
         ID_APP_KEY,
         LABEL_APP_KEY,
@@ -618,52 +618,61 @@ const appKeyAtRest: SecurityCheck = {
         'na',
         false,
         null,
-        ['The Praxrr API key is not an active authentication path in this mode.'],
+        ['API tokens are not an active authentication path in this mode.'],
         []
       );
     }
-    if (!inputs.appApiKeyPresent) {
-      return result(ID_APP_KEY, LABEL_APP_KEY, null, W, 'na', false, null, ['No Praxrr API key is configured.'], []);
-    }
-    if (inputs.appApiKeyStrong) {
+    if (inputs.apiTokens === null) {
       return result(
         ID_APP_KEY,
         LABEL_APP_KEY,
-        70,
+        null,
         W,
-        'attention',
+        'na',
         false,
         null,
-        ['The Praxrr API key is stored in plaintext in the app database.'],
-        [
-          rec(
-            'Your Praxrr API key is stored in plaintext',
-            [
-              'Anyone who can read praxrr.db or an unencrypted backup can use it for full API access. Restrict and encrypt backups, or switch to AUTH=oidc to retire the key.',
-            ],
-            'warning',
-            { kind: 'env-var', name: 'AUTH', label: 'Switch to AUTH=oidc to retire the API key' }
-          ),
-        ]
+        ['API token state could not be read; this check was not measured.'],
+        []
+      );
+    }
+    const { activeCount, legacyActive } = inputs.apiTokens;
+    if (activeCount === 0) {
+      return result(ID_APP_KEY, LABEL_APP_KEY, 100, W, 'pass', false, null, ['No API tokens are active.'], []);
+    }
+    if (!legacyActive) {
+      return result(
+        ID_APP_KEY,
+        LABEL_APP_KEY,
+        100,
+        W,
+        'pass',
+        false,
+        null,
+        [`${activeCount} scoped API token(s) are active; tokens are stored as SHA-256 hashes.`],
+        []
       );
     }
     return result(
       ID_APP_KEY,
       LABEL_APP_KEY,
-      45,
+      70,
       W,
-      'action',
+      'attention',
       false,
       null,
-      ['The Praxrr API key is plaintext and shorter than 32 characters.'],
+      ['The deprecated legacy API key is still active as an admin token.'],
       [
         rec(
-          'Your Praxrr API key is weak and stored in plaintext',
+          'The legacy API key is still active',
           [
-            'A short key in plaintext is both easy to brute-force and exposed to any database or backup reader. Regenerate a strong key, or switch to AUTH=oidc.',
+            'It was migrated to an admin token with full API access. Create scoped tokens for each integration, then revoke the legacy key.',
           ],
-          'danger',
-          { kind: 'settings-link', href: '/settings/security', label: 'Rotate the API key' }
+          'warning',
+          {
+            kind: 'settings-link',
+            href: '/settings/security',
+            label: 'Revoke the legacy API key after moving integrations to scoped tokens in Settings → Security',
+          }
         ),
       ]
     );
