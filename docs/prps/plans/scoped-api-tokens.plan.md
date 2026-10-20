@@ -136,14 +136,14 @@ export interface ApiTokenSummary {
 
 ```ts
 export const apiTokensQueries = {
-	list(): ApiTokenSummary[];                       // newest first, includes revoked/expired
-	create(input: { name: string; tokenHash: string; prefix: string; scopes: ApiTokenScope[];
-		expiresAt: string | null; isLegacy?: boolean }): ApiTokenSummary;
-	findActiveByHash(tokenHash: string): ApiTokenSummary | undefined; // not revoked, not expired
-	touchLastUsed(id: number): void;                 // writes only if NULL or older than 60s
-	revoke(id: number): boolean;                     // false if missing or already revoked
-	hasActiveLegacy(): boolean;
-	countActive(): number;
+ list(): ApiTokenSummary[];                       // newest first, includes revoked/expired
+ create(input: { name: string; tokenHash: string; prefix: string; scopes: ApiTokenScope[];
+  expiresAt: string | null; isLegacy?: boolean }): ApiTokenSummary;
+ findActiveByHash(tokenHash: string): ApiTokenSummary | undefined; // not revoked, not expired
+ touchLastUsed(id: number): void;                 // writes only if NULL or older than 60s
+ revoke(id: number): boolean;                     // false if missing or already revoked
+ hasActiveLegacy(): boolean;
+ countActive(): number;
 };
 ```
 
