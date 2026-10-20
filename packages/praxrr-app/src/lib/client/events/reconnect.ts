@@ -2,7 +2,7 @@
  * Pure helpers for the live-events client: reconnect backoff, probe classification and
  * defensive parsing of SSE `data:` payloads. No `$app/*` or `svelte` imports so Deno tests can load it.
  */
-import { LIVE_EVENT_TYPES, type LiveEvent } from '$shared/events/types.ts';
+import { LIVE_EVENT_TYPES, type LiveEvent, type LiveHelloEvent } from '$shared/events/types.ts';
 
 const BACKOFF_BASE_MS = 1_000;
 const BACKOFF_MAX_MS = 30_000;
@@ -31,6 +31,25 @@ export function classifyProbeStatus(status: number): 'ok' | 'stop' | 'backoff' {
   if (status >= 200 && status < 300) return 'ok';
   if (status === 401 || status === 403) return 'stop';
   return 'backoff';
+}
+
+type HelloHead = Pick<LiveHelloEvent, 'bootId' | 'headId'>;
+
+/** The cursor a `hello` resets to: its head id, or `${bootId}-0` before anything was published. */
+export function helloCursor(hello: HelloHead): string {
+  return hello.headId || `${hello.bootId}-0`;
+}
+
+/**
+ * Cursor after a `hello`: keeps the current one only when it belongs to the same server boot,
+ * otherwise resets to the hello head so a restart does not resync on every reconnect.
+ */
+export function cursorAfterHello(current: string | null, hello: HelloHead): string {
+  if (current !== null) {
+    const dash = current.lastIndexOf('-');
+    if (dash > 0 && current.slice(0, dash) === hello.bootId) return current;
+  }
+  return helloCursor(hello);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

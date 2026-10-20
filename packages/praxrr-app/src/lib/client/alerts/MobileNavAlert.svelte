@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-svelte';
+  import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-svelte';
   import type { AlertAction, AlertType } from './store';
   import { alertStore } from './store';
   import { fade } from 'svelte/transition';
@@ -39,24 +39,32 @@
   }
 </script>
 
+<!-- The message is announced by AlertLiveRegion, so only the text is hidden from assistive tech;
+     focusable controls stay exposed with accessible names (axe aria-hidden-focus). -->
 {#if action}
-  <a
-    href={action.href}
+  <div
     in:fade={{ duration: 150 }}
     out:fade={{ duration: 100 }}
-    aria-hidden="true"
-    onclick={dismiss}
-    class="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
+    class="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
   >
-    <Icon size={14} class="flex-shrink-0 {iconColors[type]}" />
-    <span class="min-w-0 truncate">{message} · {action.label}</span>
-  </a>
+    <Icon size={14} aria-hidden="true" class="flex-shrink-0 {iconColors[type]}" />
+    <span aria-hidden="true" class="min-w-0 truncate">{message}</span>
+    <a href={action.href} onclick={dismiss} class="flex-shrink-0 underline underline-offset-2">{action.label}</a>
+    <button
+      type="button"
+      aria-label="Dismiss notification"
+      onclick={dismiss}
+      class="ml-auto flex-shrink-0 opacity-70 hover:opacity-100"
+    >
+      <X size={14} />
+    </button>
+  </div>
 {:else}
   <div
     in:fade={{ duration: 150 }}
     out:fade={{ duration: 100 }}
     role="button"
-    aria-hidden="true"
+    aria-label="Dismiss notification"
     tabindex="0"
     onclick={dismiss}
     onkeydown={(e) => {
@@ -67,7 +75,7 @@
     }}
     class="flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold {styles[type]}"
   >
-    <Icon size={14} class="flex-shrink-0 {iconColors[type]}" />
-    <span class="min-w-0 truncate">{message}</span>
+    <Icon size={14} aria-hidden="true" class="flex-shrink-0 {iconColors[type]}" />
+    <span aria-hidden="true" class="min-w-0 truncate">{message}</span>
   </div>
 {/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invalidateAll } from '$app/navigation';
+  import { invalidate, invalidateAll } from '$app/navigation';
   import { alertStore } from '$alerts/store';
   import Badge from '$ui/badge/Badge.svelte';
   import Modal from '$ui/modal/Modal.svelte';
@@ -9,19 +9,50 @@
   import type { EntityChange, SyncPreviewSummary } from '$sync/preview/types.ts';
   import type { CanaryRolloutStatus } from '$sync/canary/types.ts';
   import type { PageData } from './$types';
-  import { subscribeLive } from '$lib/client/events/liveInvalidate';
+  import { eventsStore } from '$stores/events';
   import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
   export let data: PageData;
 
   // Live refresh re-runs the keyed load, which also renews `rollout.stateToken` for proceed/abort.
-  onMount(() =>
-    subscribeLive({
-      key: LIVE_DEPENDENCY_KEYS.canary,
-      types: ['canary.updated'],
-      filter: (e) => e.type === 'canary.updated' && e.rolloutId === data.rollout.id,
-    })
-  );
+  // While a confirm modal is open or a decision is in flight the refresh is deferred, so the user
+  // never confirms a state (token) they did not review; one deferred refresh runs once all clear.
+  const LIVE_REFRESH_DEBOUNCE_MS = 250;
+  let liveTimer: number | undefined;
+  let pendingRefresh = false;
+
+  function refreshBlocked(): boolean {
+    return proceedOpen || abortOpen || submitting;
+  }
+
+  function runLiveRefresh() {
+    liveTimer = undefined;
+    if (refreshBlocked()) {
+      pendingRefresh = true;
+      return;
+    }
+    pendingRefresh = false;
+    void invalidate(LIVE_DEPENDENCY_KEYS.canary);
+  }
+
+  function scheduleLiveRefresh() {
+    clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(runLiveRefresh, LIVE_REFRESH_DEBOUNCE_MS);
+  }
+
+  onMount(() => {
+    const off = eventsStore.on('canary.updated', (e) => {
+      if (e.rolloutId === data.rollout.id) scheduleLiveRefresh();
+    });
+    const offResync = eventsStore.onResync(scheduleLiveRefresh);
+    return () => {
+      off();
+      offResync();
+      clearTimeout(liveTimer);
+      liveTimer = undefined;
+      pendingRefresh = false;
+    };
+  });
 
   type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'info';
 
@@ -50,6 +81,13 @@
   let abortOpen = false;
   let submitting = false;
   let submittingAction: 'proceed' | 'abort' | null = null;
+
+  // Flush the one deferred live refresh once both modals are closed and no decision is in flight.
+  // `runLiveRefresh` re-checks the gate, so reopening a modal inside the debounce defers it again.
+  $: if (pendingRefresh && !proceedOpen && !abortOpen && !submitting) {
+    pendingRefresh = false;
+    scheduleLiveRefresh();
+  }
 
   $: rollout = data.rollout;
   $: diagnostics = data.diagnostics;

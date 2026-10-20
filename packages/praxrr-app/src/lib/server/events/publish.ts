@@ -13,6 +13,7 @@ import { buildJobDisplayName } from '$jobs/display.ts';
 import type { JobQueueRecord, JobRunStatus, JobStatus } from '$jobs/queueTypes.ts';
 import type { JobFailureCode } from '$shared/jobs/evidence.ts';
 import type { LiveJobEventBase } from '$shared/events/types.ts';
+import { parseUTC, toUTC } from '$shared/utils/dates.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import type { SyncHistoryInput } from '$sync/syncHistory/types.ts';
 import { eventBus } from './bus.ts';
@@ -44,6 +45,14 @@ function logPublishFailure(type: string, error: unknown): void {
   });
 }
 
+/**
+ * Normalizes SQLite `CURRENT_TIMESTAMP` text (`YYYY-MM-DD HH:MM:SS`, UTC without a zone) to
+ * RFC 3339 UTC so clients never parse it as local time. ISO input passes through unchanged.
+ */
+function rfc3339(timestamp: string): string {
+  return toUTC(timestamp) ?? timestamp;
+}
+
 /** Shared job fields. `arrType` comes from the instance row only, never from `jobType`. */
 function jobBase(job: JobQueueRecord): LiveJobEventBase {
   const instanceId = readNumericId(job.payload.instanceId);
@@ -64,7 +73,7 @@ export const _jobBase = jobBase;
 
 export function publishJobQueued(job: JobQueueRecord, { onlyIfDue }: { onlyIfDue: boolean }): void {
   try {
-    if (onlyIfDue && job.source === 'schedule' && Date.parse(job.runAt) > Date.now()) return;
+    if (onlyIfDue && job.source === 'schedule' && (parseUTC(job.runAt)?.getTime() ?? 0) > Date.now()) return;
     if (job.status !== 'queued') return;
     const base = jobBase(job);
     eventBus.publish({
@@ -76,7 +85,7 @@ export function publishJobQueued(job: JobQueueRecord, { onlyIfDue }: { onlyIfDue
       instanceId: base.instanceId,
       arrType: base.arrType,
       databaseId: base.databaseId,
-      runAt: job.runAt,
+      runAt: rfc3339(job.runAt),
     });
   } catch (error) {
     logPublishFailure('job.queued', error);
@@ -95,7 +104,7 @@ export function publishJobRunning(job: JobQueueRecord): void {
       instanceId: base.instanceId,
       arrType: base.arrType,
       databaseId: base.databaseId,
-      startedAt: job.startedAt ?? new Date().toISOString(),
+      startedAt: job.startedAt ? rfc3339(job.startedAt) : new Date().toISOString(),
     });
   } catch (error) {
     logPublishFailure('job.running', error);
@@ -117,11 +126,11 @@ export function publishJobFinished(job: JobQueueRecord, outcome: JobFinishedOutc
       status: outcome.status,
       runStatus: outcome.runStatus,
       rescheduled: outcome.rescheduled,
-      nextRunAt: outcome.nextRunAt,
+      nextRunAt: toUTC(outcome.nextRunAt),
       runId: outcome.runId,
       failureCode: outcome.failureCode,
       durationMs: outcome.durationMs,
-      finishedAt: outcome.finishedAt,
+      finishedAt: rfc3339(outcome.finishedAt),
     });
   } catch (error) {
     logPublishFailure('job.finished', error);
@@ -138,7 +147,7 @@ export function publishSyncRecorded(syncHistoryId: number, input: SyncHistoryInp
       arrType: input.arrType,
       status: input.status,
       trigger: input.trigger,
-      finishedAt: input.finishedAt ?? new Date().toISOString(),
+      finishedAt: input.finishedAt ? rfc3339(input.finishedAt) : new Date().toISOString(),
     });
   } catch (error) {
     logPublishFailure('sync.recorded', error);
@@ -176,7 +185,7 @@ export function publishDriftUpdated(input: UpsertDriftStatusInput): void {
       driftedCount: input.driftedCount,
       missingCount: input.missingCount,
       unmanagedCount: input.unmanagedCount,
-      checkedAt: input.checkedAt,
+      checkedAt: rfc3339(input.checkedAt),
     });
   } catch (error) {
     logPublishFailure('drift.updated', error);

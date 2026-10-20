@@ -6,7 +6,8 @@ import { EventBus, eventBus } from '$lib/server/events/bus.ts';
 import { EventConnectionRegistry } from '$lib/server/events/connections.ts';
 import { encodeEvent } from '$lib/server/events/sse.ts';
 import { createEventStream, type EventStreamOptions } from '$lib/server/events/stream.ts';
-import type { LiveDomainEvent } from '$shared/events/types.ts';
+import { principalKey } from '$lib/server/events/streamAuth.ts';
+import { LIVE_STREAM_QUEUE_HWM, type LiveDomainEvent } from '$shared/events/types.ts';
 import { GET } from '../../routes/api/v1/events/+server.ts';
 
 const decoder = new TextDecoder();
@@ -138,6 +139,19 @@ Deno.test('T-S5: failed revalidation sends session.expired and closes', async ()
   assertEquals(h.releases(), 1);
 });
 
+Deno.test('T-S5b: a throwing revalidate closes without session.expired', async () => {
+  const h = open({
+    heartbeatMs: 10,
+    revalidate: () => {
+      throw new Error('db locked: secret-detail');
+    },
+  });
+  await skipPreamble(h);
+  assertEquals(await readUntilDone(h, 500), []);
+  assertEquals(h.bus.subscriberCount(), 0);
+  assertEquals(h.releases(), 1);
+});
+
 Deno.test('T-S6: max lifetime closes the stream', async () => {
   const h = open({ maxLifetimeMs: 20 });
   await skipPreamble(h);
@@ -166,6 +180,38 @@ Deno.test('T-S7: replays missed events in order, or sends resync for a foreign i
   assertEquals(await r.next(), 'data: {"type":"resync","reason":"boot"}\n\n');
   r.abort.abort();
   assertEquals(bus.subscriberCount(), 0);
+});
+
+Deno.test('T-S7b: a replay longer than the queue sends resync gap and keeps the stream open', async () => {
+  const bus = new EventBus(256, 'teststrm');
+  const total = LIVE_STREAM_QUEUE_HWM + 36;
+  for (let i = 1; i <= total; i++) bus.publish(driftEvent(i));
+
+  const h = open({ lastEventId: 'teststrm-0' }, bus);
+  await skipPreamble(h);
+  assertEquals(await h.next(), 'data: {"type":"resync","reason":"gap"}\n\n');
+  assertEquals(bus.subscriberCount(), 1);
+  assertEquals(h.releases(), 0);
+  bus.publish(driftEvent(999));
+  assertEquals(await h.next(), `id: teststrm-${total + 1}\ndata: ${JSON.stringify(driftEvent(999))}\n\n`);
+  h.abort.abort();
+  assertEquals(bus.subscriberCount(), 0);
+  assertEquals(h.releases(), 1);
+});
+
+Deno.test('T-S7c: a replay that fits the queue is sent in full', async () => {
+  const bus = new EventBus(256, 'teststrm');
+  const total = LIVE_STREAM_QUEUE_HWM - 2;
+  for (let i = 1; i <= total; i++) bus.publish(driftEvent(i));
+
+  const h = open({ lastEventId: 'teststrm-0' }, bus);
+  await skipPreamble(h);
+  for (let i = 1; i <= total; i++) {
+    assertEquals(await h.next(), `id: teststrm-${i}\ndata: ${JSON.stringify(driftEvent(i))}\n\n`);
+  }
+  assertEquals(bus.subscriberCount(), 1);
+  h.abort.abort();
+  assertEquals(h.releases(), 1);
 });
 
 Deno.test('T-S8: a slow consumer is disconnected', () => {
@@ -214,6 +260,23 @@ Deno.test('T-S9: connection caps per principal and globally', () => {
   c.release();
   assertEquals(registry.count(), 0);
   assertEquals(registry.count('a'), 0);
+});
+
+Deno.test('T-S9b: bypass principals get only the global cap; identified principals keep their bucket', () => {
+  const bypass = { session: null, principal: { kind: 'bypass', scopes: [] } } as unknown as Parameters<
+    typeof principalKey
+  >[0];
+  const registry = new EventConnectionRegistry(2, 3);
+  const slots = [1, 2, 3].map(() => registry.acquire(principalKey(bypass) ?? ''));
+  assert(slots.every((slot) => slot.ok));
+  assertEquals(registry.acquire(principalKey(bypass) ?? ''), { ok: false, status: 503 });
+
+  const token = { session: null, principal: { kind: 'token', tokenId: 5, scopes: [] } } as unknown as Parameters<
+    typeof principalKey
+  >[0];
+  assertEquals(principalKey(token), 'token:5');
+  assertEquals(principalKey(token), principalKey(token));
+  assertEquals(principalKey({ session: null, principal: null }), null);
 });
 
 Deno.test({

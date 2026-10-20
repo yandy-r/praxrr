@@ -39,6 +39,8 @@ import {
 } from '$sync/preview/store.ts';
 import type { SyncPreviewSummary } from '$sync/preview/types.ts';
 import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
+import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import type { ArrSyncSection, JobQueueRecord, JobType } from '$jobs/queueTypes.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
@@ -245,6 +247,71 @@ function mapTrashGuideActionError(error: unknown): { status: number; message: st
   return { status: 500, message: 'TRaSH source sync request failed' };
 }
 
+const ARR_SYNC_SECTIONS: readonly ArrSyncSection[] = [
+  'qualityProfiles',
+  'delayProfiles',
+  'mediaManagement',
+  'metadataProfiles',
+];
+
+/** Queue job types that execute Arr sync sections for one instance (`payload.instanceId`). */
+const ARR_SYNC_SECTION_JOB_TYPES: ReadonlyMap<JobType, ArrSyncSection> = new Map<JobType, ArrSyncSection>([
+  ['arr.sync.qualityProfiles', 'qualityProfiles'],
+  ['arr.sync.delayProfiles', 'delayProfiles'],
+  ['arr.sync.mediaManagement', 'mediaManagement'],
+  ['arr.sync.metadataProfiles', 'metadataProfiles'],
+]);
+const ARR_SYNC_JOB_TYPES: readonly JobType[] = ['arr.sync', ...ARR_SYNC_SECTION_JOB_TYPES.keys()];
+
+type SectionStatusMap = Record<ArrSyncSection, string>;
+
+function isArrSyncSection(value: unknown): value is ArrSyncSection {
+  return ARR_SYNC_SECTIONS.some((section) => section === value);
+}
+
+/** Sections a queued `arr.sync*` job will run; mirrors the arrSync handler's section resolution. */
+function resolveJobSections(job: JobQueueRecord): readonly ArrSyncSection[] {
+  const mapped = ARR_SYNC_SECTION_JOB_TYPES.get(job.jobType);
+  if (mapped) return [mapped];
+  if (job.jobType !== 'arr.sync') return [];
+
+  const payload: Record<string, unknown> = job.payload;
+  const raw = payload.sections ?? payload.section;
+  const requested = Array.isArray(raw) ? raw.filter(isArrSyncSection) : isArrSyncSection(raw) ? [raw] : [];
+  return requested.length > 0 ? requested : ARR_SYNC_SECTIONS;
+}
+
+/**
+ * Reconciles persisted section sync status with the instance's active `arr.sync*` jobs.
+ *
+ * A job is marked `running` when the dispatcher claims it, but the section only flips to
+ * `in_progress` later inside the handler, so a running job covering a `pending` section reports it
+ * as `in_progress`. A `pending` section with no queued or running job covering it (a skipped or
+ * cancelled run) reports `idle` instead of a stale queued state.
+ */
+function deriveSectionStatus(instanceId: number, persisted: SectionStatusMap): SectionStatusMap {
+  const running = new Set<ArrSyncSection>();
+  const queued = new Set<ArrSyncSection>();
+  for (const job of jobQueueQueries.listActiveByJobTypesAndInstanceId(ARR_SYNC_JOB_TYPES, instanceId)) {
+    const target = job.status === 'running' ? running : queued;
+    for (const section of resolveJobSections(job)) {
+      target.add(section);
+    }
+  }
+
+  const derived = { ...persisted };
+  for (const section of ARR_SYNC_SECTIONS) {
+    const status = persisted[section];
+    if (status !== 'pending' && status !== 'in_progress') continue;
+    if (running.has(section)) {
+      derived[section] = 'in_progress';
+    } else if (status === 'pending' && !queued.has(section)) {
+      derived[section] = 'idle';
+    }
+  }
+  return derived;
+}
+
 export const load: ServerLoad = async ({ params, url, depends }) => {
   depends(LIVE_DEPENDENCY_KEYS.sync);
   const id = parseInt(params.id || '', 10);
@@ -404,12 +471,12 @@ export const load: ServerLoad = async ({ params, url, depends }) => {
     trashGuideMediaManagementBySource,
     metadataProfilesSupported: canLoadMetadataProfiles,
     syncPreview,
-    sectionStatus: {
+    sectionStatus: deriveSectionStatus(id, {
       qualityProfiles: configStatus.qualityProfiles.syncStatus,
       delayProfiles: configStatus.delayProfiles.syncStatus,
       mediaManagement: configStatus.mediaManagement.syncStatus,
       metadataProfiles: configStatus.metadataProfiles.syncStatus,
-    },
+    }),
   };
 };
 

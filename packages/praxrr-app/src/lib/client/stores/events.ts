@@ -5,7 +5,14 @@
 import { browser } from '$app/environment';
 import { base } from '$app/paths';
 import { writable } from 'svelte/store';
-import { classifyProbeStatus, nextBackoffMs, parseLiveEvent, retryAfterMs } from '$lib/client/events/reconnect.ts';
+import {
+  classifyProbeStatus,
+  cursorAfterHello,
+  helloCursor,
+  nextBackoffMs,
+  parseLiveEvent,
+  retryAfterMs,
+} from '$lib/client/events/reconnect.ts';
 import { LIVE_EVENTS_PATH, type LiveEvent, type LiveEventOf, type LiveEventType } from '$shared/events/types.ts';
 
 export type LiveStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'stopped';
@@ -25,6 +32,8 @@ function createEventsStore() {
   let currentStatus: LiveStatus = 'idle';
   let currentDownSince: number | null = null;
   let lastEventId: string | null = null;
+  /** Boot/head of the latest `hello`, so a `resync` can move the cursor onto the current boot. */
+  let lastHello: { bootId: string; headId: string } | null = null;
   let attempt = 0;
   let source: EventSource | null = null;
   let timer: number | null = null;
@@ -93,9 +102,13 @@ function createEventsStore() {
           setStatus('open');
           attempt = 0;
           setDownSince(null);
-          if (lastEventId === null) lastEventId = e.headId || null;
+          lastHello = { bootId: e.bootId, headId: e.headId };
+          lastEventId = cursorAfterHello(lastEventId, lastHello);
           return;
         case 'resync':
+          // The server sends `resync` right after `hello`; move the cursor to that head so the next
+          // reconnect replays from here instead of resyncing again.
+          if (lastHello) lastEventId = helloCursor(lastHello);
           emit(RESYNC_KEY, e);
           return;
         case 'session.expired':

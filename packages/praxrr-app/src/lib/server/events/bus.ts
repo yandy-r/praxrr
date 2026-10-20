@@ -28,12 +28,15 @@ function randomBootId(): string {
   return id;
 }
 
-/** Parses `${prefix}-${seq}`; returns null for anything that is not a positive integer suffix. */
+/**
+ * Parses `${prefix}-${seq}`; returns null unless the suffix is a non-negative safe integer.
+ * Seq `0` is the "nothing seen yet" cursor a client sends when `hello.headId` was empty.
+ */
 function parseId(raw: string): { prefix: string; seq: number } | null {
   const dash = raw.lastIndexOf('-');
   if (dash <= 0 || !/^\d+$/.test(raw.slice(dash + 1))) return null;
   const seq = Number(raw.slice(dash + 1));
-  return Number.isSafeInteger(seq) && seq > 0 ? { prefix: raw.slice(0, dash), seq } : null;
+  return Number.isSafeInteger(seq) && seq >= 0 ? { prefix: raw.slice(0, dash), seq } : null;
 }
 
 export class EventBus {

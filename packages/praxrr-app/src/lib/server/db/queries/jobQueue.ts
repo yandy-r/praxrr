@@ -180,6 +180,27 @@ export const jobQueueQueries = {
     return rows.map(rowToRecord);
   },
 
+  /**
+   * Active jobs of the given types for one instance (`payload.instanceId`): running jobs plus
+   * queued jobs that are due now. Future-dated schedule rows are excluded, matching `listActive`.
+   */
+  listActiveByJobTypesAndInstanceId(jobTypes: readonly JobType[], instanceId: number): JobQueueRecord[] {
+    if (jobTypes.length === 0) return [];
+    const placeholders = jobTypes.map(() => '?').join(', ');
+    const rows = db.query<JobQueueRow>(
+      `SELECT * FROM job_queue
+       WHERE job_type IN (${placeholders})
+       AND (json_extract(payload, '$.instanceId') = ? OR json_extract(payload, '$.instanceId') = ?)
+       AND (status = 'running'
+         OR (status = 'queued' AND (source != 'schedule'
+           OR datetime(replace(replace(run_at, 'T', ' '), 'Z', '')) <= datetime('now'))))`,
+      ...jobTypes,
+      instanceId,
+      String(instanceId)
+    );
+    return rows.map(rowToRecord);
+  },
+
   getNextQueued(): JobQueueRecord | undefined {
     const row = db.queryFirst<JobQueueRow>(
       `SELECT * FROM job_queue WHERE status = 'queued' ORDER BY run_at ASC LIMIT 1`

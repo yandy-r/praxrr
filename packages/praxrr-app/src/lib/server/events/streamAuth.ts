@@ -15,8 +15,12 @@ export interface EventStreamLocals {
   principal: AuthPrincipal | null;
 }
 
-/** Returns the cap bucket for the caller, or `null` (fail closed) when it cannot be identified. */
-export function principalKey(locals: EventStreamLocals, clientIp: string): string | null {
+/**
+ * Returns the cap bucket for the caller, or `null` (fail closed) when it cannot be identified.
+ * Bypass callers (AUTH=off, local-IP AUTH=local) carry no identity, so each stream gets its own
+ * bucket and only the global cap applies to them.
+ */
+export function principalKey(locals: EventStreamLocals): string | null {
   const principal = locals.principal;
   if (!principal) {
     return null;
@@ -27,7 +31,7 @@ export function principalKey(locals: EventStreamLocals, clientIp: string): strin
     case 'session':
       return locals.session ? `session:${locals.session.id}` : null;
     case 'bypass':
-      return `bypass:${clientIp}`;
+      return `bypass:${crypto.randomUUID()}`;
     default:
       return null;
   }

@@ -40,17 +40,18 @@
   }
 </script>
 
+<!-- The message is announced by AlertLiveRegion, so only the text is hidden from assistive tech;
+     focusable controls stay exposed with accessible names (axe aria-hidden-focus). -->
 {#if action}
   <div
     in:fly={{ y: -12, duration: 200 }}
     out:fade={{ duration: 150 }}
-    aria-hidden="true"
     class="flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg shadow-black/5 transition-colors {styles[
       type
     ]}"
   >
-    <Icon size={18} class="flex-shrink-0 {iconColors[type]}" />
-    <p class="text-sm font-medium">{message}</p>
+    <Icon size={18} aria-hidden="true" class="flex-shrink-0 {iconColors[type]}" />
+    <p aria-hidden="true" class="text-sm font-medium">{message}</p>
     <a href={action.href} onclick={dismiss} class="text-sm font-semibold underline underline-offset-2">{action.label}</a
     >
     <button
@@ -67,7 +68,7 @@
     in:fly={{ y: -12, duration: 200 }}
     out:fade={{ duration: 150 }}
     role="button"
-    aria-hidden="true"
+    aria-label="Dismiss notification"
     tabindex="0"
     onclick={dismiss}
     onkeydown={(e) => {
@@ -80,7 +81,7 @@
       type
     ]}"
   >
-    <Icon size={18} class="flex-shrink-0 {iconColors[type]}" />
-    <p class="text-sm font-medium">{message}</p>
+    <Icon size={18} aria-hidden="true" class="flex-shrink-0 {iconColors[type]}" />
+    <p aria-hidden="true" class="text-sm font-medium">{message}</p>
   </div>
 {/if}

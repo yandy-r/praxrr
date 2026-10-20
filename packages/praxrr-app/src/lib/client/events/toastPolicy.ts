@@ -25,18 +25,23 @@ export interface JobToastContext {
 const NONE: ToastDecision = { kind: 'none' };
 
 export function decideJobToast(e: LiveJobFinishedEvent, ctx: JobToastContext): ToastDecision {
-  if (e.rescheduled) return NONE;
+  // Scheduled runs always come back rescheduled, even on failure; only non-failures stay quiet.
+  if (e.rescheduled && e.runStatus !== 'failure') return NONE;
 
   const href =
     ctx.syncHistoryId !== null ? `${ctx.base}/sync-history/${ctx.syncHistoryId}` : `${ctx.base}/settings/jobs`;
   const name = e.displayName;
+  const manual = e.source === 'manual';
+  const syncFamily = SYNC_FAMILY_JOB_TYPES.includes(e.jobType);
 
-  if (e.source === 'manual') {
+  // A partial sync reports runStatus 'failure'; surface it as a warning rather than an error.
+  if (ctx.syncStatus === 'partial' && (manual || (syncFamily && e.runStatus === 'failure'))) {
+    return { kind: 'toast', type: 'warning', message: `${name} partially succeeded`, sticky: false, href };
+  }
+
+  if (manual) {
     switch (e.runStatus) {
       case 'success':
-        if (ctx.syncStatus === 'partial') {
-          return { kind: 'toast', type: 'warning', message: `${name} partially succeeded`, sticky: false, href };
-        }
         return { kind: 'toast', type: 'success', message: `${name} finished`, sticky: false, href };
       case 'failure':
         return { kind: 'toast', type: 'error', message: `${name} failed`, sticky: true, href };
@@ -49,7 +54,7 @@ export function decideJobToast(e: LiveJobFinishedEvent, ctx: JobToastContext): T
     }
   }
 
-  if (e.runStatus === 'failure' && SYNC_FAMILY_JOB_TYPES.includes(e.jobType)) {
+  if (e.runStatus === 'failure' && syncFamily) {
     return { kind: 'toast', type: 'error', message: `${name} failed`, sticky: true, href };
   }
   return NONE;

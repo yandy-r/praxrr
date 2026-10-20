@@ -5,7 +5,13 @@ import { runMigrations } from '$db/migrations.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 import { EventBus, eventBus, type LiveEventEnvelope } from '$lib/server/events/bus.ts';
-import { _jobBase, publishCanaryUpdated, publishJobFinished } from '$lib/server/events/publish.ts';
+import {
+  _jobBase,
+  publishCanaryUpdated,
+  publishJobFinished,
+  publishJobQueued,
+  publishJobRunning,
+} from '$lib/server/events/publish.ts';
 import type { LiveDomainEvent } from '$shared/events/types.ts';
 
 const FORBIDDEN_KEYS = ['error', 'payload', 'stateToken', 'nextToken', 'canaryError', 'url', 'apiKey'] as const;
@@ -129,6 +135,23 @@ Deno.test('T-B4: replaySince covers fresh, replay, foreign boot, gap, future and
   assertEquals(bus.replaySince('boottest-'), { kind: 'resync', reason: 'boot' });
 });
 
+Deno.test('T-B4b: a `${bootId}-0` cursor replays every buffered event instead of resyncing', () => {
+  const bus = new EventBus(4, 'boottest');
+  assertEquals(bus.replaySince('boottest-0'), { kind: 'replay', events: [] });
+  publishMany(bus, 3);
+  const replay = bus.replaySince('boottest-0');
+  assertEquals(replay.kind, 'replay');
+  if (replay.kind === 'replay') {
+    assertEquals(
+      replay.events.map((envelope) => envelope.seq),
+      [1, 2, 3]
+    );
+  }
+  assertEquals(bus.replaySince('other-0'), { kind: 'resync', reason: 'boot' });
+  publishMany(bus, 2);
+  assertEquals(bus.replaySince('boottest-0'), { kind: 'resync', reason: 'gap' });
+});
+
 Deno.test('T-B5: eventBus singleton lives on globalThis', () => {
   const registry = globalThis as typeof globalThis & { [key: symbol]: unknown };
   assertEquals(registry[Symbol.for('praxrr.events.bus')], eventBus);
@@ -208,4 +231,52 @@ migratedTest('T-B6: job.finished and canary.updated events carry only allow-list
     assertEquals(canary.remainingCount, 1);
     assertEquals(canary.canaryStatus, null);
   }
+});
+
+migratedTest('T-B7: job timestamps copied from SQLite are emitted as RFC 3339 UTC', () => {
+  const job: JobQueueRecord = {
+    id: 42,
+    jobType: 'arr.sync',
+    status: 'queued',
+    runAt: '2026-10-20 01:02:03',
+    payload: {} as JobQueueRecord['payload'],
+    source: 'manual',
+    dedupeKey: null,
+    cooldownUntil: null,
+    attempts: 0,
+    startedAt: '2026-10-20 01:02:04',
+    finishedAt: null,
+    createdAt: '2026-10-20 01:02:03',
+    updatedAt: '2026-10-20 01:02:03',
+  };
+
+  const captured: LiveDomainEvent[] = [];
+  const unsubscribe = eventBus.subscribe((envelope) => captured.push(envelope.event));
+  try {
+    publishJobQueued(job, { onlyIfDue: false });
+    publishJobRunning(job);
+    publishJobFinished(job, {
+      status: 'queued',
+      runStatus: 'success',
+      rescheduled: true,
+      nextRunAt: '2026-10-21 00:00:00',
+      runId: 1,
+      failureCode: null,
+      durationMs: 5,
+      finishedAt: '2026-10-20T01:02:05.000Z',
+    });
+  } finally {
+    unsubscribe();
+  }
+
+  const queued = captured.find((event) => event.type === 'job.queued');
+  const running = captured.find((event) => event.type === 'job.running');
+  const finished = captured.find((event) => event.type === 'job.finished');
+  assert(queued?.type === 'job.queued');
+  assert(running?.type === 'job.running');
+  assert(finished?.type === 'job.finished');
+  assertEquals(queued.runAt, '2026-10-20T01:02:03Z');
+  assertEquals(running.startedAt, '2026-10-20T01:02:04Z');
+  assertEquals(finished.nextRunAt, '2026-10-21T00:00:00Z');
+  assertEquals(finished.finishedAt, '2026-10-20T01:02:05.000Z');
 });

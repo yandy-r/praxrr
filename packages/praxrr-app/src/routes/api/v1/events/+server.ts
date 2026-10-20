@@ -1,5 +1,4 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { getClientIp } from '$auth/network.ts';
 import { logger } from '$logger/logger.ts';
 import { eventConnections } from '$lib/server/events/connections.ts';
 import { resolveLastEventId } from '$lib/server/events/sse.ts';
@@ -37,7 +36,7 @@ function reject(status: 401 | 429 | 503): Response {
 }
 
 export const GET: RequestHandler = (event) => {
-  const key = principalKey(event.locals, getClientIp(event));
+  const key = principalKey(event.locals);
   if (!key) {
     return reject(401);
   }
@@ -56,7 +55,7 @@ export const GET: RequestHandler = (event) => {
 };
 
 export const HEAD: RequestHandler = (event) => {
-  const key = principalKey(event.locals, getClientIp(event));
+  const key = principalKey(event.locals);
   if (!key) {
     return reject(401);
   }

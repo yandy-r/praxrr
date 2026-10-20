@@ -45,11 +45,27 @@
   let loadError: string | null = null;
   let summaryRequestId = 0;
 
-  // Drift settings form state — hydrated from the authoritative summary payload each load
-  // (no dirty tracking: this two-field panel re-reads the server value after every save).
+  // Drift settings form state. A load copies the server values in only on first hydration or
+  // while the form still matches the last server-applied values, so a live reload never
+  // clobbers an in-progress edit.
   let settingsEnabled = false;
   let settingsInterval = 15;
   let savingSettings = false;
+  let settingsHydrated = false;
+  let appliedEnabled = false;
+  let appliedInterval = 15;
+
+  function applySettings(settings: DriftSettingsResponse) {
+    settingsEnabled = settings.enabled;
+    settingsInterval = settings.intervalMinutes;
+    appliedEnabled = settings.enabled;
+    appliedInterval = settings.intervalMinutes;
+    settingsHydrated = true;
+  }
+
+  function settingsDirty(): boolean {
+    return settingsEnabled !== appliedEnabled || settingsInterval !== appliedInterval;
+  }
 
   async function loadSummary() {
     const requestId = ++summaryRequestId;
@@ -70,8 +86,7 @@
       const next = (await response.json()) as DriftSummaryResponse;
       if (requestId !== summaryRequestId) return;
       summary = next;
-      settingsEnabled = next.settings.enabled;
-      settingsInterval = next.settings.intervalMinutes;
+      if (!settingsHydrated || (!savingSettings && !settingsDirty())) applySettings(next.settings);
     } catch (err) {
       if (requestId !== summaryRequestId) return;
       loadError = err instanceof Error ? err.message : 'Failed to load drift status';
@@ -101,8 +116,7 @@
 
       const settings = (await response.json()) as DriftSettingsResponse;
       if (summary) summary = { ...summary, settings };
-      settingsEnabled = settings.enabled;
-      settingsInterval = settings.intervalMinutes;
+      applySettings(settings);
       alertStore.add('success', 'Drift settings updated.');
     } catch (err) {
       alertStore.add('error', err instanceof Error ? err.message : 'Failed to update drift settings');

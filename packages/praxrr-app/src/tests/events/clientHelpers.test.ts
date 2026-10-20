@@ -1,5 +1,12 @@
 import { assert, assertEquals } from '@std/assert';
-import { classifyProbeStatus, nextBackoffMs, parseLiveEvent, retryAfterMs } from '$lib/client/events/reconnect.ts';
+import {
+  classifyProbeStatus,
+  cursorAfterHello,
+  helloCursor,
+  nextBackoffMs,
+  parseLiveEvent,
+  retryAfterMs,
+} from '$lib/client/events/reconnect.ts';
 import { decideJobToast, SeenSet, ToastCoalescer } from '$lib/client/events/toastPolicy.ts';
 import type { LiveHelloEvent, LiveJobFinishedEvent } from '$shared/events/types.ts';
 
@@ -83,13 +90,16 @@ Deno.test('T-C4: decideJobToast covers manual statuses', () => {
     sticky: false,
     href,
   });
-  assertEquals(decideJobToast(finished({ runStatus: 'success' }), { ...ctx, syncStatus: 'partial' }), {
-    kind: 'toast',
-    type: 'warning',
-    message: 'Sync Radarr partially succeeded',
-    sticky: false,
-    href,
-  });
+  assertEquals(
+    decideJobToast(finished({ runStatus: 'failure', status: 'failed' }), { ...ctx, syncStatus: 'partial' }),
+    {
+      kind: 'toast',
+      type: 'warning',
+      message: 'Sync Radarr partially succeeded',
+      sticky: false,
+      href,
+    }
+  );
   assertEquals(decideJobToast(finished({ runStatus: 'failure', status: 'failed' }), ctx), {
     kind: 'toast',
     type: 'error',
@@ -114,7 +124,43 @@ Deno.test('T-C4: decideJobToast covers manual statuses', () => {
 });
 
 Deno.test('T-C4: decideJobToast background policy, rescheduled and href fallback', () => {
-  assertEquals(decideJobToast(finished({ rescheduled: true, runStatus: 'failure' }), noSync), { kind: 'none' });
+  assertEquals(decideJobToast(finished({ source: 'schedule', rescheduled: true }), noSync), { kind: 'none' });
+  assertEquals(decideJobToast(finished({ rescheduled: true, runStatus: 'skipped' }), noSync), { kind: 'none' });
+  const scheduledFailure = finished({ source: 'schedule', rescheduled: true, runStatus: 'failure' });
+  assertEquals(decideJobToast(scheduledFailure, noSync), {
+    kind: 'toast',
+    type: 'error',
+    message: 'Sync Radarr failed',
+    sticky: true,
+    href: '/base/settings/jobs',
+  });
+  assertEquals(decideJobToast(scheduledFailure, { syncHistoryId: 9, syncStatus: 'partial', base: '/base' }), {
+    kind: 'toast',
+    type: 'warning',
+    message: 'Sync Radarr partially succeeded',
+    sticky: false,
+    href: '/base/sync-history/9',
+  });
+  assertEquals(
+    decideJobToast(
+      finished({
+        source: 'schedule',
+        jobType: 'pcd.sync',
+        displayName: 'Sync DB',
+        runStatus: 'failure',
+        rescheduled: true,
+      }),
+      noSync
+    ),
+    { kind: 'toast', type: 'error', message: 'Sync DB failed', sticky: true, href: '/base/settings/jobs' }
+  );
+  assertEquals(decideJobToast(finished({ rescheduled: true, runStatus: 'failure' }), noSync), {
+    kind: 'toast',
+    type: 'error',
+    message: 'Sync Radarr failed',
+    sticky: true,
+    href: '/base/settings/jobs',
+  });
   assertEquals(decideJobToast(finished({ source: 'schedule' }), noSync), { kind: 'none' });
   assertEquals(decideJobToast(finished({ source: 'schedule', runStatus: 'failure', failureCode: null }), noSync), {
     kind: 'toast',
@@ -153,4 +199,16 @@ Deno.test('T-C6: SeenSet.addOnce dedupes with FIFO eviction', () => {
   assert(seen.addOnce('7:3'));
   assert(seen.addOnce('7:1'));
   assertEquals(seen.addOnce('7:3'), false);
+});
+
+Deno.test('cursorAfterHello keeps same-boot cursors and resets across boots', () => {
+  assertEquals(helloCursor({ bootId: 'b1', headId: '' }), 'b1-0');
+  assertEquals(helloCursor({ bootId: 'b1', headId: 'b1-4' }), 'b1-4');
+  assertEquals(cursorAfterHello(null, { bootId: 'b1', headId: '' }), 'b1-0');
+  assertEquals(cursorAfterHello(null, { bootId: 'b1', headId: 'b1-4' }), 'b1-4');
+  assertEquals(cursorAfterHello('b1-2', { bootId: 'b1', headId: 'b1-4' }), 'b1-2');
+  assertEquals(cursorAfterHello('b0-9', { bootId: 'b1', headId: 'b1-4' }), 'b1-4');
+  assertEquals(cursorAfterHello('b0-9', { bootId: 'b1', headId: '' }), 'b1-0');
+  assertEquals(cursorAfterHello('garbage', { bootId: 'b1', headId: '' }), 'b1-0');
+  assertEquals(cursorAfterHello('a-b-3', { bootId: 'a-b', headId: 'a-b-5' }), 'a-b-3');
 });

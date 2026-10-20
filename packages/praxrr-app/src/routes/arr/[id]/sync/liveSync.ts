@@ -3,17 +3,29 @@
  * for this instance, and normalizes the per-section sync status returned by the load.
  */
 import { subscribeLive } from '$lib/client/events/liveInvalidate.ts';
-import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
+import { LIVE_DEPENDENCY_KEYS, type LiveEvent } from '$shared/events/types.ts';
 
 export type SectionLiveStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
 
 const SECTION_LIVE_STATUSES: readonly SectionLiveStatus[] = ['idle', 'pending', 'in_progress', 'failed'];
 
+/**
+ * Whether a live event should refresh the sync page of `instanceId`. Instance-scoped events must
+ * match the instance id exactly. `trashguide.sync` jobs are source-scoped (no instance id) but feed
+ * the TRaSH source data this page's load returns, so they always pass; they only trigger a
+ * debounced invalidate.
+ */
+export function isInstanceSyncEvent(e: LiveEvent, instanceId: number): boolean {
+  const isJobEvent = e.type === 'job.queued' || e.type === 'job.running' || e.type === 'job.finished';
+  if (isJobEvent && e.jobType === 'trashguide.sync') return true;
+  return 'instanceId' in e && e.instanceId === instanceId;
+}
+
 export function subscribeInstanceSync(instanceId: number): () => void {
   return subscribeLive({
     key: LIVE_DEPENDENCY_KEYS.sync,
     types: ['job.queued', 'job.running', 'job.finished', 'sync.recorded'],
-    filter: (e) => 'instanceId' in e && e.instanceId === instanceId,
+    filter: (e) => isInstanceSyncEvent(e, instanceId),
   });
 }
 
