@@ -36,11 +36,12 @@ export class AppriseNotifier implements Notifier {
       body: message || title,
       type: APPRISE_TYPE[resolveSeverity(notification)],
     };
-    if (this.config.tags) body.tag = this.config.tags;
 
     let url = `${this.config.server_url}/notify`;
     if (this.config.config_key) {
       url += `/${encodeURIComponent(this.config.config_key)}`;
+      // Tags select URLs inside a stored config; stateless URLs carry none, so a tag would match nothing.
+      if (this.config.tags) body.tag = this.config.tags;
     } else if (this.config.urls) {
       body.urls = this.config.urls;
     }

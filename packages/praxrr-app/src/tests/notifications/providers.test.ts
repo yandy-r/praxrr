@@ -442,6 +442,7 @@ Deno.test('apprise: validation requires exactly one of config_key or urls', () =
   assertInvalid(appriseProvider, { server_url: 'http://a:8000', config_key: 'k', urls: 'json://x' }, 'exactly one');
   assertInvalid(appriseProvider, { server_url: 'http://a:8000', config_key: '../etc' }, 'configuration key must');
   assertInvalid(appriseProvider, { server_url: 'http://169.254.169.254', config_key: 'k' }, 'metadata');
+  assertInvalid(appriseProvider, { server_url: 'http://a:8000', urls: 'json://x', tags: 'ops' }, 'tags only apply');
 });
 
 // ── Retry through providers ──

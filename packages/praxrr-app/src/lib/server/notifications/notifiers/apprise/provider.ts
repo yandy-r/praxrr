@@ -45,6 +45,9 @@ export const appriseProvider: ProviderDefinition<AppriseConfig> = {
     if (configKey) config.config_key = configKey;
     if (urls) config.urls = urls;
     const tags = readString(input, 'tags');
+    if (tags && !configKey) {
+      return { ok: false, error: 'Apprise tags only apply with a configuration key' };
+    }
     if (tags) config.tags = tags;
     return { ok: true, config };
   },
