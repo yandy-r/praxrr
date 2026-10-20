@@ -33,6 +33,14 @@ export class BaseHttpClient {
   }
 
   /**
+   * Delay before retry `attempt + 1` after a retryable `error`. Exponential
+   * backoff: delay * (2 ^ attempt). Subclasses may honor `error.retryAfterMs`.
+   */
+  protected getRetryDelayMs(attempt: number, _error: HttpError): number {
+    return this.retryDelay * Math.pow(2, attempt);
+  }
+
+  /**
    * Make an HTTP request with retry logic
    */
   protected async request<T>(
@@ -104,9 +112,7 @@ export class BaseHttpClient {
             // Retry on specific status codes
             if (this.retryStatusCodes.includes(response.status) && attempt < this.retries) {
               lastError = error;
-              // Exponential backoff: delay * (2 ^ attempt)
-              const delay = this.retryDelay * Math.pow(2, attempt);
-              await this.sleep(delay);
+              await this.sleep(this.getRetryDelayMs(attempt, error));
               continue;
             }
 
@@ -135,8 +141,7 @@ export class BaseHttpClient {
         if (error instanceof HttpError) {
           if (this.retryStatusCodes.includes(error.status) && attempt < this.retries) {
             lastError = error;
-            const delay = this.retryDelay * Math.pow(2, attempt);
-            await this.sleep(delay);
+            await this.sleep(this.getRetryDelayMs(attempt, error));
             continue;
           }
         }

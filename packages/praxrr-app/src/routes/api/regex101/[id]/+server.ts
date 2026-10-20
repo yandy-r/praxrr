@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { logger } from '$logger/logger.ts';
 import { regex101CacheQueries } from '$db/queries/regex101Cache.ts';
-import { config } from '$config';
+import { matchPatterns } from '$lib/server/utils/arr/parser/client.ts';
 
 export interface Regex101UnitTest {
   description: string;
@@ -22,56 +22,29 @@ export interface Regex101Response {
 }
 
 /**
- * Run regex tests using the parser service (.NET regex engine).
+ * Run regex tests using the parser service (.NET regex engine). Requests go through the
+ * parser client, which caps concurrency, retries busy responses, and logs content-free
+ * failures; a failed test is returned without `actual`/`passed`.
  */
 async function runRegexTests(pattern: string, tests: Regex101UnitTest[]): Promise<Regex101UnitTest[]> {
-  if (tests.length === 0) return tests;
+  return await Promise.all(
+    tests.map(async (test) => {
+      // matchPatterns never throws; null means the parser request failed.
+      const results = await matchPatterns(test.testString, [pattern]);
+      if (!results) {
+        return { ...test };
+      }
 
-  try {
-    // Call parser service for each test
-    const results = await Promise.all(
-      tests.map(async (test) => {
-        try {
-          const response = await fetch(`${config.parserUrl}/match`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              text: test.testString,
-              patterns: [pattern],
-            }),
-          });
+      const matched = results.get(pattern) ?? false;
+      const shouldMatch = test.criteria === 'DOES_MATCH';
 
-          if (!response.ok) {
-            await logger.warn('Parser match request failed', {
-              source: 'Regex101API',
-              meta: { status: response.status, testString: test.testString },
-            });
-            return { ...test };
-          }
-
-          const data = await response.json();
-          const matched = data.results?.[pattern] ?? false;
-          const shouldMatch = test.criteria === 'DOES_MATCH';
-
-          return {
-            ...test,
-            actual: matched,
-            passed: matched === shouldMatch,
-          };
-        } catch {
-          return { ...test };
-        }
-      })
-    );
-
-    return results;
-  } catch (err) {
-    await logger.error('Failed to run regex tests', {
-      source: 'Regex101API',
-      meta: { error: String(err) },
-    });
-    return tests;
-  }
+      return {
+        ...test,
+        actual: matched,
+        passed: matched === shouldMatch,
+      };
+    })
+  );
 }
 
 /**

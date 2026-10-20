@@ -1,11 +1,15 @@
 /**
  * Parser Service Client
- * Calls the parser microservice with optional caching
+ * Calls the parser microservice with optional caching.
+ *
+ * Requests go through `transport.ts`, which caps concurrency below the parser's
+ * admission limits and honors `Retry-After`. Batch matching is split into
+ * requests that stay inside the parser's measured envelope (see `limits.ts`).
  */
 
-import { config } from '$config';
 import { logger } from '$logger/logger.ts';
-import { BaseHttpClient } from '../../http/client.ts';
+import { fetchPatternMatchesChunked } from './patternMatchBatch.ts';
+import { getClient } from './transport.ts';
 import { parsedReleaseCacheQueries } from '$db/queries/parsedReleaseCache.ts';
 import { patternMatchCacheQueries, getPatternMatchCacheNamespace } from '$db/queries/patternMatchCache.ts';
 import {
@@ -23,108 +27,6 @@ import {
 // refresh it so parser restarts and runtime rollbacks cannot reuse another
 // implementation's entries.
 let cachedParserVersion: string | null = null;
-
-interface EpisodeResponse {
-  seriesTitle: string | null;
-  seasonNumber: number;
-  episodeNumbers: number[];
-  absoluteEpisodeNumbers: number[];
-  airDate: string | null;
-  fullSeason: boolean;
-  isPartialSeason: boolean;
-  isMultiSeason: boolean;
-  isMiniSeries: boolean;
-  special: boolean;
-  releaseType: string;
-}
-
-interface ParseResponse {
-  title: string;
-  type: MediaType;
-  source: string;
-  resolution: number;
-  modifier: string;
-  revision: {
-    version: number;
-    real: number;
-    isRepack: boolean;
-  };
-  languages: string[];
-  releaseGroup: string | null;
-  movieTitles: string[];
-  year: number;
-  edition: string | null;
-  imdbId: string | null;
-  tmdbId: number;
-  hardcodedSubs: string | null;
-  releaseHash: string | null;
-  episode: EpisodeResponse | null;
-}
-
-interface HealthResponse {
-  status: string;
-  version: string;
-}
-
-interface MatchResponse {
-  results: Record<string, boolean>;
-}
-
-interface BatchMatchResponse {
-  results: Record<string, Record<string, boolean>>;
-}
-
-/**
- * Parser service HTTP client
- * Extends BaseHttpClient with parser-specific methods
- */
-class ParserClient extends BaseHttpClient {
-  constructor(baseUrl: string) {
-    super(baseUrl, {
-      timeout: 30000,
-      retries: 2,
-      retryDelay: 500,
-    });
-  }
-
-  /**
-   * Parse a release title
-   */
-  async parse(title: string, type: MediaType): Promise<ParseResponse> {
-    return this.post<ParseResponse>('/parse', { title, type });
-  }
-
-  /**
-   * Check health and get version
-   */
-  async health(timeoutMs?: number): Promise<HealthResponse> {
-    return this.get<HealthResponse>('/health', timeoutMs === undefined ? undefined : { timeout: timeoutMs });
-  }
-
-  /**
-   * Match patterns against text
-   */
-  async match(text: string, patterns: string[]): Promise<MatchResponse> {
-    return this.post<MatchResponse>('/match', { text, patterns });
-  }
-
-  /**
-   * Match patterns against multiple texts (batch)
-   */
-  async matchBatch(texts: string[], patterns: string[]): Promise<BatchMatchResponse> {
-    return this.post<BatchMatchResponse>('/match/batch', { texts, patterns });
-  }
-}
-
-// Singleton client instance - lazy initialized
-let parserClient: ParserClient | null = null;
-
-function getClient(): ParserClient {
-  if (!parserClient) {
-    parserClient = new ParserClient(config.parserUrl);
-  }
-  return parserClient;
-}
 
 /**
  * Parse a release title - returns quality, resolution, modifier, revision, and languages
@@ -319,7 +221,8 @@ async function parseAndCacheUncachedItem(
 
 /**
  * Parse multiple release titles with caching (batch operation)
- * More efficient than calling parseWithCache in a loop
+ * More efficient than calling parseWithCache in a loop. Uncached titles are
+ * requested together but gated by the shared parser request limiter.
  *
  * @param items - Array of { title, type } to parse
  * @returns Map of cache key to ParseResult (null for failures)
@@ -357,7 +260,7 @@ export async function parseWithCacheBatch(
 
   const cacheHits = items.length - uncached.length;
 
-  // Parse uncached items in parallel
+  // Parse uncached items; the shared limiter bounds how many are in flight
   if (uncached.length > 0) {
     const parsePromises = uncached.map((item) => parseAndCacheUncachedItem(item, parserVersion));
 
@@ -434,39 +337,18 @@ async function hashPatterns(patterns: string[]): Promise<string> {
     .join('')
     .slice(0, 16);
 }
-
 /**
- * Fetch pattern matches from parser service (no caching)
- */
-async function fetchPatternMatches(
-  texts: string[],
-  patterns: string[]
-): Promise<Map<string, Map<string, boolean>> | null> {
-  try {
-    const data = await getClient().matchBatch(texts, patterns);
-
-    const result = new Map<string, Map<string, boolean>>();
-    for (const [text, patternResults] of Object.entries(data.results)) {
-      result.set(text, new Map(Object.entries(patternResults)));
-    }
-    return result;
-  } catch {
-    await logger.warn('Failed to connect to parser for batch pattern matching', {
-      source: 'ParserClient',
-      meta: { errorClass: 'ParserRequestFailed' },
-    });
-    return null;
-  }
-}
-
-/**
- * Match multiple texts against patterns in a single request with caching
+ * Match multiple texts against patterns with caching
+ * Uncached texts are split into envelope-sized `/match/batch` requests. Only
+ * texts whose every request succeeded are returned and cached; texts or
+ * patterns over the parser's size limits are never sent (such texts are
+ * absent from the result, such patterns absent from every text's map).
  * Results are cached keyed by title + patterns hash
  * Cache automatically invalidates when patterns change
  *
  * @param texts - Array of texts to match (e.g., release titles)
  * @param patterns - Array of regex patterns to test
- * @returns Map of text -> (pattern -> matched), or null if parser unavailable
+ * @returns Map of text -> (pattern -> matched), or null if nothing could be returned
  */
 export async function matchPatternsBatch(
   texts: string[],
@@ -522,10 +404,13 @@ export async function matchPatternsBatch(
     return cacheHits > 0 ? results : null;
   }
 
-  // Fetch uncached results from parser
-  const fetchedResults = await fetchPatternMatches(uncachedTexts, patterns);
-  if (!fetchedResults) {
-    // Parser unavailable - return partial results if any
+  // Fetch uncached results from parser in envelope-sized requests; only complete texts come back
+  const client = getClient();
+  const fetchedResults = await fetchPatternMatchesChunked(uncachedTexts, patterns, (chunkTexts, chunkPatterns) =>
+    client.matchBatch(chunkTexts, chunkPatterns)
+  );
+  if (fetchedResults.size === 0) {
+    // Parser unavailable or every request failed - return partial results if any
     if (cacheHits > 0) {
       await logger.debug(`Pattern match: ${cacheHits} cache hits, parser unavailable for ${uncachedTexts.length}`, {
         source: 'PatternMatchCache',
@@ -553,9 +438,15 @@ export async function matchPatternsBatch(
     patternMatchCacheQueries.setBatch(toCache, cacheNamespace);
   }
 
-  await logger.debug(`Pattern match: ${cacheHits} cache hits, ${uncachedTexts.length} computed`, {
+  await logger.debug(`Pattern match: ${cacheHits} cache hits, ${fetchedResults.size} computed`, {
     source: 'PatternMatchCache',
-    meta: { total: texts.length, cacheHits, computed: uncachedTexts.length, cacheNamespace },
+    meta: {
+      total: texts.length,
+      cacheHits,
+      computed: fetchedResults.size,
+      incomplete: new Set(uncachedTexts).size - fetchedResults.size,
+      cacheNamespace,
+    },
   });
 
   return results;
