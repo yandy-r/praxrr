@@ -5,6 +5,7 @@ import { assertEquals } from '@std/assert';
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
 import { GET, PATCH } from '../../routes/api/v1/ui-preferences/+server.ts';
 import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 
 type Restore = () => void;
 
@@ -91,6 +92,7 @@ function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = 
       user: null,
       session: null,
       authBypass: false,
+      principal: null,
     },
   };
   if (typeof userId === 'number') {
@@ -104,6 +106,7 @@ function buildGetRequest(sectionKey: string, userId?: number, strict: boolean = 
       },
       session: null,
       authBypass: false,
+      principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
     };
   }
 
@@ -135,6 +138,7 @@ function buildPatchRequest(
       user: null,
       session: null,
       authBypass: false,
+      principal: null,
     },
   };
 
@@ -149,6 +153,7 @@ function buildPatchRequest(
       },
       session: null,
       authBypass: false,
+      principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
     };
   }
 

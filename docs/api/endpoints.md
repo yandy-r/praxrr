@@ -6,7 +6,9 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 
 - Base path: `/api/v1`
 - Content type: JSON (`application/json`) unless noted
-- Authentication: required for all endpoints except `GET /health`
+- Authentication: required for all endpoints except `GET /health`. Examples send an API token
+  (`prx_…`) in the `X-Api-Key` header; each token needs the scope its request requires (see
+  `docs/api/authentication.md`)
 - Error payloads: typically `{ "error": "..." }` (see `docs/api/errors.md`)
 
 ## Endpoint index
@@ -91,7 +93,7 @@ Semantics:
 Returns the parsed OpenAPI document served by the app.
 
 ```bash
-curl -sS -H 'X-Api-Key: <api-key>' http://localhost:5173/api/v1/openapi.json | jq '.info'
+curl -sS -H 'X-Api-Key: prx_<token>' http://localhost:5173/api/v1/openapi.json | jq '.info'
 ```
 
 ## User Interface Preferences
@@ -153,7 +155,7 @@ Request body:
 
 ```bash
 curl -sS -X PATCH \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -H 'Content-Type: application/json' \
   -d '{ "section_key": "media-management:media-settings:naming", "mode": "advanced" }' \
   http://localhost:5173/api/v1/ui-preferences | jq
@@ -233,7 +235,7 @@ Request body:
 Semantics:
 
 - Only authenticated sessions can read/write (unauthenticated sessions receive `401`).
-- API-key synthetic user id `0` returns default state and performs no DB write.
+- API-token synthetic user id `0` returns default state and performs no DB write.
 - Values are per-user and per-section.
 - Unknown `tier` or malformed `section_key` returns `400`.
 - Stale `expected_updated_at` values return `409`.
@@ -279,7 +281,7 @@ Request fields:
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{
     "databaseId": 1,
     "releases": [
@@ -345,7 +347,7 @@ Sort keys by app type:
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   'http://localhost:5173/api/v1/arr/library?instanceId=1&page=1&pageSize=2&sortKey=title&sortDirection=asc' | jq
 ```
 
@@ -372,7 +374,7 @@ Parameters:
 
 ```bash
 curl -sS -X DELETE \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   'http://localhost:5173/api/v1/arr/library?instanceId=1' | jq
 ```
 
@@ -389,7 +391,7 @@ Parameters:
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   'http://localhost:5173/api/v1/arr/library/episodes?instanceId=2&seriesId=123' | jq
 ```
 
@@ -419,7 +421,7 @@ Parameters:
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   'http://localhost:5173/api/v1/arr/releases?instanceId=1&itemId=12345' | jq
 ```
 
@@ -451,7 +453,7 @@ Execute scans the instance again. It deletes a requested custom format or qualit
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{ "instanceId": 1, "action": "scan" }' \
   http://localhost:5173/api/v1/arr/cleanup | jq
 ```
@@ -477,7 +479,7 @@ Parameters:
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   'http://localhost:5173/api/v1/pcd/export?databaseId=1&entityType=quality_profile&name=Default' | jq
 ```
 
@@ -503,7 +505,7 @@ Request fields:
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{
     "databaseId": 1,
     "layer": "user",
@@ -550,7 +552,7 @@ Request fields:
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{
     "layer": "user",
     "name": "Albums + EPs",
@@ -592,7 +594,7 @@ Request fields:
 ```bash
 curl -sS -X PUT \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{ "description": "Updated description" }' \
   http://localhost:5173/api/v1/pcd/1/lidarr-metadata-profiles/12 | jq
 ```
@@ -616,7 +618,7 @@ Request fields:
 ```bash
 curl -sS -X DELETE \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{ "name": "Albums + EPs" }' \
   http://localhost:5173/api/v1/pcd/1/lidarr-metadata-profiles/12 | jq
 ```
@@ -633,7 +635,7 @@ Returns all configured TRaSH guide sources.
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   http://localhost:5173/api/v1/trash-guide/sources | jq
 ```
 
@@ -681,7 +683,7 @@ Request fields:
 ```bash
 curl -sS \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{
     "name": "TRaSH Radarr",
     "repositoryUrl": "https://github.com/TRaSH-Guides/Guides",
@@ -736,7 +738,7 @@ Returns the full source object.
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   http://localhost:5173/api/v1/trash-guide/sources/1 | jq
 ```
 
@@ -791,7 +793,7 @@ Note: `arrType` cannot be changed after creation.
 ```bash
 curl -sS -X PUT \
   -H 'Content-Type: application/json' \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   -d '{
     "scoreProfile": "anime",
     "syncStrategy": 720
@@ -839,7 +841,7 @@ Path params:
 
 ```bash
 curl -sS -X DELETE \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   http://localhost:5173/api/v1/trash-guide/sources/1
 ```
 
@@ -858,7 +860,7 @@ Path params:
 
 ```bash
 curl -sS -X POST \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   http://localhost:5173/api/v1/trash-guide/sources/1/sync | jq
 ```
 
@@ -891,7 +893,7 @@ Path params:
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <api-key>' \
+  -H 'X-Api-Key: prx_<token>' \
   http://localhost:5173/api/v1/trash-guide/sources/1/entities | jq
 ```
 

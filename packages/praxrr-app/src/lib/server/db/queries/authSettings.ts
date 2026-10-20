@@ -1,5 +1,4 @@
 import { db } from '../db.ts';
-import { generateApiKey } from '$auth/apiKey.ts';
 
 /**
  * Types for auth_settings table
@@ -7,6 +6,7 @@ import { generateApiKey } from '$auth/apiKey.ts';
 export interface AuthSettings {
   id: number;
   session_duration_hours: number;
+  /** Deprecated: always NULL since migration 20261021 (see api_tokens). */
   api_key: string | null;
   created_at: string;
   updated_at: string;
@@ -14,7 +14,6 @@ export interface AuthSettings {
 
 export interface UpdateAuthSettingsInput {
   sessionDurationHours?: number;
-  apiKey?: string | null;
 }
 
 /**
@@ -41,13 +40,6 @@ export const authSettingsQueries = {
   },
 
   /**
-   * Get API key (may be null)
-   */
-  getApiKey(): string | null {
-    return this.get().api_key;
-  },
-
-  /**
    * Update auth settings
    */
   update(input: UpdateAuthSettingsInput): boolean {
@@ -57,10 +49,6 @@ export const authSettingsQueries = {
     if (input.sessionDurationHours !== undefined) {
       updates.push('session_duration_hours = ?');
       params.push(input.sessionDurationHours);
-    }
-    if (input.apiKey !== undefined) {
-      updates.push('api_key = ?');
-      params.push(input.apiKey);
     }
 
     if (updates.length === 0) {
@@ -73,29 +61,5 @@ export const authSettingsQueries = {
     const affected = db.execute(`UPDATE auth_settings SET ${updates.join(', ')} WHERE id = ?`, ...params);
 
     return affected > 0;
-  },
-
-  /**
-   * Regenerate API key and return the new key
-   */
-  regenerateApiKey(): string {
-    const newKey = generateApiKey();
-    this.update({ apiKey: newKey });
-    return newKey;
-  },
-
-  /**
-   * Clear API key (disable API access)
-   */
-  clearApiKey(): boolean {
-    return this.update({ apiKey: null });
-  },
-
-  /**
-   * Validate an API key
-   */
-  validateApiKey(key: string): boolean {
-    const settings = this.get();
-    return settings.api_key !== null && settings.api_key === key;
   },
 };

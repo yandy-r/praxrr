@@ -4,7 +4,6 @@
   import { enhance, applyAction, deserialize } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
   import {
-    RefreshCw,
     LogOut,
     Check,
     Globe,
@@ -21,12 +20,12 @@
   import Button from '$ui/button/Button.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
   import FormInput from '$ui/form/FormInput.svelte';
-  import MaskedApiKey from '$ui/form/MaskedApiKey.svelte';
   import Table from '$ui/table/Table.svelte';
   import TableActionButton from '$ui/table/TableActionButton.svelte';
   import { alertStore } from '$alerts/store';
   import { SETTINGS_SECURITY_SESSIONS } from '$shared/disclosure/sectionKeys';
   import type { Column } from '$ui/table/types';
+  import ApiTokensCard from './components/ApiTokensCard.svelte';
   import {
     supportsWebAuthn,
     registerPasskey as doRegisterPasskey,
@@ -47,24 +46,6 @@
   // null until resolved in onMount — avoids rendering a false "unsupported" message during SSR.
   let canUseWebAuthn: boolean | null = null;
 
-  let regeneratingKey = false;
-  let revealInProgress = false;
-  let activeAuthApiKey = '';
-  let activeAuthApiKeySource: 'regenerate' | 'reveal' | null = null;
-  let remaskSession = 0;
-  let isAuthApiKeyUnmasked = false;
-  let copyAfterReveal = false;
-  let revealSubmitButton: HTMLButtonElement | null = null;
-  let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
-  let revealRequestToken = 0;
-  let pendingRevealRequestToken = 0;
-  const authApiKeyRevealMs = 30_000;
-  $: hasStoredAuthKey = data.hasApiKey || Boolean(data.apiKeyMasked);
-
-  // Handle form responses
-  $: if (form?.apiKey) {
-    setActiveAuthApiKey(form.apiKey, 'regenerate');
-  }
   $: if (form?.passwordSuccess) {
     alertStore.add('success', 'Password changed successfully');
     currentPassword = '';
@@ -74,8 +55,14 @@
   $: if (form?.passwordError) {
     alertStore.add('error', form.passwordError);
   }
-  $: if (form?.apiKeyRegenerated) {
-    alertStore.add('success', 'API key regenerated');
+  $: if (form?.createdApiToken) {
+    alertStore.add('success', `API token '${form.createdApiToken.token.name}' created`);
+  }
+  $: if (form?.apiTokenRevoked) {
+    alertStore.add('success', 'API token revoked');
+  }
+  $: if (form?.apiTokenError) {
+    alertStore.add('error', form.apiTokenError);
   }
   $: if (form?.sessionRevoked) {
     alertStore.add('success', 'Session revoked');
@@ -94,104 +81,6 @@
   }
   $: if (form?.passkeyError) {
     alertStore.add('error', form.passkeyError);
-  }
-
-  function clearAuthApiKeyAutoHide() {
-    if (autoHideTimer) {
-      clearTimeout(autoHideTimer);
-      autoHideTimer = null;
-    }
-  }
-
-  function resetRevealSession() {
-    revealRequestToken += 1;
-    revealInProgress = false;
-  }
-
-  function setActiveAuthApiKey(value: string, source: 'regenerate' | 'reveal') {
-    if (source === 'regenerate') {
-      resetRevealSession();
-    }
-
-    activeAuthApiKey = value;
-    activeAuthApiKeySource = value ? source : null;
-    isAuthApiKeyUnmasked = Boolean(value);
-    clearAuthApiKeyAutoHide();
-
-    if (isAuthApiKeyUnmasked) {
-      autoHideTimer = setTimeout(() => {
-        isAuthApiKeyUnmasked = false;
-        remaskSession += 1;
-      }, authApiKeyRevealMs);
-    }
-
-    remaskSession += 1;
-  }
-
-  function clearActiveAuthApiKey(preserveRegenerated = false) {
-    resetRevealSession();
-    clearAuthApiKeyAutoHide();
-    isAuthApiKeyUnmasked = false;
-
-    if (!preserveRegenerated || activeAuthApiKeySource !== 'regenerate') {
-      activeAuthApiKey = '';
-      activeAuthApiKeySource = null;
-    }
-
-    remaskSession += 1;
-  }
-
-  $: maskedApiKeyValue = isAuthApiKeyUnmasked && activeAuthApiKey ? activeAuthApiKey : data.apiKeyMasked;
-  $: plainApiKeyValue = isAuthApiKeyUnmasked ? activeAuthApiKey : '';
-
-  async function copyActiveAuthApiKey() {
-    if (!activeAuthApiKey) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(activeAuthApiKey);
-      alertStore.add('success', 'API key copied to clipboard');
-    } catch {
-      alertStore.add('error', 'Could not copy API key');
-    }
-  }
-
-  function requestRevealCopy(showError = false) {
-    if (!hasStoredAuthKey || !revealSubmitButton) {
-      if (showError) {
-        alertStore.add('error', 'Unable to retrieve API key');
-      }
-      return;
-    }
-
-    pendingRevealRequestToken = ++revealRequestToken;
-    revealInProgress = true;
-    revealSubmitButton.click();
-  }
-
-  function handleRevealChange(event: CustomEvent<{ revealed: boolean; reason: 'manual' | 'timeout' }>) {
-    if (!event.detail.revealed) {
-      clearActiveAuthApiKey();
-      return;
-    }
-
-    requestRevealCopy();
-  }
-
-  function handleCopyFeedback(event: CustomEvent<{ success: boolean; message: string; error?: Error }>) {
-    if (event.detail.success) {
-      alertStore.add('success', 'API key copied to clipboard');
-      return;
-    }
-
-    if (event.detail.error?.message === 'Missing key value') {
-      copyAfterReveal = true;
-      requestRevealCopy();
-      return;
-    }
-
-    alertStore.add('error', 'Copy failed');
   }
 
   function formatDate(dateStr: string): string {
@@ -367,7 +256,7 @@
   <div class="mb-8">
     <h1 class="text-2xl font-bold text-neutral-900 md:text-3xl dark:text-neutral-50">Security</h1>
     <p class="mt-2 text-base text-neutral-600 md:mt-3 md:text-lg dark:text-neutral-400">
-      Manage your password, API key, and active sessions
+      Manage your password, API tokens, and active sessions
     </p>
     <a
       href="/security-posture"
@@ -442,113 +331,11 @@
       </div>
     {/if}
 
-    <!-- API Key -->
-    <div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-      <div class="border-b border-neutral-200 px-6 py-4 dark:border-neutral-800">
-        <h2 class="text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-50">API Key</h2>
-        <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Authenticate API requests via <code class="rounded bg-neutral-100 px-1 py-0.5 text-xs dark:bg-neutral-800"
-            >X-Api-Key</code
-          > header
-        </p>
-      </div>
-      <div class="p-6">
-        {#if hasStoredAuthKey}
-          <div class="space-y-4">
-            {#key remaskSession}
-              <MaskedApiKey
-                label="Auth API key"
-                maskedValue={maskedApiKeyValue}
-                value={plainApiKeyValue}
-                hasValue={data.hasApiKey}
-                revealLabel="Show"
-                hideLabel="Hide"
-                copyLabel="Copy"
-                disabled={revealInProgress}
-                on:revealChange={handleRevealChange}
-                on:copyFeedback={handleCopyFeedback}
-              />
-            {/key}
-
-            <form
-              method="POST"
-              action="?/revealAuthKey"
-              use:enhance={() => {
-                const requestToken = pendingRevealRequestToken;
-                return async ({ result, update }) => {
-                  if (requestToken !== revealRequestToken) {
-                    return;
-                  }
-
-                  revealInProgress = false;
-                  if (result.type === 'success') {
-                    const response = result.data as { revealedAuthKey?: string };
-                    if (response?.revealedAuthKey) {
-                      setActiveAuthApiKey(response.revealedAuthKey, 'reveal');
-                      if (copyAfterReveal) {
-                        await copyActiveAuthApiKey();
-                        copyAfterReveal = false;
-                      }
-                    } else {
-                      alertStore.add('error', 'Unable to retrieve API key');
-                      clearActiveAuthApiKey(activeAuthApiKeySource === 'regenerate');
-                    }
-                  } else {
-                    alertStore.add('error', 'Unable to retrieve API key');
-                    clearActiveAuthApiKey(activeAuthApiKeySource === 'regenerate');
-                  }
-
-                  copyAfterReveal = false;
-
-                  await update();
-                };
-              }}
-            >
-              <button type="submit" class="hidden" aria-label="Reveal API key" bind:this={revealSubmitButton}></button>
-            </form>
-
-            <form
-              method="POST"
-              action="?/regenerateApiKey"
-              use:enhance={() => {
-                regeneratingKey = true;
-                return async ({ update }) => {
-                  await update();
-                  regeneratingKey = false;
-                };
-              }}
-            >
-              <Button
-                type="submit"
-                variant="secondary"
-                size="sm"
-                icon={RefreshCw}
-                iconColor="text-accent-500"
-                text={regeneratingKey ? 'Regenerating...' : 'Regenerate Key'}
-                disabled={regeneratingKey}
-              />
-            </form>
-          </div>
-        {:else}
-          <div class="flex items-center gap-4">
-            <p class="text-sm text-neutral-500 dark:text-neutral-400">No API key configured</p>
-            <form
-              method="POST"
-              action="?/regenerateApiKey"
-              use:enhance={() => {
-                regeneratingKey = true;
-                return async ({ update }) => {
-                  await update();
-                  regeneratingKey = false;
-                };
-              }}
-            >
-              <Button type="submit" variant="secondary" size="sm" text="Generate Key" />
-            </form>
-          </div>
-        {/if}
-      </div>
-    </div>
+    <ApiTokensCard
+      tokens={data.apiTokens}
+      hasLegacyToken={data.hasLegacyApiToken}
+      created={form?.createdApiToken ?? null}
+    />
 
     {#if data.passkeysEnabled}
       <!-- Passkeys -->

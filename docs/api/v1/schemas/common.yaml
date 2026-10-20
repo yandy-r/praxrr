@@ -13,3 +13,22 @@ HealthStatus:
     - degraded
     - unhealthy
   description: Overall health status
+
+ScopeForbiddenResponse:
+  type: object
+  required:
+    - error
+    - requiredScope
+  properties:
+    error:
+      type: string
+      description: Always `Forbidden`.
+    requiredScope:
+      type: string
+      enum:
+        - read
+        - mcp
+        - sync:apply
+        - admin
+      description: The API token scope this request requires.
+  description: An authenticated API token lacks the scope the requested route requires.

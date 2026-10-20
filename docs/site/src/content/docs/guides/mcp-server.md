@@ -22,20 +22,24 @@ disable it.
 
 ## Authentication
 
-The MCP endpoint uses Praxrr's existing API-key auth — there is **no** OAuth or
-`Authorization: Bearer` support. Configure your client to send the header:
+The MCP endpoint uses Praxrr API tokens. There is **no** OAuth or
+`Authorization: Bearer` support. Create a token in **Settings → Security** with
+the `mcp` scope (or `admin`, which includes it), copy it when it is shown (it is
+shown only once), and configure your client to send the header:
 
 ```
-X-Api-Key: <your Praxrr API key>
+X-Api-Key: prx_<your token>
 ```
 
-Find or regenerate the key under **Settings → Authentication**. This requires
-`AUTH=on`. Notes:
+Notes:
 
-- Under `AUTH=off` or `AUTH=local`, the endpoint is reachable without a key
-  (the deployment already trusts the caller/network).
-- Under `AUTH=oidc` there is no headless API-key path, so a non-browser MCP
-  client cannot authenticate in that mode.
+- Tokens work under `AUTH=on` and `AUTH=oidc`, and for remote clients under
+  `AUTH=local`.
+- Under `AUTH=off`, or under `AUTH=local` from a local IP, the endpoint is
+  reachable without a token (the deployment already trusts the caller/network).
+- A token without the `mcp` scope gets **403**. A `read`-only token is not
+  enough.
+- Revoke the token in Settings → Security to cut off a client immediately.
 
 ## Connecting a client
 
@@ -45,7 +49,7 @@ bridge with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
 
 ```bash
 npx mcp-remote https://<your-praxrr-host>/api/v1/mcp \
-  --header "X-Api-Key: <your key>"
+  --header "X-Api-Key: prx_<your token>"
 ```
 
 ## What is exposed

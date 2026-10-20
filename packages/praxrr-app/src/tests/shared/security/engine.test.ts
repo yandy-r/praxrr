@@ -19,6 +19,8 @@ import {
   type ShieldFix,
 } from '$shared/security/index.ts';
 
+const NO_TOKENS = { activeCount: 0, legacyActive: false };
+
 function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
   return {
     authMode: 'on',
@@ -26,8 +28,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     port: 6868,
     oidcConfigured: false,
     oidcPartiallyConfigured: false,
-    appApiKeyPresent: true,
-    appApiKeyStrong: true,
+    apiTokens: { activeCount: 1, legacyActive: true },
     instances: [
       { id: 1, name: 'Radarr', arrType: 'radarr', url: 'http://radarr:7878' },
       { id: 2, name: 'Sonarr', arrType: 'sonarr', url: 'http://sonarr:8989' },
@@ -103,9 +104,10 @@ function instance(id: number, url: string, dns?: DnsTransportEvidence): Instance
 
 Deno.test('computeShieldReport: stamps the engine version and generatedAt from nowIso', () => {
   const report = computeShieldReport(makeInputs());
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '4'); // '3' proxy trust (#228) → '4' DNS transport evidence (#229)
+  // '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' scoped API tokens (YAN-534).
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '5');
   assertEquals(report.engineVersion, SECURITY_POSTURE_ENGINE_VERSION);
-  assertEquals(report.engineVersion, '4');
+  assertEquals(report.engineVersion, '5');
   assertEquals(report.generatedAt, '2026-07-09T02:00:00.000Z');
 });
 
@@ -206,14 +208,15 @@ Deno.test('computeShieldReport: DNS evidence produces the exact conservative row
 Deno.test('computeShieldReport: DNS contributions, recoverable points, and order remain exact', () => {
   const local = computeShieldReport(
     makeInputs({
-      appApiKeyPresent: false,
+      apiTokens: NO_TOKENS,
       instances: [instance(1, 'http://local.example.com', dnsEvidence({}, { private: 1 }))],
     })
   );
   const localCheck = local.checks.find((check) => check.id === 'arr_transport');
-  assertEquals(local.score, 85);
+  // auth 100·40 + transport 65·30 + no-token app_key 100·15 over Σ85 → 87.6 → 88.
+  assertEquals(local.score, 88);
   assertEquals(local.band, 'hardened');
-  assertEquals(localCheck?.recoverablePoints, 15);
+  assertEquals(localCheck?.recoverablePoints, 12);
   assertEquals(
     local.checks.reduce((sum, check) => sum + check.contribution, 0),
     local.score
@@ -244,8 +247,8 @@ Deno.test('computeShieldReport: DNS contributions, recoverable points, and order
 Deno.test('computeShieldReport: DNS public and mixed evidence cap a would-be hardened report at guarded', () => {
   for (const dns of [dnsEvidence({}, { public: 1 }), dnsEvidence({}, { private: 1, public: 1 })]) {
     const instances = [instance(1, 'https://secure'), instance(2, 'http://arr.example.com', dns)];
-    const report = computeShieldReport(makeInputs({ appApiKeyPresent: false, instances }));
-    assertEquals(report.score, 85);
+    const report = computeShieldReport(makeInputs({ apiTokens: NO_TOKENS, instances }));
+    assertEquals(report.score, 88);
     assertEquals(report.band, 'guarded');
     assertEquals(report.bandCappedBy?.checkId, 'arr_transport');
   }
@@ -349,12 +352,13 @@ Deno.test('computeShieldReport: band thresholds at 85 (hardened) and 60 (guarded
 });
 
 Deno.test('computeShieldReport: recoverablePoints = round((100 - score) * weight / Σ scored weights)', () => {
-  // Only control_plane_auth scores: local=60 (weight 40); no app key (null), no instances (transport null),
-  // single-key rotation (null), redaction assured (null). Σ scored weight = 40 → round((100-60)*40/40) = 40.
-  const report = computeShieldReport(makeInputs({ authMode: 'local', appApiKeyPresent: false, instances: [] }));
+  // control_plane_auth local=60 (weight 40) + app_key_at_rest no tokens=100 (weight 15); no instances
+  // (transport null), single-key rotation (null), redaction assured (null). Σ scored weight = 55 →
+  // round((100-60)*40/55) = 29.
+  const report = computeShieldReport(makeInputs({ authMode: 'local', apiTokens: NO_TOKENS, instances: [] }));
   const auth = report.checks.find((c) => c.id === 'control_plane_auth');
   assertEquals(auth?.score, 60);
-  assertEquals(auth?.recoverablePoints, 40);
+  assertEquals(auth?.recoverablePoints, 29);
 });
 
 Deno.test('computeShieldReport: AUTH=off on a public bind is capped to exposed despite a high average', () => {
@@ -371,12 +375,12 @@ Deno.test('computeShieldReport: AUTH=off on a public bind is capped to exposed d
 });
 
 Deno.test('computeShieldReport: a public-http instance caps a would-be-hardened band down to guarded', () => {
-  // No app key set (app_key null) + auth 100 + transport mean(https 100, public-http 30)=65 →
-  // (100*40 + 65*30)/70 = 85 which is numerically 'hardened', but the public-http action caps it.
+  // No active tokens (app_key 100) + auth 100 + transport mean(https 100, public-http 30)=65 →
+  // (100*40 + 65*30 + 100*15)/85 ≈ 88 which is numerically 'hardened', but the public-http action caps it.
   const report = computeShieldReport(
     makeInputs({
       authMode: 'on',
-      appApiKeyPresent: false,
+      apiTokens: NO_TOKENS,
       instances: [
         { id: 1, name: 'Secure', arrType: 'radarr', url: 'https://secure' },
         { id: 2, name: 'Exposed', arrType: 'sonarr', url: 'http://8.8.8.8' },
@@ -421,7 +425,7 @@ Deno.test('computeShieldReport: actionability invariant — no warning/danger re
     makeInputs({ authMode: 'off', bindHost: '0.0.0.0' }),
     makeInputs({ authMode: 'local' }),
     makeInputs({ authMode: 'oidc', oidcConfigured: false }),
-    makeInputs({ authMode: 'on', appApiKeyStrong: false }),
+    makeInputs({ authMode: 'on', apiTokens: { activeCount: 1, legacyActive: true } }),
     makeInputs({ instances: [{ id: 1, name: 'R', arrType: 'radarr', url: 'http://8.8.8.8' }] }),
     makeInputs({ redactionVerified: false }),
     makeInputs({
@@ -504,14 +508,14 @@ Deno.test(
         makeInputs({
           session,
           authMode: 'on',
-          appApiKeyPresent: false,
+          apiTokens: NO_TOKENS,
           instances: [
             { id: 1, name: 'Secure', arrType: 'radarr', url: 'https://secure' },
             { id: 2, name: 'Exposed', arrType: 'sonarr', url: 'http://8.8.8.8' },
           ],
         })
       );
-      assertEquals(transportCapped.score, 85);
+      assertEquals(transportCapped.score, 88);
       assertEquals(transportCapped.band, 'guarded');
       assertEquals(transportCapped.bandCappedBy?.checkId, 'arr_transport');
 
@@ -527,9 +531,9 @@ Deno.test(
       assertEquals(authCapped.bandCappedBy?.checkId, 'control_plane_auth');
 
       const recoverable = computeShieldReport(
-        makeInputs({ session, authMode: 'local', appApiKeyPresent: false, instances: [] })
+        makeInputs({ session, authMode: 'local', apiTokens: NO_TOKENS, instances: [] })
       );
-      assertEquals(recoverable.checks.find((c) => c.id === 'control_plane_auth')?.recoverablePoints, 40);
+      assertEquals(recoverable.checks.find((c) => c.id === 'control_plane_auth')?.recoverablePoints, 29);
 
       for (const report of [hardened, guarded, exposed, transportCapped, authCapped, recoverable]) {
         const sum = report.checks.reduce((total, c) => total + c.contribution, 0);
@@ -553,10 +557,10 @@ Deno.test(
   }
 );
 
-Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 4 for every transport', () => {
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '4');
+Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 5 for every transport', () => {
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '5');
   for (const session of ALL_SESSIONS) {
-    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '4');
+    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '5');
   }
 });
 

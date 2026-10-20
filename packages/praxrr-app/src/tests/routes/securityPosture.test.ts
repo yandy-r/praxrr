@@ -204,7 +204,7 @@ migratedTest('GET /security-posture/summary emits bounded redacted DNS evidence 
 		const first = await getSummary();
 		assertEquals(first.status, 200);
 		assertEquals(first.cacheControl, 'no-store');
-		assertEquals(first.body.engineVersion, '4');
+		assertEquals(first.body.engineVersion, '5');
 
 		const publicRow = rowByHost(first.body, 'public.example.com');
 		assertEquals(publicRow.arrType, 'radarr');
@@ -361,8 +361,8 @@ migratedTest(
   async () => {
     const { status, body } = await getSummary();
     assertEquals(status, 200);
-    // Report surface: '3' proxy trust (#228) → '4' DNS transport evidence (#229).
-    assertEquals(body.engineVersion, '4');
+    // Report surface: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens.
+    assertEquals(body.engineVersion, '5');
 
     // A no-context ({}) event cannot observe transport, so it is reported unknown and never assumed safe.
     const transportAdvisory = body.advisories.find((a) => a.id === 'session_cookie_transport');

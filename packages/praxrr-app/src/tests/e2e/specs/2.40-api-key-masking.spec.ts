@@ -8,8 +8,8 @@ function getTmdbCard(page: Page): Locator {
   return page.locator('div.rounded-lg').filter({ has: page.getByRole('heading', { name: 'TMDB Configuration' }) });
 }
 
-function getSecurityApiCard(page: Page): Locator {
-  return page.locator('div.rounded-lg').filter({ has: page.getByRole('heading', { name: 'API Key' }) });
+function getSecurityApiTokensCard(page: Page): Locator {
+  return page.locator('div.rounded-lg').filter({ has: page.getByRole('heading', { name: 'API tokens' }) });
 }
 
 function getMaskedDisplay(card: Locator): Locator {
@@ -162,53 +162,66 @@ test.describe('3.2 API key masking UI regression coverage', () => {
     expect(finalPayload).not.toContain(TMDB_REGRESSION_KEY);
   });
 
-  test('Regenerated auth key takes precedence over masked load data until remasked', async ({ page }) => {
+  test('Created API token secret is shown once, gone after reload, and revocable via confirmation', async ({
+    page,
+  }) => {
+    await setupClipboardMock(page, 'success');
     await page.goto('/settings/security');
     await page.waitForLoadState('networkidle');
 
-    const card = getSecurityApiCard(page);
-    const generateButton = card.getByRole('button', { name: 'Generate Key' });
-    const regenerateButton = card.getByRole('button', { name: 'Regenerate Key' });
-    const hideButton = card.getByRole('button', { name: 'Hide Auth API key' });
-    const showButton = card.getByRole('button', { name: 'Show Auth API key' });
+    const tokenName = `e2e-token-${Date.now()}`;
+    const card = getSecurityApiTokensCard(page);
+    await card.getByRole('textbox', { name: 'Name' }).fill(tokenName);
+    await expect(card.getByRole('checkbox', { name: /^Read/ })).toBeChecked();
+    await card.getByRole('combobox', { name: 'Expires' }).selectOption('30');
 
-    if (await generateButton.count()) {
-      await generateButton.click();
-    }
-
-    await expect(regenerateButton).toBeVisible();
-    await expect(showButton.or(hideButton)).toBeVisible();
-
-    if (await hideButton.count()) {
-      await hideButton.click();
-    }
-
-    const keyDisplay = getMaskedDisplay(card);
-    const maskedData = await keyDisplay.textContent();
-    expect(maskedData).toBeTruthy();
-    if (maskedData) {
-      expect(maskedData).not.toContain(TMDB_REGRESSION_KEY);
-    }
-
-    const regenerateRequest = page.waitForResponse((response) => {
+    const createResponse = page.waitForResponse((response) => {
       return (
         response.url().includes('/settings/security') &&
-        response.url().includes('regenerateApiKey') &&
+        response.url().includes('createApiToken') &&
         response.request().method() === 'POST'
       );
     });
-    await regenerateButton.click();
-    const regenerateResponse = await regenerateRequest;
-    const regeneratePayload = (await regenerateResponse.json()) as { apiKey?: string };
-    const regeneratedKey = regeneratePayload.apiKey;
-    expect(regeneratedKey).toBeTruthy();
+    await card.getByRole('button', { name: 'Create token' }).click();
+    await createResponse;
 
-    await expect(keyDisplay).toContainText(regeneratedKey!);
-    await expect(hideButton).toBeVisible();
+    const secretField = card.getByRole('textbox', { name: 'New API token' });
+    await expect(secretField).toBeVisible();
+    await expect(card.getByText("Copy this token now. You won't be able to see it again.")).toBeVisible();
+    const secret = await secretField.inputValue();
+    expect(secret).toMatch(/^prx_[0-9a-f]{64}$/);
 
-    await hideButton.click();
-    await expect(showButton).toBeVisible();
-    await expect(keyDisplay).not.toContainText(regeneratedKey!);
+    await card.getByRole('button', { name: 'Copy new API token' }).click();
+    await expect(getToast(page, 'Token copied to clipboard')).toBeVisible();
+    expect((await getClipboardWrites(page)).join('\n')).toContain(secret);
+
+    const row = card.getByRole('row').filter({ hasText: tokenName });
+    await expect(row).toContainText('prx_');
+    await expect(row).toContainText('Active');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(await page.content()).not.toContain(secret);
+    await expect(getSecurityApiTokensCard(page).getByRole('textbox', { name: 'New API token' })).toHaveCount(0);
+
+    const reloadedRow = getSecurityApiTokensCard(page).getByRole('row').filter({ hasText: tokenName });
+    await reloadedRow.getByRole('button', { name: `Revoke token ${tokenName}` }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('Revoke API token');
+    const revokeResponse = page.waitForResponse((response) => {
+      return (
+        response.url().includes('/settings/security') &&
+        response.url().includes('revokeApiToken') &&
+        response.request().method() === 'POST'
+      );
+    });
+    await dialog.getByRole('button', { name: 'Revoke' }).click();
+    await revokeResponse;
+
+    await expect(getToast(page, 'API token revoked')).toBeVisible();
+    await expect(reloadedRow).toContainText('Revoked');
+    await expect(reloadedRow.getByRole('button', { name: `Revoke token ${tokenName}` })).toHaveCount(0);
   });
 
   test('Copy success and failure paths never expose plaintext in status/toast output', async ({ page }) => {

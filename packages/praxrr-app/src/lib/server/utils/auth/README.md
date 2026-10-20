@@ -174,15 +174,15 @@ sequenceDiagram
 
 ### AUTH=on (Default)
 
-| Scenario                              | What Happens              |
-| ------------------------------------- | ------------------------- |
-| First run, no users                   | Redirect to `/auth/setup` |
-| User exists, not logged in            | Redirect to `/auth/login` |
-| User exists, logged in                | Allow access              |
-| Session expired                       | Redirect to `/auth/login` |
-| API request, no auth                  | 401 JSON response         |
-| API request, valid X-Api-Key          | Allow access              |
-| Visit `/auth/setup` after user exists | Redirect to `/`           |
+| Scenario                              | What Happens                      |
+| ------------------------------------- | --------------------------------- |
+| First run, no users                   | Redirect to `/auth/setup`         |
+| User exists, not logged in            | Redirect to `/auth/login`         |
+| User exists, logged in                | Allow access                      |
+| Session expired                       | Redirect to `/auth/login`         |
+| API request, no auth                  | 401 JSON response                 |
+| API request, valid scoped token       | Allow if scope suffices, else 403 |
+| Visit `/auth/setup` after user exists | Redirect to `/`                   |
 
 ### AUTH=local
 
@@ -195,19 +195,52 @@ sequenceDiagram
 
 ### AUTH=oidc
 
-| Scenario                 | What Happens                                 |
-| ------------------------ | -------------------------------------------- |
-| Not logged in            | Redirect to `/auth/login` (shows SSO button) |
-| Click "Sign in with SSO" | Redirect to OIDC provider                    |
-| Return from provider     | Create session, redirect to `/`              |
-| Session expired          | Redirect to `/auth/login`                    |
-| Visit `/auth/setup`      | Redirect to `/` (no setup needed)            |
+| Scenario                  | What Happens                                 |
+| ------------------------- | -------------------------------------------- |
+| Not logged in             | Redirect to `/auth/login` (shows SSO button) |
+| Click "Sign in with SSO"  | Redirect to OIDC provider                    |
+| Return from provider      | Create session, redirect to `/`              |
+| Session expired           | Redirect to `/auth/login`                    |
+| Visit `/auth/setup`       | Redirect to `/` (no setup needed)            |
+| `/api/v1/*` + valid token | Allow if scope suffices, else 403            |
 
 ### AUTH=off
 
 | Scenario    | What Happens                  |
 | ----------- | ----------------------------- |
 | Any request | Allow access (no auth checks) |
+
+## API Tokens
+
+Programmatic access uses named, scoped, revocable API tokens managed in Settings → Security
+(replaces the single plaintext `auth_settings.api_key`, which is always NULL since migration
+`20261021`).
+
+- **Transport**: `X-Api-Key: prx_…` header or `?apikey=prx_…` query parameter.
+- **Where**: only paths under `/api/v1/`; tokens never authenticate page routes, form actions, or
+  the app-internal non-v1 `/api/*` routes (e.g. `/api/backups/download/*`), which need a session.
+- **Modes**: checked in every authenticating mode (`on`, `local` from a remote IP, `oidc`). Under
+  `off` or a local-IP bypass no token is needed.
+- **Storage**: only the SHA-256 hex of the secret is stored; lookup is by hash, never by
+  comparing plaintext. The secret (`prx_` + 64 hex) is shown once at creation. `prefix`
+  (`prx_ab12`) is a non-secret display handle.
+- **Lifecycle**: optional expiry (30/90/365 days); revocation takes effect on the next request;
+  `last_used_at` is updated at most once per 60 seconds per token.
+- **Legacy key**: an existing key is migrated to a hashed `admin` token named "Legacy API key"
+  (flagged legacy) when a user exists, so existing integrations keep working until it is revoked.
+
+### Scopes
+
+`scopePolicy.ts` (`requiredScopeFor`) maps each request to a scope; `admin` implies every scope.
+Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 403
+`{ "error": "Forbidden", "requiredScope": "…" }`.
+
+| Scope        | Grants                                                                                                                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`       | GET/HEAD/OPTIONS on `/api/v1/*`; dry-run POSTs: `/api/v1/sync/preview`, `/api/v1/goals/preview`, `/api/v1/simulate/{score,impact}`, `/api/v1/entity-testing/evaluate`                                                         |
+| `mcp`        | `/api/v1/mcp` (any method); each MCP tool also declares `requiredScope` (JSON-RPC `-32003` + HTTP 403 when unmet)                                                                                                             |
+| `sync:apply` | POST `/api/v1/sync/preview/{id}/apply`, `/api/v1/trash-guide/sources/{id}/sync`, `/api/v1/goals/apply`, `/api/v1/pcd/{db}/snapshots/{id}/rollback`, `/api/v1/canary/rollouts`, `/api/v1/canary/rollouts/{id}/{proceed,abort}` |
+| `admin`      | Everything, including every other mutating `/api/v1/*` route                                                                                                                                                                  |
 
 ## Session Management
 
@@ -218,14 +251,16 @@ sequenceDiagram
 
 ## Files
 
-| File            | Purpose                                      |
-| --------------- | -------------------------------------------- |
-| `middleware.ts` | Core auth logic (getAuthState, isPublicPath) |
-| `password.ts`   | Bcrypt hash/verify                           |
-| `network.ts`    | IP detection (getClientIp, isLocalAddress)   |
-| `userAgent.ts`  | Parse browser/OS/device from user agent      |
-| `apiKey.ts`     | API key generation                           |
-| `oidc.ts`       | OIDC discovery, token exchange, JWT parsing  |
+| File             | Purpose                                             |
+| ---------------- | --------------------------------------------------- |
+| `middleware.ts`  | Core auth logic (getAuthState, isPublicPath)        |
+| `password.ts`    | Bcrypt hash/verify                                  |
+| `network.ts`     | IP detection (getClientIp, isLocalAddress)          |
+| `userAgent.ts`   | Parse browser/OS/device from user agent             |
+| `apiTokens.ts`   | Token secret generation, hashing, create, resolve   |
+| `principal.ts`   | `AuthPrincipal` (session / bypass / token + scopes) |
+| `scopePolicy.ts` | Route → required token scope (fail-closed)          |
+| `oidc.ts`        | OIDC discovery, token exchange, JWT parsing         |
 
 ## Environment Variables
 
@@ -248,4 +283,4 @@ OIDC_CLIENT_SECRET=your-secret
 | `/auth/logout`        | Logout (clear session)                 |
 | `/auth/oidc/login`    | Initiate OIDC flow                     |
 | `/auth/oidc/callback` | Handle OIDC provider response          |
-| `/settings/security`  | Manage sessions, API key, password     |
+| `/settings/security`  | Manage sessions, API tokens, password  |

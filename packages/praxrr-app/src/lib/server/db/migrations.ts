@@ -89,6 +89,7 @@ import { migration as migration20260724CreatePluginRegistry } from './migrations
 import { migration as migration20260725AddPluginsEnabledToGeneralSettings } from './migrations/20260725_add_plugins_enabled_to_general_settings.ts';
 import { migration as migration20261006AddSessionPublicId } from './migrations/20261006_add_session_public_id.ts';
 import { migration as migration20261020AddSetupChecklistDismissedAt } from './migrations/20261020_add_setup_checklist_dismissed_at.ts';
+import { migration as migration20261021CreateApiTokens } from './migrations/20261021_create_api_tokens.ts';
 
 export interface Migration {
   version: number;
@@ -412,6 +413,7 @@ export function loadMigrations(): Migration[] {
     migration20260725AddPluginsEnabledToGeneralSettings,
     migration20261006AddSessionPublicId,
     migration20261020AddSetupChecklistDismissedAt,
+    migration20261021CreateApiTokens,
   ];
 
   // Sort by version number

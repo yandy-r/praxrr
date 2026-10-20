@@ -11,16 +11,19 @@ mcp:
       Read-only: exposes Praxrr's configuration and observability surface (instances, drift, config
       health, security posture, PCD databases and resolved entities, sync history, and the redacted
       feature-aware `list_plugins` tool) plus a write-free `preview_sync`. `list_plugins` exposes no
-      plugin source directory, raw manifest, credential, or mutation handler. Authenticate with the
-      `X-Api-Key` header (required under AUTH=on); there is no OAuth/Bearer support. Disabled (404)
-      when `MCP_ENABLED` is off.
+      plugin source directory, raw manifest, credential, or mutation handler. Authenticate with an
+      API token (`prx_…`) carrying the `mcp` scope (or `admin`) in the `X-Api-Key` header; tokens
+      work under AUTH=on, AUTH=oidc, and for remote clients under AUTH=local. There is no
+      OAuth/Bearer support. Disabled (404) when `MCP_ENABLED` is off.
     tags:
       - MCP
     parameters:
       - name: X-Api-Key
         in: header
         required: false
-        description: Praxrr API key. Required for non-browser clients under AUTH=on.
+        description: |
+          Praxrr API token (`prx_…`) with the `mcp` scope (or `admin`). Required for non-browser
+          clients under AUTH=on and AUTH=oidc, and for remote clients under AUTH=local.
         schema:
           type: string
       - name: MCP-Protocol-Version
@@ -55,9 +58,23 @@ mcp:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
-        description: Unauthenticated (missing or invalid API key).
+        description: Unauthenticated (missing, invalid, revoked, or expired API token).
       '403':
-        description: Rejected cross-origin request (DNS-rebinding defense).
+        description: |
+          Rejected cross-origin request (DNS-rebinding defense), or the API token lacks the `mcp`
+          scope (body `{ "error": "Forbidden", "requiredScope": "mcp" }`). A tool call whose
+          required scope is not granted is a JSON-RPC `-32003` error, also returned with 403. The
+          cross-origin rejection has no body.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+                - type: object
+                  additionalProperties: true
+                  description: |
+                    A JSON-RPC 2.0 error response object whose `error.code` is `-32003` (tool
+                    requires a scope the token lacks).
       '404':
         description: The MCP endpoint is disabled (MCP_ENABLED is off).
       '413':

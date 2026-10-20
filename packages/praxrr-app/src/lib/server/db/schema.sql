@@ -951,10 +951,31 @@ CREATE UNIQUE INDEX idx_sessions_public_id ON sessions(public_id);
 CREATE TABLE auth_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     session_duration_hours INTEGER NOT NULL DEFAULT 168,  -- 7 days
-    api_key TEXT,                           -- For programmatic access
+    api_key TEXT,                           -- Deprecated: always NULL since 20261021 (see api_tokens)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ==============================================================================
+-- TABLE: api_tokens
+-- Purpose: Named, hashed, scoped, revocable API tokens (replaces auth_settings.api_key)
+-- Migration: 20261021_create_api_tokens.ts
+-- ==============================================================================
+
+CREATE TABLE api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,        -- SHA-256 hex of the secret; plaintext never stored
+    prefix TEXT NOT NULL,                   -- Non-secret display handle (e.g. prx_ab12)
+    scopes TEXT NOT NULL,                   -- JSON array of read|mcp|sync:apply|admin
+    is_legacy INTEGER NOT NULL DEFAULT 0,   -- 1 = migrated from auth_settings.api_key
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME,
+    expires_at DATETIME,                    -- NULL = never; CURRENT_TIMESTAMP format
+    revoked_at DATETIME
+);
+
+CREATE INDEX idx_api_tokens_revoked_at ON api_tokens(revoked_at);
 
 -- ==============================================================================
 -- TABLE: setup_state

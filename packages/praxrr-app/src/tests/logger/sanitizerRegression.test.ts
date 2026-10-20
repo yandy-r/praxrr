@@ -40,6 +40,17 @@ Deno.test('sanitizeLogMeta strips embedded tokens and credential query values', 
   assert(serialized.includes('"header":"[REDACTED]"'));
 });
 
+Deno.test('sanitizeLogMeta strips Praxrr prx_ API token secrets by value and when embedded', () => {
+  const secret = `prx_${'ab12'.repeat(16)}`;
+  const sanitized = sanitizeLogMeta({ opaque: secret, note: `client sent ${secret} on /api/v1/mcp` }) as Record<
+    string,
+    string
+  >;
+  assertEquals(sanitized.opaque, '[REDACTED]');
+  assertEquals(sanitized.note, 'client sent [REDACTED] on /api/v1/mcp');
+  assert(!JSON.stringify(sanitized).includes(secret), 'a prx_ token must not survive');
+});
+
 Deno.test('sanitizeLogMeta redacts a non-string value under a sensitive key', () => {
   const sanitized = sanitizeLogMeta({ credential: { user: 'admin', token: 42 } }) as Record<string, unknown>;
   assertEquals(sanitized.credential, '[REDACTED]');

@@ -24,19 +24,23 @@ Accepted truthy values are `1`, `true`, `yes`, and `on`. Any other value
 
 `/api/v1/metrics` uses the same auth as the rest of `/api/v1`:
 
-- Under `AUTH=on`, send your API key as the `X-Api-Key` header or the
-  `?apikey=` query parameter, or use an authenticated session. Unauthenticated
-  requests return **401**.
-- Under `AUTH=oidc`, API keys are not accepted; only a browser session works,
-  which a scraper cannot keep, so scraping is not supported in this mode yet.
-- Under `AUTH=off`, or under `AUTH=local` from a local IP, the endpoint is
-  open like the rest of the API.
+- Under `AUTH=on` and `AUTH=oidc`, send an API token as the `X-Api-Key` header
+  or the `?apikey=` query parameter, or use an authenticated session.
+  Unauthenticated requests return **401**.
+- Under `AUTH=local`, requests from a local IP are open; remote scrapers need a
+  token.
+- Under `AUTH=off`, the endpoint is open like the rest of the API.
+
+Create a dedicated token for Prometheus in **Settings → Security** with only the
+`read` scope. That is all `GET /api/v1/metrics` needs, and a `read` token cannot
+change anything. The token is shown once, so copy it into your secret file
+straight away. A token without the needed scope gets **403**.
 
 ## Prometheus scrape config
 
-Send the API key in the `X-Api-Key` header. Prometheus supports custom headers
-through `http_headers`; `files` reads the key from a file so it stays out of the
-config and is hidden on the Prometheus configuration page:
+Send the token in the `X-Api-Key` header. Prometheus supports custom headers
+through `http_headers`; `files` reads the token from a file so it stays out of
+the config and is hidden on the Prometheus configuration page:
 
 ```yaml
 scrape_configs:
@@ -46,19 +50,19 @@ scrape_configs:
     metrics_path: /api/v1/metrics
     http_headers:
       X-Api-Key:
-        files: ['/etc/prometheus/praxrr-api-key']
+        files: ['/etc/prometheus/praxrr-api-token']
 ```
 
-If your scraper cannot set headers, pass the key as a query parameter instead:
+If your scraper cannot set headers, pass the token as a query parameter instead:
 
 ```yaml
 params:
-  apikey: ['<your Praxrr API key>']
+  apikey: ['prx_<your read token>']
 ```
 
-With `params`, the key becomes part of the request URL and can end up in access
-logs (reverse proxy or Praxrr request logs). Use the header form when you can,
-and restrict access to those logs.
+With `params`, the token becomes part of the request URL and can end up in
+access logs (reverse proxy or Praxrr request logs). Use the header form when you
+can, and restrict access to those logs.
 
 ## Metric reference
 

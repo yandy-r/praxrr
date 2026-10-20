@@ -6,6 +6,7 @@ import { Database } from '@jsr/db__sqlite';
 import { Kysely } from 'kysely';
 import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import { setCache, deleteCache } from '$pcd/database/registry.ts';
 import { GET as GET_GRAPH } from '../../routes/api/v1/pcd/[databaseId]/graph/+server.ts';
@@ -18,7 +19,7 @@ type DependencyGraphResponse = components['schemas']['DependencyGraphResponse'];
 type GraphImpactResponse = components['schemas']['GraphImpactResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
-function buildLocals(authenticated: boolean) {
+function buildLocals(authenticated: boolean): App.Locals {
   return authenticated
     ? {
         user: {
@@ -30,11 +31,13 @@ function buildLocals(authenticated: boolean) {
         },
         session: null,
         authBypass: false,
+        principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
       }
     : {
         user: null,
         session: null,
         authBypass: false,
+        principal: null,
       };
 }
 

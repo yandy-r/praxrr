@@ -19,7 +19,7 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * per-check score formula, OR the unscored advisory/assurance report surface changes, so a client
  * can tell a report was produced by a different engine generation. Declared here ONCE.
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '4';
+export const SECURITY_POSTURE_ENGINE_VERSION = '5';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -191,6 +191,14 @@ export interface InstanceFact {
   readonly dns?: DnsTransportEvidence;
 }
 
+/** Praxrr API token state (counts only; secrets and hashes are NEVER carried into the engine). */
+export interface ApiTokenFacts {
+  /** Non-revoked, non-expired tokens. */
+  readonly activeCount: number;
+  /** An active token migrated from the deprecated single global API key exists. */
+  readonly legacyActive: boolean;
+}
+
 /** Credential key-ring facts used to detect instances still encrypted under a retired key. */
 export interface RotationFacts {
   readonly activeVersion: string;
@@ -229,9 +237,7 @@ export interface PostureInputs {
   readonly oidcConfigured: boolean;
   /** Some but not all OIDC settings present (a misconfiguration that weakens `oidc`). */
   readonly oidcPartiallyConfigured: boolean;
-  readonly appApiKeyPresent: boolean;
-  /** Length ≥ 32; the key value itself is NEVER carried into the engine. */
-  readonly appApiKeyStrong: boolean;
+  readonly apiTokens: ApiTokenFacts;
   readonly instances: readonly InstanceFact[];
   readonly rotation: RotationFacts;
   /** Runtime self-verify: `sanitizeLogMeta` stripped a planted secret at gather time. */

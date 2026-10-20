@@ -38,6 +38,7 @@ import {
 } from '$sync/preview/limits.ts';
 import { DEFAULT_RATE_LIMIT_MAX_REQUESTS, resetRateLimitForTests } from '$utils/rateLimit.ts';
 import { logger } from '$logger/logger.ts';
+import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 
 type ListGetEvent = Parameters<typeof GET_LIST>[0];
 type NamedGetEvent = Parameters<typeof GET_NAMED>[0];
@@ -49,7 +50,7 @@ type ResolvedLiveDiffResponse = components['schemas']['ResolvedLiveDiffResponse'
 type CrossInstanceComparisonResponse = components['schemas']['CrossInstanceComparisonResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
-function buildLocals(authenticated: boolean) {
+function buildLocals(authenticated: boolean): App.Locals {
   return authenticated
     ? {
         user: {
@@ -61,11 +62,13 @@ function buildLocals(authenticated: boolean) {
         },
         session: null,
         authBypass: false,
+        principal: { kind: 'session', scopes: API_TOKEN_SCOPES },
       }
     : {
         user: null,
         session: null,
         authBypass: false,
+        principal: null,
       };
 }
 

@@ -756,6 +756,8 @@ components:
       $ref: './schemas/common.yaml#/ComponentStatus'
     HealthStatus:
       $ref: './schemas/common.yaml#/HealthStatus'
+    ScopeForbiddenResponse:
+      $ref: './schemas/common.yaml#/ScopeForbiddenResponse'
     # Health
     HealthResponse:
       $ref: './schemas/health.yaml#/HealthResponse'
