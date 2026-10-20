@@ -88,6 +88,7 @@ import { migration as migration20260723AddCanaryPreviewEvidence } from './migrat
 import { migration as migration20260724CreatePluginRegistry } from './migrations/20260724_create_plugin_registry.ts';
 import { migration as migration20260725AddPluginsEnabledToGeneralSettings } from './migrations/20260725_add_plugins_enabled_to_general_settings.ts';
 import { migration as migration20261006AddSessionPublicId } from './migrations/20261006_add_session_public_id.ts';
+import { migration as migration20261020AddSetupChecklistDismissedAt } from './migrations/20261020_add_setup_checklist_dismissed_at.ts';
 
 export interface Migration {
   version: number;
@@ -410,6 +411,7 @@ export function loadMigrations(): Migration[] {
     migration20260724CreatePluginRegistry,
     migration20260725AddPluginsEnabledToGeneralSettings,
     migration20261006AddSessionPublicId,
+    migration20261020AddSetupChecklistDismissedAt,
   ];
 
   // Sort by version number

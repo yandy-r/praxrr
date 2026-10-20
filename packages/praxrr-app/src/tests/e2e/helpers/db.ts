@@ -175,3 +175,37 @@ export function parseDesiredState(op: PcdOp): Record<string, unknown> | null {
     return null;
   }
 }
+
+export interface SetupStateRow {
+  wizard_completed: number;
+  wizard_dismissed_at: string | null;
+  wizard_current_step: string;
+  setup_checklist_dismissed_at: string | null;
+}
+
+/** Read the singleton setup_state row (read-only; never mutates wizard state) */
+export function getSetupState(): SetupStateRow {
+  const db = openDb();
+  try {
+    const row = db
+      .prepare(
+        'SELECT wizard_completed, wizard_dismissed_at, wizard_current_step, setup_checklist_dismissed_at FROM setup_state WHERE id = 1'
+      )
+      .get() as SetupStateRow | undefined;
+    if (!row) throw new Error('setup_state row not found');
+    return row;
+  } finally {
+    db.close();
+  }
+}
+
+/** Count configured Arr instances */
+export function countArrInstances(): number {
+  const db = openDb();
+  try {
+    const row = db.prepare('SELECT COUNT(*) AS count FROM arr_instances').get() as { count: number };
+    return row.count;
+  } finally {
+    db.close();
+  }
+}

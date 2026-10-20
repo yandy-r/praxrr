@@ -686,6 +686,10 @@ paths:
     $ref: './paths/setup.yaml#/complete'
   /setup/skip:
     $ref: './paths/setup.yaml#/skip'
+  /setup/resume:
+    $ref: './paths/setup.yaml#/resume'
+  /setup/checklist/dismiss:
+    $ref: './paths/setup.yaml#/checklistDismiss'
   /compatibility/parity:
     $ref: './paths/compatibility.yaml#/parity'
   /compatibility/versions:
@@ -1701,6 +1705,12 @@ components:
       $ref: './schemas/setup.yaml#/SetupStateResponse'
     SetupStatePatchRequest:
       $ref: './schemas/setup.yaml#/SetupStatePatchRequest'
+    SetupPrerequisites:
+      $ref: './schemas/setup.yaml#/SetupPrerequisites'
+    SetupResumeResponse:
+      $ref: './schemas/setup.yaml#/SetupResumeResponse'
+    SetupChecklistDismissResponse:
+      $ref: './schemas/setup.yaml#/SetupChecklistDismissResponse'
     TestConnectionRequest:
       $ref: './schemas/setup.yaml#/TestConnectionRequest'
     TestConnectionResponse:

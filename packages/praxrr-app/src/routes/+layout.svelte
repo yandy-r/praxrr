@@ -5,6 +5,7 @@
   import PageNav from '$ui/navigation/pageNav/pageNav.svelte';
   import BottomNav from '$ui/navigation/bottomNav/BottomNav.svelte';
   import AlertContainer from '$alerts/AlertContainer.svelte';
+  import SetupChecklist from '$ui/setup/SetupChecklist.svelte';
   import { page } from '$app/stores';
 
   export let data;
@@ -26,5 +27,8 @@
 <AlertContainer />
 
 <main class={isAuthPage ? '' : 'pt-16 pb-16 md:pt-0 md:pb-0 md:pl-80'}>
+  {#if !isAuthPage && data.setupChecklist}
+    <SetupChecklist checklist={data.setupChecklist} />
+  {/if}
   <slot />
 </main>

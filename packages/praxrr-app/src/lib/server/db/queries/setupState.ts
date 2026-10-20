@@ -9,6 +9,7 @@ export interface SetupState {
   wizard_completed: number;
   wizard_dismissed_at: string | null;
   wizard_current_step: WizardStep;
+  setup_checklist_dismissed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +100,46 @@ export const setupStateQueries = {
   markWizardDismissed(): boolean {
     const affected = db.execute(
       'UPDATE setup_state SET wizard_dismissed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+    );
+    return affected > 0;
+  },
+
+  /**
+   * Reopen the wizard at `step`: clears completion, the skip timestamp, and
+   * the checklist dismissal so the guided flow runs again. A single UPDATE, so
+   * the reset is atomic and repeat calls converge on the same state.
+   */
+  reopenWizard(step: WizardStep): boolean {
+    if (!WIZARD_STEPS.includes(step)) {
+      throw new Error(`Invalid wizard step: ${step}`);
+    }
+    const affected = db.execute(
+      `UPDATE setup_state
+       SET wizard_completed = 0,
+           wizard_dismissed_at = NULL,
+           setup_checklist_dismissed_at = NULL,
+           wizard_current_step = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = 1`,
+      step
+    );
+    return affected > 0;
+  },
+
+  /**
+   * Whether the post-skip "Finish setup" checklist was permanently dismissed
+   */
+  isChecklistDismissed(): boolean {
+    return this.get().setup_checklist_dismissed_at !== null;
+  },
+
+  /**
+   * Permanently dismiss the post-skip checklist. Keeps the first dismissal
+   * timestamp so repeat calls are idempotent.
+   */
+  markChecklistDismissed(): boolean {
+    const affected = db.execute(
+      'UPDATE setup_state SET setup_checklist_dismissed_at = COALESCE(setup_checklist_dismissed_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = 1'
     );
     return affected > 0;
   },

@@ -6,6 +6,7 @@ import type { ArrInstance, UpdateArrInstanceInput } from '../../lib/server/db/qu
 import { resolveRootLayoutData } from '../../lib/server/navigation/layoutData.ts';
 import type { User } from '../../lib/server/db/queries/users.ts';
 import { logger } from '$logger/logger.ts';
+import { setupStateQueries } from '$db/queries/setupState.ts';
 
 type Restore = () => void;
 type LayoutLoad = typeof arrLayoutLoad;
@@ -41,6 +42,24 @@ function createSettingsRequest(id: number, fields: Record<string, string>): Requ
 }
 
 Deno.test('auth routes omit navShell while auth-bypass sessions keep navShell in layout payload', () => {
+  const restores: Restore[] = [];
+  // The root layout also resolves the post-skip setup checklist; keep it off
+  // the DB here (wizard never skipped → checklist hidden).
+  installPatch(
+    setupStateQueries,
+    'get',
+    () => ({
+      id: 1,
+      default_database_linked: 0,
+      wizard_completed: 0,
+      wizard_dismissed_at: null,
+      wizard_current_step: 'welcome',
+      setup_checklist_dismissed_at: null,
+      created_at: '',
+      updated_at: '',
+    }),
+    restores
+  );
   const shellUser = {
     id: 1,
     username: 'test-user',
@@ -80,11 +99,16 @@ Deno.test('auth routes omit navShell while auth-bypass sessions keep navShell in
     authBypass: false,
   });
 
-  assertEquals('navShell' in authLogin, false);
-  assertEquals('navShell' in authSetup, false);
-  assertEquals('navShell' in unauthenticated, false);
-  assertEquals('navShell' in authBypassSession, true);
-  assertEquals('navShell' in authenticated, true);
+  try {
+    assertEquals('navShell' in authLogin, false);
+    assertEquals('navShell' in authSetup, false);
+    assertEquals('navShell' in unauthenticated, false);
+    assertEquals('navShell' in authBypassSession, true);
+    assertEquals('navShell' in authenticated, true);
+    assertEquals(authenticated.setupChecklist, null);
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
 });
 
 Deno.test('arr layout load reflects updated external_url after settings action rerun', async () => {

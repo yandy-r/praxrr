@@ -1,10 +1,12 @@
 import type { User } from '$db/queries/users.ts';
 import type { NavShell } from '$shared/navigation/types.ts';
+import { resolveSetupChecklist, type SetupChecklist } from '$server/setup/progress.ts';
 import { resolveNavShell } from './resolver.ts';
 
 export interface RootLayoutData {
   version: string;
   navShell?: NavShell;
+  setupChecklist?: SetupChecklist | null;
 }
 
 interface ResolveRootLayoutDataInput {
@@ -15,7 +17,8 @@ interface ResolveRootLayoutDataInput {
 }
 
 /**
- * Build data for the root layout, including resolved navigation shell.
+ * Build data for the root layout, including resolved navigation shell and the
+ * post-skip "Finish setup" checklist (only alongside the nav shell).
  *
  * @param input - Input including version, path, auth context, and user.
  * @returns The layout payload consumed by the root layout data hook.
@@ -45,5 +48,6 @@ export function resolveRootLayoutData({
   return {
     version,
     navShell: resolveNavShell({ user: resolvedUser }),
+    setupChecklist: resolveSetupChecklist(pathname),
   };
 }
