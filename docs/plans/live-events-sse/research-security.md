@@ -31,22 +31,22 @@ in events.
 
 ## Findings by Severity
 
-| ID | Severity | Finding | Mitigation |
-| --- | --- | --- | --- |
-| S1 | CRITICAL (if violated) | Making `/api/v1/events` public, or skipping `authHandle`, would broadcast instance names and sync outcomes to anyone. | Keep it out of `PUBLIC_PATHS`. Add a regression test that asserts an unauthenticated request gets `401` under `AUTH=on` and `oidc`. |
-| S2 | CRITICAL (if violated) | Raw sync error text (`sync_history.error`, `sectionResults[].error`, `*_sync.last_error`, `canaryError`) embeds upstream Arr response bodies and transport messages. | Event payloads use an allow-listed DTO: ids, enums, counts, `failureCode`. Fetch details through the existing endpoints. |
-| W1 | WARNING | The open stream outlives logout, session revocation (`settings/security` actions), session expiry, and token revocation. | Re-validate every 30–60 s with `sessionsQueries.getValidById` or `resolveApiToken`. Close when invalid. Hard max lifetime (for example 1 h) so the client reconnects through `authHandle`. |
-| W2 | WARNING | No cap on concurrent streams per principal or globally. Each stream holds a socket, a subscriber closure, and a timer. | Per-principal cap (for example 5) and a global cap (for example 50). Reply `429` with `Retry-After` when exceeded. Evict the oldest stream for the same session. |
-| W3 | WARNING | Subscriber leak if `cancel()`, `request.signal` abort, or write errors don't unsubscribe. | One `close()` path, idempotent. It runs on `cancel`, on `signal` abort, on an `enqueue` throw, and on revalidation failure. It clears timers and removes the subscriber. Add a test that the subscriber count returns to 0. |
-| W4 | WARNING | Slow consumers: an unbounded `enqueue` buffers without limit. | Check `controller.desiredSize`. When it is ≤ 0 for N events, drop the client. The client then refetches state on reconnect, because events are hints, not state. |
-| W5 | WARNING | `sync.canary` events could include `stateToken` / `nextToken`. These are value guards for `proceed`/`abort` (`routes/api/v1/canary/rollouts/[id]/proceed`). | Never send tokens. The Canary page refetches the rollout over the authenticated GET. |
-| A1 | ADVISORY | `AUTH=off` and `AUTH=local` (local IP) bypass grant the stream to anyone who can reach the port. This matches every other route. | Document it. No special handling. |
-| A2 | ADVISORY | `?apikey=` query auth works for `/api/v1/*`, so it would also work for the stream. Tokens in URLs leak into proxy and access logs. | Allow it with the `read` scope (`scopePolicy.ts` already maps GET → `read`). Don't use it from the app UI. Note in OpenAPI that the header is preferred. |
-| A3 | ADVISORY | CSRF: this is a GET with no side effects, and `csrfGuard` only gates mutating methods. A cross-site page can't read the stream, because there is no CORS. | Keep the handler free of side effects. Never let it enqueue or ack jobs. |
-| A4 | ADVISORY | CORS: no `Access-Control-Allow-*` headers exist in the app. `EventSource` from another origin fails, and `withCredentials` needs ACAO. | Don't add CORS headers. |
-| A5 | ADVISORY | Log noise: `authHandle` logs `Unauthorized API access` at warn on every 401. A logged-out tab reconnecting with backoff would flood logs. `Session extended` debug fires on every connect. | On 401 the client stops reconnecting and redirects to login (no retry loop). Log stream open and close at debug only. Never log per event. |
-| A6 | ADVISORY | Sliding expiry: `maybeExtendSession` runs only on the connect request. A long stream doesn't keep the session alive, which is the correct behavior. | Don't extend sessions from heartbeats. |
-| A7 | ADVISORY | Proxy buffering and compression can stall the stream, which can look like an outage. | Send `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`. Send a heartbeat comment every 15–25 s. |
+| ID  | Severity               | Finding                                                                                                                                                                                    | Mitigation                                                                                                                                                                                                                  |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1  | CRITICAL (if violated) | Making `/api/v1/events` public, or skipping `authHandle`, would broadcast instance names and sync outcomes to anyone.                                                                      | Keep it out of `PUBLIC_PATHS`. Add a regression test that asserts an unauthenticated request gets `401` under `AUTH=on` and `oidc`.                                                                                         |
+| S2  | CRITICAL (if violated) | Raw sync error text (`sync_history.error`, `sectionResults[].error`, `*_sync.last_error`, `canaryError`) embeds upstream Arr response bodies and transport messages.                       | Event payloads use an allow-listed DTO: ids, enums, counts, `failureCode`. Fetch details through the existing endpoints.                                                                                                    |
+| W1  | WARNING                | The open stream outlives logout, session revocation (`settings/security` actions), session expiry, and token revocation.                                                                   | Re-validate every 30–60 s with `sessionsQueries.getValidById` or `resolveApiToken`. Close when invalid. Hard max lifetime (for example 1 h) so the client reconnects through `authHandle`.                                  |
+| W2  | WARNING                | No cap on concurrent streams per principal or globally. Each stream holds a socket, a subscriber closure, and a timer.                                                                     | Per-principal cap (for example 5) and a global cap (for example 50). Reply `429` with `Retry-After` when exceeded. Evict the oldest stream for the same session.                                                            |
+| W3  | WARNING                | Subscriber leak if `cancel()`, `request.signal` abort, or write errors don't unsubscribe.                                                                                                  | One `close()` path, idempotent. It runs on `cancel`, on `signal` abort, on an `enqueue` throw, and on revalidation failure. It clears timers and removes the subscriber. Add a test that the subscriber count returns to 0. |
+| W4  | WARNING                | Slow consumers: an unbounded `enqueue` buffers without limit.                                                                                                                              | Check `controller.desiredSize`. When it is ≤ 0 for N events, drop the client. The client then refetches state on reconnect, because events are hints, not state.                                                            |
+| W5  | WARNING                | `sync.canary` events could include `stateToken` / `nextToken`. These are value guards for `proceed`/`abort` (`routes/api/v1/canary/rollouts/[id]/proceed`).                                | Never send tokens. The Canary page refetches the rollout over the authenticated GET.                                                                                                                                        |
+| A1  | ADVISORY               | `AUTH=off` and `AUTH=local` (local IP) bypass grant the stream to anyone who can reach the port. This matches every other route.                                                           | Document it. No special handling.                                                                                                                                                                                           |
+| A2  | ADVISORY               | `?apikey=` query auth works for `/api/v1/*`, so it would also work for the stream. Tokens in URLs leak into proxy and access logs.                                                         | Allow it with the `read` scope (`scopePolicy.ts` already maps GET → `read`). Don't use it from the app UI. Note in OpenAPI that the header is preferred.                                                                    |
+| A3  | ADVISORY               | CSRF: this is a GET with no side effects, and `csrfGuard` only gates mutating methods. A cross-site page can't read the stream, because there is no CORS.                                  | Keep the handler free of side effects. Never let it enqueue or ack jobs.                                                                                                                                                    |
+| A4  | ADVISORY               | CORS: no `Access-Control-Allow-*` headers exist in the app. `EventSource` from another origin fails, and `withCredentials` needs ACAO.                                                     | Don't add CORS headers.                                                                                                                                                                                                     |
+| A5  | ADVISORY               | Log noise: `authHandle` logs `Unauthorized API access` at warn on every 401. A logged-out tab reconnecting with backoff would flood logs. `Session extended` debug fires on every connect. | On 401 the client stops reconnecting and redirects to login (no retry loop). Log stream open and close at debug only. Never log per event.                                                                                  |
+| A6  | ADVISORY               | Sliding expiry: `maybeExtendSession` runs only on the connect request. A long stream doesn't keep the session alive, which is the correct behavior.                                        | Don't extend sessions from heartbeats.                                                                                                                                                                                      |
+| A7  | ADVISORY               | Proxy buffering and compression can stall the stream, which can look like an outage.                                                                                                       | Send `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`. Send a heartbeat comment every 15–25 s.                                                                                                           |
 
 ## Auth Analysis
 
@@ -55,13 +55,13 @@ How the pipeline treats the route (`hooks.server.ts:251-319`, `utils/auth/middle
 `handle = sequence(csrfGuard, authHandle)`. `csrfGuard` ignores GET. `getAuthState` checks, in
 order:
 
-| Mode | Resolution for `GET /api/v1/events` | Outcome |
-| --- | --- | --- |
-| `AUTH=off` | `BYPASS_PRINCIPAL`, `skipAuth` | Stream allowed. Trust is delegated to the upstream proxy (A1). |
-| `AUTH=local`, local IP | `BYPASS_PRINCIPAL` (unless `needsSetup` → 303 to `/auth/setup`) | Allowed. `EventSource` treats a redirect to HTML as an error, so the client must handle `onerror`. |
-| `AUTH=local`, remote / `AUTH=on` | API token (header or `?apikey`) **then** `session` cookie → `sessionsQueries.getValidById` | 401 JSON when neither is present. |
-| `AUTH=oidc` | Token, then session cookie (OIDC users have local sessions) | Same as `on`. |
-| Token principal | `enforceTokenScope`: GET → `read` | A token with `read` can subscribe. |
+| Mode                             | Resolution for `GET /api/v1/events`                                                        | Outcome                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `AUTH=off`                       | `BYPASS_PRINCIPAL`, `skipAuth`                                                             | Stream allowed. Trust is delegated to the upstream proxy (A1).                                     |
+| `AUTH=local`, local IP           | `BYPASS_PRINCIPAL` (unless `needsSetup` → 303 to `/auth/setup`)                            | Allowed. `EventSource` treats a redirect to HTML as an error, so the client must handle `onerror`. |
+| `AUTH=local`, remote / `AUTH=on` | API token (header or `?apikey`) **then** `session` cookie → `sessionsQueries.getValidById` | 401 JSON when neither is present.                                                                  |
+| `AUTH=oidc`                      | Token, then session cookie (OIDC users have local sessions)                                | Same as `on`.                                                                                      |
+| Token principal                  | `enforceTokenScope`: GET → `read`                                                          | A token with `read` can subscribe.                                                                 |
 
 Notes:
 
@@ -113,25 +113,25 @@ What is NOT safe to forward:
 - Job `payload` (`JobQueueRecord.payload`) is typed per job but should not be broadcast. Only
   ids are needed.
 - Arr API keys never appear in these structures (they are sent as the `X-Api-Key` request header
-  in `utils/arr/base.ts:39`, and are not echoed). However, an Arr or proxy error body *could*
+  in `utils/arr/base.ts:39`, and are not echoed). However, an Arr or proxy error body _could_
   echo request details, which is why the raw body is excluded.
 
 Recommended event payload allow-list (contract to define in OpenAPI):
 
-| Event | Fields (only) |
-| --- | --- |
-| `job.queued` / `job.running` | `jobId`, `jobType`, `source`, `instanceId?`, `arrType?`, `at` |
-| `job.finished` | the above + `status` (`success`/`failed`/`cancelled`/`skipped`), `failureCode?`, `durationMs`, `syncHistoryId?` |
-| `sync.updated` | `instanceId`, `arrType`, `section`, `syncStatus`, `lastSyncedAt?`, `syncHistoryId?` |
-| `drift.updated` | `instanceId`, `arrType`, `status`, `checkedAt` |
-| `canary.updated` | `rolloutId`, `arrType`, `status`, `canaryStatus` |
-| `heartbeat` (comment `: ping`) | none |
+| Event                          | Fields (only)                                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `job.queued` / `job.running`   | `jobId`, `jobType`, `source`, `instanceId?`, `arrType?`, `at`                                                   |
+| `job.finished`                 | the above + `status` (`success`/`failed`/`cancelled`/`skipped`), `failureCode?`, `durationMs`, `syncHistoryId?` |
+| `sync.updated`                 | `instanceId`, `arrType`, `section`, `syncStatus`, `lastSyncedAt?`, `syncHistoryId?`                             |
+| `drift.updated`                | `instanceId`, `arrType`, `status`, `checkedAt`                                                                  |
+| `canary.updated`               | `rolloutId`, `arrType`, `status`, `canaryStatus`                                                                |
+| `heartbeat` (comment `: ping`) | none                                                                                                            |
 
 Rules:
 
 - Display strings (toast text) come from `FAILURE_COPY[failureCode]` on the server, or from a
   client-side mapping. Never from handler text.
-- Instance *names* are user-authored and already shown on every page. Including `instanceName`
+- Instance _names_ are user-authored and already shown on every page. Including `instanceName`
   is acceptable, but use ids and let the client resolve names from loaded data. That keeps the
   payload minimal and avoids stale names after a rename.
 - Encode with `JSON.stringify` per `data:` line. Never interpolate raw strings into the SSE

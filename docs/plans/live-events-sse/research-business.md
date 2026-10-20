@@ -44,17 +44,17 @@ Key decisions in this document:
 
 ## User Stories
 
-| ID | As a… | I want… | So that… | AC |
-|---|---|---|---|---|
-| US-1 | Operator on `/arr/{id}/sync` | the section status to go from pending to running to idle/failed, and "Last synced" to update, without a reload | I know the sync I clicked actually ran | AC1 |
-| US-2 | Operator on Settings → Jobs | the scheduled-jobs table status/next run and the Job History list to update live | I can watch the queue drain | AC1 |
-| US-3 | Operator on any page | a success or failure toast when a sync I triggered finishes, with a **View details** link to `/sync-history/{id}` | I don't have to go looking for the result | AC2 |
-| US-4 | Operator on `/sync-history` | new rows to appear as runs are recorded | the audit list is current | — |
-| US-5 | Operator on `/canary/{id}` | the rollout to move from `rolling_out` to `completed`/`failed`, and batch progress to advance live | I can watch a staged rollout | — |
-| US-6 | Operator with drift detection enabled | drift badges and summary to refresh when a sweep chunk persists new status | drift indicators aren't stale | — |
-| US-7 | Operator on a flaky network or across an app restart | pages to keep working and catch up once the stream is back | a dropped stream never blocks work | AC3 |
-| US-8 | Operator with a busy schedule | *not* to get a toast for every successful scheduled job | toasts stay meaningful | — |
-| US-9 | API-token user (scripts, MCP) | to optionally consume the same stream with a `read`-scoped token | automation can follow job outcomes | — |
+| ID   | As a…                                                | I want…                                                                                                           | So that…                                  | AC  |
+| ---- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --- |
+| US-1 | Operator on `/arr/{id}/sync`                         | the section status to go from pending to running to idle/failed, and "Last synced" to update, without a reload    | I know the sync I clicked actually ran    | AC1 |
+| US-2 | Operator on Settings → Jobs                          | the scheduled-jobs table status/next run and the Job History list to update live                                  | I can watch the queue drain               | AC1 |
+| US-3 | Operator on any page                                 | a success or failure toast when a sync I triggered finishes, with a **View details** link to `/sync-history/{id}` | I don't have to go looking for the result | AC2 |
+| US-4 | Operator on `/sync-history`                          | new rows to appear as runs are recorded                                                                           | the audit list is current                 | —   |
+| US-5 | Operator on `/canary/{id}`                           | the rollout to move from `rolling_out` to `completed`/`failed`, and batch progress to advance live                | I can watch a staged rollout              | —   |
+| US-6 | Operator with drift detection enabled                | drift badges and summary to refresh when a sweep chunk persists new status                                        | drift indicators aren't stale             | —   |
+| US-7 | Operator on a flaky network or across an app restart | pages to keep working and catch up once the stream is back                                                        | a dropped stream never blocks work        | AC3 |
+| US-8 | Operator with a busy schedule                        | _not_ to get a toast for every successful scheduled job                                                           | toasts stay meaningful                    | —   |
+| US-9 | API-token user (scripts, MCP)                        | to optionally consume the same stream with a `read`-scoped token                                                  | automation can follow job outcomes        | —   |
 
 ## Business Rules
 
@@ -77,6 +77,7 @@ Key decisions in this document:
   Rule: emit `job.finished` with `rescheduled: true` for each run, but **suppress terminal toasts**
   for intermediate chunks. Drift continuation and canary non-terminal batches are progress, not
   completion. Toast the canary only on the terminal batch (`canaryRollout.ts:111-132`).
+
 - **BR-3: a run-history row exists for every executed run.** That includes handler-not-found
   (`dispatcher.ts:79-88`) and thrown handlers (`dispatcher.ts:107-117`). `job_run_history.id` is
   therefore the durable per-run identity. `job_queue.id` is not, because scheduled rows are reused
@@ -108,6 +109,7 @@ Key decisions in this document:
   Fallback link: `/sync-history?instanceId={id}` (the filter exists at
   `routes/sync-history/+page.server.ts:47-51`). If there is no instance either, link to
   `/settings/jobs`.
+
 - **BR-7: one manual click produces one job, one run and at most one history row.** All four section
   sync actions enqueue a single-section job type with `source: 'manual'`:
   - `routes/arr/[id]/sync/+page.server.ts:777-782` (delay profiles)
@@ -117,6 +119,7 @@ Key decisions in this document:
 
   Each run calls `recordHistory` exactly once on its terminal path (`arrSync.ts:1155`).
   Correlating `jobId → syncHistoryId` is therefore 1:1 for queued manual syncs.
+
 - **BR-8: the enqueue response must return `jobId`.** The page receives the job id through the
   form action response, but today only `{ success, message }` is returned (`+page.server.ts:794`).
   The client then knows which job "it" started. That determines which job gets the
@@ -216,9 +219,9 @@ Key decisions in this document:
    `lib/server/db/queries/arrSync.ts:1293-1299`), and runs it.
    - Optional `sync.section` progress event (out of scope v1).
 5. The handler completes or fails the section, which sets `idle` + `last_synced_at`, or `failed`
-   + `last_error` (`arrSync.ts:1116,1129`; SQL `arrSync.ts:1357-1405`). It then records history
-   (`arrSync.ts:1155`).
-   - Publish `sync.recorded{syncHistoryId, jobId, instanceId, arrType, status}` from inside
+   - `last_error` (`arrSync.ts:1116,1129`; SQL `arrSync.ts:1357-1405`). It then records history
+     (`arrSync.ts:1155`).
+   * Publish `sync.recorded{syncHistoryId, jobId, instanceId, arrType, status}` from inside
      `recordSyncHistory` after the insert (`record.ts:197`).
 6. The dispatcher writes `job_run_history` (`dispatcher.ts:123`), then calls `markFinished`
    (`dispatcher.ts:152`).
@@ -320,35 +323,35 @@ if the job is terminal.
 
 ## Domain Model
 
-| Entity | Table / source | Identity | States | Event relevance |
-|---|---|---|---|---|
-| Job (queue slot) | `job_queue` (`schema.sql:169-183`) | `id`; reused via `dedupe_key` (unique, partial) | `queued, running, success, failed, cancelled` | `job.queued/running/finished` |
-| Job run | `job_run_history` (`schema.sql:191-203`) | `id` (durable per run), `queue_id` FK `SET NULL` | `success, failure, skipped, cancelled` + `SafeJobEvidence` | `runId`, `runStatus`, safe failure |
-| Sync run (audit) | `sync_history` (`migrations/20260710_create_sync_history_tables.ts:31`) | `id`; `job_id` nullable, no FK | `success, partial, failed, skipped` | `sync.recorded`, toast link |
-| Section sync state | `arr_sync_*_config.sync_status`, `last_synced_at` (`schema.sql:485-487,505-507,526-528`) | `instance_id` × section | `idle, pending, in_progress, failed` | sync page live status |
-| Canary rollout | `canary_rollouts` | `id`, `state_token` | `canary_running, awaiting_confirmation, rolling_out, completed, aborted, failed` | `canary.updated` |
-| Drift status | `drift_status` | `arr_instance_id` | `in-sync, drifted, unreachable, unauthorized, error` | `drift.updated` |
-| TRaSH sync run | queue payload `runToken` (`queueTypes.ts:65-81`) + `job_run_history.output` evidence | `runToken` → `job_run_history.id` | as Job | already-correlated manual surface |
-| Principal | `locals.principal` (`principal.ts:10-19`) | session / bypass / token | — | stream auth only; no ownership |
+| Entity             | Table / source                                                                           | Identity                                         | States                                                                           | Event relevance                    |
+| ------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------- |
+| Job (queue slot)   | `job_queue` (`schema.sql:169-183`)                                                       | `id`; reused via `dedupe_key` (unique, partial)  | `queued, running, success, failed, cancelled`                                    | `job.queued/running/finished`      |
+| Job run            | `job_run_history` (`schema.sql:191-203`)                                                 | `id` (durable per run), `queue_id` FK `SET NULL` | `success, failure, skipped, cancelled` + `SafeJobEvidence`                       | `runId`, `runStatus`, safe failure |
+| Sync run (audit)   | `sync_history` (`migrations/20260710_create_sync_history_tables.ts:31`)                  | `id`; `job_id` nullable, no FK                   | `success, partial, failed, skipped`                                              | `sync.recorded`, toast link        |
+| Section sync state | `arr_sync_*_config.sync_status`, `last_synced_at` (`schema.sql:485-487,505-507,526-528`) | `instance_id` × section                          | `idle, pending, in_progress, failed`                                             | sync page live status              |
+| Canary rollout     | `canary_rollouts`                                                                        | `id`, `state_token`                              | `canary_running, awaiting_confirmation, rolling_out, completed, aborted, failed` | `canary.updated`                   |
+| Drift status       | `drift_status`                                                                           | `arr_instance_id`                                | `in-sync, drifted, unreachable, unauthorized, error`                             | `drift.updated`                    |
+| TRaSH sync run     | queue payload `runToken` (`queueTypes.ts:65-81`) + `job_run_history.output` evidence     | `runToken` → `job_run_history.id`                | as Job                                                                           | already-correlated manual surface  |
+| Principal          | `locals.principal` (`principal.ts:10-19`)                                                | session / bypass / token                         | —                                                                                | stream auth only; no ownership     |
 
 Job types and toast class are listed below. The inventory is
 `JOB_TYPES` (`queueTypes.ts:10-29`). Trigger sources were verified by grepping for
 `enqueueJob` and `upsertScheduledJob`.
 
-| Job type | Manual trigger | Scheduled / system | Toast on success | Toast on failure |
-|---|---|---|---|---|
-| `arr.sync.{qualityProfiles,delayProfiles,mediaManagement,metadataProfiles}` | `routes/arr/[id]/sync/+page.server.ts:777-910` | schedule `schedule.ts:52-58`; system `processor.ts:416-456` | manual only | manual: error; system/schedule: debounced warning |
-| `arr.sync` (aggregate, legacy) | — (inline `executeSyncJob` uses id 0) | legacy scheduled, unscheduled at `schedule.ts:33` | manual only | as above |
-| `arr.upgrade` | `routes/arr/[id]/upgrades/+page.server.ts:210-216` (upsert, manual) | `schedule.ts:78-79` | manual only | manual only |
-| `arr.rename` | `routes/arr/[id]/rename/+page.server.ts:212-217` | `schedule.ts:99-100` | manual only | manual only |
-| `pcd.sync` | `lib/server/jobs/helpers/pcdSyncQueue.ts:54-62` | `schedule.ts:117-121` | manual only | all sources (debounced) |
-| `trashguide.sync` | `trashGuideSyncQueue.ts:145-151`, from `+page.server.ts:700-760` | scheduled via same helper | manual only | all sources, unless rescheduled for retry |
-| `sync.canary.rollout` | `coordinator.ts:368-374` | — | terminal batch only | terminal batch only |
-| `backup.create` | `routes/settings/backups/+page.server.ts:63-64` | `schedule.ts:142-143` | manual only | manual only |
-| `logs.cleanup` | `routes/settings/logs/+page.server.ts:28-29` | `schedule.ts:170-171` | manual only | never |
-| `drift.check` | — | `schedule.ts:202-203` | never | never (use `drift.updated`) |
-| `arr.pull.startup` | — | system at boot, `hooks.server.ts:200-206` | never | debounced warning |
-| `backup.cleanup`, `sync.history.cleanup`, `config-health.snapshot`, `config-health.cleanup` | — | `schedule.ts:150,221,248,268` | never | never |
+| Job type                                                                                    | Manual trigger                                                      | Scheduled / system                                          | Toast on success    | Toast on failure                                  |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------- | ------------------------------------------------- |
+| `arr.sync.{qualityProfiles,delayProfiles,mediaManagement,metadataProfiles}`                 | `routes/arr/[id]/sync/+page.server.ts:777-910`                      | schedule `schedule.ts:52-58`; system `processor.ts:416-456` | manual only         | manual: error; system/schedule: debounced warning |
+| `arr.sync` (aggregate, legacy)                                                              | — (inline `executeSyncJob` uses id 0)                               | legacy scheduled, unscheduled at `schedule.ts:33`           | manual only         | as above                                          |
+| `arr.upgrade`                                                                               | `routes/arr/[id]/upgrades/+page.server.ts:210-216` (upsert, manual) | `schedule.ts:78-79`                                         | manual only         | manual only                                       |
+| `arr.rename`                                                                                | `routes/arr/[id]/rename/+page.server.ts:212-217`                    | `schedule.ts:99-100`                                        | manual only         | manual only                                       |
+| `pcd.sync`                                                                                  | `lib/server/jobs/helpers/pcdSyncQueue.ts:54-62`                     | `schedule.ts:117-121`                                       | manual only         | all sources (debounced)                           |
+| `trashguide.sync`                                                                           | `trashGuideSyncQueue.ts:145-151`, from `+page.server.ts:700-760`    | scheduled via same helper                                   | manual only         | all sources, unless rescheduled for retry         |
+| `sync.canary.rollout`                                                                       | `coordinator.ts:368-374`                                            | —                                                           | terminal batch only | terminal batch only                               |
+| `backup.create`                                                                             | `routes/settings/backups/+page.server.ts:63-64`                     | `schedule.ts:142-143`                                       | manual only         | manual only                                       |
+| `logs.cleanup`                                                                              | `routes/settings/logs/+page.server.ts:28-29`                        | `schedule.ts:170-171`                                       | manual only         | never                                             |
+| `drift.check`                                                                               | —                                                                   | `schedule.ts:202-203`                                       | never               | never (use `drift.updated`)                       |
+| `arr.pull.startup`                                                                          | —                                                                   | system at boot, `hooks.server.ts:200-206`                   | never               | debounced warning                                 |
+| `backup.cleanup`, `sync.history.cleanup`, `config-health.snapshot`, `config-health.cleanup` | —                                                                   | `schedule.ts:150,221,248,268`                               | never               | never                                             |
 
 ## Existing Codebase Integration
 
@@ -362,6 +365,7 @@ The publish points below are the minimum set needed to cover AC1–AC3.
     - `trashGuideSyncQueue.ts:144`
 
     These bypass `queueService`, so publishing at the query layer or in a thin wrapper is safer.
+
   - `setRunNow` (`jobQueue.ts:230`).
 - **Running:** after `claimNextDue()` returns, in `dispatcher.runDueJobs` (`dispatcher.ts:60-62`).
 - **Finished:** in `dispatcher.executeJob`, after the history insert, on three branches:
@@ -403,7 +407,7 @@ Client consumers:
 ## Success Criteria
 
 1. Manual QP, DP, MM or MP sync on `/arr/{id}/sync`: the section goes `pending → in_progress →
-   idle|failed` and "Last synced" updates with no reload. The new run appears in Settings → Jobs →
+idle|failed` and "Last synced" updates with no reload. The new run appears in Settings → Jobs →
    Job History within about 1 s of `markFinished`.
 2. The originating tab shows exactly one terminal toast per manual job. It links to
    `/sync-history/{id}` when a history row exists, and otherwise to the filtered list. Another tab

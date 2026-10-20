@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';
   import { FlaskConical, Play, Shield } from 'lucide-svelte';
   import Card from '$ui/card/Card.svelte';
@@ -25,8 +26,12 @@
     type CanaryBadgeVariant,
   } from '$ui/canary/canaryStatus.ts';
   import type { PageData } from './$types';
+  import { subscribeLive } from '$lib/client/events/liveInvalidate';
+  import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
   export let data: PageData;
+
+  onMount(() => subscribeLive({ key: LIVE_DEPENDENCY_KEYS.canary, types: ['canary.updated'] }));
 
   const ARR_TYPE_LABEL: Record<CanaryArrType, string> = {
     radarr: 'Radarr',

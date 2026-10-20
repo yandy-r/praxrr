@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { invalidateAll } from '$app/navigation';
   import { alertStore } from '$alerts/store';
   import Badge from '$ui/badge/Badge.svelte';
@@ -8,8 +9,19 @@
   import type { EntityChange, SyncPreviewSummary } from '$sync/preview/types.ts';
   import type { CanaryRolloutStatus } from '$sync/canary/types.ts';
   import type { PageData } from './$types';
+  import { subscribeLive } from '$lib/client/events/liveInvalidate';
+  import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
   export let data: PageData;
+
+  // Live refresh re-runs the keyed load, which also renews `rollout.stateToken` for proceed/abort.
+  onMount(() =>
+    subscribeLive({
+      key: LIVE_DEPENDENCY_KEYS.canary,
+      types: ['canary.updated'],
+      filter: (e) => e.type === 'canary.updated' && e.rolloutId === data.rollout.id,
+    })
+  );
 
   type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'info';
 

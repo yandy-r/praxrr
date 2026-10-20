@@ -6,6 +6,7 @@
   import Badge from '$ui/badge/Badge.svelte';
   import EmptyState from '$ui/state/EmptyState.svelte';
   import { alertStore } from '$alerts/store';
+  import { eventsStore } from '$stores/events';
   import { DRIFT_STATUS_LABEL, driftStatusVariant } from '$ui/drift/driftStatus.ts';
   import type { DriftInstanceSummary, DriftSettingsResponse } from '$sync/drift/responses.ts';
   import type { PageData } from './$types';
@@ -112,8 +113,28 @@
 
   $: totals = summary?.totals ?? null;
 
+  // Drift data is client-fetched (no `depends()`), so live events re-run the guarded loader directly.
+  const LIVE_RELOAD_DEBOUNCE_MS = 500;
+
   onMount(() => {
     void loadSummary();
+
+    let timer: number | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void loadSummary();
+      }, LIVE_RELOAD_DEBOUNCE_MS);
+    };
+    const off = eventsStore.on('drift.updated', schedule);
+    const offResync = eventsStore.onResync(schedule);
+
+    return () => {
+      off();
+      offResync();
+      clearTimeout(timer);
+    };
   });
 </script>
 

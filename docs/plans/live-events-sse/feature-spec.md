@@ -47,12 +47,12 @@ re-validation, caps, and one idempotent close mitigate them [[1]](./decisions.md
 
 ### Libraries and SDKs
 
-| Library | Version | Purpose | Installation |
-| --- | --- | --- | --- |
-| Web `ReadableStream` / `TextEncoder` | Deno 2.x built-in | Server stream body and frame encoding | none |
-| Browser `EventSource` | Web platform | Client transport with `Last-Event-ID` | none |
-| `svelte/store` `writable` | Svelte 5.39 (existing) | `eventsStore` (no runes) | none (already in `package.json`) |
-| `openapi-typescript` | existing (`npx`) | Regenerate `lib/api/v1.d.ts` | `deno task generate:api-types` |
+| Library                              | Version                | Purpose                               | Installation                     |
+| ------------------------------------ | ---------------------- | ------------------------------------- | -------------------------------- |
+| Web `ReadableStream` / `TextEncoder` | Deno 2.x built-in      | Server stream body and frame encoding | none                             |
+| Browser `EventSource`                | Web platform           | Client transport with `Last-Event-ID` | none                             |
+| `svelte/store` `writable`            | Svelte 5.39 (existing) | `eventsStore` (no runes)              | none (already in `package.json`) |
+| `openapi-typescript`                 | existing (`npx`)       | Regenerate `lib/api/v1.d.ts`          | `deno task generate:api-types`   |
 
 No new dependency. `sveltekit-sse`, `@lok/kit-sse` and `@microsoft/fetch-event-source` were
 rejected (see [research-external.md](./research-external.md)).
@@ -127,19 +127,19 @@ rejected (see [research-external.md](./research-external.md)).
 
 ### Edge Cases
 
-| Scenario | Expected Behavior | Notes |
-| --- | --- | --- |
-| Reconnect within buffer, same boot | Missed events replay in order; toasts fire once | Toast dedupe keyed by `jobId:runId` |
-| Reconnect after restart or eviction | Server sends `resync`; client invalidates every live page | `Last-Event-ID` boot prefix mismatch |
-| Session revoked while streaming | `session.expired` within 20 s; client stops reconnecting | Next navigation redirects to login |
-| 401/403 on reconnect | HEAD probe classifies it; client stops; indicator "Live updates paused" | No retry storm or log flood |
-| 429/503 | Client backs off, honoring `Retry-After` | Capped at 5 min |
-| History recording disabled | No `sync.recorded`; toast links to `/settings/jobs` | `recordSyncHistory` returns null |
-| Reviewed apply / canary inline sync | `sync.recorded` with `jobId: null`; no job toast | Initiating tab already shows the HTTP result |
-| Unknown or new event type | Ignored by the client parser | Forward compatible |
-| Slow consumer (queue full) | Server drops the stream; client reconnects and replays or resyncs | `desiredSize <= 0` |
-| Handler not found | `job.finished` `status: failed`, `failureCode: handlerNotFound` | Run history row exists |
-| Dev HMR re-evaluates modules | Bus and connection registry survive on `globalThis` | `Symbol.for` keys |
+| Scenario                            | Expected Behavior                                                       | Notes                                        |
+| ----------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| Reconnect within buffer, same boot  | Missed events replay in order; toasts fire once                         | Toast dedupe keyed by `jobId:runId`          |
+| Reconnect after restart or eviction | Server sends `resync`; client invalidates every live page               | `Last-Event-ID` boot prefix mismatch         |
+| Session revoked while streaming     | `session.expired` within 20 s; client stops reconnecting                | Next navigation redirects to login           |
+| 401/403 on reconnect                | HEAD probe classifies it; client stops; indicator "Live updates paused" | No retry storm or log flood                  |
+| 429/503                             | Client backs off, honoring `Retry-After`                                | Capped at 5 min                              |
+| History recording disabled          | No `sync.recorded`; toast links to `/settings/jobs`                     | `recordSyncHistory` returns null             |
+| Reviewed apply / canary inline sync | `sync.recorded` with `jobId: null`; no job toast                        | Initiating tab already shows the HTTP result |
+| Unknown or new event type           | Ignored by the client parser                                            | Forward compatible                           |
+| Slow consumer (queue full)          | Server drops the stream; client reconnects and replays or resyncs       | `desiredSize <= 0`                           |
+| Handler not found                   | `job.finished` `status: failed`, `failureCode: handlerNotFound`         | Run history row exists                       |
+| Dev HMR re-evaluates modules        | Bus and connection registry survive on `globalThis`                     | `Symbol.for` keys                            |
 
 ### Success Criteria
 
@@ -182,12 +182,12 @@ are needed.
 
 #### `job_queue` (existing): new query `jobQueueQueries.listActive(limit = 50)`
 
-| Field | Type | Constraints | Description |
-| --- | --- | --- | --- |
-| id | INTEGER | PK | Queue row id (`jobId` in events) |
-| status | TEXT | `queued` / `running` filter | Active states only |
-| source | TEXT | `schedule` / `manual` / `system` | Future scheduled rows are excluded |
-| run_at | TEXT | ISO | Queued rows with `source='schedule'` and `run_at > now` are excluded |
+| Field  | Type    | Constraints                      | Description                                                          |
+| ------ | ------- | -------------------------------- | -------------------------------------------------------------------- |
+| id     | INTEGER | PK                               | Queue row id (`jobId` in events)                                     |
+| status | TEXT    | `queued` / `running` filter      | Active states only                                                   |
+| source | TEXT    | `schedule` / `manual` / `system` | Future scheduled rows are excluded                                   |
+| run_at | TEXT    | ISO                              | Queued rows with `source='schedule'` and `run_at > now` are excluded |
 
 **Indexes:**
 
@@ -199,40 +199,82 @@ are needed.
 
 #### `api_tokens` (existing): new query `apiTokensQueries.isActiveById(id)`
 
-| Field | Type | Constraints | Description |
-| --- | --- | --- | --- |
-| id | INTEGER | PK | Token principal id (`locals.principal.tokenId`) |
-| revoked_at / expires_at | TEXT | `ACTIVE_PREDICATE` | Reuse the predicate at `apiTokens.ts:35` |
+| Field                   | Type    | Constraints        | Description                                     |
+| ----------------------- | ------- | ------------------ | ----------------------------------------------- |
+| id                      | INTEGER | PK                 | Token principal id (`locals.principal.tokenId`) |
+| revoked_at / expires_at | TEXT    | `ACTIVE_PREDICATE` | Reuse the predicate at `apiTokens.ts:35`        |
 
 #### In-memory replay ring (`lib/server/events/bus.ts`)
 
-| Field | Type | Constraints | Description |
-| --- | --- | --- | --- |
-| bootId | string | `[a-z0-9]{8}`, random per process | Id prefix; a mismatch means restart, so the server sends `resync` |
-| seq | number | monotonic, starts at 1 | Per-boot sequence |
-| buffer | `LiveEventEnvelope[]` | ≤ 256, FIFO eviction | `{ id, seq, event }` |
+| Field  | Type                  | Constraints                       | Description                                                       |
+| ------ | --------------------- | --------------------------------- | ----------------------------------------------------------------- |
+| bootId | string                | `[a-z0-9]{8}`, random per process | Id prefix; a mismatch means restart, so the server sends `resync` |
+| seq    | number                | monotonic, starts at 1            | Per-boot sequence                                                 |
+| buffer | `LiveEventEnvelope[]` | ≤ 256, FIFO eviction              | `{ id, seq, event }`                                              |
 
 #### Event union (`lib/shared/events/types.ts`)
 
 ```ts
 type JobEventBase = {
-  jobId: number; jobType: JobType; source: JobSource; displayName: string;
-  instanceId: number | null; arrType: LiveArrType | null; databaseId: number | null;
+  jobId: number;
+  jobType: JobType;
+  source: JobSource;
+  displayName: string;
+  instanceId: number | null;
+  arrType: LiveArrType | null;
+  databaseId: number | null;
 };
 type LiveEvent =
-  | { type: 'hello'; bootId: string; headId: string; serverTime: string; heartbeatMs: number }
+  | {
+      type: 'hello';
+      bootId: string;
+      headId: string;
+      serverTime: string;
+      heartbeatMs: number;
+    }
   | { type: 'resync'; reason: 'boot' | 'gap' }
   | ({ type: 'job.queued'; runAt: string } & JobEventBase)
   | ({ type: 'job.running'; startedAt: string } & JobEventBase)
-  | ({ type: 'job.finished'; status: JobStatus; runStatus: JobRunStatus; rescheduled: boolean;
-       nextRunAt: string | null; runId: number; failureCode: JobFailureCode | null;
-       durationMs: number; finishedAt: string } & JobEventBase)
-  | { type: 'sync.recorded'; syncHistoryId: number; jobId: number | null; instanceId: number;
-      arrType: LiveArrType; status: SyncOperationStatus; trigger: SyncTrigger; finishedAt: string }
-  | { type: 'canary.updated'; rolloutId: number; arrType: LiveArrType; status: CanaryRolloutStatus;
-      canaryStatus: CanaryOutcomeStatus | null; completedCount: number; remainingCount: number }
-  | { type: 'drift.updated'; instanceId: number; arrType: LiveArrType; status: DriftStatus;
-      driftedCount: number; missingCount: number; unmanagedCount: number; checkedAt: string }
+  | ({
+      type: 'job.finished';
+      status: JobStatus;
+      runStatus: JobRunStatus;
+      rescheduled: boolean;
+      nextRunAt: string | null;
+      runId: number;
+      failureCode: JobFailureCode | null;
+      durationMs: number;
+      finishedAt: string;
+    } & JobEventBase)
+  | {
+      type: 'sync.recorded';
+      syncHistoryId: number;
+      jobId: number | null;
+      instanceId: number;
+      arrType: LiveArrType;
+      status: SyncOperationStatus;
+      trigger: SyncTrigger;
+      finishedAt: string;
+    }
+  | {
+      type: 'canary.updated';
+      rolloutId: number;
+      arrType: LiveArrType;
+      status: CanaryRolloutStatus;
+      canaryStatus: CanaryOutcomeStatus | null;
+      completedCount: number;
+      remainingCount: number;
+    }
+  | {
+      type: 'drift.updated';
+      instanceId: number;
+      arrType: LiveArrType;
+      status: DriftStatus;
+      driftedCount: number;
+      missingCount: number;
+      unmanagedCount: number;
+      checkedAt: string;
+    }
   | { type: 'session.expired' };
 ```
 
@@ -273,12 +315,12 @@ data: {"type":"job.running","jobId":7,"jobType":"arr.sync.delayProfiles","source
 
 **Errors:**
 
-| Status | Condition | Response |
-| --- | --- | --- |
-| 401 | No session or token (`authHandle`), or `locals.principal` null | `{ "error": "Unauthorized" }` |
-| 403 | Token without the `read` scope | `{ "error": "Forbidden", "requiredScope": "read" }` |
-| 429 | 8 streams already open for this principal | `{ "error": "Too many event streams" }`, `Retry-After: 30` |
-| 503 | 100 streams open in the process | `{ "error": "Event stream capacity reached" }`, `Retry-After: 30` |
+| Status | Condition                                                      | Response                                                          |
+| ------ | -------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 401    | No session or token (`authHandle`), or `locals.principal` null | `{ "error": "Unauthorized" }`                                     |
+| 403    | Token without the `read` scope                                 | `{ "error": "Forbidden", "requiredScope": "read" }`               |
+| 429    | 8 streams already open for this principal                      | `{ "error": "Too many event streams" }`, `Retry-After: 30`        |
+| 503    | 100 streams open in the process                                | `{ "error": "Event stream capacity reached" }`, `Retry-After: 30` |
 
 #### `HEAD /api/v1/events`
 
@@ -386,13 +428,13 @@ stream or taking a slot. The client uses it to classify an `EventSource` error.
 
 ### UI Patterns
 
-| Component | Pattern | Notes |
-| --- | --- | --- |
-| Toast with action | `<div>` + `<a>` "View details" + dismiss `<button>` | No whole-toast `role="button"` when `action` is set |
-| Mobile toast | Whole pill is an `<a>` when `action` is set | `MobileNavAlert.svelte` |
-| Active jobs table | `Table` + `Badge` running (accent) / queued (neutral) | Above the scheduled jobs table |
-| Section live chip | `SyncFooter` `liveStatus` → Queued / Syncing… badge | Sync Now disabled while active |
-| Connection indicator | Small pill in `version.svelte` | Hidden while healthy; colour plus text |
+| Component            | Pattern                                               | Notes                                               |
+| -------------------- | ----------------------------------------------------- | --------------------------------------------------- |
+| Toast with action    | `<div>` + `<a>` "View details" + dismiss `<button>`   | No whole-toast `role="button"` when `action` is set |
+| Mobile toast         | Whole pill is an `<a>` when `action` is set           | `MobileNavAlert.svelte`                             |
+| Active jobs table    | `Table` + `Badge` running (accent) / queued (neutral) | Above the scheduled jobs table                      |
+| Section live chip    | `SyncFooter` `liveStatus` → Queued / Syncing… badge   | Sync Now disabled while active                      |
+| Connection indicator | Small pill in `version.svelte`                        | Hidden while healthy; colour plus text              |
 
 ### Accessibility Requirements
 
@@ -435,13 +477,13 @@ stream or taking a slot. The client uses it to classify an `EventSource` error.
 
 ### Technology Decisions
 
-| Decision | Recommendation | Rationale |
-| --- | --- | --- |
-| Transport | Native SSE + `EventSource` | No upgrade hook for WebSocket in the adapter; zero deps |
-| Missed events | 256-event ring + `resync` fallback | Keeps AC2 toasts across short drops; always correct |
-| Reconnect | Client-managed, `?lastEventId=`, HEAD probe | Native retry stops for good on 401/503, and the status code is unreadable |
-| Singleton | `globalThis[Symbol.for(...)]` | Survives Vite HMR (decision 8) |
-| Framing | Unnamed `message` events, `type` in the JSON | One handler; `JSON.stringify` blocks frame injection |
+| Decision      | Recommendation                               | Rationale                                                                 |
+| ------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| Transport     | Native SSE + `EventSource`                   | No upgrade hook for WebSocket in the adapter; zero deps                   |
+| Missed events | 256-event ring + `resync` fallback           | Keeps AC2 toasts across short drops; always correct                       |
+| Reconnect     | Client-managed, `?lastEventId=`, HEAD probe  | Native retry stops for good on 401/503, and the status code is unreadable |
+| Singleton     | `globalThis[Symbol.for(...)]`                | Survives Vite HMR (decision 8)                                            |
+| Framing       | Unnamed `message` events, `type` in the JSON | One handler; `JSON.stringify` blocks frame injection                      |
 
 ### Quick Wins
 
@@ -459,13 +501,13 @@ stream or taking a slot. The client uses it to classify an `EventSource` error.
 
 ### Technical Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Subscriber or timer leak in the long-running process | Med | High | One idempotent `close()`; test that the count returns to 0 |
-| A listener throws inside the dispatcher | Low | High | `publish()` isolates each listener with try/catch and never throws |
-| Event floods at boot from schedule upserts | Med | Med | Never publish from `schedule.ts`; queued events only from service paths |
-| Six-tab HTTP/1.1 limit stalls page loads | Med | Med | Documented; client closes on `pagehide`; BroadcastChannel is a follow-up |
-| Proxy buffering hides events | Med | Low | `X-Accel-Buffering: no`, `no-transform`, 20 s heartbeat; troubleshooting doc |
+| Risk                                                 | Likelihood | Impact | Mitigation                                                                   |
+| ---------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------- |
+| Subscriber or timer leak in the long-running process | Med        | High   | One idempotent `close()`; test that the count returns to 0                   |
+| A listener throws inside the dispatcher              | Low        | High   | `publish()` isolates each listener with try/catch and never throws           |
+| Event floods at boot from schedule upserts           | Med        | Med    | Never publish from `schedule.ts`; queued events only from service paths      |
+| Six-tab HTTP/1.1 limit stalls page loads             | Med        | Med    | Documented; client closes on `pagehide`; BroadcastChannel is a follow-up     |
+| Proxy buffering hides events                         | Med        | Low    | `X-Accel-Buffering: no`, `no-transform`, 20 s heartbeat; troubleshooting doc |
 
 ### Integration Challenges
 
@@ -480,18 +522,18 @@ stream or taking a slot. The client uses it to classify an `EventSource` error.
 
 #### Critical — Hard Stops
 
-| Finding | Risk | Required Mitigation |
-| --- | --- | --- |
-| Adding `/api/v1/events` to `PUBLIC_PATHS` | Broadcasts instance names and outcomes to anyone | Never add it; the route also fails closed on a null principal |
+| Finding                                                              | Risk                                                     | Required Mitigation                                                      |
+| -------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Adding `/api/v1/events` to `PUBLIC_PATHS`                            | Broadcasts instance names and outcomes to anyone         | Never add it; the route also fails closed on a null principal            |
 | Forwarding raw error text, `last_error`, `canaryError`, `stateToken` | Leaks Arr response bodies and proceed/abort value guards | Allow-list builders in `publish.ts`; dispatcher test asserts the absence |
 
 #### Warnings — Must Address
 
-| Finding | Risk | Mitigation | Alternatives |
-| --- | --- | --- | --- |
-| Stream outlives logout or revocation | Signed-out tab keeps receiving events | 20 s heartbeat revalidation; `session.expired`; 60 min lifetime | Close streams from logout actions (follow-up) |
-| Unbounded connections | Memory and socket exhaustion | 8 per principal (429) and 100 global (503) | Evict oldest (rejected: hides runaway clients) |
-| Slow consumer buffering | Unbounded queue growth | Close when `desiredSize <= 0` (high-water mark 64) | Drop events (rejected: silent loss) |
+| Finding                              | Risk                                  | Mitigation                                                      | Alternatives                                   |
+| ------------------------------------ | ------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| Stream outlives logout or revocation | Signed-out tab keeps receiving events | 20 s heartbeat revalidation; `session.expired`; 60 min lifetime | Close streams from logout actions (follow-up)  |
+| Unbounded connections                | Memory and socket exhaustion          | 8 per principal (429) and 100 global (503)                      | Evict oldest (rejected: hides runaway clients) |
+| Slow consumer buffering              | Unbounded queue growth                | Close when `desiredSize <= 0` (high-water mark 64)              | Drop events (rejected: silent loss)            |
 
 #### Advisories — Best Practices
 

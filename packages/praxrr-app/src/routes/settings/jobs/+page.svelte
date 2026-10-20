@@ -1,13 +1,21 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { PageData } from './$types';
   import { parseUTC } from '$shared/utils/dates';
+  import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types';
+  import { subscribeLive } from '$lib/client/events/liveInvalidate';
   import type { Column } from '$lib/client/ui/table/types';
   import ExpandableTable from '$lib/client/ui/table/ExpandableTable.svelte';
   import Badge from '$lib/client/ui/badge/Badge.svelte';
+  import ActiveJobs from './components/ActiveJobs.svelte';
   import JobHistory from './components/JobHistory.svelte';
   import { CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-svelte';
 
   export let data: PageData;
+
+  onMount(() =>
+    subscribeLive({ key: LIVE_DEPENDENCY_KEYS.jobs, types: ['job.queued', 'job.running', 'job.finished'] })
+  );
 
   type Job = (typeof data.jobs)[0];
 
@@ -84,6 +92,8 @@
     </p>
   </div>
 
+  <ActiveJobs jobs={data.activeJobs} />
+
   <!-- Jobs Table -->
   <div class="mb-8">
     <ExpandableTable
@@ -105,6 +115,10 @@
             <Badge variant="neutral">Queued</Badge>
           {:else if row.status === 'cancelled'}
             <Badge variant="danger">Cancelled</Badge>
+          {:else if row.status === 'success'}
+            <Badge variant="success" icon={CheckCircle}>Success</Badge>
+          {:else if row.status === 'failed'}
+            <Badge variant="danger" icon={XCircle}>Failed</Badge>
           {:else}
             <Badge variant="neutral">{row.status}</Badge>
           {/if}

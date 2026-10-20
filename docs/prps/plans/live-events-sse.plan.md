@@ -73,13 +73,13 @@ finishes, so that I know a sync I triggered actually ran and how it ended, witho
 Tasks are grouped by dependency for parallel execution. Tasks in the same batch run concurrently,
 and batches run in order. No two tasks in a batch touch the same file.
 
-| Batch | Tasks | Depends On | Parallel Width |
-| ----- | ----- | ---------- | -------------- |
-| B1 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6 | — | 6 |
-| B2 | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 | B1 | 6 |
-| B3 | 3.1, 3.2, 3.3, 3.4, 3.5 | B2 | 5 |
-| B4 | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 | B3 | 6 |
-| B5 | 5.1 | B4 | 1 |
+| Batch | Tasks                        | Depends On | Parallel Width |
+| ----- | ---------------------------- | ---------- | -------------- |
+| B1    | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6 | —          | 6              |
+| B2    | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 | B1         | 6              |
+| B3    | 3.1, 3.2, 3.3, 3.4, 3.5      | B2         | 5              |
+| B4    | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 | B3         | 6              |
+| B5    | 5.1                          | B4         | 1              |
 
 - **Total tasks**: 24
 - **Total batches**: 5
@@ -127,64 +127,64 @@ sidebar version card:  (nothing when healthy)  │ ● Reconnecting…  (>10 s d
 
 ### Interaction Changes
 
-| Touchpoint | Before | After | Notes |
-| --- | --- | --- | --- |
-| Sync section "Sync Now" | `success` toast "… queued" | `info` toast; footer chip Queued → Syncing…; button disabled while active | Chip comes from server `sync_status` (`pending`/`in_progress`) |
-| Job completion | none | Toast by policy, with a "View details" link | Manual jobs: every outcome. Background sync-family jobs: failures only, coalesced over 60 s |
-| Settings → Jobs | Scheduled jobs only, static | New "Active jobs" table; all tables refresh live | `listActive()` includes manual jobs |
-| Sync History list | Static | New rows appear on `sync.recorded` | `invalidate('praxrr:sync-history')` |
-| Canary list/detail | Static, except after the page's own proceed/abort | Status, batches, and `stateToken` refresh on `canary.updated` | Value guards stay valid |
-| Drift list/detail | Fetched on mount only | Re-fetched on `drift.updated` (detail: matching instance only) | Existing client loaders, debounced |
-| Toast markup | Whole toast is `role="button"` | With an action: `<a>` plus a separate dismiss `<button>`. Without one: unchanged | Persistent live regions announce every toast |
-| Connection lost | n/a | Hidden for 10 s, then an indicator in the version card | Never a toast or a modal |
+| Touchpoint              | Before                                            | After                                                                            | Notes                                                                                       |
+| ----------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Sync section "Sync Now" | `success` toast "… queued"                        | `info` toast; footer chip Queued → Syncing…; button disabled while active        | Chip comes from server `sync_status` (`pending`/`in_progress`)                              |
+| Job completion          | none                                              | Toast by policy, with a "View details" link                                      | Manual jobs: every outcome. Background sync-family jobs: failures only, coalesced over 60 s |
+| Settings → Jobs         | Scheduled jobs only, static                       | New "Active jobs" table; all tables refresh live                                 | `listActive()` includes manual jobs                                                         |
+| Sync History list       | Static                                            | New rows appear on `sync.recorded`                                               | `invalidate('praxrr:sync-history')`                                                         |
+| Canary list/detail      | Static, except after the page's own proceed/abort | Status, batches, and `stateToken` refresh on `canary.updated`                    | Value guards stay valid                                                                     |
+| Drift list/detail       | Fetched on mount only                             | Re-fetched on `drift.updated` (detail: matching instance only)                   | Existing client loaders, debounced                                                          |
+| Toast markup            | Whole toast is `role="button"`                    | With an action: `<a>` plus a separate dismiss `<button>`. Without one: unchanged | Persistent live regions announce every toast                                                |
+| Connection lost         | n/a                                               | Hidden for 10 s, then an indicator in the version card                           | Never a toast or a modal                                                                    |
 
 ---
 
 ## Mandatory Reading
 
-| Priority | File | Lines | Why |
-| --- | --- | --- | --- |
-| P0 (critical) | `docs/plans/live-events-sse/decisions.md` | all | Authoritative resolutions (wins over the research) |
-| P0 (critical) | `packages/praxrr-app/src/lib/server/jobs/dispatcher.ts` | 54-153 | running/finished publish points, handler-not-found, reschedule |
-| P0 (critical) | `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts` | 10-37, 197-211 | `JOB_TYPES`, `JobStatus`, `JobRunStatus`, `JobSource`, `JobQueueRecord` |
-| P0 (critical) | `packages/praxrr-app/src/hooks.server.ts` | 251-319 | Auth gate (401 JSON for `/api`), `enforceTokenScope` |
-| P0 (critical) | `packages/praxrr-app/src/lib/server/utils/auth/scopePolicy.ts` | 18-62 | Route → scope policy |
-| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/queueService.ts` | 1-19 | Enqueue fan-in |
-| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/helpers/pcdSyncQueue.ts` | 43-77 | Direct `upsertScheduled` that bypasses `queueService` |
-| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/helpers/trashGuideSyncQueue.ts` | 110-176 | Manual TRaSH enqueue wrapper |
-| P1 (important) | `packages/praxrr-app/src/lib/server/sync/syncHistory/record.ts` | 186-212 | Never-throw recorder, the `sync.recorded` point |
-| P1 (important) | `packages/praxrr-app/src/lib/server/sync/canary/coordinator.ts` | 247-399 | Canary transitions |
-| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/handlers/canaryRollout.ts` | 74-135 | Batch progress and finish |
-| P1 (important) | `packages/praxrr-app/src/lib/server/sync/drift/persist.ts` | 95-130 | Drift upsert |
-| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts` | 135-228 | Query style, datetime normalization |
-| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/apiTokens.ts` | 35, 101-108 | `ACTIVE_PREDICATE` |
-| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/sessions.ts` | 86-94 | `getValidById` |
-| P1 (important) | `packages/praxrr-app/src/lib/server/utils/auth/principal.ts` | 10-19 | `AuthPrincipal` union |
-| P1 (important) | `packages/praxrr-app/src/lib/server/mcp/context.ts` | 19-30 | Structural locals type (server files are deno-checked without `app.d.ts`) |
-| P1 (important) | `packages/praxrr-app/src/lib/client/alerts/store.ts` | 1-46 | `alertStore.add` signature |
-| P1 (important) | `packages/praxrr-app/src/lib/client/alerts/Alert.svelte` | 1-61 | Current toast markup (legacy `on:`) |
-| P1 (important) | `packages/praxrr-app/src/routes/+layout.svelte` | 1-35 | Mount point, `isAuthPage` |
-| P1 (important) | `packages/praxrr-app/src/routes/settings/jobs/+page.server.ts` | 1-58 | Jobs load |
-| P1 (important) | `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts` | 247-404, 760-933 | Sync load and actions |
-| P1 (important) | `packages/praxrr-app/src/routes/arr/[id]/sync/components/SyncFooter.svelte` | 1-107 | Sync Now button / `syncDisabled` |
-| P2 (reference) | `packages/praxrr-app/src/tests/routes/syncHistory.test.ts` | 1-61 | `migratedTest` plus route-handler casting |
-| P2 (reference) | `packages/praxrr-app/src/tests/server/utils/auth/apiTokens.test.ts` | 236-270 | Scope table test |
-| P2 (reference) | `packages/praxrr-app/src/tests/base/bundleApiContract.test.ts` | 1-60 | Contract-test style (`satisfies`) |
-| P2 (reference) | `docs/api/v1/paths/system.yaml` | 67-110 | Non-JSON response, `X-Api-Key` param, 401/403 refs |
-| P2 (reference) | `docs/api/v1/schemas/canary.yaml` | 9-35, 257-270 | Enums, `oneOf` + discriminator |
-| P2 (reference) | `scripts/test.ts` | 11-60 | Test aliases |
-| P2 (reference) | `.prettierrc` | all | **Actual** format: 2 spaces, semicolons, `trailingComma: es5`, width 120 (the `CLAUDE.md` text is stale; follow the file) |
+| Priority       | File                                                                        | Lines            | Why                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| P0 (critical)  | `docs/plans/live-events-sse/decisions.md`                                   | all              | Authoritative resolutions (wins over the research)                                                                        |
+| P0 (critical)  | `packages/praxrr-app/src/lib/server/jobs/dispatcher.ts`                     | 54-153           | running/finished publish points, handler-not-found, reschedule                                                            |
+| P0 (critical)  | `packages/praxrr-app/src/lib/server/jobs/queueTypes.ts`                     | 10-37, 197-211   | `JOB_TYPES`, `JobStatus`, `JobRunStatus`, `JobSource`, `JobQueueRecord`                                                   |
+| P0 (critical)  | `packages/praxrr-app/src/hooks.server.ts`                                   | 251-319          | Auth gate (401 JSON for `/api`), `enforceTokenScope`                                                                      |
+| P0 (critical)  | `packages/praxrr-app/src/lib/server/utils/auth/scopePolicy.ts`              | 18-62            | Route → scope policy                                                                                                      |
+| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/queueService.ts`                   | 1-19             | Enqueue fan-in                                                                                                            |
+| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/helpers/pcdSyncQueue.ts`           | 43-77            | Direct `upsertScheduled` that bypasses `queueService`                                                                     |
+| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/helpers/trashGuideSyncQueue.ts`    | 110-176          | Manual TRaSH enqueue wrapper                                                                                              |
+| P1 (important) | `packages/praxrr-app/src/lib/server/sync/syncHistory/record.ts`             | 186-212          | Never-throw recorder, the `sync.recorded` point                                                                           |
+| P1 (important) | `packages/praxrr-app/src/lib/server/sync/canary/coordinator.ts`             | 247-399          | Canary transitions                                                                                                        |
+| P1 (important) | `packages/praxrr-app/src/lib/server/jobs/handlers/canaryRollout.ts`         | 74-135           | Batch progress and finish                                                                                                 |
+| P1 (important) | `packages/praxrr-app/src/lib/server/sync/drift/persist.ts`                  | 95-130           | Drift upsert                                                                                                              |
+| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts`                 | 135-228          | Query style, datetime normalization                                                                                       |
+| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/apiTokens.ts`                | 35, 101-108      | `ACTIVE_PREDICATE`                                                                                                        |
+| P1 (important) | `packages/praxrr-app/src/lib/server/db/queries/sessions.ts`                 | 86-94            | `getValidById`                                                                                                            |
+| P1 (important) | `packages/praxrr-app/src/lib/server/utils/auth/principal.ts`                | 10-19            | `AuthPrincipal` union                                                                                                     |
+| P1 (important) | `packages/praxrr-app/src/lib/server/mcp/context.ts`                         | 19-30            | Structural locals type (server files are deno-checked without `app.d.ts`)                                                 |
+| P1 (important) | `packages/praxrr-app/src/lib/client/alerts/store.ts`                        | 1-46             | `alertStore.add` signature                                                                                                |
+| P1 (important) | `packages/praxrr-app/src/lib/client/alerts/Alert.svelte`                    | 1-61             | Current toast markup (legacy `on:`)                                                                                       |
+| P1 (important) | `packages/praxrr-app/src/routes/+layout.svelte`                             | 1-35             | Mount point, `isAuthPage`                                                                                                 |
+| P1 (important) | `packages/praxrr-app/src/routes/settings/jobs/+page.server.ts`              | 1-58             | Jobs load                                                                                                                 |
+| P1 (important) | `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`              | 247-404, 760-933 | Sync load and actions                                                                                                     |
+| P1 (important) | `packages/praxrr-app/src/routes/arr/[id]/sync/components/SyncFooter.svelte` | 1-107            | Sync Now button / `syncDisabled`                                                                                          |
+| P2 (reference) | `packages/praxrr-app/src/tests/routes/syncHistory.test.ts`                  | 1-61             | `migratedTest` plus route-handler casting                                                                                 |
+| P2 (reference) | `packages/praxrr-app/src/tests/server/utils/auth/apiTokens.test.ts`         | 236-270          | Scope table test                                                                                                          |
+| P2 (reference) | `packages/praxrr-app/src/tests/base/bundleApiContract.test.ts`              | 1-60             | Contract-test style (`satisfies`)                                                                                         |
+| P2 (reference) | `docs/api/v1/paths/system.yaml`                                             | 67-110           | Non-JSON response, `X-Api-Key` param, 401/403 refs                                                                        |
+| P2 (reference) | `docs/api/v1/schemas/canary.yaml`                                           | 9-35, 257-270    | Enums, `oneOf` + discriminator                                                                                            |
+| P2 (reference) | `scripts/test.ts`                                                           | 11-60            | Test aliases                                                                                                              |
+| P2 (reference) | `.prettierrc`                                                               | all              | **Actual** format: 2 spaces, semicolons, `trailingComma: es5`, width 120 (the `CLAUDE.md` text is stale; follow the file) |
 
 ## External Documentation
 
-| Topic | Source | Key Takeaway |
-| --- | --- | --- |
-| SSE framing | https://html.spec.whatwg.org/multipage/server-sent-events.html | A blank line dispatches; `id:` sets `Last-Event-ID`; frames without `id:` keep the previous one; `retry:` sets the reconnect delay |
-| EventSource | https://developer.mozilla.org/en-US/docs/Web/API/EventSource | Same-origin requests always send cookies; a non-200 response closes it permanently (`readyState` 2) and the status is unreadable |
-| Deno streaming | https://docs.deno.com/runtime/fundamentals/http_server/ | You must implement `cancel()`, or chunks queue forever |
-| Deno abort | https://docs.deno.com/runtime/reference/deno_serve_legacy_abort/ | `request.signal` aborts when the request finishes or disconnects; both paths must call `close()` |
-| SvelteKit server routes | https://svelte.dev/docs/kit/routing#server | `+server.ts` may return any `Response`; when `HEAD` is not exported, Kit runs `GET` |
-| nginx buffering | http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout | Default timeout is 60 s, so a 20 s heartbeat is needed; `X-Accel-Buffering: no` disables buffering |
+| Topic                   | Source                                                                      | Key Takeaway                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| SSE framing             | https://html.spec.whatwg.org/multipage/server-sent-events.html              | A blank line dispatches; `id:` sets `Last-Event-ID`; frames without `id:` keep the previous one; `retry:` sets the reconnect delay |
+| EventSource             | https://developer.mozilla.org/en-US/docs/Web/API/EventSource                | Same-origin requests always send cookies; a non-200 response closes it permanently (`readyState` 2) and the status is unreadable   |
+| Deno streaming          | https://docs.deno.com/runtime/fundamentals/http_server/                     | You must implement `cancel()`, or chunks queue forever                                                                             |
+| Deno abort              | https://docs.deno.com/runtime/reference/deno_serve_legacy_abort/            | `request.signal` aborts when the request finishes or disconnects; both paths must call `close()`                                   |
+| SvelteKit server routes | https://svelte.dev/docs/kit/routing#server                                  | `+server.ts` may return any `Response`; when `HEAD` is not exported, Kit runs `GET`                                                |
+| nginx buffering         | http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout | Default timeout is 60 s, so a 20 s heartbeat is needed; `X-Accel-Buffering: no` disables buffering                                 |
 
 ---
 
@@ -295,7 +295,12 @@ to the table at `tests/server/utils/auth/apiTokens.test.ts:237-266`.
 
 ```ts
 // SOURCE: packages/praxrr-app/src/lib/shared/narration/narrate.ts:18-19
-import type { DriftCategory, DriftCounts, DriftEntityChange, DriftReason } from '$sync/drift/types.ts';
+import type {
+  DriftCategory,
+  DriftCounts,
+  DriftEntityChange,
+  DriftReason,
+} from '$sync/drift/types.ts';
 import type { DriftSummaryStatus } from '$sync/drift/responses.ts';
 ```
 
@@ -308,80 +313,80 @@ server or client code.
 
 Paths are relative to the repository root.
 
-| File | Action | Justification |
-| --- | --- | --- |
-| `packages/praxrr-app/src/lib/shared/events/types.ts` | CREATE | Event union, constants, dependency keys (single source of truth) |
-| `docs/api/v1/paths/events.yaml` | CREATE | `GET`/`HEAD /events` contract |
-| `docs/api/v1/schemas/events.yaml` | CREATE | `LiveEvent` `oneOf` and variants |
-| `docs/api/v1/openapi.yaml` | UPDATE | Events tag, `/events` path, components entries |
-| `packages/praxrr-app/src/lib/api/v1.d.ts` | UPDATE | Regenerated (`deno task generate:api-types`) |
-| `packages/praxrr-api/openapi.json` | UPDATE | Regenerated (`deno task bundle:api`) |
-| `packages/praxrr-api/types.ts` | UPDATE | Regenerated (`deno task bundle:api`) |
-| `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts` | UPDATE | `listActive(limit)` |
-| `packages/praxrr-app/src/lib/server/db/queries/apiTokens.ts` | UPDATE | `isActiveById(id)` |
-| `packages/praxrr-app/src/lib/client/alerts/store.ts` | UPDATE | Optional `action` arg |
-| `packages/praxrr-app/src/lib/client/alerts/Alert.svelte` | UPDATE | Link + dismiss button; `onclick` migration; `aria-hidden` |
-| `packages/praxrr-app/src/lib/client/alerts/AlertContainer.svelte` | UPDATE | Pass `action` |
-| `packages/praxrr-app/src/lib/client/alerts/MobileNavAlert.svelte` | UPDATE | `action` → `<a>` pill; `onclick` migration |
-| `packages/praxrr-app/src/lib/client/ui/navigation/navbar/navbar.svelte` | UPDATE | Pass `action` |
-| `packages/praxrr-app/src/lib/client/alerts/AlertLiveRegion.svelte` | CREATE | Persistent polite/assertive regions |
-| `packages/praxrr-app/src/lib/server/utils/auth/scopePolicy.ts` | UPDATE | Explicit events → `read` entry |
-| `packages/praxrr-app/src/tests/server/utils/auth/apiTokens.test.ts` | UPDATE | Scope rows for `/api/v1/events` |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/components/DelayProfiles.svelte` | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3) |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/components/QualityProfiles.svelte` | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3) |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/components/MediaManagement.svelte` | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3) |
-| `packages/praxrr-app/src/routes/databases/[id]/changes/+page.svelte` | UPDATE | Queued toast `info` |
-| `packages/praxrr-app/src/routes/databases/trash/[id]/+page.svelte` | UPDATE | Queued toast `info` |
-| `packages/praxrr-app/src/routes/arr/[id]/rename/+page.svelte` | UPDATE | Queued toast `info` |
-| `packages/praxrr-app/src/routes/arr/[id]/upgrades/+page.svelte` | UPDATE | Queued toast `info` |
-| `packages/praxrr-app/src/routes/settings/backups/+page.svelte` | UPDATE | Queued toasts `info` (×2) |
-| `packages/praxrr-app/src/lib/server/events/bus.ts` | CREATE | `EventBus` + ring buffer + `globalThis` singleton |
-| `packages/praxrr-app/src/lib/server/events/publish.ts` | CREATE | Never-throw allow-list builders |
-| `packages/praxrr-app/src/lib/server/events/sse.ts` | CREATE | Frame encoder, event-id parser |
-| `packages/praxrr-app/src/lib/server/events/connections.ts` | CREATE | Cap registry (`globalThis`) |
-| `packages/praxrr-app/src/lib/client/events/reconnect.ts` | CREATE | Pure backoff, parse, failure classifier |
-| `packages/praxrr-app/src/lib/client/events/toastPolicy.ts` | CREATE | Pure toast decision + coalescing |
-| `packages/praxrr-app/src/tests/events/clientHelpers.test.ts` | CREATE | Backoff/parse/toast-policy tests |
-| `packages/praxrr-app/src/routes/settings/jobs/+page.server.ts` | UPDATE | `depends`, `activeJobs` |
-| `packages/praxrr-app/src/routes/sync-history/+page.server.ts` | UPDATE | `depends('praxrr:sync-history')` |
-| `packages/praxrr-app/src/routes/canary/+page.server.ts` | UPDATE | `depends('praxrr:canary')` |
-| `packages/praxrr-app/src/routes/canary/[id]/+page.server.ts` | UPDATE | `depends('praxrr:canary')` |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts` | UPDATE | `depends('praxrr:sync')`, `sectionStatus`, actions return `jobId` |
-| `packages/praxrr-app/src/tests/events/contract.test.ts` | CREATE | Shared union ⟷ OpenAPI types |
-| `packages/praxrr-app/src/lib/server/jobs/dispatcher.ts` | UPDATE | `job.running`, `job.finished` (3 paths) |
-| `packages/praxrr-app/src/lib/server/jobs/queueService.ts` | UPDATE | `job.queued` |
-| `packages/praxrr-app/src/lib/server/jobs/helpers/pcdSyncQueue.ts` | UPDATE | `job.queued` |
-| `packages/praxrr-app/src/lib/server/jobs/helpers/trashGuideSyncQueue.ts` | UPDATE | `job.queued` (manual path) |
-| `packages/praxrr-app/src/lib/server/sync/syncHistory/record.ts` | UPDATE | `sync.recorded` |
-| `packages/praxrr-app/src/lib/server/sync/canary/coordinator.ts` | UPDATE | `canary.updated` ×4 |
-| `packages/praxrr-app/src/lib/server/jobs/handlers/canaryRollout.ts` | UPDATE | `canary.updated` ×2 |
-| `packages/praxrr-app/src/lib/server/sync/drift/persist.ts` | UPDATE | `drift.updated` |
-| `packages/praxrr-app/src/tests/events/bus.test.ts` | CREATE | Bus isolation, ring, replay/resync, publish allow-list |
-| `packages/praxrr-app/src/lib/server/events/stream.ts` | CREATE | `createEventStream` |
-| `packages/praxrr-app/src/lib/server/events/streamAuth.ts` | CREATE | Principal key + revalidator from locals |
-| `packages/praxrr-app/src/routes/api/v1/events/+server.ts` | CREATE | `GET` / `HEAD` |
-| `packages/praxrr-app/src/tests/events/stream.test.ts` | CREATE | Headers, heartbeat, cleanup, caps, expiry, lifetime |
-| `scripts/test.ts` | UPDATE | `events` alias |
-| `packages/praxrr-app/src/lib/client/stores/events.ts` | CREATE | `eventsStore` |
-| `packages/praxrr-app/src/lib/client/events/liveInvalidate.ts` | CREATE | Debounced `invalidate`/`subscribeLive` |
-| `packages/praxrr-app/src/lib/client/events/jobToasts.ts` | CREATE | Events → `alertStore` |
-| `packages/praxrr-app/src/lib/client/events/LiveStatusIndicator.svelte` | CREATE | Connection indicator |
-| `packages/praxrr-app/src/routes/+layout.svelte` | UPDATE | Start store + toasts; live region |
-| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/version.svelte` | UPDATE | Render indicator |
-| `packages/praxrr-app/src/routes/settings/jobs/+page.svelte` | UPDATE | Active table + live subscription |
-| `packages/praxrr-app/src/routes/settings/jobs/components/ActiveJobs.svelte` | CREATE | Active jobs table |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/+page.svelte` | UPDATE | Live subscription; pass `liveStatus` |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/liveSync.ts` | CREATE | Sync page subscription helper |
-| `packages/praxrr-app/src/routes/arr/[id]/sync/components/SyncFooter.svelte` | UPDATE | `liveStatus` chip, disable Sync Now |
-| `packages/praxrr-app/src/routes/sync-history/+page.svelte` | UPDATE | Live subscription |
-| `packages/praxrr-app/src/routes/canary/+page.svelte` | UPDATE | Live subscription |
-| `packages/praxrr-app/src/routes/canary/[id]/+page.svelte` | UPDATE | Live subscription |
-| `packages/praxrr-app/src/routes/drift/+page.svelte` | UPDATE | Re-run `loadSummary` on `drift.updated` |
-| `packages/praxrr-app/src/routes/drift/[instanceId]/+page.svelte` | UPDATE | Re-run `loadDetail` on a matching `drift.updated` |
-| `packages/praxrr-app/src/tests/jobs/dispatcherEvents.test.ts` | CREATE | Event order, no raw error text |
-| `docs/api/endpoints.md` | UPDATE | Index row + `/events` section |
-| `docs/site/src/content/docs/guides/syncing-profiles.md` | UPDATE | "Live progress" subsection |
-| `docs/site/src/content/docs/guides/troubleshooting.md` | UPDATE | "Live updates paused / proxies" section |
+| File                                                                             | Action | Justification                                                     |
+| -------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| `packages/praxrr-app/src/lib/shared/events/types.ts`                             | CREATE | Event union, constants, dependency keys (single source of truth)  |
+| `docs/api/v1/paths/events.yaml`                                                  | CREATE | `GET`/`HEAD /events` contract                                     |
+| `docs/api/v1/schemas/events.yaml`                                                | CREATE | `LiveEvent` `oneOf` and variants                                  |
+| `docs/api/v1/openapi.yaml`                                                       | UPDATE | Events tag, `/events` path, components entries                    |
+| `packages/praxrr-app/src/lib/api/v1.d.ts`                                        | UPDATE | Regenerated (`deno task generate:api-types`)                      |
+| `packages/praxrr-api/openapi.json`                                               | UPDATE | Regenerated (`deno task bundle:api`)                              |
+| `packages/praxrr-api/types.ts`                                                   | UPDATE | Regenerated (`deno task bundle:api`)                              |
+| `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts`                      | UPDATE | `listActive(limit)`                                               |
+| `packages/praxrr-app/src/lib/server/db/queries/apiTokens.ts`                     | UPDATE | `isActiveById(id)`                                                |
+| `packages/praxrr-app/src/lib/client/alerts/store.ts`                             | UPDATE | Optional `action` arg                                             |
+| `packages/praxrr-app/src/lib/client/alerts/Alert.svelte`                         | UPDATE | Link + dismiss button; `onclick` migration; `aria-hidden`         |
+| `packages/praxrr-app/src/lib/client/alerts/AlertContainer.svelte`                | UPDATE | Pass `action`                                                     |
+| `packages/praxrr-app/src/lib/client/alerts/MobileNavAlert.svelte`                | UPDATE | `action` → `<a>` pill; `onclick` migration                        |
+| `packages/praxrr-app/src/lib/client/ui/navigation/navbar/navbar.svelte`          | UPDATE | Pass `action`                                                     |
+| `packages/praxrr-app/src/lib/client/alerts/AlertLiveRegion.svelte`               | CREATE | Persistent polite/assertive regions                               |
+| `packages/praxrr-app/src/lib/server/utils/auth/scopePolicy.ts`                   | UPDATE | Explicit events → `read` entry                                    |
+| `packages/praxrr-app/src/tests/server/utils/auth/apiTokens.test.ts`              | UPDATE | Scope rows for `/api/v1/events`                                   |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/components/DelayProfiles.svelte`   | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3)                |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/components/QualityProfiles.svelte` | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3)                |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/components/MediaManagement.svelte` | UPDATE | Queued toast `info` (1.6); `liveStatus` prop (4.3)                |
+| `packages/praxrr-app/src/routes/databases/[id]/changes/+page.svelte`             | UPDATE | Queued toast `info`                                               |
+| `packages/praxrr-app/src/routes/databases/trash/[id]/+page.svelte`               | UPDATE | Queued toast `info`                                               |
+| `packages/praxrr-app/src/routes/arr/[id]/rename/+page.svelte`                    | UPDATE | Queued toast `info`                                               |
+| `packages/praxrr-app/src/routes/arr/[id]/upgrades/+page.svelte`                  | UPDATE | Queued toast `info`                                               |
+| `packages/praxrr-app/src/routes/settings/backups/+page.svelte`                   | UPDATE | Queued toasts `info` (×2)                                         |
+| `packages/praxrr-app/src/lib/server/events/bus.ts`                               | CREATE | `EventBus` + ring buffer + `globalThis` singleton                 |
+| `packages/praxrr-app/src/lib/server/events/publish.ts`                           | CREATE | Never-throw allow-list builders                                   |
+| `packages/praxrr-app/src/lib/server/events/sse.ts`                               | CREATE | Frame encoder, event-id parser                                    |
+| `packages/praxrr-app/src/lib/server/events/connections.ts`                       | CREATE | Cap registry (`globalThis`)                                       |
+| `packages/praxrr-app/src/lib/client/events/reconnect.ts`                         | CREATE | Pure backoff, parse, failure classifier                           |
+| `packages/praxrr-app/src/lib/client/events/toastPolicy.ts`                       | CREATE | Pure toast decision + coalescing                                  |
+| `packages/praxrr-app/src/tests/events/clientHelpers.test.ts`                     | CREATE | Backoff/parse/toast-policy tests                                  |
+| `packages/praxrr-app/src/routes/settings/jobs/+page.server.ts`                   | UPDATE | `depends`, `activeJobs`                                           |
+| `packages/praxrr-app/src/routes/sync-history/+page.server.ts`                    | UPDATE | `depends('praxrr:sync-history')`                                  |
+| `packages/praxrr-app/src/routes/canary/+page.server.ts`                          | UPDATE | `depends('praxrr:canary')`                                        |
+| `packages/praxrr-app/src/routes/canary/[id]/+page.server.ts`                     | UPDATE | `depends('praxrr:canary')`                                        |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/+page.server.ts`                   | UPDATE | `depends('praxrr:sync')`, `sectionStatus`, actions return `jobId` |
+| `packages/praxrr-app/src/tests/events/contract.test.ts`                          | CREATE | Shared union ⟷ OpenAPI types                                      |
+| `packages/praxrr-app/src/lib/server/jobs/dispatcher.ts`                          | UPDATE | `job.running`, `job.finished` (3 paths)                           |
+| `packages/praxrr-app/src/lib/server/jobs/queueService.ts`                        | UPDATE | `job.queued`                                                      |
+| `packages/praxrr-app/src/lib/server/jobs/helpers/pcdSyncQueue.ts`                | UPDATE | `job.queued`                                                      |
+| `packages/praxrr-app/src/lib/server/jobs/helpers/trashGuideSyncQueue.ts`         | UPDATE | `job.queued` (manual path)                                        |
+| `packages/praxrr-app/src/lib/server/sync/syncHistory/record.ts`                  | UPDATE | `sync.recorded`                                                   |
+| `packages/praxrr-app/src/lib/server/sync/canary/coordinator.ts`                  | UPDATE | `canary.updated` ×4                                               |
+| `packages/praxrr-app/src/lib/server/jobs/handlers/canaryRollout.ts`              | UPDATE | `canary.updated` ×2                                               |
+| `packages/praxrr-app/src/lib/server/sync/drift/persist.ts`                       | UPDATE | `drift.updated`                                                   |
+| `packages/praxrr-app/src/tests/events/bus.test.ts`                               | CREATE | Bus isolation, ring, replay/resync, publish allow-list            |
+| `packages/praxrr-app/src/lib/server/events/stream.ts`                            | CREATE | `createEventStream`                                               |
+| `packages/praxrr-app/src/lib/server/events/streamAuth.ts`                        | CREATE | Principal key + revalidator from locals                           |
+| `packages/praxrr-app/src/routes/api/v1/events/+server.ts`                        | CREATE | `GET` / `HEAD`                                                    |
+| `packages/praxrr-app/src/tests/events/stream.test.ts`                            | CREATE | Headers, heartbeat, cleanup, caps, expiry, lifetime               |
+| `scripts/test.ts`                                                                | UPDATE | `events` alias                                                    |
+| `packages/praxrr-app/src/lib/client/stores/events.ts`                            | CREATE | `eventsStore`                                                     |
+| `packages/praxrr-app/src/lib/client/events/liveInvalidate.ts`                    | CREATE | Debounced `invalidate`/`subscribeLive`                            |
+| `packages/praxrr-app/src/lib/client/events/jobToasts.ts`                         | CREATE | Events → `alertStore`                                             |
+| `packages/praxrr-app/src/lib/client/events/LiveStatusIndicator.svelte`           | CREATE | Connection indicator                                              |
+| `packages/praxrr-app/src/routes/+layout.svelte`                                  | UPDATE | Start store + toasts; live region                                 |
+| `packages/praxrr-app/src/lib/client/ui/navigation/pageNav/version.svelte`        | UPDATE | Render indicator                                                  |
+| `packages/praxrr-app/src/routes/settings/jobs/+page.svelte`                      | UPDATE | Active table + live subscription                                  |
+| `packages/praxrr-app/src/routes/settings/jobs/components/ActiveJobs.svelte`      | CREATE | Active jobs table                                                 |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/+page.svelte`                      | UPDATE | Live subscription; pass `liveStatus`                              |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/liveSync.ts`                       | CREATE | Sync page subscription helper                                     |
+| `packages/praxrr-app/src/routes/arr/[id]/sync/components/SyncFooter.svelte`      | UPDATE | `liveStatus` chip, disable Sync Now                               |
+| `packages/praxrr-app/src/routes/sync-history/+page.svelte`                       | UPDATE | Live subscription                                                 |
+| `packages/praxrr-app/src/routes/canary/+page.svelte`                             | UPDATE | Live subscription                                                 |
+| `packages/praxrr-app/src/routes/canary/[id]/+page.svelte`                        | UPDATE | Live subscription                                                 |
+| `packages/praxrr-app/src/routes/drift/+page.svelte`                              | UPDATE | Re-run `loadSummary` on `drift.updated`                           |
+| `packages/praxrr-app/src/routes/drift/[instanceId]/+page.svelte`                 | UPDATE | Re-run `loadDetail` on a matching `drift.updated`                 |
+| `packages/praxrr-app/src/tests/jobs/dispatcherEvents.test.ts`                    | CREATE | Event order, no raw error text                                    |
+| `docs/api/endpoints.md`                                                          | UPDATE | Index row + `/events` section                                     |
+| `docs/site/src/content/docs/guides/syncing-profiles.md`                          | UPDATE | "Live progress" subsection                                        |
+| `docs/site/src/content/docs/guides/troubleshooting.md`                           | UPDATE | "Live updates paused / proxies" section                           |
 
 ## NOT Building
 
@@ -448,15 +453,15 @@ the test suite inside a task; task 5.1 does that.
   - Export the constants:
 
     ```ts
-    LIVE_HEARTBEAT_MS = 20_000
-    LIVE_MAX_STREAM_MS = 60 * 60_000
-    LIVE_RETRY_MS = 5_000
-    LIVE_REPLAY_BUFFER = 256
-    LIVE_MAX_STREAMS_PER_PRINCIPAL = 8
-    LIVE_MAX_STREAMS_GLOBAL = 100
-    LIVE_STREAM_QUEUE_HWM = 64
-    LIVE_RETRY_AFTER_SECONDS = 30
-    LIVE_EVENTS_PATH = '/api/v1/events'
+    LIVE_HEARTBEAT_MS = 20_000;
+    LIVE_MAX_STREAM_MS = 60 * 60_000;
+    LIVE_RETRY_MS = 5_000;
+    LIVE_REPLAY_BUFFER = 256;
+    LIVE_MAX_STREAMS_PER_PRINCIPAL = 8;
+    LIVE_MAX_STREAMS_GLOBAL = 100;
+    LIVE_STREAM_QUEUE_HWM = 64;
+    LIVE_RETRY_AFTER_SECONDS = 30;
+    LIVE_EVENTS_PATH = '/api/v1/events';
     ```
 
   - Export `LIVE_DEPENDENCY_KEYS = { jobs: 'praxrr:jobs', sync: 'praxrr:sync', syncHistory: 'praxrr:sync-history', canary: 'praxrr:canary', drift: 'praxrr:drift' } as const`.
@@ -561,9 +566,10 @@ the test suite inside a task; task 5.1 does that.
     ```
 
     Map the rows with `rowToRecord`.
+
   - `apiTokensQueries.isActiveById(id: number): boolean`:
     `db.queryFirst<{ id: number }>(\`SELECT id FROM api_tokens WHERE id = ? AND ${ACTIVE_PREDICATE}\`, id) !== undefined`.
-    Place it after `findActiveByHash` (line 108).
+Place it after `findActiveByHash` (line 108).
 - **MIRROR**: REPOSITORY_PATTERN.
 - **IMPORTS**: none new.
 - **GOTCHA**:
@@ -713,7 +719,8 @@ the test suite inside a task; task 5.1 does that.
       ```ts
       const KEY = Symbol.for('praxrr.events.bus');
       type G = typeof globalThis & { [KEY]?: EventBus };
-      export const eventBus: EventBus = ((globalThis as G)[KEY] ??= new EventBus());
+      export const eventBus: EventBus = ((globalThis as G)[KEY] ??=
+        new EventBus());
       ```
 
   - `publish.ts`. Every export is `void` and wraps its body in `try/catch` that logs through
@@ -793,8 +800,7 @@ the test suite inside a task; task 5.1 does that.
     - `encodeRetry(ms) → encoder.encode(\`retry: ${ms}\n\n\`)`
     - `encodeComment(text = 'ping') → \`: ${text}\n\n\``
     - `encodeEvent(event: LiveEvent, id?: string)` returns
-      `${id ? \`id: ${id}\n\` : ''}data: ${JSON.stringify(event)}\n\n`. It throws `TypeError` if
-      `id` contains `\n`, `\r` or `\0`. `JSON.stringify` escapes newlines in values, which
+      `${id ? \`id: ${id}\n\` : ''}data: ${JSON.stringify(event)}\n\n`. It throws `TypeError`if`id`contains`\n`, `\r`or`\0`. `JSON.stringify` escapes newlines in values, which
       prevents frame injection.
     - `parseEventId(raw: string | null): { bootId: string; seq: number } | null`: the trimmed
       value must match `^([a-z0-9]{1,16})-(\d{1,15})$`; otherwise return `null`.
@@ -944,6 +950,7 @@ the test suite inside a task; task 5.1 does that.
     ```
 
     The value type is `string`: one of `idle`, `pending`, `in_progress` or `failed`.
+
   - The four section actions return `{ success: true, message: '… sync queued', jobId: queued.id }`
     (lines 794, 835, 876 and 922).
 - **MIRROR**: REPOSITORY_PATTERN (`getSyncConfigStatus` at `lib/server/db/queries/arrSync.ts:1561-1600`).
@@ -1108,8 +1115,11 @@ the test suite inside a task; task 5.1 does that.
       session: { id: string } | null;
       principal: AuthPrincipal | null;
     }
-    export function principalKey(locals: EventStreamLocals, clientIp: string): string | null
-    export function buildRevalidator(locals: EventStreamLocals): () => boolean
+    export function principalKey(
+      locals: EventStreamLocals,
+      clientIp: string
+    ): string | null;
+    export function buildRevalidator(locals: EventStreamLocals): () => boolean;
     ```
 
     - `principalKey` returns:
@@ -1121,6 +1131,7 @@ the test suite inside a task; task 5.1 does that.
       - for a token: `() => apiTokensQueries.isActiveById(tokenId)`
       - for a session: `() => sessionsQueries.getValidById(sessionId) !== undefined`
       - for bypass: `() => true`
+
   - `stream.ts`:
     - Options:
 
@@ -1136,7 +1147,9 @@ the test suite inside a task; task 5.1 does that.
         highWaterMark?: number;
         now?: () => number;
       }
-      export function createEventStream(opts: EventStreamOptions): ReadableStream<Uint8Array>
+      export function createEventStream(
+        opts: EventStreamOptions
+      ): ReadableStream<Uint8Array>;
       ```
 
     - Return
@@ -1197,6 +1210,7 @@ the test suite inside a task; task 5.1 does that.
     - `HEAD`: the same key check, then `eventConnections.check(key)` → return 401, 429/503, or
       `new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })`.
     - Export **only** `GET` and `HEAD`.
+
   - `scripts/test.ts`: add `events: 'packages/praxrr-app/src/tests/events,packages/praxrr-app/src/tests/jobs/dispatcherEvents.test.ts',`
     in the alias map, in alphabetical order with the other individual-file aliases.
   - `tests/events/stream.test.ts`. Use a fresh `new EventBus(8, 'teststrm')` and an
@@ -1529,8 +1543,7 @@ the test suite inside a task; task 5.1 does that.
   `docs/site/src/content/docs/guides/troubleshooting.md`.
 - **IMPLEMENT**:
   - `endpoints.md`:
-    - In the index table (lines 16-48), add `| GET    | \`/events\`  | Live event stream (SSE) |`
-      and `| HEAD   | \`/events\` | Event stream availability probe |`.
+    - In the index table (lines 16-48), add `| GET    | \`/events\` | Live event stream (SSE) |`and`| HEAD | \`/events\` | Event stream availability probe |`.
     - Add a `## Live events` section with `### \`GET /events\`` covering:
       - authentication: the session cookie, or `X-Api-Key` with the `read` scope (`?apikey=`
         works but leaks into logs);
@@ -1667,36 +1680,36 @@ are no UI snapshot tests. `deno task test events` runs `tests/events/*` plus
 
 ### Unit Tests
 
-| Test | Input | Expected Output | Edge Case? |
-| ---- | ----- | --------------- | ---------- |
-| T-B1 bus isolation | 2 listeners, the first throws | 2nd receives; `publish` does not throw | Yes |
-| T-B2 unsubscribe | unsubscribe ×2 | `subscriberCount() === 0` | Yes |
-| T-B3 ring | capacity 4, 6 publishes | ids `…-3..6` kept | Yes |
-| T-B4 replay/resync | `null`, same boot in buffer, other boot, evicted gap, future seq, garbage | empty / replay / resync boot / resync gap / resync boot / resync boot | Yes |
-| T-B5 HMR singleton | `eventBus` vs `globalThis[Symbol.for('praxrr.events.bus')]` | identical | No |
-| T-B6 allow-list | records containing `error`, `stateToken`, `payload` | serialized event has none of the forbidden keys | Yes |
-| T-S1 framing | open stream, publish 1 | `retry:` → `hello` → `id: <boot>-1\ndata:` | No |
-| T-S2 heartbeat | `heartbeatMs: 10` | `: ping` frame | No |
-| T-S3/T-S4 cleanup | abort signal; reader cancel | 0 subscribers, release called once, stream done | Yes |
-| T-S5 session expiry | `revalidate → false` | `session.expired` then done, 0 subscribers | Yes |
-| T-S6 lifetime | `maxLifetimeMs: 20` | done ≤ 100 ms | Yes |
-| T-S7 replay through stream | `lastEventId` in buffer / other boot | ids 2,3 replayed / `resync` | Yes |
-| T-S8 slow consumer | `highWaterMark: 2`, no reads, 10 publishes | stream dropped, 0 subscribers | Yes |
-| T-S9 caps | registry(2,3) | 429 per principal, 503 global, idempotent release | Yes |
-| T-S10 route | bypass principal; null principal | 200 + 4 SSE headers; 401 | Yes |
-| T-S11 injection | id with `\n`; data with `\n` | throws; single `data:` line | Yes |
-| T-D1 order | manual `logs.cleanup` success | queued → running → finished(success) | No |
-| T-D2 redaction | handler throws secret-bearing error | `failed`, `failureCode` set, no secret substrings | Yes |
-| T-D3 handler-not-found | unknown job type row | `failureCode: handlerNotFound` | Yes |
-| T-D4 reschedule | `rescheduleAt` +1 h | `rescheduled: true`, `status: queued`, `nextRunAt` | Yes |
-| T-D5 schedule silence | future `schedule` upsert | no `job.queued` | Yes |
-| T-C1 backoff | attempts 0..10, random 0/0.5/1 | 1 s → 30 s cap, ±20 %, ≥ 1 s | Yes |
-| T-C2 parse | bad JSON, array, unknown type, missing `jobId`, valid `hello` | null ×5 / event | Yes |
-| T-C3 classify | 204/401/403/429/503 | ok/stop/stop/backoff/backoff | No |
-| T-C4 toast policy | each `runStatus` × source, partial, rescheduled, non-sync failure | per decision 5 | Yes |
-| T-C5/T-C6 coalesce + dedupe | repeat failures in 60 s; repeated `jobId:runId` | blocked / once | Yes |
-| Contract | shared union vs `components['schemas']`; `LiveJobType` vs `JOB_TYPES` | mutually assignable; equal | No |
-| Scope policy | GET/HEAD/POST `/api/v1/events` | read / read / admin | Yes |
+| Test                        | Input                                                                     | Expected Output                                                       | Edge Case? |
+| --------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------- |
+| T-B1 bus isolation          | 2 listeners, the first throws                                             | 2nd receives; `publish` does not throw                                | Yes        |
+| T-B2 unsubscribe            | unsubscribe ×2                                                            | `subscriberCount() === 0`                                             | Yes        |
+| T-B3 ring                   | capacity 4, 6 publishes                                                   | ids `…-3..6` kept                                                     | Yes        |
+| T-B4 replay/resync          | `null`, same boot in buffer, other boot, evicted gap, future seq, garbage | empty / replay / resync boot / resync gap / resync boot / resync boot | Yes        |
+| T-B5 HMR singleton          | `eventBus` vs `globalThis[Symbol.for('praxrr.events.bus')]`               | identical                                                             | No         |
+| T-B6 allow-list             | records containing `error`, `stateToken`, `payload`                       | serialized event has none of the forbidden keys                       | Yes        |
+| T-S1 framing                | open stream, publish 1                                                    | `retry:` → `hello` → `id: <boot>-1\ndata:`                            | No         |
+| T-S2 heartbeat              | `heartbeatMs: 10`                                                         | `: ping` frame                                                        | No         |
+| T-S3/T-S4 cleanup           | abort signal; reader cancel                                               | 0 subscribers, release called once, stream done                       | Yes        |
+| T-S5 session expiry         | `revalidate → false`                                                      | `session.expired` then done, 0 subscribers                            | Yes        |
+| T-S6 lifetime               | `maxLifetimeMs: 20`                                                       | done ≤ 100 ms                                                         | Yes        |
+| T-S7 replay through stream  | `lastEventId` in buffer / other boot                                      | ids 2,3 replayed / `resync`                                           | Yes        |
+| T-S8 slow consumer          | `highWaterMark: 2`, no reads, 10 publishes                                | stream dropped, 0 subscribers                                         | Yes        |
+| T-S9 caps                   | registry(2,3)                                                             | 429 per principal, 503 global, idempotent release                     | Yes        |
+| T-S10 route                 | bypass principal; null principal                                          | 200 + 4 SSE headers; 401                                              | Yes        |
+| T-S11 injection             | id with `\n`; data with `\n`                                              | throws; single `data:` line                                           | Yes        |
+| T-D1 order                  | manual `logs.cleanup` success                                             | queued → running → finished(success)                                  | No         |
+| T-D2 redaction              | handler throws secret-bearing error                                       | `failed`, `failureCode` set, no secret substrings                     | Yes        |
+| T-D3 handler-not-found      | unknown job type row                                                      | `failureCode: handlerNotFound`                                        | Yes        |
+| T-D4 reschedule             | `rescheduleAt` +1 h                                                       | `rescheduled: true`, `status: queued`, `nextRunAt`                    | Yes        |
+| T-D5 schedule silence       | future `schedule` upsert                                                  | no `job.queued`                                                       | Yes        |
+| T-C1 backoff                | attempts 0..10, random 0/0.5/1                                            | 1 s → 30 s cap, ±20 %, ≥ 1 s                                          | Yes        |
+| T-C2 parse                  | bad JSON, array, unknown type, missing `jobId`, valid `hello`             | null ×5 / event                                                       | Yes        |
+| T-C3 classify               | 204/401/403/429/503                                                       | ok/stop/stop/backoff/backoff                                          | No         |
+| T-C4 toast policy           | each `runStatus` × source, partial, rescheduled, non-sync failure         | per decision 5                                                        | Yes        |
+| T-C5/T-C6 coalesce + dedupe | repeat failures in 60 s; repeated `jobId:runId`                           | blocked / once                                                        | Yes        |
+| Contract                    | shared union vs `components['schemas']`; `LiveJobType` vs `JOB_TYPES`     | mutually assignable; equal                                            | No         |
+| Scope policy                | GET/HEAD/POST `/api/v1/events`                                            | read / read / admin                                                   | Yes        |
 
 ### Edge Cases Checklist
 
@@ -1770,20 +1783,20 @@ EXPECT: The build succeeds, and the stream works in dev.
   - the chip goes Queued → Syncing… → cleared, and "Last synced" updates;
   - a success toast with **View details** opens `/sync-history/{id}`.
 - [ ] Force a failure (wrong API key on the instance), then Sync Now. A sticky error toast appears
-  and stays until dismissed.
+      and stays until dismissed.
 - [ ] `/settings/jobs` shows the manual job in **Active jobs**: Queued, then Running, then it is
-  gone. Job History gains a row with no reload.
+      gone. Job History gains a row with no reload.
 - [ ] Two tabs open → the toast appears in both. Reload one tab during a sync → its toast still
-  appears once (replay).
+      appears once (replay).
 - [ ] Stop the server for 15 s → "Reconnecting…" appears in the sidebar version card. Restart →
-  the indicator hides and the pages refresh (`resync`).
+      the indicator hides and the pages refresh (`resync`).
 - [ ] Log out in tab A → tab B's stream closes within 20 s and shows "Live updates paused". Tab B
-  does not loop requests in the Network tab.
+      does not loop requests in the Network tab.
 - [ ] Block `/api/v1/events` in devtools → every page still loads and actions still work (AC3).
 - [ ] Screen reader / Accessibility pane: toast text is announced through the live region, and
-  Tab reaches **View details** and then **Dismiss**.
+      Tab reaches **View details** and then **Dismiss**.
 - [ ] A Lidarr instance's metadata profiles chip works. Radarr/Sonarr instances show no metadata
-  section (Arr-specific behavior unchanged).
+      section (Arr-specific behavior unchanged).
 
 ---
 
@@ -1826,20 +1839,20 @@ EXPECT: The build succeeds, and the stream works in dev.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| **CRITICAL (if violated)**: the route is added to `PUBLIC_PATHS` or skips `authHandle` | Low | High | Never edit `PUBLIC_PATHS`; the route fails closed on a null principal (T-S10) |
-| **CRITICAL (if violated)**: raw error text or `stateToken` in events | Low | High | Field-by-field builders in `publish.ts`; T-B6 and T-D2 assert absence |
-| **WARNING**: stream outlives logout or revocation | Med | Med | 20 s heartbeat revalidation → `session.expired`; 60 min lifetime (T-S5, T-S6) |
-| **WARNING**: subscriber or timer leak in the single long-running process | Med | High | One idempotent `close()` on every exit path; tests assert 0 subscribers |
-| **WARNING**: unbounded connections / slow consumers | Low | Med | Caps 8/100 → 429/503; `desiredSize` guard with HWM 64 (T-S8, T-S9) |
-| `publish` throwing inside the dispatcher breaks jobs | Low | High | Listener isolation plus an outer try/catch; publish is synchronous and returns `void` (T-B1) |
-| Boot flood from schedule upserts | Med | Med | `onlyIfDue` guard; no publish in `schedule.ts` (T-D5) |
-| Six-connection HTTP/1.1 limit with many tabs | Med | Med | Close on `pagehide`; documented in troubleshooting; BroadcastChannel is a follow-up |
-| Proxy buffering hides events | Med | Low | `X-Accel-Buffering: no`, `no-transform`, heartbeat; nginx snippet in the docs |
-| Svelte 5 event syntax mix breaks the alert components | Med | Low | Migrate each alert component fully to `onclick`/`onkeydown` (task 1.4) |
-| Source-string tests break on page edits | Med | Low | Additive edits only in `canary/[id]/+page.svelte` and `databases/trash/[id]/+page.svelte` |
-| **ADVISORY**: `?apikey=` leaks tokens into logs; `AUTH=off/local` bypass grants the stream | — | Low | Documented in OpenAPI and endpoints.md; matches app-wide behavior |
+| Risk                                                                                       | Likelihood | Impact | Mitigation                                                                                   |
+| ------------------------------------------------------------------------------------------ | ---------- | ------ | -------------------------------------------------------------------------------------------- |
+| **CRITICAL (if violated)**: the route is added to `PUBLIC_PATHS` or skips `authHandle`     | Low        | High   | Never edit `PUBLIC_PATHS`; the route fails closed on a null principal (T-S10)                |
+| **CRITICAL (if violated)**: raw error text or `stateToken` in events                       | Low        | High   | Field-by-field builders in `publish.ts`; T-B6 and T-D2 assert absence                        |
+| **WARNING**: stream outlives logout or revocation                                          | Med        | Med    | 20 s heartbeat revalidation → `session.expired`; 60 min lifetime (T-S5, T-S6)                |
+| **WARNING**: subscriber or timer leak in the single long-running process                   | Med        | High   | One idempotent `close()` on every exit path; tests assert 0 subscribers                      |
+| **WARNING**: unbounded connections / slow consumers                                        | Low        | Med    | Caps 8/100 → 429/503; `desiredSize` guard with HWM 64 (T-S8, T-S9)                           |
+| `publish` throwing inside the dispatcher breaks jobs                                       | Low        | High   | Listener isolation plus an outer try/catch; publish is synchronous and returns `void` (T-B1) |
+| Boot flood from schedule upserts                                                           | Med        | Med    | `onlyIfDue` guard; no publish in `schedule.ts` (T-D5)                                        |
+| Six-connection HTTP/1.1 limit with many tabs                                               | Med        | Med    | Close on `pagehide`; documented in troubleshooting; BroadcastChannel is a follow-up          |
+| Proxy buffering hides events                                                               | Med        | Low    | `X-Accel-Buffering: no`, `no-transform`, heartbeat; nginx snippet in the docs                |
+| Svelte 5 event syntax mix breaks the alert components                                      | Med        | Low    | Migrate each alert component fully to `onclick`/`onkeydown` (task 1.4)                       |
+| Source-string tests break on page edits                                                    | Med        | Low    | Additive edits only in `canary/[id]/+page.svelte` and `databases/trash/[id]/+page.svelte`    |
+| **ADVISORY**: `?apikey=` leaks tokens into logs; `AUTH=off/local` bypass grants the stream | —          | Low    | Documented in OpenAPI and endpoints.md; matches app-wide behavior                            |
 
 ## Notes
 

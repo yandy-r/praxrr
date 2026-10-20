@@ -5,6 +5,7 @@
   import SyncFooter from './SyncFooter.svelte';
   import { alertStore } from '$lib/client/alerts/store.ts';
   import type { SectionType } from '$sync/types.ts';
+  import type { SectionLiveStatus } from '../liveSync.ts';
 
   interface DatabaseWithProfiles {
     id: number;
@@ -26,6 +27,7 @@
   export let previewConfig: unknown = null;
   export let previewSection: SectionType | null = null;
   export let lastSyncedAt: string | null = null;
+  export let liveStatus: SectionLiveStatus = 'idle';
 
   let saving = false;
   let syncing = false;
@@ -109,7 +111,7 @@
 
       if (response.ok) {
         const data = await response.json();
-	alertStore.add('info', data?.message ?? 'Sync queued');
+        alertStore.add('info', data?.message ?? 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
         alertStore.add('error', 'Sync failed');
@@ -174,6 +176,7 @@
     {previewEnabled}
     {previewConfig}
     {previewSection}
+    {liveStatus}
     on:previewGenerated
     on:previewError
     on:save={handleSave}

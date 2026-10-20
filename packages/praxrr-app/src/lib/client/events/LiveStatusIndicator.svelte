@@ -41,8 +41,7 @@
     title="Live updates are temporarily unavailable; pages still work."
     class="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
   >
-    <span class="h-2 w-2 shrink-0 rounded-full {stopped ? 'bg-neutral-400' : 'bg-amber-500'}" aria-hidden="true"
-    ></span>
+    <span class="h-2 w-2 shrink-0 rounded-full {stopped ? 'bg-neutral-400' : 'bg-amber-500'}" aria-hidden="true"></span>
     <span>{stopped ? 'Live updates paused' : 'Reconnecting…'}</span>
   </button>
 {/if}

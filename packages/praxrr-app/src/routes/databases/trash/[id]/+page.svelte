@@ -56,7 +56,7 @@
         runToken = data.runToken || null;
         statusUrl = data.statusUrl ?? `/api/v1/trash-guide/sources/${source.id}/sync`;
         runView = data.view ?? null;
-	alertStore.add('info', 'Sync job queued');
+        alertStore.add('info', 'Sync job queued');
         void pollStatus();
       } else if (res.status === 409) {
         // Dedupe: link to the already-running run rather than acking a new one.

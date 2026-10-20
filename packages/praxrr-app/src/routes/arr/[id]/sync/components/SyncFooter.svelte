@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
   import CronInput from '$ui/cron/CronInput.svelte';
   import Toggle from '$ui/toggle/Toggle.svelte';
@@ -7,6 +8,7 @@
   import SyncPreviewTrigger from './SyncPreviewTrigger.svelte';
   import type { SyncPreviewSummary } from '$sync/preview/types.ts';
   import type { SectionType } from '$sync/types.ts';
+  import type { SectionLiveStatus } from '../liveSync.ts';
 
   export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
   export let cronExpression: string = '0 * * * *';
@@ -19,6 +21,7 @@
   export let previewEnabled = false;
   export let previewSection: SectionType | null = null;
   export let previewConfig: unknown = null;
+  export let liveStatus: SectionLiveStatus = 'idle';
 
   const dispatch = createEventDispatcher<{
     save: void;
@@ -36,7 +39,8 @@
 
   // Save disabled when not dirty or can't save, Sync disabled when dirty (unsaved changes)
   $: saveDisabled = saving || !isDirty || !canSave;
-  $: syncDisabled = syncing || isDirty || !canSync;
+  $: syncDisabled = syncing || isDirty || !canSync || liveStatus === 'in_progress';
+  $: syncTitle = isDirty ? 'Save changes before syncing' : liveStatus === 'in_progress' ? 'Sync in progress' : '';
   $: previewDisabled = syncing || !previewEnabled;
 
   function selectTrigger(value: (typeof triggerOptions)[number]['value'], enabled: boolean) {
@@ -77,6 +81,13 @@
         </div>
       {/if}
       <div class="flex items-center gap-3">
+        {#if liveStatus === 'pending'}
+          <Badge variant="neutral">Queued</Badge>
+        {:else if liveStatus === 'in_progress'}
+          <Badge variant="accent" icon={Loader2}>Syncing…</Badge>
+        {:else if liveStatus === 'failed'}
+          <Badge variant="danger">Last sync failed</Badge>
+        {/if}
         <SyncPreviewTrigger
           disabled={previewDisabled}
           sections={previewSection ? [previewSection] : []}
@@ -90,7 +101,7 @@
           disabled={syncDisabled}
           icon={syncing ? Loader2 : RefreshCw}
           iconColor={syncing ? 'text-blue-600 dark:text-blue-400 animate-spin' : 'text-blue-600 dark:text-blue-400'}
-          title={isDirty ? 'Save changes before syncing' : ''}
+          title={syncTitle}
           on:click={() => dispatch('sync')}
         />
         <Button

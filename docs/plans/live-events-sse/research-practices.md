@@ -29,7 +29,7 @@ limits, and testability. Paths are relative to `packages/praxrr-app/` unless not
   relative-time text ("next run in…", preview staleness). None of them polls the server. SSE
   replaces nothing there.
 - **Scope the MVP to job lifecycle.** Pages react by calling `invalidate`/`invalidateAll`. The
-  completion toast is wired once in the root layout. Sync, drift and Canary *domain* events are
+  completion toast is wired once in the root layout. Sync, drift and Canary _domain_ events are
   thin follow-ons: they map to job types `arr.sync*`, `drift.check` and `sync.canary.rollout`,
   so the job event already gives those pages a refresh trigger.
 
@@ -37,28 +37,28 @@ limits, and testability. Paths are relative to `packages/praxrr-app/` unless not
 
 ### Server
 
-| Concern | Existing code | How to reuse |
-| --- | --- | --- |
-| Singleton style | `src/lib/server/jobs/queueRegistry.ts` (class + `export const jobQueueRegistry`) | Mirror it: `class EventBus { … }` / `export const eventBus = new EventBus()` |
-| Lifecycle hook point | `dispatcher.ts:60` `claimNextDue()` (→ running), `:79` / `:152` `markFinished`, `:139` `reschedule` | Call `publish` right after each DB state change, so the event never runs ahead of persisted state |
-| Enqueue fan-in | `jobs/queueService.ts` (`enqueueJob`, `upsertScheduledJob`); `jobs/helpers/pcdSyncQueue.ts:71`; `jobs/helpers/trashGuideSyncQueue.ts:173`; `jobs/schedule.ts:17-20` | `queued` is optional. If wanted, emit it in `enqueueJob` only (manual triggers), not in scheduled upserts, to avoid noise |
-| Display names | `jobs/display.ts` `buildJobDisplayName(jobType, payload)` (already computed at `dispatcher.ts:71`) | Put `displayName` in the event, so the toast text needs no client lookup |
-| Safe failure info | `jobs/evidence.ts` `buildSafeJobEvidence` → `evidence.failure?.code` (`dispatcher.ts:134`) | Send only the typed `failureCode`, never raw errors. This keeps the existing "redaction by construction" rule (`dispatcher.ts:110-111`) |
-| Job types / status | `jobs/queueTypes.ts:12-33` (`JobType`, `JobStatus`, `JobRunStatus`), `ArrSyncJobPayload.instanceId` (`:41-58`) | Reuse these types directly in the event union. Do not invent a parallel status model; a comment at `queueTypes.ts:221` asks for exactly this |
-| Fire-and-forget idiom | `sync/syncHistory/record.ts:192-213` (`recordSyncHistory` never throws), `sync/canary/notify.ts` (void + swallow) | `publish()` must never throw into the dispatcher. Wrap each subscriber call in `try/catch` and log through `$logger` |
-| Sync-history id for "View details" | `recordSyncHistory` returns the row id; `handlers/arrSync.ts:61,711` carries `syncHistoryId` | Not visible at the dispatcher today. Either thread it out through `JobHandlerResult` (an optional `syncHistoryId`) or publish a `sync.recorded` event from `recordSyncHistory`. See Open Questions |
-| DI for testing | `handlers/arrSync.ts:100-118` `ReviewedSyncExecutionDependencies`; `sync/drift/persist.ts:95-98` `deps: Partial<…>` | The SSE handler factory takes `{ bus, heartbeatMs }` deps so tests can use a fake bus and a short heartbeat |
-| Auth / scope | `hooks.server.ts:251-313`, `utils/auth/scopePolicy.ts`, `App.Locals` (`src/app.d.ts:11-16`) | Rely on the middleware. Inside the route, `locals.principal` is available if a per-principal filter is ever needed |
+| Concern                            | Existing code                                                                                                                                                       | How to reuse                                                                                                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Singleton style                    | `src/lib/server/jobs/queueRegistry.ts` (class + `export const jobQueueRegistry`)                                                                                    | Mirror it: `class EventBus { … }` / `export const eventBus = new EventBus()`                                                                                                                       |
+| Lifecycle hook point               | `dispatcher.ts:60` `claimNextDue()` (→ running), `:79` / `:152` `markFinished`, `:139` `reschedule`                                                                 | Call `publish` right after each DB state change, so the event never runs ahead of persisted state                                                                                                  |
+| Enqueue fan-in                     | `jobs/queueService.ts` (`enqueueJob`, `upsertScheduledJob`); `jobs/helpers/pcdSyncQueue.ts:71`; `jobs/helpers/trashGuideSyncQueue.ts:173`; `jobs/schedule.ts:17-20` | `queued` is optional. If wanted, emit it in `enqueueJob` only (manual triggers), not in scheduled upserts, to avoid noise                                                                          |
+| Display names                      | `jobs/display.ts` `buildJobDisplayName(jobType, payload)` (already computed at `dispatcher.ts:71`)                                                                  | Put `displayName` in the event, so the toast text needs no client lookup                                                                                                                           |
+| Safe failure info                  | `jobs/evidence.ts` `buildSafeJobEvidence` → `evidence.failure?.code` (`dispatcher.ts:134`)                                                                          | Send only the typed `failureCode`, never raw errors. This keeps the existing "redaction by construction" rule (`dispatcher.ts:110-111`)                                                            |
+| Job types / status                 | `jobs/queueTypes.ts:12-33` (`JobType`, `JobStatus`, `JobRunStatus`), `ArrSyncJobPayload.instanceId` (`:41-58`)                                                      | Reuse these types directly in the event union. Do not invent a parallel status model; a comment at `queueTypes.ts:221` asks for exactly this                                                       |
+| Fire-and-forget idiom              | `sync/syncHistory/record.ts:192-213` (`recordSyncHistory` never throws), `sync/canary/notify.ts` (void + swallow)                                                   | `publish()` must never throw into the dispatcher. Wrap each subscriber call in `try/catch` and log through `$logger`                                                                               |
+| Sync-history id for "View details" | `recordSyncHistory` returns the row id; `handlers/arrSync.ts:61,711` carries `syncHistoryId`                                                                        | Not visible at the dispatcher today. Either thread it out through `JobHandlerResult` (an optional `syncHistoryId`) or publish a `sync.recorded` event from `recordSyncHistory`. See Open Questions |
+| DI for testing                     | `handlers/arrSync.ts:100-118` `ReviewedSyncExecutionDependencies`; `sync/drift/persist.ts:95-98` `deps: Partial<…>`                                                 | The SSE handler factory takes `{ bus, heartbeatMs }` deps so tests can use a fake bus and a short heartbeat                                                                                        |
+| Auth / scope                       | `hooks.server.ts:251-313`, `utils/auth/scopePolicy.ts`, `App.Locals` (`src/app.d.ts:11-16`)                                                                         | Rely on the middleware. Inside the route, `locals.principal` is available if a per-principal filter is ever needed                                                                                 |
 
 ### Client
 
-| Concern | Existing code | How to reuse |
-| --- | --- | --- |
-| Store factory | `$alerts/store.ts` (`createAlertStore` → `{ subscribe, add, remove, clear }`), `$stores/libraryCache.ts:113,235`, `$stores/mobileNav.ts` | `createEventsStore()` returns `{ subscribe, connect, disconnect, on(type, fn) }` |
-| Browser guard | `$stores/accent.ts:6,131,141`, `$stores/navScope.ts:1,53` (`import { browser } from '$app/environment'`) | Never construct `EventSource` during SSR. Guard `connect()` with `if (!browser) return` |
-| Toasts | `alertStore.add(type, message, duration?)`; rendered by `AlertContainer` in `src/routes/+layout.svelte:7,27` | Completion and failure toasts. **Gap:** `Alert.svelte` renders only `message` (plain `<p>`), so it has no link support. "View details" needs an optional `href`/action on `Alert` and in `Alert.svelte` (a small additive change) |
-| Refresh | `invalidateAll()` used widely (`routes/arr/[id]/sync/+page.svelte:364`, `canary/[id]/+page.svelte:145`, the sync components) | Pages call `invalidateAll()` (or a `depends('praxrr:jobs')` key with `invalidate('praxrr:jobs')`) when a relevant event arrives |
-| Layout mount point | `src/routes/+layout.svelte` (already mounts `AlertContainer` and `SetupChecklist`) | Connect once in `onMount`, disconnect in the returned cleanup. One `EventSource` per tab |
+| Concern            | Existing code                                                                                                                            | How to reuse                                                                                                                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Store factory      | `$alerts/store.ts` (`createAlertStore` → `{ subscribe, add, remove, clear }`), `$stores/libraryCache.ts:113,235`, `$stores/mobileNav.ts` | `createEventsStore()` returns `{ subscribe, connect, disconnect, on(type, fn) }`                                                                                                                                                  |
+| Browser guard      | `$stores/accent.ts:6,131,141`, `$stores/navScope.ts:1,53` (`import { browser } from '$app/environment'`)                                 | Never construct `EventSource` during SSR. Guard `connect()` with `if (!browser) return`                                                                                                                                           |
+| Toasts             | `alertStore.add(type, message, duration?)`; rendered by `AlertContainer` in `src/routes/+layout.svelte:7,27`                             | Completion and failure toasts. **Gap:** `Alert.svelte` renders only `message` (plain `<p>`), so it has no link support. "View details" needs an optional `href`/action on `Alert` and in `Alert.svelte` (a small additive change) |
+| Refresh            | `invalidateAll()` used widely (`routes/arr/[id]/sync/+page.svelte:364`, `canary/[id]/+page.svelte:145`, the sync components)             | Pages call `invalidateAll()` (or a `depends('praxrr:jobs')` key with `invalidate('praxrr:jobs')`) when a relevant event arrives                                                                                                   |
+| Layout mount point | `src/routes/+layout.svelte` (already mounts `AlertContainer` and `SetupChecklist`)                                                       | Connect once in `onMount`, disconnect in the returned cleanup. One `EventSource` per tab                                                                                                                                          |
 
 Consumer pages:
 
@@ -70,11 +70,11 @@ Consumer pages:
 
 ### Polling sites: migration verdict
 
-| Site | What it does | Migrate? |
-| --- | --- | --- |
+| Site                                                          | What it does                                                                                           | Migrate?                                                                                                                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `routes/arr/[id]/sync/components/SyncPreviewPanel.svelte:147` | 15 s tick of `stalenessNow`, which feeds `evaluateStaleness(preview.createdAt, stalenessNow)` (`:621`) | **No.** A local clock that needs no server data. Optionally, a sync-finished event for this instance could mark the preview stale right away. That is nice to have, not MVP |
-| `routes/arr/[id]/rename/components/RenameSettings.svelte:40` | 1 s tick of `now` for the "next run in" countdown from `lastRunAt` | **No** to replacing the tick. The prop `lastRunAt` does go stale after a run. An `arr.rename` terminal event plus `invalidateAll()` on the parent page fixes that for free |
-| `routes/arr/[id]/upgrades/components/CoreSettings.svelte:38` | Same as above, for `arr.upgrade` | Same: keep the tick, refresh `lastRunAt` with an event-driven invalidate |
+| `routes/arr/[id]/rename/components/RenameSettings.svelte:40`  | 1 s tick of `now` for the "next run in" countdown from `lastRunAt`                                     | **No** to replacing the tick. The prop `lastRunAt` does go stale after a run. An `arr.rename` terminal event plus `invalidateAll()` on the parent page fixes that for free  |
+| `routes/arr/[id]/upgrades/components/CoreSettings.svelte:38`  | Same as above, for `arr.upgrade`                                                                       | Same: keep the tick, refresh `lastRunAt` with an event-driven invalidate                                                                                                    |
 
 The issue lists these as "ad-hoc setIntervals". They are not data polling, so removing them
 would break the countdowns. **Recommendation:** leave them untouched in this ticket. A shared
@@ -87,24 +87,24 @@ Minimal module set. Each module stays well under 500 lines, most under 120.
 1. **`src/lib/shared/events/types.ts`**: the `PraxrrEvent` discriminated union, shared by the
    server and the client. MVP variant:
    `{ type: 'job'; jobId; jobType: JobType; status: JobStatus; displayName; instanceId?: number;
-   failureCode?: JobFailureCode; syncHistoryId?: number | null; at: string }`.
+failureCode?: JobFailureCode; syncHistoryId?: number | null; at: string }`.
    - `instanceId` comes from the payload, but only for job types whose payload defines it
      (`arr.*`). There is no inference.
    - Add `type: 'canary'` and `type: 'drift'` variants only if a page needs data the job event
      lacks.
    - This module must also match the OpenAPI schema (contract-first).
 2. **`src/lib/server/events/bus.ts`**: `class EventBus { subscribe(fn): () => void;
-   publish(e): void; get size(): number }` backed by a `Set`. It is synchronous and never throws
+publish(e): void; get size(): number }` backed by a `Set`. It is synchronous and never throws
    (each listener is isolated). Export the singleton `eventBus`.
 3. **`src/lib/server/events/sse.ts`**: pure helpers.
    - `formatSseMessage(event): string` returns `event: <type>\ndata: <json>\n\n`. Only
      `JSON.stringify` output goes into `data`, so no raw newlines can break framing.
    - `createEventStream({ bus, signal, heartbeatMs }): ReadableStream<Uint8Array>`. It subscribes
      on `start`, sends a `: ping` comment on an interval (proxy/idle keepalive), and unsubscribes
-     and clears the timer on `signal` abort *and* on `cancel()`.
+     and clears the timer on `signal` abort _and_ on `cancel()`.
 4. **`src/routes/api/v1/events/+server.ts`**: about 20 lines. Its `GET` returns
    `new Response(createEventStream({ bus: eventBus, signal: request.signal, heartbeatMs }), {
-   headers })` with these headers:
+headers })` with these headers:
    - `Content-Type: text/event-stream`
    - `Cache-Control: no-cache, no-transform`
    - `Connection: keep-alive`
@@ -164,7 +164,7 @@ The existing patterns to copy:
 
 - **Route tests** import handlers directly and cast minimal events, for example
   `{ url } as unknown as Parameters<typeof GET>[0]` (`src/tests/routes/syncHistory.test.ts:19-23,
-  125-147`).
+125-147`).
 - **Auth/locals:** tests never run `hooks.server.ts`. They build `App.Locals` by hand, for
   example `localsOf(principal)` with `{ user: null, session: null, authBypass, principal }`
   (`src/tests/routes/securityApiTokens.test.ts:43-56`). So the 401 / scope behaviour is
@@ -189,12 +189,12 @@ Proposed tests (Deno, no browser):
    - `size` returns to 0 after unsubscribe.
 2. `src/tests/events/sse.test.ts`:
    - `formatSseMessage` framing;
-   - read the `createEventStream` output through `getReader()`, then publish on a *fresh*
+   - read the `createEventStream` output through `getReader()`, then publish on a _fresh_
      `new EventBus()` (not the singleton) and assert the decoded chunk;
    - `AbortController.abort()` unsubscribes (`bus.size === 0`) and clears the heartbeat;
    - use `heartbeatMs: 10` to assert that a `: ping` comment appears.
 3. `src/tests/routes/events.test.ts`: call `GET({ request: new Request(url, { signal }) } as
-   unknown as …)`, then assert the status, the `text/event-stream` header, and that the body is a
+unknown as …)`, then assert the status, the `text/event-stream` header, and that the body is a
    stream. Abort at the end so the test leaks no resources (keep `sanitizeOps: false` like the
    other route tests).
 4. **Dispatcher emission** (`src/tests/jobs/jobEvents.test.ts`):
@@ -240,6 +240,7 @@ instances. The singleton is only the production wiring.
 
    Recommendation: (a), so there is one event per job. If the history id is null (recording is
    disabled), link to `/sync-history` or the jobs page instead.
+
 2. **Toast scope.** Toast only `source: 'manual'` jobs (the user triggered them), or every job?
    Recommendation: manual only. Scheduled jobs (backups, cleanups, drift sweeps) would spam the
    user. Failures of scheduled sync jobs are an open UX question for `UxResearcher`.
@@ -251,7 +252,7 @@ instances. The singleton is only the production wiring.
    from every enqueue path (`schedule.ts` notify, `pcdSyncQueue`, `trashGuideSyncQueue`)? The
    acceptance criteria only need running → result, so emitting `queued` is optional.
 5. **Reverse-proxy buffering** (nginx, Traefik) for users behind proxies. The `X-Accel-Buffering:
-   no` header plus a heartbeat of 15–25 s should cover it. Document this in the deployment docs.
+no` header plus a heartbeat of 15–25 s should cover it. Document this in the deployment docs.
 6. **Arr-specific semantics.** Events carry `jobType` (which is already per-Arr where it matters,
    for example `arr.sync.metadataProfiles` is Lidarr-only) and `instanceId`. Pages must filter by
    the explicit instance id, not by the Arr type. Do not add a generic "arr" bucket.

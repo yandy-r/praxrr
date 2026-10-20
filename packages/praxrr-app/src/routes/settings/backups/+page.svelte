@@ -157,7 +157,7 @@
         if (result.type === 'failure' && result.data) {
           alertStore.add('error', (result.data as { error?: string }).error || 'Failed to create backup');
         } else if (result.type === 'success') {
-	  alertStore.add('info', 'Backup queued');
+          alertStore.add('info', 'Backup queued');
         }
         await update();
       };
@@ -174,7 +174,7 @@
         if (result.type === 'failure' && result.data) {
           alertStore.add('error', (result.data as { error?: string }).error || 'Failed to run backup cleanup');
         } else if (result.type === 'success') {
-	  alertStore.add('info', 'Backup cleanup queued');
+          alertStore.add('info', 'Backup cleanup queued');
         }
         await update();
       };

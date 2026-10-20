@@ -20,7 +20,7 @@ The verified architecture makes this low-risk:
 - **The adapter can stream.** `sveltekit-adapter-deno@0.16.1` (`files/mod.ts`) is
   `Deno.serve(...)` → `server.respond(request)`. It returns the SvelteKit `Response` unchanged,
   so a `+server.ts` that returns `new Response(ReadableStream, {'content-type':
-  'text/event-stream'})` streams natively, with no buffering and no compression middleware. The
+'text/event-stream'})` streams natively, with no buffering and no compression middleware. The
   app has no SSE or EventSource code today, so this is the first streaming route.
 - **The lifecycle hook points are few and central.**
   - `claimNextDue()` is where a job moves to running.
@@ -137,19 +137,19 @@ nothing breaks (AC3), and we never have to keep a second state model consistent.
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Restart drops in-memory bus and ring buffer | Certain on restart | Low | Client reconnects. `seq` resets, so the server sends `resync` (the new `bootId` differs, sent in `hello`). The client then calls `invalidateAll()`. `recoverRunning()` re-queues interrupted jobs, and the next claim emits `job.running` again. |
-| Future multi-process or HA deploy | Low (single binary, `deno compile`) | High if it happens | Keep the bus behind an interface. Document the assumption in the module header. Polling fallback still works. |
-| Reverse proxy buffering or idle timeout (nginx, Traefik, Cloudflare ~100s) | Medium | Medium | `x-accel-buffering: no`, 25s heartbeat, client backoff. Document this in the docs site. |
-| Connection leak (cancel not firing, listeners accumulating) | Medium | Medium | Unsubscribe in both `cancel()` and on `request.signal` abort. Cap connections and expose the count in a debug log. Test that the listener count returns to 0. |
-| Publishing inside the dispatcher throws and corrupts job state | Low | High | `publish` never throws, and listener errors are caught. Publish after the DB write so events never precede the persisted state. |
-| Event floods (startup `scheduleAllJobs`, per-section syncs) | Medium | Low | Only emit `queued` for due or manual jobs. Debounce client invalidation. |
-| Secret or PII leakage via payloads | Low | High | Allow-list payload fields, reuse the evidence redaction, and include a test that asserts the payload keys. |
-| Session expiry not enforced on a long-lived stream | Medium | Medium | Re-check the session on heartbeat and close the stream if it is invalid. Include a test. |
-| HTTP/1.1 limit of 6 connections per origin, across many tabs | Medium | Low | One stream per tab, lazily connected and paused when hidden. HTTP/2 behind a proxy removes the limit. `BroadcastChannel` sharing is a follow-up. |
-| Cross-Arr conflation in payloads | Low | Medium | `arrType` comes from the instance row. Never derive it from `jobType` prefixes (`arr.sync.metadataProfiles` is Lidarr-only). |
-| Vite dev server SSE behavior differs from the compiled binary | Low | Low | Smoke-test both `deno task dev` and `deno task preview`. |
+| Risk                                                                       | Likelihood                          | Impact             | Mitigation                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------- | ----------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Restart drops in-memory bus and ring buffer                                | Certain on restart                  | Low                | Client reconnects. `seq` resets, so the server sends `resync` (the new `bootId` differs, sent in `hello`). The client then calls `invalidateAll()`. `recoverRunning()` re-queues interrupted jobs, and the next claim emits `job.running` again. |
+| Future multi-process or HA deploy                                          | Low (single binary, `deno compile`) | High if it happens | Keep the bus behind an interface. Document the assumption in the module header. Polling fallback still works.                                                                                                                                    |
+| Reverse proxy buffering or idle timeout (nginx, Traefik, Cloudflare ~100s) | Medium                              | Medium             | `x-accel-buffering: no`, 25s heartbeat, client backoff. Document this in the docs site.                                                                                                                                                          |
+| Connection leak (cancel not firing, listeners accumulating)                | Medium                              | Medium             | Unsubscribe in both `cancel()` and on `request.signal` abort. Cap connections and expose the count in a debug log. Test that the listener count returns to 0.                                                                                    |
+| Publishing inside the dispatcher throws and corrupts job state             | Low                                 | High               | `publish` never throws, and listener errors are caught. Publish after the DB write so events never precede the persisted state.                                                                                                                  |
+| Event floods (startup `scheduleAllJobs`, per-section syncs)                | Medium                              | Low                | Only emit `queued` for due or manual jobs. Debounce client invalidation.                                                                                                                                                                         |
+| Secret or PII leakage via payloads                                         | Low                                 | High               | Allow-list payload fields, reuse the evidence redaction, and include a test that asserts the payload keys.                                                                                                                                       |
+| Session expiry not enforced on a long-lived stream                         | Medium                              | Medium             | Re-check the session on heartbeat and close the stream if it is invalid. Include a test.                                                                                                                                                         |
+| HTTP/1.1 limit of 6 connections per origin, across many tabs               | Medium                              | Low                | One stream per tab, lazily connected and paused when hidden. HTTP/2 behind a proxy removes the limit. `BroadcastChannel` sharing is a follow-up.                                                                                                 |
+| Cross-Arr conflation in payloads                                           | Low                                 | Medium             | `arrType` comes from the instance row. Never derive it from `jobType` prefixes (`arr.sync.metadataProfiles` is Lidarr-only).                                                                                                                     |
+| Vite dev server SSE behavior differs from the compiled binary              | Low                                 | Low                | Smoke-test both `deno task dev` and `deno task preview`.                                                                                                                                                                                         |
 
 ### Testing strategy
 

@@ -97,15 +97,15 @@ All file references are relative to `packages/praxrr-app/src/` at worktree base 
 
 ### Toast content
 
-| Event | Type | Message | Action | Duration |
-|---|---|---|---|---|
-| Enqueue accepted (existing) | `info` (was `success`) | "Quality profiles sync queued for Radarr 4K" | none | default |
-| Manual job success | `success` | "Quality profiles synced to Radarr 4K · 12 items" | View details | default (5 s) |
-| Partial (`SyncOperationStatus='partial'`) | `warning` | "Quality profiles partially synced to Radarr 4K · 2 failures" | View details | sticky until dismissed |
-| Failed (any trigger) | `error` | "Delay profiles sync to Sonarr failed: {short reason}" | View details | sticky until dismissed |
-| Skipped (`skipped`) | none (row update only) | | | |
-| Coalesced burst | by worst status | "5 syncs finished · 1 failed" | View history (`/sync-history?status=failed` when any failed) | by worst status |
-| Canary gate | `warning` | "Canary 'X' is waiting for confirmation" | Review | sticky |
+| Event                                     | Type                   | Message                                                       | Action                                                       | Duration               |
+| ----------------------------------------- | ---------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------- |
+| Enqueue accepted (existing)               | `info` (was `success`) | "Quality profiles sync queued for Radarr 4K"                  | none                                                         | default                |
+| Manual job success                        | `success`              | "Quality profiles synced to Radarr 4K · 12 items"             | View details                                                 | default (5 s)          |
+| Partial (`SyncOperationStatus='partial'`) | `warning`              | "Quality profiles partially synced to Radarr 4K · 2 failures" | View details                                                 | sticky until dismissed |
+| Failed (any trigger)                      | `error`                | "Delay profiles sync to Sonarr failed: {short reason}"        | View details                                                 | sticky until dismissed |
+| Skipped (`skipped`)                       | none (row update only) |                                                               |                                                              |                        |
+| Coalesced burst                           | by worst status        | "5 syncs finished · 1 failed"                                 | View history (`/sync-history?status=failed` when any failed) | by worst status        |
+| Canary gate                               | `warning`              | "Canary 'X' is waiting for confirmation"                      | Review                                                       | sticky                 |
 
 Rules:
 
@@ -218,16 +218,16 @@ Recommendations:
 
 ## Error States
 
-| Situation | UX |
-|---|---|
-| Stream never connects (proxy strips SSE, auth expired) | Pages work exactly as today: SSR load plus manual reload. No toast. After ~10 s the indicator shows "Live updates unavailable". |
-| Stream drops mid-session | Silent reconnect with backoff. Indicator appears only if down for more than ~10 s. On reconnect, refetch every live-subscribed load (`invalidate` of the page's dependency keys), then hide the indicator. Do **not** toast "Reconnected". |
-| Events missed during the gap | Never replay missed terminal events as toasts; that would flood. Exception: a job this tab started (in `pendingJobIds`) that finished during the gap. After refetch, if the job is terminal, show its normal outcome toast once, which keeps acceptance criterion 2 true across short drops. |
-| Session expired (401 on reconnect) | Stop reconnecting and set the indicator to "Signed out — live updates paused". The existing auth redirect on the next navigation handles re-login. No retry storm. |
-| Server restart / redeploy | Same as a drop. The dispatcher restarts and jobs are recovered from the DB. Refetch-on-reconnect shows the authoritative state, including jobs that were re-queued. |
-| Job stuck in Running (no terminal event) | No client-side timeout toast. The row keeps showing Running with its start time, so the user sees elapsed time. Refetch on reconnect or focus corrects it. |
-| Enqueue failure | Unchanged: the existing error toast from the action (`+page.svelte:366-370`). |
-| Unknown or new event type | Ignore silently on the client (forward compatibility). Log only in dev. |
+| Situation                                              | UX                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stream never connects (proxy strips SSE, auth expired) | Pages work exactly as today: SSR load plus manual reload. No toast. After ~10 s the indicator shows "Live updates unavailable".                                                                                                                                                              |
+| Stream drops mid-session                               | Silent reconnect with backoff. Indicator appears only if down for more than ~10 s. On reconnect, refetch every live-subscribed load (`invalidate` of the page's dependency keys), then hide the indicator. Do **not** toast "Reconnected".                                                   |
+| Events missed during the gap                           | Never replay missed terminal events as toasts; that would flood. Exception: a job this tab started (in `pendingJobIds`) that finished during the gap. After refetch, if the job is terminal, show its normal outcome toast once, which keeps acceptance criterion 2 true across short drops. |
+| Session expired (401 on reconnect)                     | Stop reconnecting and set the indicator to "Signed out — live updates paused". The existing auth redirect on the next navigation handles re-login. No retry storm.                                                                                                                           |
+| Server restart / redeploy                              | Same as a drop. The dispatcher restarts and jobs are recovered from the DB. Refetch-on-reconnect shows the authoritative state, including jobs that were re-queued.                                                                                                                          |
+| Job stuck in Running (no terminal event)               | No client-side timeout toast. The row keeps showing Running with its start time, so the user sees elapsed time. Refetch on reconnect or focus corrects it.                                                                                                                                   |
+| Enqueue failure                                        | Unchanged: the existing error toast from the action (`+page.svelte:366-370`).                                                                                                                                                                                                                |
+| Unknown or new event type                              | Ignore silently on the client (forward compatibility). Log only in dev.                                                                                                                                                                                                                      |
 
 The connection indicator itself:
 
@@ -241,6 +241,7 @@ The connection indicator itself:
 
 **Sonarr / Radarr / Lidarr (SignalR `/signalr/messages`).** Closest analogue, and familiar to this
 app's users.
+
 - Commands (RefreshSeries, RssSync, Backup) appear in System → Tasks → Queue with live status. A
   small spinner in the sidebar footer (lower-left) shows the currently running command name.
 - Toasts appear mainly for manually triggered commands and errors. Scheduled RSS syncs are silent.
@@ -251,16 +252,19 @@ app's users.
   so a subtle indicator fits better.
 
 **GitHub Actions (live logs, check runs).**
+
 - Status icons transition in place (queued → in-progress spinner → check or cross) inside lists
   without reordering.
 - Notifications are opt-in and outcome-only, with no per-step toasts. Copy in-place badge
   transitions and the "outcome-only notification" principle.
 
 **Portainer / Home Assistant (WebSocket UIs).**
+
 - Home Assistant shows a persistent "Connection lost. Reconnecting…" banner only while
   disconnected and refreshes state on reconnect. This supports the delayed, subtle indicator.
 
 **Vercel / Netlify deploy dashboards.**
+
 - A deploy row shows live status, and a completion toast with a "Visit" or "View deployment" link
   appears for the deploy you triggered. Copy the "View details" action targeting the persisted
   result record (sync-history id), not the transient job.
@@ -316,7 +320,7 @@ app's users.
    rename/upgrade jobs, which have no sync-history row. Proposed: `/settings/jobs` with the run
    expanded, or the job-specific page. This needs a mapping per job type.
 3. **Who counts as the triggering user?** Should failure toasts for manual jobs started by
-   *another* admin be visible to everyone? This depends on whether events are user-scoped. Ask the
+   _another_ admin be visible to everyone? This depends on whether events are user-scoped. Ask the
    security research about multi-user and API-token visibility.
 4. **Drift toasts:** should transitioning to `drifted` ever toast globally, or only update badges?
    Proposed: badges only, plus a toast scoped to the instance page.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getPlatformLabel, getChannelLabel, shouldShowVersion } from '$shared/utils/version.ts';
   import logo from '$assets/logo.svg';
+  import LiveStatusIndicator from '$lib/client/events/LiveStatusIndicator.svelte';
 
   export let version: string = '';
 
@@ -20,3 +21,4 @@
     </div>
   </div>
 </div>
+<LiveStatusIndicator />

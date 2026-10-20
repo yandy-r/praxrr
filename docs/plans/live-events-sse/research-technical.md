@@ -26,7 +26,7 @@ relative to `packages/praxrr-app/src/`.
   The route still adds a heartbeat with session/token revalidation, idempotent cleanup, and
   connection caps.
 - **Contract.** The OpenAPI source of truth is `docs/api/v1/openapi.yaml` plus the
-  `paths/`/`schemas/` split files. `packages/praxrr-api/openapi.json` is a *bundled artifact*
+  `paths/`/`schemas/` split files. `packages/praxrr-api/openapi.json` is a _bundled artifact_
   produced by `scripts/bundle-api.ts:86`. `generate:api-types` reads the YAML (`deno.json:72`).
 - **Client.** Add `lib/client/stores/events.ts`: a `writable`-based `eventsStore` (no runes)
   that owns one `EventSource`, its own exponential backoff, and a `status` store. It starts from
@@ -35,7 +35,7 @@ relative to `packages/praxrr-app/src/`.
 - **Two gaps the issue does not mention:**
   1. The Jobs page **never lists manual or one-off jobs**. Its load uses
      `jobQueueQueries.listScheduled()`, which filters on `dedupe_key IS NOT NULL AND source =
-     'schedule'` (`db/queries/jobQueue.ts:143-148`). So a "Sync now" job can't show "running"
+'schedule'` (`db/queries/jobQueue.ts:143-148`). So a "Sync now" job can't show "running"
      there today. AC1 needs a new "Active jobs" list (`listActive()`).
   2. The sync page has **no server-side running indicator**. `syncing` is local button state
      only (`components/DelayProfiles.svelte:31,103-120`). Its load doesn't return per-section
@@ -62,29 +62,29 @@ relative to `packages/praxrr-app/src/`.
 
 ### Server modules (new)
 
-| File | Responsibility |
-|---|---|
-| `lib/shared/events/types.ts` | `LIVE_EVENT_TYPES` tuple and the `LiveEvent` discriminated union. Type-only imports of `JobType`/`JobStatus`/`JobRunStatus`/`JobSource` (`lib/server/jobs/queueTypes.ts:31-37`), `SyncOperationStatus`/`SyncTrigger` (`sync/syncHistory/types.ts:22,31`), `CanaryRolloutStatus` (`sync/canary/types.ts:21`), and `JobFailureCode` (`shared/jobs/evidence.ts:25`). Type-only server imports from client code already exist: `routes/arr/[id]/sync/+page.svelte:17-18`. |
-| `lib/server/events/bus.ts` | `eventBus.publish(event)`, `subscribe(fn): () => void`, `subscriberCount()`, `bootId`, and a monotonic `seq`. Fan-out is synchronous, and each listener runs in try/catch. `publish` **never throws**, because it is called inside the dispatcher and the sync handlers. |
-| `lib/server/events/publish.ts` | Typed builders that keep the redaction and arr_type rules in one place: `publishJobQueued(record)`, `publishJobRunning(record)`, `publishJobFinished(record, result, evidence, outcome)`, `publishSyncRecorded(id, input)`, `publishCanaryUpdated(rolloutId)`, `publishDriftUpdated(row)`. `arrType` comes from `arrInstancesQueries.getById(payload.instanceId)?.type`, narrowed with `isSyncPreviewArrType` (`sync/preview/types.ts:68`), and is otherwise `null`. It is **never inferred from `jobType`** (cross-Arr policy). `displayName` reuses `buildJobDisplayName` (`jobs/display.ts:84`). |
-| `lib/server/events/stream.ts` | `createEventStream({ signal, principalKey, revalidate })` returns a `ReadableStream<Uint8Array>`. It handles SSE framing, heartbeat, caps, and the single idempotent `close()`. This keeps `+server.ts` thin and unit-testable. |
-| `routes/api/v1/events/+server.ts` | `GET` only: builds the principal key and revalidator from `locals`, then returns `new Response(stream, headers)`. |
+| File                              | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/shared/events/types.ts`      | `LIVE_EVENT_TYPES` tuple and the `LiveEvent` discriminated union. Type-only imports of `JobType`/`JobStatus`/`JobRunStatus`/`JobSource` (`lib/server/jobs/queueTypes.ts:31-37`), `SyncOperationStatus`/`SyncTrigger` (`sync/syncHistory/types.ts:22,31`), `CanaryRolloutStatus` (`sync/canary/types.ts:21`), and `JobFailureCode` (`shared/jobs/evidence.ts:25`). Type-only server imports from client code already exist: `routes/arr/[id]/sync/+page.svelte:17-18`.                                                                                                                               |
+| `lib/server/events/bus.ts`        | `eventBus.publish(event)`, `subscribe(fn): () => void`, `subscriberCount()`, `bootId`, and a monotonic `seq`. Fan-out is synchronous, and each listener runs in try/catch. `publish` **never throws**, because it is called inside the dispatcher and the sync handlers.                                                                                                                                                                                                                                                                                                                            |
+| `lib/server/events/publish.ts`    | Typed builders that keep the redaction and arr_type rules in one place: `publishJobQueued(record)`, `publishJobRunning(record)`, `publishJobFinished(record, result, evidence, outcome)`, `publishSyncRecorded(id, input)`, `publishCanaryUpdated(rolloutId)`, `publishDriftUpdated(row)`. `arrType` comes from `arrInstancesQueries.getById(payload.instanceId)?.type`, narrowed with `isSyncPreviewArrType` (`sync/preview/types.ts:68`), and is otherwise `null`. It is **never inferred from `jobType`** (cross-Arr policy). `displayName` reuses `buildJobDisplayName` (`jobs/display.ts:84`). |
+| `lib/server/events/stream.ts`     | `createEventStream({ signal, principalKey, revalidate })` returns a `ReadableStream<Uint8Array>`. It handles SSE framing, heartbeat, caps, and the single idempotent `close()`. This keeps `+server.ts` thin and unit-testable.                                                                                                                                                                                                                                                                                                                                                                     |
+| `routes/api/v1/events/+server.ts` | `GET` only: builds the principal key and revalidator from `locals`, then returns `new Response(stream, headers)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ### Publish points (exact)
 
-| Event | Location | Notes |
-|---|---|---|
-| `job.queued` | `lib/server/jobs/queueService.ts:11` (`enqueueJob`) and `:17` (`upsertScheduledJob`) | Fires after `notifyJobEnqueued`. Covers sync page actions (`routes/arr/[id]/sync/+page.server.ts:777,818,859,905`), rename/upgrade/backup/logs actions, canary `proceedRollout` (`sync/canary/coordinator.ts:368`), and on-change syncs (`sync/processor.ts:419-452`, `source: 'system'`). |
-| `job.queued` | `lib/server/jobs/helpers/pcdSyncQueue.ts:71`, `lib/server/jobs/helpers/trashGuideSyncQueue.ts:173` | These call `jobQueueQueries.upsertScheduled` directly, which bypasses `queueService`. Publish next to their `notifyJobEnqueued`. |
-| *(none)* | `lib/server/jobs/schedule.ts:17-20,52,74,…` | Recurring schedule upserts set future `runAt`s. **Don't publish**, or `scheduleAllJobs()` at boot (`jobs/init.ts:20`) floods the stream. The Jobs page shows `next_run_at` statically anyway. |
-| `job.running` | `lib/server/jobs/dispatcher.ts:60-61` | Fires after `claimNextDue()` returns a record (its status is already `running`; see `db/queries/jobQueue.ts:194-207`) and before `executeJob`. |
-| `job.finished` | `dispatcher.ts:79` (handler not found, `status: 'failed'`, `failureCode: 'handlerNotFound'`) | Fires after `markFinished` and `jobRunHistoryQueries.create` (which returns the run id, `db/queries/jobRunHistory.ts:42-70`). |
-| `job.finished` | `dispatcher.ts:139` (`reschedule`) | Sends `status: 'queued'`, `rescheduled: true`, and `nextRunAt`. Canary batches reschedule to "now" (`jobs/handlers/canaryRollout.ts:98-102`), so they emit one event per batch. That is acceptable, and it doubles as progress. |
-| `job.finished` | `dispatcher.ts:152` (`markFinished`) | Maps `status` with the existing ternary (`dispatcher.ts:143-150`). Includes `runStatus` (`result.status`), `failureCode`, and the safe `message` from `evidence.failure?.message` (`buildSafeJobEvidence`, `dispatcher.ts:121`). It never includes raw errors. |
-| `sync.recorded` | `lib/server/sync/syncHistory/record.ts:197-198` (after `syncHistoryQueries.insert`, next to `fireNotification`) | One choke point for all three sync paths: the queued handler (`jobs/handlers/arrSync.ts:847`, `jobId` = queue id), reviewed apply on the request thread (`arrSync.ts:711`, `jobId: null`, from `routes/api/v1/sync/preview/[previewId]/apply/+server.ts:269`), and the canary/inline `executeSyncJob` (`arrSync.ts:190-216`, `id: 0`, so `jobId: null` per `arrSync.ts:851`). It doesn't fire when history recording is disabled (`record.ts:194`). |
-| `canary.updated` | `sync/canary/coordinator.ts:278` (after insert, `canary_running`), `:302-307` (after `recordCanaryOutcome`, `awaiting_confirmation`/`aborted`), `:363-376` (`proceedRollout` → `rolling_out`), `:393-398` (`abortRollout` → `aborted`) | Each fires via `publishCanaryUpdated(id)`, which reads `canaryRolloutQueries.getById` (`db/queries/canaryRollouts.ts:606`) and projects summary fields only, never `stateToken`. |
-| `canary.updated` | `jobs/handlers/canaryRollout.ts:92` (`recordBatchProgress`), `:112` (`finishRollout` → `completed`/`failed`) | Batch progress plus the terminal state. |
-| `drift.updated` | `sync/drift/persist.ts:111-125` (after `driftStatusQueries.upsert`) | Covers the scheduled `drift.check` job (`jobs/handlers/driftCheck.ts:90`) and the on-demand `POST /api/v1/drift/{id}` (`routes/api/v1/drift/[instanceId]/+server.ts:84`). |
+| Event            | Location                                                                                                                                                                                                                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `job.queued`     | `lib/server/jobs/queueService.ts:11` (`enqueueJob`) and `:17` (`upsertScheduledJob`)                                                                                                                                                   | Fires after `notifyJobEnqueued`. Covers sync page actions (`routes/arr/[id]/sync/+page.server.ts:777,818,859,905`), rename/upgrade/backup/logs actions, canary `proceedRollout` (`sync/canary/coordinator.ts:368`), and on-change syncs (`sync/processor.ts:419-452`, `source: 'system'`).                                                                                                                                                          |
+| `job.queued`     | `lib/server/jobs/helpers/pcdSyncQueue.ts:71`, `lib/server/jobs/helpers/trashGuideSyncQueue.ts:173`                                                                                                                                     | These call `jobQueueQueries.upsertScheduled` directly, which bypasses `queueService`. Publish next to their `notifyJobEnqueued`.                                                                                                                                                                                                                                                                                                                    |
+| _(none)_         | `lib/server/jobs/schedule.ts:17-20,52,74,…`                                                                                                                                                                                            | Recurring schedule upserts set future `runAt`s. **Don't publish**, or `scheduleAllJobs()` at boot (`jobs/init.ts:20`) floods the stream. The Jobs page shows `next_run_at` statically anyway.                                                                                                                                                                                                                                                       |
+| `job.running`    | `lib/server/jobs/dispatcher.ts:60-61`                                                                                                                                                                                                  | Fires after `claimNextDue()` returns a record (its status is already `running`; see `db/queries/jobQueue.ts:194-207`) and before `executeJob`.                                                                                                                                                                                                                                                                                                      |
+| `job.finished`   | `dispatcher.ts:79` (handler not found, `status: 'failed'`, `failureCode: 'handlerNotFound'`)                                                                                                                                           | Fires after `markFinished` and `jobRunHistoryQueries.create` (which returns the run id, `db/queries/jobRunHistory.ts:42-70`).                                                                                                                                                                                                                                                                                                                       |
+| `job.finished`   | `dispatcher.ts:139` (`reschedule`)                                                                                                                                                                                                     | Sends `status: 'queued'`, `rescheduled: true`, and `nextRunAt`. Canary batches reschedule to "now" (`jobs/handlers/canaryRollout.ts:98-102`), so they emit one event per batch. That is acceptable, and it doubles as progress.                                                                                                                                                                                                                     |
+| `job.finished`   | `dispatcher.ts:152` (`markFinished`)                                                                                                                                                                                                   | Maps `status` with the existing ternary (`dispatcher.ts:143-150`). Includes `runStatus` (`result.status`), `failureCode`, and the safe `message` from `evidence.failure?.message` (`buildSafeJobEvidence`, `dispatcher.ts:121`). It never includes raw errors.                                                                                                                                                                                      |
+| `sync.recorded`  | `lib/server/sync/syncHistory/record.ts:197-198` (after `syncHistoryQueries.insert`, next to `fireNotification`)                                                                                                                        | One choke point for all three sync paths: the queued handler (`jobs/handlers/arrSync.ts:847`, `jobId` = queue id), reviewed apply on the request thread (`arrSync.ts:711`, `jobId: null`, from `routes/api/v1/sync/preview/[previewId]/apply/+server.ts:269`), and the canary/inline `executeSyncJob` (`arrSync.ts:190-216`, `id: 0`, so `jobId: null` per `arrSync.ts:851`). It doesn't fire when history recording is disabled (`record.ts:194`). |
+| `canary.updated` | `sync/canary/coordinator.ts:278` (after insert, `canary_running`), `:302-307` (after `recordCanaryOutcome`, `awaiting_confirmation`/`aborted`), `:363-376` (`proceedRollout` → `rolling_out`), `:393-398` (`abortRollout` → `aborted`) | Each fires via `publishCanaryUpdated(id)`, which reads `canaryRolloutQueries.getById` (`db/queries/canaryRollouts.ts:606`) and projects summary fields only, never `stateToken`.                                                                                                                                                                                                                                                                    |
+| `canary.updated` | `jobs/handlers/canaryRollout.ts:92` (`recordBatchProgress`), `:112` (`finishRollout` → `completed`/`failed`)                                                                                                                           | Batch progress plus the terminal state.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `drift.updated`  | `sync/drift/persist.ts:111-125` (after `driftStatusQueries.upsert`)                                                                                                                                                                    | Covers the scheduled `drift.check` job (`jobs/handlers/driftCheck.ts:90`) and the on-demand `POST /api/v1/drift/{id}` (`routes/api/v1/drift/[instanceId]/+server.ts:84`).                                                                                                                                                                                                                                                                           |
 
 **Ordering guarantee used by the toast.** In the queued sync handler, `recordHistory(...)`
 (`arrSync.ts:1155`) runs **before** the handler returns. The dispatcher publishes `job.finished`
@@ -107,54 +107,74 @@ introduce `succeeded`, which would be a second convention.
 ```ts
 // lib/shared/events/types.ts
 export const LIVE_EVENT_TYPES = [
-	'hello', 'job.queued', 'job.running', 'job.finished',
-	'sync.recorded', 'canary.updated', 'drift.updated', 'session.expired'
+  'hello',
+  'job.queued',
+  'job.running',
+  'job.finished',
+  'sync.recorded',
+  'canary.updated',
+  'drift.updated',
+  'session.expired',
 ] as const;
 export type LiveEventType = (typeof LIVE_EVENT_TYPES)[number];
 export type LiveArrType = 'radarr' | 'sonarr' | 'lidarr';
 
 interface JobEventBase {
-	jobId: number;
-	jobType: JobType;
-	source: JobSource;            // 'schedule' | 'manual' | 'system'
-	displayName: string;          // buildJobDisplayName (no secrets)
-	instanceId: number | null;    // payload.instanceId when numeric
-	arrType: LiveArrType | null;  // from arr_instances row, never inferred
-	databaseId: number | null;    // pcd.sync
-	sections: ArrSyncSection[] | null; // arr.sync.* (resolved like resolveSections, arrSync.ts:871)
+  jobId: number;
+  jobType: JobType;
+  source: JobSource; // 'schedule' | 'manual' | 'system'
+  displayName: string; // buildJobDisplayName (no secrets)
+  instanceId: number | null; // payload.instanceId when numeric
+  arrType: LiveArrType | null; // from arr_instances row, never inferred
+  databaseId: number | null; // pcd.sync
+  sections: ArrSyncSection[] | null; // arr.sync.* (resolved like resolveSections, arrSync.ts:871)
 }
 export type LiveEvent =
-	| { type: 'hello'; bootId: string; serverTime: string; heartbeatMs: number }
-	| ({ type: 'job.queued'; runAt: string } & JobEventBase)
-	| ({ type: 'job.running'; startedAt: string } & JobEventBase)
-	| ({
-			type: 'job.finished';
-			status: 'success' | 'failed' | 'cancelled' | 'queued'; // 'queued' only when rescheduled
-			rescheduled: boolean;
-			nextRunAt: string | null;
-			runId: number;             // job_run_history.id
-			runStatus: JobRunStatus;   // success|failure|skipped|cancelled
-			failureCode: JobFailureCode | null;
-			message: string | null;    // FAILURE_COPY message only
-			durationMs: number;
-	  } & JobEventBase)
-	| {
-			type: 'sync.recorded';
-			syncHistoryId: number; jobId: number | null; instanceId: number;
-			instanceName: string; arrType: LiveArrType;
-			status: SyncOperationStatus; trigger: SyncTrigger; finishedAt: string;
-	  }
-	| {
-			type: 'canary.updated';
-			rolloutId: number; arrType: LiveArrType; status: CanaryRolloutStatus;
-			canaryStatus: CanaryOutcomeStatus | null; completedCount: number; remainingCount: number;
-	  }
-	| {
-			type: 'drift.updated';
-			instanceId: number; arrType: LiveArrType; status: DriftStatus;
-			drifted: number; missing: number; unmanaged: number; checkedAt: string;
-	  }
-	| { type: 'session.expired' };
+  | { type: 'hello'; bootId: string; serverTime: string; heartbeatMs: number }
+  | ({ type: 'job.queued'; runAt: string } & JobEventBase)
+  | ({ type: 'job.running'; startedAt: string } & JobEventBase)
+  | ({
+      type: 'job.finished';
+      status: 'success' | 'failed' | 'cancelled' | 'queued'; // 'queued' only when rescheduled
+      rescheduled: boolean;
+      nextRunAt: string | null;
+      runId: number; // job_run_history.id
+      runStatus: JobRunStatus; // success|failure|skipped|cancelled
+      failureCode: JobFailureCode | null;
+      message: string | null; // FAILURE_COPY message only
+      durationMs: number;
+    } & JobEventBase)
+  | {
+      type: 'sync.recorded';
+      syncHistoryId: number;
+      jobId: number | null;
+      instanceId: number;
+      instanceName: string;
+      arrType: LiveArrType;
+      status: SyncOperationStatus;
+      trigger: SyncTrigger;
+      finishedAt: string;
+    }
+  | {
+      type: 'canary.updated';
+      rolloutId: number;
+      arrType: LiveArrType;
+      status: CanaryRolloutStatus;
+      canaryStatus: CanaryOutcomeStatus | null;
+      completedCount: number;
+      remainingCount: number;
+    }
+  | {
+      type: 'drift.updated';
+      instanceId: number;
+      arrType: LiveArrType;
+      status: DriftStatus;
+      drifted: number;
+      missing: number;
+      unmanaged: number;
+      checkedAt: string;
+    }
+  | { type: 'session.expired' };
 ```
 
 ### Wire framing
@@ -180,16 +200,26 @@ id: <seq>\ndata: {"type":"job.running",...}\n\n
 
 ```ts
 export const GET: RequestHandler = ({ request, locals }) => {
-	const key = principalKey(locals); // 'session:<id>' | 'token:<id>' | 'bypass'
-	const slot = eventStreams.acquire(key); // evicts oldest for same key; null => global cap hit
-	if (!slot) return json({ error: 'Too many event streams' }, { status: 503, headers: { 'Retry-After': '30' } });
-	const stream = createEventStream({ signal: request.signal, slot, revalidate: revalidator(locals) });
-	return new Response(stream, { headers: {
-		'Content-Type': 'text/event-stream; charset=utf-8',
-		'Cache-Control': 'no-cache, no-transform',
-		'X-Accel-Buffering': 'no',
-		Connection: 'keep-alive'
-	} });
+  const key = principalKey(locals); // 'session:<id>' | 'token:<id>' | 'bypass'
+  const slot = eventStreams.acquire(key); // evicts oldest for same key; null => global cap hit
+  if (!slot)
+    return json(
+      { error: 'Too many event streams' },
+      { status: 503, headers: { 'Retry-After': '30' } }
+    );
+  const stream = createEventStream({
+    signal: request.signal,
+    slot,
+    revalidate: revalidator(locals),
+  });
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+      Connection: 'keep-alive',
+    },
+  });
 };
 ```
 
@@ -348,14 +378,14 @@ onMount(() => {
 
 ### Toast with link (alertStore extension)
 
-| File | Change |
-|---|---|
-| `lib/client/alerts/store.ts:7-12` | Add `export interface AlertAction { label: string; href: string }` and `action?: AlertAction` to `Alert`. |
-| `lib/client/alerts/store.ts:19` | Change the signature to `add(type, message, duration?, action?)`. It stays positional and backward compatible: 10 existing three-argument callers keep working. |
-| `lib/client/alerts/Alert.svelte:7-9,42-59` | Add `export let action: AlertAction \| undefined`. Today the whole toast is a `div role="button"` with `on:click={dismiss}` (`:42-53`), and putting an `<a>` inside it would nest interactive elements. When `action` is set, render the toast as a plain `div`: the message, an `<a href={action.href}>` that calls `dismiss()` on click, and a small dismiss `<button>`. When `action` is not set, keep the current markup unchanged. |
-| `lib/client/alerts/AlertContainer.svelte:29` | Pass `action={alert.action}`. |
-| `lib/client/alerts/MobileNavAlert.svelte:7-9,41-57` | Add an `action` prop. On the small bar, make the whole pill an `<a>` when `action` is set. |
-| `lib/client/ui/navigation/navbar/navbar.svelte:34` | Pass `action={latestAlert.action}`. |
+| File                                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/client/alerts/store.ts:7-12`                   | Add `export interface AlertAction { label: string; href: string }` and `action?: AlertAction` to `Alert`.                                                                                                                                                                                                                                                                                                                               |
+| `lib/client/alerts/store.ts:19`                     | Change the signature to `add(type, message, duration?, action?)`. It stays positional and backward compatible: 10 existing three-argument callers keep working.                                                                                                                                                                                                                                                                         |
+| `lib/client/alerts/Alert.svelte:7-9,42-59`          | Add `export let action: AlertAction \| undefined`. Today the whole toast is a `div role="button"` with `on:click={dismiss}` (`:42-53`), and putting an `<a>` inside it would nest interactive elements. When `action` is set, render the toast as a plain `div`: the message, an `<a href={action.href}>` that calls `dismiss()` on click, and a small dismiss `<button>`. When `action` is not set, keep the current markup unchanged. |
+| `lib/client/alerts/AlertContainer.svelte:29`        | Pass `action={alert.action}`.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `lib/client/alerts/MobileNavAlert.svelte:7-9,41-57` | Add an `action` prop. On the small bar, make the whole pill an `<a>` when `action` is set.                                                                                                                                                                                                                                                                                                                                              |
+| `lib/client/ui/navigation/navbar/navbar.svelte:34`  | Pass `action={latestAlert.action}`.                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 These components use legacy `on:click`. Svelte 5 won't compile a component that mixes `on:click`
 and `onclick`. Either migrate both alert components to `onclick` as part of this change
@@ -363,14 +393,14 @@ and `onclick`. Either migrate both alert components to `onclick` as part of this
 
 ### Page integrations
 
-| Page | How it loads today | Change |
-|---|---|---|
-| `routes/settings/jobs/+page.server.ts:9-58` + `+page.svelte` | Server `load`. Scheduled jobs come from `listScheduled()` (`jobQueue.ts:143`), and the 50 most recent runs from `jobRunHistoryQueries.getRecent(50)`. There is no refresh at all. | (1) `load({ depends })` calls `depends('praxrr:jobs')`. (2) Add `activeJobs` from a new `jobQueueQueries.listActive(limit=50)` (`status IN ('queued','running') AND (dedupe_key IS NULL OR source != 'schedule' OR run_at <= now)`) and render an "Active" table above the scheduled table, reusing `ExpandableTable` and the `Badge` running/queued variants (`+page.svelte:102-105`). (3) In `onMount`: `eventsStore.on('*')` filtered to `job.*` → a 250 ms debounced `invalidate('praxrr:jobs')`, plus `onResync` → `invalidate`. AC1 needs the new list, because the existing tables never show manual jobs. |
-| `routes/arr/[id]/sync/+page.server.ts:247-404` + `+page.svelte` | Server `load`. Returns `syncData` from `getFullSyncData` (`arrSync.ts:955-962`), with `lastSyncedAt` only and no status. `syncing` is local button state. The page already calls `invalidateAll()` after a trigger (`+page.svelte:364`; `DelayProfiles.svelte:113`), so re-running the load is proven safe for local edit state, because the `let` values initialize once (`+page.svelte:78-104`). | (1) `depends(`praxrr:arr-sync:${id}`)`. (2) Add `sectionStatus: arrSyncQueries.getSyncConfigStatus(id)` (`arrSync.ts:1561`; `syncStatus` is `idle|pending|in_progress|failed`, `:120`) to the return value. (3) Pass a `running` prop (`sectionStatus.X.syncStatus` is `pending`/`in_progress`, OR a live `job.running` exists for this instanceId whose `sections` include X) into `SyncFooter` as `syncing` (`components/SyncFooter.svelte:14,39`). This gives the authoritative "running" state, and the button spinner shows it. (4) Subscribe to `job.queued/running/finished` and `sync.recorded` where `instanceId === data.instance.id` → debounced `invalidate`. `lastSyncedAt` props (`+page.svelte:405,422,436`) then update. Removing the per-component `invalidateAll` after the trigger is optional. |
-| `routes/sync-history/+page.server.ts:41-76` | Server `load` driven by URL filters (`search` + `count`). Navigation uses `goto(..., { invalidateAll: true })` (`+page.svelte:189,201`). | `depends('praxrr:sync-history')`. On `sync.recorded` (any instance) or resync → debounced `invalidate`. The queries are cheap. The detail page `sync-history/[id]` fetches immutable rows client-side (`[id]/+page.svelte:47`), so it needs no change. |
-| `routes/canary/[id]/+page.server.ts:16-33` + `+page.svelte` | Server `load` (`getById` + diagnostics). Already calls `invalidateAll()` after proceed/abort (`[id]/+page.svelte:145,158`). | `depends(`praxrr:canary:${id}`)`. On `canary.updated` with `rolloutId === rollout.id` → `invalidate`. The refreshed load also refreshes `stateToken`, so the proceed/abort value guards stay valid. |
-| `routes/canary/+page.server.ts` (list) | Server `load`. | `depends('praxrr:canary')`, invalidated on any `canary.updated`. |
-| `routes/drift/+page.svelte:59`, `routes/drift/[instanceId]/+page.svelte:40` | Client `fetch` in a local loader. | On `drift.updated` (matching `instanceId` on the detail page) → call the existing local loader again. This is optional for the ACs, but it's cheap. |
+| Page                                                                        | How it loads today                                                                                                                                                                                                                                                                                                                                                                                 | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes/settings/jobs/+page.server.ts:9-58` + `+page.svelte`                | Server `load`. Scheduled jobs come from `listScheduled()` (`jobQueue.ts:143`), and the 50 most recent runs from `jobRunHistoryQueries.getRecent(50)`. There is no refresh at all.                                                                                                                                                                                                                  | (1) `load({ depends })` calls `depends('praxrr:jobs')`. (2) Add `activeJobs` from a new `jobQueueQueries.listActive(limit=50)` (`status IN ('queued','running') AND (dedupe_key IS NULL OR source != 'schedule' OR run_at <= now)`) and render an "Active" table above the scheduled table, reusing `ExpandableTable` and the `Badge` running/queued variants (`+page.svelte:102-105`). (3) In `onMount`: `eventsStore.on('*')` filtered to `job.*` → a 250 ms debounced `invalidate('praxrr:jobs')`, plus `onResync` → `invalidate`. AC1 needs the new list, because the existing tables never show manual jobs. |
+| `routes/arr/[id]/sync/+page.server.ts:247-404` + `+page.svelte`             | Server `load`. Returns `syncData` from `getFullSyncData` (`arrSync.ts:955-962`), with `lastSyncedAt` only and no status. `syncing` is local button state. The page already calls `invalidateAll()` after a trigger (`+page.svelte:364`; `DelayProfiles.svelte:113`), so re-running the load is proven safe for local edit state, because the `let` values initialize once (`+page.svelte:78-104`). | (1) `depends(`praxrr:arr-sync:${id}`)`. (2) Add `sectionStatus: arrSyncQueries.getSyncConfigStatus(id)` (`arrSync.ts:1561`; `syncStatus` is `idle                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | pending | in_progress | failed`, `:120`) to the return value. (3) Pass a `running` prop (`sectionStatus.X.syncStatus`is`pending`/`in_progress`, OR a live `job.running`exists for this instanceId whose`sections`include X) into`SyncFooter`as`syncing` (`components/SyncFooter.svelte:14,39`). This gives the authoritative "running" state, and the button spinner shows it. (4) Subscribe to `job.queued/running/finished`and`sync.recorded`where`instanceId === data.instance.id`→ debounced`invalidate`. `lastSyncedAt` props (`+page.svelte:405,422,436`) then update. Removing the per-component `invalidateAll` after the trigger is optional. |
+| `routes/sync-history/+page.server.ts:41-76`                                 | Server `load` driven by URL filters (`search` + `count`). Navigation uses `goto(..., { invalidateAll: true })` (`+page.svelte:189,201`).                                                                                                                                                                                                                                                           | `depends('praxrr:sync-history')`. On `sync.recorded` (any instance) or resync → debounced `invalidate`. The queries are cheap. The detail page `sync-history/[id]` fetches immutable rows client-side (`[id]/+page.svelte:47`), so it needs no change.                                                                                                                                                                                                                                                                                                                                                            |
+| `routes/canary/[id]/+page.server.ts:16-33` + `+page.svelte`                 | Server `load` (`getById` + diagnostics). Already calls `invalidateAll()` after proceed/abort (`[id]/+page.svelte:145,158`).                                                                                                                                                                                                                                                                        | `depends(`praxrr:canary:${id}`)`. On `canary.updated` with `rolloutId === rollout.id` → `invalidate`. The refreshed load also refreshes `stateToken`, so the proceed/abort value guards stay valid.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `routes/canary/+page.server.ts` (list)                                      | Server `load`.                                                                                                                                                                                                                                                                                                                                                                                     | `depends('praxrr:canary')`, invalidated on any `canary.updated`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `routes/drift/+page.svelte:59`, `routes/drift/[instanceId]/+page.svelte:40` | Client `fetch` in a local loader.                                                                                                                                                                                                                                                                                                                                                                  | On `drift.updated` (matching `instanceId` on the detail page) → call the existing local loader again. This is optional for the ACs, but it's cheap.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 Leave the existing intervals alone: `SyncPreviewPanel.svelte:147` (a staleness clock),
 `RenameSettings.svelte:40`, and `CoreSettings.svelte:38` (countdown clocks). They are wall-clock
@@ -451,7 +481,7 @@ is a UX choice (see the UX research). It isn't required.
 1. **Replay vs resync.** A `Last-Event-ID` ring buffer (the recommendations doc proposes about
    200 events) adds a second state path. Our client manages reconnects itself with a fresh
    `EventSource`, so it would also need `?lastEventId=`. Proposal: v1 resyncs by `invalidate`
-   only; terminal toasts for jobs that finish *during* a gap are lost. Is that acceptable?
+   only; terminal toasts for jobs that finish _during_ a gap are lost. Is that acceptable?
 2. **Over-cap policy.** The security doc says 429; the recommendations doc says 503 global. This
    doc proposes evict-oldest per principal plus 503 global. Confirm which.
 3. **Toast audience.** Only `source: 'manual'` jobs, shown in every tab of every session? Should

@@ -7,15 +7,15 @@ with WebSocket and polling.
 
 Pinned stack (checked in the worktree):
 
-| Component | Version / config | Source |
-| --- | --- | --- |
-| Deno | 2.9.7 (local CLI and `Dockerfile` `FROM denoland/deno:2.9.7`) | `deno --version`, `Dockerfile:12` |
-| SvelteKit | `@sveltejs/kit` 2.69.2 (lockfile) | `deno.lock:946` |
-| Svelte | 5.56.4 (no runes, per project rule) | `deno.lock` |
-| Adapter | `sveltekit-adapter-deno` ^0.16.1, `usage: 'deno-compile'` | `package.json:19`, `packages/praxrr-app/svelte.config.js:25-33` |
-| Prod server | adapter `files/mod.ts`: plain `Deno.serve({ port, hostname }, handler)` → `serveDir` static → `server.respond(request, …)` | `~/.cache/deno/npm/registry.npmjs.org/sveltekit-adapter-deno/0.16.1/files/mod.ts` |
-| Dev server | `deno run -A npm:vite dev` (Node `http` compat; SvelteKit's `getRequest`/`setResponse` bridge) | `deno.json:41`, `@sveltejs/kit/src/exports/node/index.js` |
-| Auth | `handle = sequence(csrfGuard, authHandle)`; session cookie `session`; API token via `X-Api-Key` **or** `?apikey=` (only under `/api/v1/`) | `hooks.server.ts:319`, `lib/server/utils/auth/middleware.ts:60,138` |
+| Component   | Version / config                                                                                                                          | Source                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Deno        | 2.9.7 (local CLI and `Dockerfile` `FROM denoland/deno:2.9.7`)                                                                             | `deno --version`, `Dockerfile:12`                                                 |
+| SvelteKit   | `@sveltejs/kit` 2.69.2 (lockfile)                                                                                                         | `deno.lock:946`                                                                   |
+| Svelte      | 5.56.4 (no runes, per project rule)                                                                                                       | `deno.lock`                                                                       |
+| Adapter     | `sveltekit-adapter-deno` ^0.16.1, `usage: 'deno-compile'`                                                                                 | `package.json:19`, `packages/praxrr-app/svelte.config.js:25-33`                   |
+| Prod server | adapter `files/mod.ts`: plain `Deno.serve({ port, hostname }, handler)` → `serveDir` static → `server.respond(request, …)`                | `~/.cache/deno/npm/registry.npmjs.org/sveltekit-adapter-deno/0.16.1/files/mod.ts` |
+| Dev server  | `deno run -A npm:vite dev` (Node `http` compat; SvelteKit's `getRequest`/`setResponse` bridge)                                            | `deno.json:41`, `@sveltejs/kit/src/exports/node/index.js`                         |
+| Auth        | `handle = sequence(csrfGuard, authHandle)`; session cookie `session`; API token via `X-Api-Key` **or** `?apikey=` (only under `/api/v1/`) | `hooks.server.ts:319`, `lib/server/utils/auth/middleware.ts:60,138`               |
 
 ---
 
@@ -69,7 +69,7 @@ Spec: <https://html.spec.whatwg.org/multipage/server-sent-events.html> · MDN gu
   - `event: <type>`: the name used for `addEventListener(type)`. Without it the event type is
     `message`.
   - `data: <text>`: may repeat. Multiple lines are joined with `\n`. JSON should go on a single line.
-  - `id: <string>`: sets the source's *last event ID*. The value **persists** until the server sets
+  - `id: <string>`: sets the source's _last event ID_. The value **persists** until the server sets
     another `id`. An `id` containing U+0000 is ignored. An empty `id:` resets the ID, and then no
     `Last-Event-ID` is sent.
   - `retry: <ms>`: ASCII digits only. Sets the reconnection delay.
@@ -84,9 +84,9 @@ Spec: <https://html.spec.whatwg.org/multipage/server-sent-events.html> · MDN gu
   - HTTP **204** is the documented "stop reconnecting" signal.
   - 301/307 redirects are followed.
 - `Last-Event-ID` request header (§9.2.4) is sent on reconnect when the last event ID is not empty.
-- Heartbeat guidance (§9.2.7): *"Legacy proxy servers are known to … drop HTTP connections after a
+- Heartbeat guidance (§9.2.7): _"Legacy proxy servers are known to … drop HTTP connections after a
   short timeout. To protect against such proxy servers, authors can include a comment line … every
-  15 seconds or so."*
+  15 seconds or so."_
 - Connection limit guidance (§9.2.7): multiple pages each opening an `EventSource` can hit the
   per-server connection limit. The suggested mitigations are a SharedWorker or a per-page toggle.
 
@@ -143,8 +143,8 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
 <https://docs.deno.com/api/deno/~/Deno.serve>
 
 - Streaming bodies: return `new Response(readableStream)`. The docs warn that **you must implement
-  `cancel()`**, otherwise *"the server will keep queuing up messages forever, and eventually run out
-  of memory."* A disconnect can also show up as a `write()` error on a `TransformStream` writer.
+  `cancel()`**, otherwise _"the server will keep queuing up messages forever, and eventually run out
+  of memory."_ A disconnect can also show up as a `write()` error on a `TransformStream` writer.
 - `ServeHandlerInfo.completed` (<https://docs.deno.com/api/deno/~/Deno.ServeHandlerInfo>) resolves
   once the response is fully sent and rejects if delivery fails. It is not reachable from
   `+server.ts`, because the adapter only forwards `getClientAddress`.
@@ -166,14 +166,14 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
 
 ## Libraries and SDKs
 
-| Option | What it is | Fit for Praxrr |
-| --- | --- | --- |
-| **Native `ReadableStream` + hand-written encoder** | about 20 lines (see Code Examples) | **Recommended.** No dependency, works under `deno compile`, fully under our control. |
-| `@std/http` `ServerSentEventStream` (JSR, `jsr:@std/http@1/server-sent-event-stream`) — <https://jsr.io/@std/http/doc/server-sent-event-stream/~/ServerSentEventStream> | `TransformStream<ServerSentEventMessage, Uint8Array>` with `{ event, data, id, retry, comment }` that validates fields (rejects newlines in `event`/`id`) | Good optional choice. The adapter already pulls `jsr:@std/http@1` for `serveDir`. Adds a JSR import to app code. Either option is acceptable. |
-| `sveltekit-sse` (razshare) — <https://github.com/razshare/sveltekit-sse> | Kit helper with its own client. Uses **POST** + `fetch` streaming and a 30 s ping | Not recommended. POST passes through `csrfGuard`, and it replaces native `EventSource` reconnect with its own protocol, tying the code to a third-party wire format. |
-| `@lok/kit-sse` (JSR) — <https://jsr.io/@lok/kit-sse> | Schema-validated typed SSE for Kit | Small and young. Contract-first OpenAPI already covers payload typing. Skip. |
-| `@microsoft/fetch-event-source` — <https://github.com/Azure/fetch-event-source> | `fetch`-based client that allows custom headers, POST, and a retry callback, and closes when the page is hidden | Only needed if browser clients had to send `X-Api-Key`. They don't, because the cookie works. Last release 2.0.1 (2021). Skip. |
-| `eventsource` (npm) — <https://github.com/EventSource/eventsource> | Spec-compliant `EventSource` for Node/Deno with custom `fetch` | Useful **only in tests** to consume the endpoint the way a browser would. Deno tests can also just parse a `fetch` body. |
+| Option                                                                                                                                                                  | What it is                                                                                                                                                | Fit for Praxrr                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Native `ReadableStream` + hand-written encoder**                                                                                                                      | about 20 lines (see Code Examples)                                                                                                                        | **Recommended.** No dependency, works under `deno compile`, fully under our control.                                                                                 |
+| `@std/http` `ServerSentEventStream` (JSR, `jsr:@std/http@1/server-sent-event-stream`) — <https://jsr.io/@std/http/doc/server-sent-event-stream/~/ServerSentEventStream> | `TransformStream<ServerSentEventMessage, Uint8Array>` with `{ event, data, id, retry, comment }` that validates fields (rejects newlines in `event`/`id`) | Good optional choice. The adapter already pulls `jsr:@std/http@1` for `serveDir`. Adds a JSR import to app code. Either option is acceptable.                        |
+| `sveltekit-sse` (razshare) — <https://github.com/razshare/sveltekit-sse>                                                                                                | Kit helper with its own client. Uses **POST** + `fetch` streaming and a 30 s ping                                                                         | Not recommended. POST passes through `csrfGuard`, and it replaces native `EventSource` reconnect with its own protocol, tying the code to a third-party wire format. |
+| `@lok/kit-sse` (JSR) — <https://jsr.io/@lok/kit-sse>                                                                                                                    | Schema-validated typed SSE for Kit                                                                                                                        | Small and young. Contract-first OpenAPI already covers payload typing. Skip.                                                                                         |
+| `@microsoft/fetch-event-source` — <https://github.com/Azure/fetch-event-source>                                                                                         | `fetch`-based client that allows custom headers, POST, and a retry callback, and closes when the page is hidden                                           | Only needed if browser clients had to send `X-Api-Key`. They don't, because the cookie works. Last release 2.0.1 (2021). Skip.                                       |
+| `eventsource` (npm) — <https://github.com/EventSource/eventsource>                                                                                                      | Spec-compliant `EventSource` for Node/Deno with custom `fetch`                                                                                            | Useful **only in tests** to consume the endpoint the way a browser would. Deno tests can also just parse a `fetch` body.                                             |
 
 ---
 
@@ -222,23 +222,23 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
 
 ### SSE vs WebSocket vs polling
 
-| Criterion | SSE (`EventSource`) | WebSocket | Polling (`setInterval` + `invalidate`) |
-| --- | --- | --- | --- |
-| Direction | Server → client (all we need) | Bidirectional | Client pull |
-| SvelteKit `+server.ts` support on this adapter | Native (return a stream) | **No.** Kit has no upgrade hook; would need `Deno.upgradeWebSocket` in a custom `Deno.serve` wrapper replacing the adapter's `mod.ts`, plus separate Vite dev handling | Native |
-| Auth | Session cookie automatic; same hooks/CSRF path (GET is CSRF-safe) | Cookie on handshake; must re-implement auth outside `handle` | Existing |
-| Reconnect / resume | Built-in; `Last-Event-ID` | Hand-written | N/A |
-| Proxies | Plain HTTP; needs buffering off + heartbeat | Needs `Upgrade`/`Connection` headers configured in nginx | Trivial |
-| Connection cost | 1 long-lived HTTP/1.1 connection per tab (6-per-origin limit) | 1 socket per tab (not subject to the 6 limit) | N requests/interval; stale between ticks |
-| Verdict | **Chosen** | Overkill and needs adapter surgery | Current state; what the issue removes |
+| Criterion                                      | SSE (`EventSource`)                                               | WebSocket                                                                                                                                                              | Polling (`setInterval` + `invalidate`)   |
+| ---------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Direction                                      | Server → client (all we need)                                     | Bidirectional                                                                                                                                                          | Client pull                              |
+| SvelteKit `+server.ts` support on this adapter | Native (return a stream)                                          | **No.** Kit has no upgrade hook; would need `Deno.upgradeWebSocket` in a custom `Deno.serve` wrapper replacing the adapter's `mod.ts`, plus separate Vite dev handling | Native                                   |
+| Auth                                           | Session cookie automatic; same hooks/CSRF path (GET is CSRF-safe) | Cookie on handshake; must re-implement auth outside `handle`                                                                                                           | Existing                                 |
+| Reconnect / resume                             | Built-in; `Last-Event-ID`                                         | Hand-written                                                                                                                                                           | N/A                                      |
+| Proxies                                        | Plain HTTP; needs buffering off + heartbeat                       | Needs `Upgrade`/`Connection` headers configured in nginx                                                                                                               | Trivial                                  |
+| Connection cost                                | 1 long-lived HTTP/1.1 connection per tab (6-per-origin limit)     | 1 socket per tab (not subject to the 6 limit)                                                                                                                          | N requests/interval; stale between ticks |
+| Verdict                                        | **Chosen**                                                        | Overkill and needs adapter surgery                                                                                                                                     | Current state; what the issue removes    |
 
 ---
 
 ## Constraints and Gotchas
 
 - **G1 — Deno legacy abort.** Under the default flags, Deno 2.9.7 aborts `request.signal` after
-  *every* request finishes and warns about relying on it (seen in my local test, warning text:
-  *"Deno.serve: request.signal aborts on successful responses (legacy behavior)…"*). For a stream
+  _every_ request finishes and warns about relying on it (seen in my local test, warning text:
+  _"Deno.serve: request.signal aborts on successful responses (legacy behavior)…"_). For a stream
   that never ends this is harmless, because the abort only happens at disconnect. In my test, the
   signal aborted about 1 ms before `cancel()` under both modes. Use `cancel()` as the primary
   cleanup hook and `request.signal` as a backstop, and make `cleanup()` idempotent. Do not add
@@ -259,8 +259,8 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
   `Content-Type: text/event-stream`
   (<https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#flush_interval>). No config
   needed. Traefik streams by default, though its compress middleware should exclude
-  `text/event-stream`. *[INFERENCE: Traefik default excludes event-stream in v3; not verified
-  here.]*
+  `text/event-stream`. _[INFERENCE: Traefik default excludes event-stream in v3; not verified
+  here.]_
 - **G6 — Compression.** Deno's automatic compression is off by default and the adapter does not
   enable it. Even with `DENO_SERVE_AUTOMATIC_COMPRESSION=1`, my local test returned no
   `Content-Encoding` for `text/event-stream`. Send `Cache-Control: no-cache, no-transform` anyway,
@@ -277,13 +277,13 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
   used by page navigations, `fetch`, and `__data.json` loads. One tab uses 1 socket. Opening 6 tabs
   saturates the pool, and every other request on the origin queues. HTTP/2 needs TLS in browsers,
   and Deno serves h2 only over TLS or prior-knowledge h2c, so a TLS-terminating proxy speaking h2
-  to the browser removes the limit. *[INFERENCE: common Praxrr deployments are plain HTTP on a
-  LAN port.]*
+  to the browser removes the limit. _[INFERENCE: common Praxrr deployments are plain HTTP on a
+  LAN port.]_
 - **G9 — No custom headers from `EventSource`.** Browser auth must be cookie-based. The `?apikey=`
   query fallback works for scripts but leaks into proxy access logs. Prefer `X-Api-Key` for
   non-browser consumers that use `fetch` streaming.
 - **G10 — CSRF.** `csrfGuard` (`lib/server/security/csrf.ts:127`) rejects only cross-origin
-  *mutations*. Its own test `csrfGuard: GET with a foreign Origin is never blocked` confirms GET
+  _mutations_. Its own test `csrfGuard: GET with a foreign Origin is never blocked` confirms GET
   passes. Keep the endpoint GET and side-effect-free. Since GET skips the guard, a cross-site page
   could open `EventSource` to it, but with `SameSite` session cookies and no CORS headers it cannot
   read the stream. Do not add `Access-Control-Allow-*` to this route.
@@ -293,7 +293,7 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
   because of the epoch.
 - **G12 — Vite dev.** Under `vite dev` the response goes through Kit's Node bridge (`setResponse`),
   which writes each chunk with `res.write`. Vite's own compression middleware is not enabled in dev
-  for SSR responses. *[INFERENCE: not measured.]* Vite HMR uses a separate WebSocket, so one SSE
+  for SSR responses. _[INFERENCE: not measured.]_ Vite HMR uses a separate WebSocket, so one SSE
   connection plus HMR is fine.
 - **G13 — `deno compile`.** Native streams and `TextEncoder` work unchanged in the compiled binary.
   A JSR import such as `@std/http` must be resolvable at build time. The adapter already bundles
@@ -304,7 +304,7 @@ Docs: <https://docs.deno.com/runtime/fundamentals/http_server/> · SSE example:
   `document.visibilityState` check could reduce the noise.
 - **G15 — Event payload hygiene.** Payloads go to any authenticated session. Never include Arr API
   keys, URLs with credentials, or raw error bodies. Reuse the existing credential redaction
-  helpers. *[INFERENCE: `arrCredentialRedactionRoutes.test.ts` indicates such helpers exist.]*
+  helpers. _[INFERENCE: `arrCredentialRedactionRoutes.test.ts` indicates such helpers exist.]_
 - **G16 — `id` and newlines.** `event`/`id` values must not contain CR/LF, and `data` must be
   single-line JSON (JSON.stringify output contains no raw newlines). Validate in the encoder.
 
@@ -322,53 +322,58 @@ const HEARTBEAT_MS = 15_000;
 const encoder = new TextEncoder();
 
 function frame(e: PraxrrEvent): Uint8Array {
-	// e.id is `${bootEpoch}-${seq}`; e.type is a fixed enum (no CR/LF)
-	return encoder.encode(`id: ${e.id}\nevent: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`);
+  // e.id is `${bootEpoch}-${seq}`; e.type is a fixed enum (no CR/LF)
+  return encoder.encode(
+    `id: ${e.id}\nevent: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`
+  );
 }
 
 export const GET: RequestHandler = ({ request }) => {
-	const lastEventId = request.headers.get('last-event-id');
-	let cleanup = () => {};
+  const lastEventId = request.headers.get('last-event-id');
+  let cleanup = () => {};
 
-	const stream = new ReadableStream<Uint8Array>({
-		start(controller) {
-			let closed = false;
-			const send = (chunk: Uint8Array) => {
-				if (closed) return;
-				try {
-					controller.enqueue(chunk);
-				} catch {
-					cleanup();
-				}
-			};
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      let closed = false;
+      const send = (chunk: Uint8Array) => {
+        if (closed) return;
+        try {
+          controller.enqueue(chunk);
+        } catch {
+          cleanup();
+        }
+      };
 
-			send(encoder.encode('retry: 5000\n\n'));
-			for (const e of eventBus.replaySince(lastEventId)) send(frame(e)); // or a single `resync`
+      send(encoder.encode('retry: 5000\n\n'));
+      for (const e of eventBus.replaySince(lastEventId)) send(frame(e)); // or a single `resync`
 
-			const unsubscribe = eventBus.subscribe((e) => send(frame(e)));
-			const heartbeat = setInterval(() => send(encoder.encode(': ping\n\n')), HEARTBEAT_MS);
+      const unsubscribe = eventBus.subscribe((e) => send(frame(e)));
+      const heartbeat = setInterval(
+        () => send(encoder.encode(': ping\n\n')),
+        HEARTBEAT_MS
+      );
 
-			cleanup = () => {
-				if (closed) return;
-				closed = true;
-				clearInterval(heartbeat);
-				unsubscribe();
-				request.signal.removeEventListener('abort', cleanup);
-			};
-			request.signal.addEventListener('abort', cleanup, { once: true });
-		},
-		cancel() {
-			cleanup(); // primary path: Deno calls this on client disconnect ("resource closed")
-		}
-	});
+      cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(heartbeat);
+        unsubscribe();
+        request.signal.removeEventListener('abort', cleanup);
+      };
+      request.signal.addEventListener('abort', cleanup, { once: true });
+    },
+    cancel() {
+      cleanup(); // primary path: Deno calls this on client disconnect ("resource closed")
+    },
+  });
 
-	return new Response(stream, {
-		headers: {
-			'Content-Type': 'text/event-stream; charset=utf-8',
-			'Cache-Control': 'no-cache, no-transform',
-			'X-Accel-Buffering': 'no'
-		}
-	});
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 };
 ```
 
@@ -381,8 +386,10 @@ manages it.
 import { ServerSentEventStream } from 'jsr:@std/http@1/server-sent-event-stream';
 
 const body = messages /* ReadableStream<ServerSentEventMessage> */
-	.pipeThrough(new ServerSentEventStream()); // { event, data, id, retry, comment }
-return new Response(body, { headers: { 'content-type': 'text/event-stream' /* … */ } });
+  .pipeThrough(new ServerSentEventStream()); // { event, data, id, retry, comment }
+return new Response(body, {
+  headers: { 'content-type': 'text/event-stream' /* … */ },
+});
 ```
 
 ### Client store sketch (`$stores/events.ts`, no runes)
@@ -398,46 +405,47 @@ let attempt = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function attach(type: string) {
-	source?.addEventListener(type, (e) => {
-		const data = JSON.parse((e as MessageEvent).data);
-		for (const h of handlers.get(type) ?? []) h(data, e as MessageEvent);
-	});
+  source?.addEventListener(type, (e) => {
+    const data = JSON.parse((e as MessageEvent).data);
+    for (const h of handlers.get(type) ?? []) h(data, e as MessageEvent);
+  });
 }
 
 export function connect(url = '/api/v1/events') {
-	if (source) return;
-	source = new EventSource(url); // same-origin → session cookie sent automatically
-	for (const type of handlers.keys()) attach(type);
-	source.onopen = () => {
-		attempt = 0;
-		eventsConnected.set(true);
-	};
-	source.onerror = () => {
-		eventsConnected.set(false);
-		if (source?.readyState === EventSource.CLOSED) {
-			// fatal (401/500/wrong content-type): browser will NOT retry — we do, with backoff
-			source = null;
-			const delay = Math.min(30_000, 1000 * 2 ** attempt++) * (0.5 + Math.random() / 2);
-			timer = setTimeout(connect, delay, url);
-		}
-		// readyState CONNECTING → browser auto-retries using `retry:` delay
-	};
+  if (source) return;
+  source = new EventSource(url); // same-origin → session cookie sent automatically
+  for (const type of handlers.keys()) attach(type);
+  source.onopen = () => {
+    attempt = 0;
+    eventsConnected.set(true);
+  };
+  source.onerror = () => {
+    eventsConnected.set(false);
+    if (source?.readyState === EventSource.CLOSED) {
+      // fatal (401/500/wrong content-type): browser will NOT retry — we do, with backoff
+      source = null;
+      const delay =
+        Math.min(30_000, 1000 * 2 ** attempt++) * (0.5 + Math.random() / 2);
+      timer = setTimeout(connect, delay, url);
+    }
+    // readyState CONNECTING → browser auto-retries using `retry:` delay
+  };
 }
 
 export function disconnect() {
-	clearTimeout(timer);
-	source?.close();
-	source = null;
-	eventsConnected.set(false);
+  clearTimeout(timer);
+  source?.close();
+  source = null;
+  eventsConnected.set(false);
 }
 
 export function on(type: string, h: Handler): () => void {
-	if (!handlers.has(type)) {
-		handlers.set(type, new Set());
-		attach(type);
-	}
-	handlers.get(type)!.add(h);
-	return () => handlers.get(type)?.delete(h);
+  if (!handlers.has(type)) {
+    handlers.set(type, new Set());
+    attach(type);
+  }
+  handlers.get(type)!.add(h);
+  return () => handlers.get(type)?.delete(h);
 }
 ```
 
@@ -468,16 +476,16 @@ curl -N -H 'X-Api-Key: prx_…' -H 'Last-Event-ID: 1729-42' http://localhost:696
 
 ### Local behavior tests run for this research (Deno 2.9.7)
 
-| Test | Result |
-| --- | --- |
-| Client aborts `fetch` of SSE stream (default flags) | `request.signal` abort → `cancel("resource closed")` +1 ms → `info.completed` resolved; legacy-abort deprecation warning printed |
-| Same with `--unstable-no-legacy-abort` | Same order and timing; no warning |
-| Server sends nothing for 70 s, then one event | Connection stayed open; event delivered; no Deno idle timeout |
-| `DENO_SERVE_AUTOMATIC_COMPRESSION=1`, `Accept-Encoding: gzip`, `text/event-stream`, with/without `no-transform` | `Content-Encoding` absent in all cases |
+| Test                                                                                                            | Result                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Client aborts `fetch` of SSE stream (default flags)                                                             | `request.signal` abort → `cancel("resource closed")` +1 ms → `info.completed` resolved; legacy-abort deprecation warning printed |
+| Same with `--unstable-no-legacy-abort`                                                                          | Same order and timing; no warning                                                                                                |
+| Server sends nothing for 70 s, then one event                                                                   | Connection stayed open; event delivered; no Deno idle timeout                                                                    |
+| `DENO_SERVE_AUTOMATIC_COMPRESSION=1`, `Accept-Encoding: gzip`, `text/event-stream`, with/without `no-transform` | `Content-Encoding` absent in all cases                                                                                           |
 
 These tests used bare `Deno.serve`, not the full SvelteKit stack. The adapter passes the native
 request and response through unchanged (`mod.ts:73`), so the same behavior is expected end to end.
-*[INFERENCE]*
+_[INFERENCE]_
 
 ---
 

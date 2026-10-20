@@ -8,6 +8,7 @@
   import type { TrashGuideSourceArrType } from '$shared/trashguide/types.ts';
   import type { TrashGuideSyncTrigger } from '$shared/trashguide/types.ts';
   import type { SectionType } from '$sync/types.ts';
+  import type { SectionLiveStatus } from '../liveSync.ts';
   import { extractFormError } from '$lib/client/utils/extractFormError.ts';
 
   type UnifiedSourceType = 'pcd' | 'trash';
@@ -63,6 +64,7 @@
   export let previewConfig: unknown = null;
   export let previewSection: SectionType | null = null;
   export let lastSyncedAt: string | null = null;
+  export let liveStatus: SectionLiveStatus = 'idle';
 
   let saving = false;
   let syncing = false;
@@ -600,6 +602,7 @@
     {previewEnabled}
     {previewConfig}
     {previewSection}
+    {liveStatus}
     on:previewGenerated
     on:previewError
     on:save={handleSave}
