@@ -32,7 +32,7 @@
     info: 'text-sky-600 dark:text-sky-300',
   };
 
-  const Icon = icons[type];
+  $: Icon = icons[type];
 
   function dismiss() {
     alertStore.remove(id);

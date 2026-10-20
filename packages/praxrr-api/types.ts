@@ -116,8 +116,10 @@ export interface paths {
      *
      *     Replay: send the last received id in the `Last-Event-ID` header (set automatically by
      *     `EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are
-     *     replayed from a bounded in-memory buffer. When replay is impossible (server restarted or the
-     *     id fell out of the buffer) the server sends `resync` and the client must refetch its state.
+     *     replayed from a 256-event in-memory buffer, at most 62 events per connection. When replay is
+     *     impossible the server sends `resync` and the client must refetch its state: `reason: boot`
+     *     when the id is from a previous server process or is over-long or malformed; `reason: gap`
+     *     when the id is older than the buffer or the backlog exceeds 62 events.
      *
      *     Session checks: each heartbeat re-validates the session or API token; when it is no longer
      *     valid the server sends `session.expired` and closes the stream. Streams are closed after a
@@ -3411,8 +3413,9 @@ export interface components {
     };
     /**
      * @description Replay of missed events is impossible; the client must refetch all state. `boot` means the
-     *     server restarted since the client's last event id; `gap` means the id fell out of the replay
-     *     buffer.
+     *     client's last event id is from a previous server process, or is over-long or malformed. `gap`
+     *     means the id is older than the 256-event replay buffer, or the backlog since it exceeds the
+     *     62 events replayed per connection.
      */
     LiveResyncEvent: {
       /**
@@ -3509,6 +3512,11 @@ export interface components {
       status: components['schemas']['CanaryRolloutStatus'];
       canaryStatus: components['schemas']['CanaryOutcomeStatus'] | null;
       completedCount: number;
+      /**
+       * @description Targets not yet completed in this rollout (remaining targets minus recorded results).
+       *     Distinct from the rollout summary's `remainingCount`, which counts all remaining targets
+       *     including those already completed.
+       */
       remainingCount: number;
     };
     /** @description A drift check result was persisted for an instance. */
@@ -6139,6 +6147,12 @@ export interface operations {
   streamEvents: {
     parameters: {
       query?: {
+        /**
+         * @description Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.
+         *     Warning: the token leaks into proxy and access logs and browser history; prefer
+         *     `X-Api-Key`.
+         */
+        apikey?: string;
         /** @description Query-string alternative to the `Last-Event-ID` header. */
         lastEventId?: string;
       };
@@ -6196,7 +6210,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description The server-wide stream limit is reached, or the server is shutting down. */
+      /** @description The server-wide stream limit is reached. */
       503: {
         headers: {
           'Retry-After'?: number;
@@ -6210,7 +6224,14 @@ export interface operations {
   };
   probeEvents: {
     parameters: {
-      query?: never;
+      query?: {
+        /**
+         * @description Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.
+         *     Warning: the token leaks into proxy and access logs and browser history; prefer
+         *     `X-Api-Key`.
+         */
+        apikey?: string;
+      };
       header?: {
         /** @description Praxrr API token (`prx_…`) with the `read` scope. */
         'X-Api-Key'?: string;
@@ -6244,13 +6265,17 @@ export interface operations {
       /** @description Too many concurrent streams for this principal. */
       429: {
         headers: {
+          /** @description Seconds to wait before retrying. */
+          'Retry-After'?: number;
           [name: string]: unknown;
         };
         content?: never;
       };
-      /** @description The server-wide stream limit is reached, or the server is shutting down. */
+      /** @description The server-wide stream limit is reached. */
       503: {
         headers: {
+          /** @description Seconds to wait before retrying. */
+          'Retry-After'?: number;
           [name: string]: unknown;
         };
         content?: never;

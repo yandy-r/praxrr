@@ -4,7 +4,7 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
-import { EventBus, eventBus, type LiveEventEnvelope } from '$lib/server/events/bus.ts';
+import { EventBus, eventBus, randomBootId, type LiveEventEnvelope } from '$lib/server/events/bus.ts';
 import {
   _jobBase,
   publishCanaryUpdated,
@@ -157,6 +157,22 @@ Deno.test('T-B5: eventBus singleton lives on globalThis', () => {
   assertEquals(registry[Symbol.for('praxrr.events.bus')], eventBus);
   assertEquals(eventBus.bootId.length, 8);
   assert(/^[0-9a-z]{8}$/.test(eventBus.bootId));
+});
+
+Deno.test('T-B5b: randomBootId rejects bytes >= 252 so every base36 digit stays uniform', () => {
+  const original = crypto.getRandomValues;
+  // 252..255 would map to 0..3 under a plain modulo and must be skipped.
+  const bytes = [252, 253, 254, 255, 0, 35, 10, 1, 2, 3, 4, 5, 251, 200, 9, 9];
+  crypto.getRandomValues = (<T extends ArrayBufferView | null>(array: T): T => {
+    (array as unknown as Uint8Array).set(bytes);
+    return array;
+  }) as typeof crypto.getRandomValues;
+  try {
+    assertEquals(randomBootId(), '0za12345');
+  } finally {
+    crypto.getRandomValues = original;
+  }
+  for (let i = 0; i < 50; i++) assert(/^[0-9a-z]{8}$/.test(randomBootId()));
 });
 
 migratedTest('T-B6: job.finished and canary.updated events carry only allow-listed fields', () => {

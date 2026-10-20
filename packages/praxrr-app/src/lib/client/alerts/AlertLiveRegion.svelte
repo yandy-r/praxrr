@@ -11,18 +11,30 @@
     return alert.action ? `${alert.message}. ${alert.action.label} available.` : alert.message;
   }
 
-  async function announce(alert: Alert) {
-    const text = describe(alert);
+  // Alerts arriving in the same tick are batched and joined, so a second one never overwrites the first.
+  let politeQueue: string[] = [];
+  let assertiveQueue: string[] = [];
+  let flushScheduled = false;
+
+  async function flush() {
+    flushScheduled = false;
+    const polite = politeQueue.join(' ');
+    const assertive = assertiveQueue.join(' ');
+    politeQueue = [];
+    assertiveQueue = [];
     // Clear first, then set on the next tick so identical messages are re-announced.
-    if (alert.type === 'error') {
-      assertiveText = '';
-      await tick();
-      assertiveText = text;
-    } else {
-      politeText = '';
-      await tick();
-      politeText = text;
-    }
+    if (polite) politeText = '';
+    if (assertive) assertiveText = '';
+    await tick();
+    if (polite) politeText = polite;
+    if (assertive) assertiveText = assertive;
+  }
+
+  function announce(alert: Alert) {
+    (alert.type === 'error' ? assertiveQueue : politeQueue).push(describe(alert));
+    if (flushScheduled) return;
+    flushScheduled = true;
+    queueMicrotask(() => void flush());
   }
 
   const unsubscribe = alertStore.subscribe((alerts) => {
@@ -31,7 +43,7 @@
       current.add(alert.id);
       if (!seen.has(alert.id)) {
         seen.add(alert.id);
-        void announce(alert);
+        announce(alert);
       }
     }
     for (const id of seen) {

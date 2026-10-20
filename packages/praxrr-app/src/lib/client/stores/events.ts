@@ -22,6 +22,8 @@ type LiveHandler = (e: LiveEvent) => void;
 
 const RESYNC_KEY = 'resync';
 const WILDCARD_KEY = '*';
+/** Close the stream after the tab stays hidden this long; replay on return covers the gap. */
+const HIDDEN_DISCONNECT_MS = 30_000;
 
 function createEventsStore() {
   const status = writable<LiveStatus>('idle');
@@ -37,6 +39,7 @@ function createEventsStore() {
   let attempt = 0;
   let source: EventSource | null = null;
   let timer: number | null = null;
+  let hiddenTimer: number | null = null;
   let started = false;
   /** Bumped on every connect/stop so stale `onerror` probes cannot schedule a reconnect. */
   let generation = 0;
@@ -151,13 +154,31 @@ function createEventsStore() {
     timer = window.setTimeout(connect, delay);
   }
 
+  function clearHiddenTimer(): void {
+    if (hiddenTimer !== null) {
+      clearTimeout(hiddenTimer);
+      hiddenTimer = null;
+    }
+  }
+
+  // Hidden tabs release their stream after a grace period so many background tabs cannot exhaust the
+  // HTTP/1.1 per-origin connection cap; the `lastEventId` cursor replays the gap on return.
   function onVisibilityChange(): void {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible') {
+      if (hiddenTimer === null && currentStatus !== 'stopped') {
+        hiddenTimer = window.setTimeout(() => {
+          hiddenTimer = null;
+          if (started && document.visibilityState !== 'visible') disconnect();
+        }, HIDDEN_DISCONNECT_MS);
+      }
+      return;
+    }
+    clearHiddenTimer();
     if (currentStatus === 'open' || currentStatus === 'stopped') return;
     connect();
   }
 
-  /** `pagehide`: close the stream but keep `stopReason`; `visibilitychange` reconnects. */
+  /** `pagehide` or a long-hidden tab: close the stream but keep `stopReason`; `visibilitychange` reconnects. */
   function disconnect(): void {
     ++generation;
     clearTimer();
@@ -173,6 +194,7 @@ function createEventsStore() {
   function removeListeners(): void {
     document.removeEventListener('visibilitychange', onVisibilityChange);
     window.removeEventListener('pagehide', disconnect);
+    clearHiddenTimer();
   }
 
   function start(): void {

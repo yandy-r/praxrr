@@ -62,7 +62,17 @@ export function decideJobToast(e: LiveJobFinishedEvent, ctx: JobToastContext): T
 
 const COALESCER_MAX_KEYS = 200;
 
-/** Suppresses repeated background failure toasts for the same job type and instance. */
+/** Identity of a background failure stream: one job type against one instance and database. */
+export function coalesceKey(e: LiveJobFinishedEvent): string {
+  return `${e.jobType}:${e.instanceId ?? 'none'}:${e.databaseId ?? 'none'}`;
+}
+
+/** True for failures that are coalesced and replace each other's toast instead of stacking. */
+export function isBackgroundFailure(e: LiveJobFinishedEvent): boolean {
+  return e.source !== 'manual' && e.runStatus === 'failure';
+}
+
+/** Suppresses repeated background failure toasts for the same job type, instance and database. */
 export class ToastCoalescer {
   private readonly seen = new Map<string, number>();
 
@@ -72,9 +82,9 @@ export class ToastCoalescer {
   ) {}
 
   allow(e: LiveJobFinishedEvent): boolean {
-    if (e.source === 'manual' || e.runStatus !== 'failure') return true;
+    if (!isBackgroundFailure(e)) return true;
 
-    const key = `${e.jobType}:${e.instanceId ?? 'none'}`;
+    const key = coalesceKey(e);
     const at = this.now();
     const last = this.seen.get(key);
     if (last !== undefined && at - last < this.windowMs) return false;

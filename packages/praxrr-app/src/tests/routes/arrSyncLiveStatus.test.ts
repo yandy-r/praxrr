@@ -8,6 +8,7 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import type { ArrSyncSection, JobType } from '$jobs/queueTypes.ts';
 import { load } from '../../routes/arr/[id]/sync/+page.server.ts';
@@ -167,4 +168,78 @@ migratedTest('arr sync load: in_progress section without a running job is left a
 
   const status = await loadSectionStatus(instanceId);
   assertEquals(status.qualityProfiles, 'in_progress');
+});
+
+/** Insert a `rolling_out` rollout whose in-flight batch is `remaining[cursor, cursor + batch)`. */
+function insertRollingOut(remaining: number[], opts: { batchCursor?: number; maxBatchSize?: number } = {}): number {
+  const id = canaryRolloutQueries.insert({
+    arrType: 'radarr',
+    canaryInstanceId: null,
+    canaryInstanceName: 'Canary Radarr',
+    sections: ['qualityProfiles'],
+    maxBatchSize: opts.maxBatchSize ?? 10,
+    partialPolicy: 'gate',
+    remainingTargets: remaining.map((instanceId) => ({ instanceId, instanceName: `Radarr ${instanceId}` })),
+    trigger: 'manual',
+    startedAt: new Date().toISOString(),
+    stateToken: 'tok-arrange',
+  });
+  db.execute(
+    "UPDATE canary_rollouts SET status = 'rolling_out', batch_cursor = ? WHERE id = ?",
+    opts.batchCursor ?? 0,
+    id
+  );
+  return id;
+}
+
+function enqueueRollout(rolloutId: number): number {
+  return jobQueueQueries.create({
+    jobType: 'sync.canary.rollout',
+    runAt: new Date().toISOString(),
+    payload: { rolloutId },
+    source: 'manual',
+    dedupeKey: `canary.rollout:${rolloutId}`,
+  });
+}
+
+migratedTest('arr sync load: running canary rollout batch covers its sections on the instance', async () => {
+  const instanceId = createInstance();
+  markSectionsPending(instanceId);
+  const jobId = enqueueRollout(insertRollingOut([instanceId]));
+  jobQueueQueries.setStatus(jobId, 'running');
+
+  const status = await loadSectionStatus(instanceId);
+  assertEquals(status.qualityProfiles, 'in_progress');
+  // Rollout sections exclude delay profiles, so the stale pending still collapses.
+  assertEquals(status.delayProfiles, 'idle');
+});
+
+migratedTest('arr sync load: queued due canary rollout keeps its sections pending', async () => {
+  const instanceId = createInstance();
+  markSectionsPending(instanceId);
+  enqueueRollout(insertRollingOut([instanceId]));
+
+  const status = await loadSectionStatus(instanceId);
+  assertEquals(status.qualityProfiles, 'pending');
+});
+
+migratedTest('arr sync load: canary rollout outside the current batch does not cover the instance', async () => {
+  const instanceId = createInstance();
+  const otherId = createInstance();
+  markSectionsPending(instanceId);
+  // Instance already synced in batch 0; the running batch is [otherId] only.
+  const jobId = enqueueRollout(insertRollingOut([instanceId, otherId], { batchCursor: 1, maxBatchSize: 1 }));
+  jobQueueQueries.setStatus(jobId, 'running');
+
+  const status = await loadSectionStatus(instanceId);
+  assertEquals(status.qualityProfiles, 'idle');
+});
+
+migratedTest('arr sync load: finished canary rollout job never covers the instance', async () => {
+  const instanceId = createInstance();
+  markSectionsPending(instanceId);
+  jobQueueQueries.markFinished(enqueueRollout(insertRollingOut([instanceId])), 'success');
+
+  const status = await loadSectionStatus(instanceId);
+  assertEquals(status.qualityProfiles, 'idle');
 });

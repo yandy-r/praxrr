@@ -40,6 +40,7 @@ import {
 import type { SyncPreviewSummary } from '$sync/preview/types.ts';
 import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import type { ArrSyncSection, JobQueueRecord, JobType } from '$jobs/queueTypes.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
@@ -281,8 +282,30 @@ function resolveJobSections(job: JobQueueRecord): readonly ArrSyncSection[] {
   return requested.length > 0 ? requested : ARR_SYNC_SECTIONS;
 }
 
+function isDueQueuedJob(job: JobQueueRecord, now: number): boolean {
+  if (job.status !== 'queued') return false;
+  const runAt = Date.parse(job.runAt);
+  return !Number.isFinite(runAt) || runAt <= now;
+}
+
 /**
- * Reconciles persisted section sync status with the instance's active `arr.sync*` jobs.
+ * Sections a running (or queued and due) `sync.canary.rollout` job covers on this instance. The
+ * rollout handler syncs `remainingTargets[batchCursor, batchCursor + maxBatchSize)` through
+ * `executeSyncJob`, which marks sections pending without a per-instance queue row; the cursor only
+ * advances after the batch finishes, so the current slice is exactly the in-flight batch.
+ */
+function resolveCanaryRolloutSections(job: JobQueueRecord, instanceId: number): readonly ArrSyncSection[] {
+  const rollout = canaryRolloutQueries.getById(Number(job.payload.rolloutId));
+  if (!rollout || rollout.status !== 'rolling_out') return [];
+  const batch = rollout.remainingTargets.slice(rollout.batchCursor, rollout.batchCursor + rollout.maxBatchSize);
+  if (!batch.some((target) => target.instanceId === instanceId)) return [];
+  const sections = (rollout.sections ?? []).filter(isArrSyncSection);
+  return sections.length > 0 ? sections : ARR_SYNC_SECTIONS;
+}
+
+/**
+ * Reconciles persisted section sync status with the instance's active `arr.sync*` jobs and any
+ * active canary rollout batch that includes the instance.
  *
  * A job is marked `running` when the dispatcher claims it, but the section only flips to
  * `in_progress` later inside the handler, so a running job covering a `pending` section reports it
@@ -292,11 +315,19 @@ function resolveJobSections(job: JobQueueRecord): readonly ArrSyncSection[] {
 function deriveSectionStatus(instanceId: number, persisted: SectionStatusMap): SectionStatusMap {
   const running = new Set<ArrSyncSection>();
   const queued = new Set<ArrSyncSection>();
-  for (const job of jobQueueQueries.listActiveByJobTypesAndInstanceId(ARR_SYNC_JOB_TYPES, instanceId)) {
+  const cover = (job: JobQueueRecord, sections: readonly ArrSyncSection[]): void => {
     const target = job.status === 'running' ? running : queued;
-    for (const section of resolveJobSections(job)) {
+    for (const section of sections) {
       target.add(section);
     }
+  };
+  for (const job of jobQueueQueries.listActiveByJobTypesAndInstanceId(ARR_SYNC_JOB_TYPES, instanceId)) {
+    cover(job, resolveJobSections(job));
+  }
+  const now = Date.now();
+  for (const job of jobQueueQueries.listByJobTypes(['sync.canary.rollout'])) {
+    if (job.status !== 'running' && !isDueQueuedJob(job, now)) continue;
+    cover(job, resolveCanaryRolloutSections(job, instanceId));
   }
 
   const derived = { ...persisted };

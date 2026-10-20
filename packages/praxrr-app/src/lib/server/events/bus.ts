@@ -18,12 +18,19 @@ export type ReplayResult = { kind: 'replay'; events: LiveEventEnvelope[] } | { k
 
 type LiveEventListener = (envelope: LiveEventEnvelope) => void;
 
-/** Eight lowercase base36 characters from a CSPRNG. */
-function randomBootId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
+const BOOT_ID_LENGTH = 8;
+/** Largest multiple of 36 that fits in a byte; bytes at or above it are rejected to avoid modulo bias. */
+const UNBIASED_BYTE_LIMIT = 252;
+
+/** Eight lowercase base36 characters from a CSPRNG, uniformly distributed via rejection sampling. */
+export function randomBootId(): string {
   let id = '';
-  for (const byte of bytes) {
-    id += (byte % 36).toString(36);
+  while (id.length < BOOT_ID_LENGTH) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(BOOT_ID_LENGTH * 2))) {
+      if (byte >= UNBIASED_BYTE_LIMIT) continue;
+      id += (byte % 36).toString(36);
+      if (id.length === BOOT_ID_LENGTH) break;
+    }
   }
   return id;
 }

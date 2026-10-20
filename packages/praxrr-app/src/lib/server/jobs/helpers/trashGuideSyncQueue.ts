@@ -118,7 +118,10 @@ export function enqueueTrashGuideSourceSync(input: {
   trigger: TrashGuideSyncEnqueueTrigger;
   runAt?: string;
 }): EnqueueTrashGuideSyncResult {
-  return enqueueTrashGuideSourceSyncRecord(input).result;
+  const { result, record } = enqueueTrashGuideSourceSyncRecord(input);
+  // Scheduler rows are usually future-dated; `onlyIfDue` publishes only catch-up runs due now.
+  if (record && input.trigger === 'scheduled') publishJobQueued(record, { onlyIfDue: true });
+  return result;
 }
 
 /** Enqueue core; also returns the persisted queue row so the manual path can publish without a re-read. */

@@ -73,7 +73,8 @@ export const _jobBase = jobBase;
 
 export function publishJobQueued(job: JobQueueRecord, { onlyIfDue }: { onlyIfDue: boolean }): void {
   try {
-    if (onlyIfDue && job.source === 'schedule' && (parseUTC(job.runAt)?.getTime() ?? 0) > Date.now()) return;
+    // Matches `listActive`: a future-dated row of any source is not active yet, so it is not announced.
+    if (onlyIfDue && (parseUTC(job.runAt)?.getTime() ?? 0) > Date.now()) return;
     if (job.status !== 'queued') return;
     const base = jobBase(job);
     eventBus.publish({
@@ -134,6 +135,31 @@ export function publishJobFinished(job: JobQueueRecord, outcome: JobFinishedOutc
     });
   } catch (error) {
     logPublishFailure('job.finished', error);
+  }
+}
+
+/**
+ * Cancellation outside the dispatcher (dedupe-key cancel, unschedule, instance/database cleanup):
+ * publishes `job.finished` with status/runStatus `cancelled` so other tabs drop the stale active job.
+ * No run history row exists, so `runId` is `0` (history ids start at 1) and `durationMs` is `0`.
+ * Callers pass the rows they read before the DB write; each row is built and published independently.
+ */
+export function publishJobsCancelled(jobs: readonly JobQueueRecord[]): void {
+  const finishedAt = new Date().toISOString();
+  for (const job of jobs) {
+    publishJobFinished(
+      { ...job, status: 'cancelled' },
+      {
+        status: 'cancelled',
+        runStatus: 'cancelled',
+        rescheduled: false,
+        nextRunAt: null,
+        runId: 0,
+        failureCode: null,
+        durationMs: 0,
+        finishedAt,
+      }
+    );
   }
 }
 

@@ -301,9 +301,10 @@ const authHandle: Handle = async ({ event, resolve }) => {
   const scopeDenied = enforceTokenScope(event, auth.principal);
   if (scopeDenied) return scopeDenied;
 
-  // Sliding expiration: extend session if past halfway point. The live events stream (GET and its
-  // HEAD probe) is skipped so an idle background tab cannot keep a session alive forever.
-  if (auth.session && event.url.pathname !== LIVE_EVENTS_PATH) {
+  // Sliding expiration: extend session past halfway point. The live events stream (GET and its
+  // HEAD probe) and live-triggered `__data.json` refetches (`x-praxrr-live: 1`) are skipped so an
+  // idle background tab cannot keep the session alive forever.
+  if (auth.session && event.url.pathname !== LIVE_EVENTS_PATH && event.request.headers.get('x-praxrr-live') !== '1') {
     maybeExtendSession(auth.session);
   }
 

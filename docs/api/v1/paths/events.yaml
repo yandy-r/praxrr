@@ -12,8 +12,10 @@ stream:
 
       Replay: send the last received id in the `Last-Event-ID` header (set automatically by
       `EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are
-      replayed from a bounded in-memory buffer. When replay is impossible (server restarted or the
-      id fell out of the buffer) the server sends `resync` and the client must refetch its state.
+      replayed from a 256-event in-memory buffer, at most 62 events per connection. When replay is
+      impossible the server sends `resync` and the client must refetch its state: `reason: boot`
+      when the id is from a previous server process or is over-long or malformed; `reason: gap`
+      when the id is older than the buffer or the backlog exceeds 62 events.
 
       Session checks: each heartbeat re-validates the session or API token; when it is no longer
       valid the server sends `session.expired` and closes the stream. Streams are closed after a
@@ -31,6 +33,15 @@ stream:
         description: |
           Praxrr API token (`prx_…`) with the `read` scope. Preferred over the `apikey` query
           parameter.
+        schema:
+          type: string
+      - name: apikey
+        in: query
+        required: false
+        description: |
+          Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.
+          Warning: the token leaks into proxy and access logs and browser history; prefer
+          `X-Api-Key`.
         schema:
           type: string
       - name: Last-Event-ID
@@ -77,7 +88,7 @@ stream:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '503':
-        description: The server-wide stream limit is reached, or the server is shutting down.
+        description: The server-wide stream limit is reached.
         headers:
           Retry-After:
             schema:
@@ -101,6 +112,15 @@ stream:
         description: Praxrr API token (`prx_…`) with the `read` scope.
         schema:
           type: string
+      - name: apikey
+        in: query
+        required: false
+        description: |
+          Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.
+          Warning: the token leaks into proxy and access logs and browser history; prefer
+          `X-Api-Key`.
+        schema:
+          type: string
     responses:
       '204':
         description: A stream would be accepted.
@@ -110,5 +130,15 @@ stream:
         description: The API token lacks the `read` scope.
       '429':
         description: Too many concurrent streams for this principal.
+        headers:
+          Retry-After:
+            description: Seconds to wait before retrying.
+            schema:
+              type: integer
       '503':
-        description: The server-wide stream limit is reached, or the server is shutting down.
+        description: The server-wide stream limit is reached.
+        headers:
+          Retry-After:
+            description: Seconds to wait before retrying.
+            schema:
+              type: integer

@@ -114,8 +114,9 @@ The sync page updates on its own while a job runs; you do not need to reload.
   a **View details** link to its Sync History entry or to **Settings → Jobs**.
   Failure toasts stay until you dismiss them.
 - **Which jobs toast:** jobs you start manually always toast. Background sync
-  failures toast too, at most one per minute per instance. Successful
-  background runs stay quiet.
+  failures toast too, at most one per minute for each job type and target
+  (instance or database). A toast for a repeated failure replaces the previous
+  one instead of stacking. Successful background runs stay quiet.
 - **Connection indicator:** if the live connection drops, a small
   **Reconnecting…** indicator appears. If Praxrr cannot reconnect, it shows
   **Live updates paused**. Pages keep working without live updates; reload or

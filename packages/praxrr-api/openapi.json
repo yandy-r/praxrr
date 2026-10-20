@@ -258,7 +258,7 @@
       "get": {
         "operationId": "streamEvents",
         "summary": "Live event stream (SSE)",
-        "description": "Server-Sent Events stream of live job, sync, canary and drift progress.\n\nFraming: the stream opens with `retry: 5000`, then emits `data: <LiveEvent JSON>` frames (see\n`#/components/schemas/LiveEvent`). The first frame is always `hello`. Domain events\n(`job.*`, `sync.recorded`, `canary.updated`, `drift.updated`) carry `id: <bootId>-<seq>`;\n`hello`, `resync` and `session.expired` carry no id. A `: ping` comment is sent every 20 s.\n\nReplay: send the last received id in the `Last-Event-ID` header (set automatically by\n`EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are\nreplayed from a bounded in-memory buffer. When replay is impossible (server restarted or the\nid fell out of the buffer) the server sends `resync` and the client must refetch its state.\n\nSession checks: each heartbeat re-validates the session or API token; when it is no longer\nvalid the server sends `session.expired` and closes the stream. Streams are closed after a\nmaximum lifetime of 60 minutes; clients reconnect and resume via `Last-Event-ID`.\n\nAuthentication: browser session cookie, or an API token with the `read` scope. Prefer the\n`X-Api-Key` header; the `?apikey=` query parameter is accepted for `EventSource` clients that\ncannot set headers, but leaks into logs and history.\n",
+        "description": "Server-Sent Events stream of live job, sync, canary and drift progress.\n\nFraming: the stream opens with `retry: 5000`, then emits `data: <LiveEvent JSON>` frames (see\n`#/components/schemas/LiveEvent`). The first frame is always `hello`. Domain events\n(`job.*`, `sync.recorded`, `canary.updated`, `drift.updated`) carry `id: <bootId>-<seq>`;\n`hello`, `resync` and `session.expired` carry no id. A `: ping` comment is sent every 20 s.\n\nReplay: send the last received id in the `Last-Event-ID` header (set automatically by\n`EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are\nreplayed from a 256-event in-memory buffer, at most 62 events per connection. When replay is\nimpossible the server sends `resync` and the client must refetch its state: `reason: boot`\nwhen the id is from a previous server process or is over-long or malformed; `reason: gap`\nwhen the id is older than the buffer or the backlog exceeds 62 events.\n\nSession checks: each heartbeat re-validates the session or API token; when it is no longer\nvalid the server sends `session.expired` and closes the stream. Streams are closed after a\nmaximum lifetime of 60 minutes; clients reconnect and resume via `Last-Event-ID`.\n\nAuthentication: browser session cookie, or an API token with the `read` scope. Prefer the\n`X-Api-Key` header; the `?apikey=` query parameter is accepted for `EventSource` clients that\ncannot set headers, but leaks into logs and history.\n",
         "tags": ["Events"],
         "parameters": [
           {
@@ -266,6 +266,15 @@
             "in": "header",
             "required": false,
             "description": "Praxrr API token (`prx_…`) with the `read` scope. Preferred over the `apikey` query\nparameter.\n",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "required": false,
+            "description": "Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.\nWarning: the token leaks into proxy and access logs and browser history; prefer\n`X-Api-Key`.\n",
             "schema": {
               "type": "string"
             }
@@ -338,7 +347,7 @@
             }
           },
           "503": {
-            "description": "The server-wide stream limit is reached, or the server is shutting down.",
+            "description": "The server-wide stream limit is reached.",
             "headers": {
               "Retry-After": {
                 "schema": {
@@ -370,6 +379,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "required": false,
+            "description": "Praxrr API token with the `read` scope, for `EventSource` clients that cannot set headers.\nWarning: the token leaks into proxy and access logs and browser history; prefer\n`X-Api-Key`.\n",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -383,10 +401,26 @@
             "description": "The API token lacks the `read` scope."
           },
           "429": {
-            "description": "Too many concurrent streams for this principal."
+            "description": "Too many concurrent streams for this principal.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
           },
           "503": {
-            "description": "The server-wide stream limit is reached, or the server is shutting down."
+            "description": "The server-wide stream limit is reached.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
           }
         }
       }
@@ -10661,7 +10695,7 @@
         "type": "object",
         "required": ["type", "reason"],
         "additionalProperties": false,
-        "description": "Replay of missed events is impossible; the client must refetch all state. `boot` means the\nserver restarted since the client's last event id; `gap` means the id fell out of the replay\nbuffer.\n",
+        "description": "Replay of missed events is impossible; the client must refetch all state. `boot` means the\nclient's last event id is from a previous server process, or is over-long or malformed. `gap`\nmeans the id is older than the 256-event replay buffer, or the backlog since it exceeds the\n62 events replayed per connection.\n",
         "properties": {
           "type": {
             "type": "string",
@@ -10994,7 +11028,9 @@
             "type": "integer"
           },
           "remainingCount": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "description": "Targets not yet completed in this rollout (remaining targets minus recorded results).\nDistinct from the rollout summary's `remainingCount`, which counts all remaining targets\nincluding those already completed.\n"
           }
         }
       },

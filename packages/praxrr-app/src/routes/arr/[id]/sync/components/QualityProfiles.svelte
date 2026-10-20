@@ -176,26 +176,61 @@
     }
   }
 
+  function buildServerTrashGuideState(
+    sources: TrashGuideQualityProfileSource[]
+  ): Record<number, Record<string, boolean>> {
+    const nextState: Record<number, Record<string, boolean>> = {};
+    for (const source of sources) {
+      const selected = new Set(
+        source.selectedQualityProfiles
+          .map((profileName) => normalizeProfileName(profileName))
+          .filter((profileName): profileName is string => Boolean(profileName))
+      );
+      nextState[source.sourceId] = {};
+      for (const profileName of getAllProfilesForTrashSource(source)) {
+        nextState[source.sourceId][profileName] = selected.has(profileName);
+      }
+    }
+    return nextState;
+  }
+
+  /** Keep the user's unsaved choices; only add profiles (and sources) the server newly reports. */
+  function mergeNewTrashGuideProfiles(
+    current: Record<number, Record<string, boolean>>,
+    server: Record<number, Record<string, boolean>>
+  ): Record<number, Record<string, boolean>> {
+    const merged: Record<number, Record<string, boolean>> = {};
+    for (const [sourceId, serverProfiles] of Object.entries(server)) {
+      merged[Number(sourceId)] = { ...serverProfiles, ...(current[Number(sourceId)] ?? {}) };
+    }
+    return merged;
+  }
+
+  // Live reloads re-run the page load; a clean section adopts the server selections (and
+  // re-baselines its saved snapshot), a dirty one keeps unsaved edits and only gains new profiles.
+  let rebaselineSavedState = false;
+  // Read through a function so this block does not statically depend on `isDirty`, which itself
+  // derives from `trashGuideProfileState` (a reactive cycle otherwise). Runs before
+  // `currentState` recomputes, so it compares the pre-reload edits against the saved snapshot.
+  function hasUnsavedChanges(): boolean {
+    return hasInitializedSavedState && currentState !== savedState;
+  }
   $: {
     const nextKey = buildTrashGuideStateKey(trashGuideSources);
-    if (nextKey === trashGuideStateKey) {
-      // no-op
-    } else {
-      const nextState: Record<number, Record<string, boolean>> = {};
-      for (const source of trashGuideSources) {
-        const selected = new Set(
-          source.selectedQualityProfiles
-            .map((profileName) => normalizeProfileName(profileName))
-            .filter((profileName): profileName is string => Boolean(profileName))
-        );
-        nextState[source.sourceId] = {};
-        for (const profileName of getAllProfilesForTrashSource(source)) {
-          nextState[source.sourceId][profileName] = selected.has(profileName);
-        }
+    if (nextKey !== trashGuideStateKey) {
+      const serverState = buildServerTrashGuideState(trashGuideSources);
+      if (hasUnsavedChanges()) {
+        trashGuideProfileState = mergeNewTrashGuideProfiles(trashGuideProfileState, serverState);
+      } else {
+        trashGuideProfileState = serverState;
+        rebaselineSavedState = true;
       }
-      trashGuideProfileState = nextState;
       trashGuideStateKey = nextKey;
     }
+  }
+  $: if (rebaselineSavedState) {
+    savedState = currentState;
+    rebaselineSavedState = false;
   }
 
   $: selectedKeys = new Set(

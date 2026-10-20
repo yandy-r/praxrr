@@ -8,7 +8,6 @@ import type { LiveEvent } from '$shared/events/types.ts';
 
 const encoder = new TextEncoder();
 
-const EVENT_ID_PATTERN = /^([a-z0-9]{1,16})-(\d{1,15})$/;
 const MAX_LAST_EVENT_ID_LENGTH = 64;
 
 /** Encodes the `retry:` field that sets the client's reconnection delay. */
@@ -32,28 +31,24 @@ export function encodeEvent(event: LiveEvent, id?: string): Uint8Array {
   return encoder.encode(`${id ? `id: ${id}\n` : ''}data: ${JSON.stringify(event)}\n\n`);
 }
 
-/** Parses a `<bootId>-<seq>` event id. Returns `null` for anything malformed. */
-export function parseEventId(raw: string | null): { bootId: string; seq: number } | null {
-  if (raw === null) {
-    return null;
-  }
-  const match = EVENT_ID_PATTERN.exec(raw.trim());
-  if (!match) {
-    return null;
-  }
-  return { bootId: match[1], seq: Number(match[2]) };
-}
+/**
+ * Stands in for a supplied-but-unusable resume id. It never parses as `<bootId>-<seq>`, so
+ * `EventBus.replaySince` answers `resync 'boot'` instead of the stream silently starting fresh.
+ */
+export const REJECTED_LAST_EVENT_ID = 'rejected';
 
 /**
- * Returns the resume point: the `Last-Event-ID` header, else the `lastEventId` query parameter,
- * else `null`. Values longer than 64 characters are ignored.
+ * Resume point: the `Last-Event-ID` header, else the `lastEventId` query parameter, else `null`.
+ * Values longer than 64 characters are not used; if every supplied value is too long the result is
+ * {@link REJECTED_LAST_EVENT_ID} so the client is told to resync.
  */
 export function resolveLastEventId(request: Request, url: URL): string | null {
   const candidates = [request.headers.get('Last-Event-ID'), url.searchParams.get('lastEventId')];
+  let rejected = false;
   for (const value of candidates) {
-    if (value !== null && value.length <= MAX_LAST_EVENT_ID_LENGTH) {
-      return value;
-    }
+    if (value === null) continue;
+    if (value.length <= MAX_LAST_EVENT_ID_LENGTH) return value;
+    rejected = true;
   }
-  return null;
+  return rejected ? REJECTED_LAST_EVENT_ID : null;
 }

@@ -9,6 +9,10 @@ import { enqueueJob, upsertScheduledJob } from '$jobs/queueService.ts';
 import type { JobHandler, JobType } from '$jobs/queueTypes.ts';
 import { eventBus } from '$lib/server/events/bus.ts';
 import type { LiveEvent, LiveEventOf } from '$shared/events/types.ts';
+import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
+import { cleanupJobsForDatabase } from '$jobs/cleanup.ts';
+import { cancelQueuedRenameJobs } from '$jobs/renameHelpers.ts';
+import { scheduleDriftCheck } from '$jobs/schedule.ts';
 
 // Register production handlers (side-effect only) so the override/restore below is meaningful.
 import '$jobs/handlers/index.ts';
@@ -206,5 +210,120 @@ migratedTest('T-D5 future scheduled upserts publish no job.queued', () => {
   assertEquals(
     seen.filter((event) => event.type === 'job.queued'),
     []
+  );
+});
+
+/** Records every bus event published while `fn` runs (publishing is synchronous, so no wait is needed). */
+function capture(fn: () => void): LiveEvent[] {
+  const seen: LiveEvent[] = [];
+  const unsubscribe = eventBus.subscribe((envelope) => {
+    seen.push(envelope.event);
+  });
+  try {
+    fn();
+  } finally {
+    unsubscribe();
+  }
+  return seen;
+}
+
+function assertCancelled(event: LiveEvent | undefined, jobId: number): void {
+  assertExists(event);
+  assert(isFinished(event));
+  assertEquals(event.jobId, jobId);
+  assertEquals(event.status, 'cancelled');
+  assertEquals(event.runStatus, 'cancelled');
+  assertEquals(event.rescheduled, false);
+  assertEquals(event.nextRunAt, null);
+  assertEquals(event.runId, 0);
+}
+
+migratedTest('T-D6 due scheduler upserts publish job.queued; disabling publishes job.finished cancelled', () => {
+  const queued = capture(() => scheduleDriftCheck()).filter((event) => event.type === 'job.queued');
+  assertEquals(queued.length, 1);
+  const job = jobQueueQueries.getByDedupeKey('drift.check');
+  assertExists(job);
+  assertEquals(queued[0].type === 'job.queued' && queued[0].jobId, job.id);
+
+  driftSettingsQueries.update({ enabled: false });
+  const cancelled = capture(() => scheduleDriftCheck());
+  assertEquals(cancelled.length, 1);
+  assertCancelled(cancelled[0], job.id);
+  assertEquals(jobQueueQueries.getById(job.id)?.status, 'cancelled');
+
+  // Already-cancelled rows are not re-announced.
+  assertEquals(
+    capture(() => scheduleDriftCheck()),
+    []
+  );
+});
+
+migratedTest('T-D7 rename cancel and database cleanup publish job.finished cancelled per queued row', () => {
+  const runAt = new Date(Date.now() + 3_600_000).toISOString();
+  const slotted = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 5 }, dedupeKey: 'arr.rename:5' });
+  const loose = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 5 } });
+  const other = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 6 } });
+
+  const renameEvents = capture(() => cancelQueuedRenameJobs(5));
+  assertEquals(renameEvents.length, 2);
+  assertCancelled(renameEvents[0], slotted.id);
+  assertCancelled(renameEvents[1], loose.id);
+  assertEquals(jobQueueQueries.getById(other.id)?.status, 'queued');
+
+  const pcd = enqueueJob({ jobType: 'pcd.sync', runAt, payload: { databaseId: 9 } });
+  const cleanupEvents = capture(() => assertEquals(cleanupJobsForDatabase(9), 1));
+  assertEquals(cleanupEvents.length, 1);
+  assertCancelled(cleanupEvents[0], pcd.id);
+  assertEquals(jobQueueQueries.getById(pcd.id), undefined);
+});
+
+migratedTest('T-D8 listActive excludes future-dated queued rows from every source', () => {
+  const future = new Date(Date.now() + 3_600_000).toISOString();
+  const past = new Date(Date.now() - 60_000).toISOString();
+  const ids = {
+    futureManual: jobQueueQueries.create({
+      jobType: 'arr.rename',
+      runAt: future,
+      source: 'manual',
+      payload: { instanceId: 3 },
+    }),
+    futureSystem: jobQueueQueries.create({
+      jobType: 'arr.rename',
+      runAt: future,
+      source: 'system',
+      payload: { instanceId: 3 },
+    }),
+    futureSchedule: jobQueueQueries.create({
+      jobType: 'arr.rename',
+      runAt: future,
+      source: 'schedule',
+      payload: { instanceId: 3 },
+    }),
+    dueManual: jobQueueQueries.create({
+      jobType: 'arr.rename',
+      runAt: past,
+      source: 'manual',
+      payload: { instanceId: 3 },
+    }),
+    running: jobQueueQueries.create({
+      jobType: 'arr.rename',
+      runAt: future,
+      source: 'manual',
+      payload: { instanceId: 3 },
+    }),
+  };
+  jobQueueQueries.setStatus(ids.running, 'running');
+
+  const expected = [ids.running, ids.dueManual];
+  assertEquals(
+    jobQueueQueries.listActive(50).map((job) => job.id),
+    expected
+  );
+  assertEquals(
+    jobQueueQueries
+      .listActiveByJobTypesAndInstanceId(['arr.rename'], 3)
+      .map((job) => job.id)
+      .sort((a, b) => a - b),
+    [...expected].sort((a, b) => a - b)
   );
 });

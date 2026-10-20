@@ -109,8 +109,9 @@ LiveResyncEvent:
   additionalProperties: false
   description: |
     Replay of missed events is impossible; the client must refetch all state. `boot` means the
-    server restarted since the client's last event id; `gap` means the id fell out of the replay
-    buffer.
+    client's last event id is from a previous server process, or is over-long or malformed. `gap`
+    means the id is older than the 256-event replay buffer, or the backlog since it exceeds the
+    62 events replayed per connection.
   properties:
     type:
       type: string
@@ -338,6 +339,11 @@ LiveCanaryUpdatedEvent:
       type: integer
     remainingCount:
       type: integer
+      minimum: 0
+      description: |
+        Targets not yet completed in this rollout (remaining targets minus recorded results).
+        Distinct from the rollout summary's `remainingCount`, which counts all remaining targets
+        including those already completed.
 
 LiveDriftUpdatedEvent:
   type: object

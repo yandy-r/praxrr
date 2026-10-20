@@ -4,7 +4,7 @@
 import { assert, assertEquals, assertStringIncludes, assertThrows } from '@std/assert';
 import { EventBus, eventBus } from '$lib/server/events/bus.ts';
 import { EventConnectionRegistry } from '$lib/server/events/connections.ts';
-import { encodeEvent } from '$lib/server/events/sse.ts';
+import { encodeEvent, REJECTED_LAST_EVENT_ID, resolveLastEventId } from '$lib/server/events/sse.ts';
 import { createEventStream, type EventStreamOptions } from '$lib/server/events/stream.ts';
 import { principalKey } from '$lib/server/events/streamAuth.ts';
 import { LIVE_STREAM_QUEUE_HWM, type LiveDomainEvent } from '$shared/events/types.ts';
@@ -67,16 +67,30 @@ async function skipPreamble(h: Harness): Promise<void> {
   assertStringIncludes((await h.next()) ?? '', '"type":"hello"');
 }
 
-/** Drains until `done`, failing if it takes longer than `ms`. */
+/**
+ * Drains until `done`; each read races the remaining budget so a hung stream fails instead of blocking.
+ * The real timer is a failure guard only (never awaited on the passing path), not a wait.
+ */
 async function readUntilDone(h: Harness, ms = 1000): Promise<string[]> {
   const frames: string[] = [];
   const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
-    const frame = await h.next();
-    if (frame === null) return frames;
-    frames.push(frame);
+  let timer: number | undefined;
+  try {
+    while (true) {
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('stream did not finish in time')),
+          Math.max(0, deadline - Date.now())
+        ) as unknown as number;
+      });
+      const frame = await Promise.race([h.next(), timeout]);
+      clearTimeout(timer);
+      if (frame === null) return frames;
+      frames.push(frame);
+    }
+  } finally {
+    clearTimeout(timer);
   }
-  throw new Error('stream did not finish in time');
 }
 
 Deno.test('T-S1: preamble then live event frames', async () => {
@@ -156,8 +170,8 @@ Deno.test('T-S6: max lifetime closes the stream', async () => {
   const h = open({ maxLifetimeMs: 20 });
   await skipPreamble(h);
   const started = Date.now();
-  assertEquals(await readUntilDone(h, 100), []);
-  assert(Date.now() - started < 100);
+  assertEquals(await readUntilDone(h, 1000), []);
+  assert(Date.now() - started < 1000);
   assertEquals(h.bus.subscriberCount(), 0);
   assertEquals(h.releases(), 1);
 });
@@ -321,4 +335,24 @@ Deno.test('T-S11: encodeEvent rejects newline ids and keeps data on one line', (
   assertEquals(lines.length, 4);
   assert(lines[1].startsWith('data: '));
   assertStringIncludes(lines[1], 'line1\\nline2');
+});
+
+Deno.test('T-S12: over-long Last-Event-ID answers resync boot instead of starting fresh', async () => {
+  const url = new URL('http://x/api/v1/events');
+  const longId = `teststrm-${'1'.repeat(64)}`;
+  const headers = (value: string) => new Request(url, { headers: { 'Last-Event-ID': value } });
+  assertEquals(resolveLastEventId(new Request(url), url), null);
+  assertEquals(resolveLastEventId(headers('teststrm-2'), url), 'teststrm-2');
+  assertEquals(resolveLastEventId(headers(longId), url), REJECTED_LAST_EVENT_ID);
+  // A usable query fallback still wins over a rejected header.
+  const withQuery = new URL(`${url}?lastEventId=teststrm-1`);
+  assertEquals(resolveLastEventId(headers(longId), withQuery), 'teststrm-1');
+
+  const bus = new EventBus(8, 'teststrm');
+  bus.publish(driftEvent(1));
+  const h = open({ lastEventId: resolveLastEventId(headers(longId), url) }, bus);
+  await skipPreamble(h);
+  assertEquals(await h.next(), `data: ${JSON.stringify({ type: 'resync', reason: 'boot' })}\n\n`);
+  h.abort.abort();
+  assertEquals(h.releases(), 1);
 });

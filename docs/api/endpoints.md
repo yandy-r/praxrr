@@ -111,7 +111,8 @@ Authentication:
 - Browser: the session cookie (`EventSource` sends it automatically on the same origin).
 - API clients: `X-Api-Key: prx_…` with the `read` scope. `?apikey=prx_…` also works, but the
   token then appears in proxy and access logs; prefer the header.
-- An unauthenticated request returns `401` before a stream opens.
+- An unauthenticated request returns `401` before a stream opens; a token without the `read`
+  scope returns `403`.
 
 Framing: the stream starts with `retry: 5000`, then a `hello` event, then any replayed events
 (or a `resync`), then live events. Each event is one `data:` line of JSON with a `type`
@@ -123,7 +124,7 @@ retry: 5000
 data: {"type":"hello","bootId":"k3x9","headId":"k3x9-41","serverTime":"2026-10-20T12:00:00.000Z","heartbeatMs":20000}
 
 id: k3x9-42
-data: {"type":"job.finished","jobId":118,"jobType":"arr.sync","source":"manual","displayName":"Sync Radarr","instanceId":1,"arrType":"radarr","databaseId":null,"status":"success","runStatus":"success","rescheduled":false,"nextRunAt":null,"runId":907,"failureCode":null,"durationMs":1840,"finishedAt":"2026-10-20T12:00:03.000Z"}
+data: {"type":"job.finished","jobId":118,"jobType":"arr.sync","source":"manual","displayName":"Arr Sync - Radarr","instanceId":1,"arrType":"radarr","databaseId":null,"status":"success","runStatus":"success","rescheduled":false,"nextRunAt":null,"runId":907,"failureCode":null,"durationMs":1840,"finishedAt":"2026-10-20T12:00:03.000Z"}
 
 : ping
 ```
@@ -148,10 +149,11 @@ Job events share `jobId`, `jobType`, `source`, `displayName`, `instanceId`, `arr
 Replay:
 
 - Reconnect with the `Last-Event-ID` header (browsers send it automatically) or the
-  `lastEventId` query parameter. The server replays newer events from a 256-event buffer.
-- If the id is from a previous process (`reason: "boot"`) or older than the buffer
-  (`reason: "gap"`), the server sends `resync` instead. Re-read everything you display.
-- Malformed or over-long ids are treated as a restart and also produce `resync`.
+  `lastEventId` query parameter. The server replays newer events from a 256-event buffer, at
+  most 62 events per connection.
+- If the id is from a previous process, or is malformed or over-long, the server sends `resync`
+  with `reason: "boot"`. If the id is older than the buffer, or more than 62 events were missed,
+  it sends `resync` with `reason: "gap"`. Either way, re-read everything you display.
 
 Lifetime:
 
@@ -177,7 +179,8 @@ curl -N -H 'X-Api-Key: prx_…' http://localhost:6868/api/v1/events
 ### `HEAD /events`
 
 Checks authentication and capacity without opening a stream. Returns `204` when a stream would be
-accepted, otherwise the same `401`, `429` or `503` as `GET`.
+accepted, otherwise the same `401`, `403`, `429` or `503` as `GET` (with `Retry-After` on `429`
+and `503`). It accepts the same `X-Api-Key` header or `apikey` query parameter.
 
 ## User Interface Preferences
 

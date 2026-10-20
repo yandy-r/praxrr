@@ -275,6 +275,7 @@ Deno.test('scheduleTrashGuideSyncJobs unschedules disabled and non-scheduled sou
     'unscheduleByDedupeKey',
     ((dedupeKey: string) => {
       unscheduledKeys.push(dedupeKey);
+      return [];
     }) as typeof jobQueueQueries.unscheduleByDedupeKey,
     restores
   );

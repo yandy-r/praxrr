@@ -7,7 +7,10 @@ import {
   parseLiveEvent,
   retryAfterMs,
 } from '$lib/client/events/reconnect.ts';
-import { decideJobToast, SeenSet, ToastCoalescer } from '$lib/client/events/toastPolicy.ts';
+import { coalesceKey, decideJobToast, SeenSet, ToastCoalescer } from '$lib/client/events/toastPolicy.ts';
+import { DebounceScheduler, type DebounceTimers } from '$lib/client/events/debounce.ts';
+import { dataUrlPagePath, isLiveDataRequest } from '$lib/client/events/liveFetch.ts';
+import { pushAlert } from '$lib/client/alerts/stack.ts';
 import type { LiveHelloEvent, LiveJobFinishedEvent } from '$shared/events/types.ts';
 
 function finished(overrides: Partial<LiveJobFinishedEvent> = {}): LiveJobFinishedEvent {
@@ -211,4 +214,109 @@ Deno.test('cursorAfterHello keeps same-boot cursors and resets across boots', ()
   assertEquals(cursorAfterHello('b0-9', { bootId: 'b1', headId: '' }), 'b1-0');
   assertEquals(cursorAfterHello('garbage', { bootId: 'b1', headId: '' }), 'b1-0');
   assertEquals(cursorAfterHello('a-b-3', { bootId: 'a-b', headId: 'a-b-5' }), 'a-b-3');
+});
+
+Deno.test('ToastCoalescer keys on job type, instance and database', () => {
+  const coalescer = new ToastCoalescer(60_000, () => 1_000_000);
+  const failure = finished({ source: 'schedule', jobType: 'pcd.sync', instanceId: null, runStatus: 'failure' });
+  assertEquals(coalesceKey(failure), 'pcd.sync:none:none');
+  assertEquals(coalesceKey({ ...failure, instanceId: 4, databaseId: 9 }), 'pcd.sync:4:9');
+  assert(coalescer.allow({ ...failure, databaseId: 1 }));
+  assertEquals(coalescer.allow({ ...failure, databaseId: 1 }), false);
+  assert(coalescer.allow({ ...failure, databaseId: 2 }));
+});
+
+Deno.test('pushAlert replaces same-key alerts and caps the stack, dropping oldest non-error first', () => {
+  type A = { id: string; type: string; key?: string };
+  let stack: A[] = [];
+  stack = pushAlert(stack, { id: 'e1', type: 'error', key: 'k' });
+  stack = pushAlert(stack, { id: 'e2', type: 'error', key: 'k' });
+  assertEquals(
+    stack.map((a) => a.id),
+    ['e2']
+  );
+  stack = pushAlert(stack, { id: 's1', type: 'success' });
+  stack = pushAlert(stack, { id: 's2', type: 'success' });
+  stack = pushAlert(stack, { id: 'e3', type: 'error' });
+  stack = pushAlert(stack, { id: 'e4', type: 'error' });
+  stack = pushAlert(stack, { id: 'e5', type: 'error' }, 5);
+  assertEquals(
+    stack.map((a) => a.id),
+    ['e2', 's2', 'e3', 'e4', 'e5']
+  );
+  stack = pushAlert(stack, { id: 'e6', type: 'error' }, 5);
+  assertEquals(
+    stack.map((a) => a.id),
+    ['e2', 'e3', 'e4', 'e5', 'e6']
+  );
+  stack = pushAlert(stack, { id: 'i1', type: 'info' }, 5);
+  assertEquals(
+    stack.map((a) => a.id),
+    ['e3', 'e4', 'e5', 'e6', 'i1']
+  );
+});
+
+function fakeTimers() {
+  let now = 0;
+  let nextId = 1;
+  const pending = new Map<number, { at: number; fn: () => void }>();
+  const timers: DebounceTimers = {
+    now: () => now,
+    set: (fn, ms) => {
+      pending.set(nextId, { at: now + ms, fn });
+      return nextId++;
+    },
+    clear: (id) => void pending.delete(id),
+  };
+  const advance = (ms: number) => {
+    const target = now + ms;
+    for (;;) {
+      const due = [...pending.entries()].filter(([, t]) => t.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!due) break;
+      pending.delete(due[0]);
+      now = due[1].at;
+      due[1].fn();
+    }
+    now = target;
+  };
+  return { timers, advance };
+}
+
+Deno.test('DebounceScheduler trails bursts and still fires within maxWait under continuous events', () => {
+  const { timers, advance } = fakeTimers();
+  let calls = 0;
+  const s = new DebounceScheduler(() => calls++, 250, 2_000, timers);
+  s.schedule();
+  advance(100);
+  s.schedule();
+  advance(249);
+  assertEquals(calls, 0);
+  advance(1);
+  assertEquals(calls, 1);
+
+  // An event every 100 ms for 5 s must not starve the refresh.
+  for (let i = 0; i < 50; i++) {
+    s.schedule();
+    advance(100);
+  }
+  assert(calls >= 3, `expected at least 3 refreshes, got ${calls}`);
+  s.cancel();
+  advance(5_000);
+  const settled = calls;
+  advance(5_000);
+  assertEquals(calls, settled);
+});
+
+Deno.test('isLiveDataRequest tags only GET data requests for live pages', () => {
+  assertEquals(dataUrlPagePath('/settings/jobs/__data.json'), '/settings/jobs');
+  assertEquals(dataUrlPagePath('/__data.json'), '/');
+  assertEquals(dataUrlPagePath('/page.html__data.json'), '/page');
+  assertEquals(dataUrlPagePath('/api/v1/jobs'), null);
+  const live = new Map([['/settings/jobs', 1]]);
+  const url = (p: string) => new URL(p, 'http://localhost');
+  assert(isLiveDataRequest(url('/settings/jobs/__data.json?x-sveltekit-invalidated=01'), 'GET', live));
+  assertEquals(isLiveDataRequest(url('/settings/jobs/__data.json'), 'POST', live), false);
+  assertEquals(isLiveDataRequest(url('/sync-history/__data.json'), 'GET', live), false);
+  assertEquals(isLiveDataRequest(url('/api/v1/jobs'), 'GET', live), false);
+  assertEquals(isLiveDataRequest(url('/settings/jobs/__data.json'), 'GET', new Map()), false);
 });
