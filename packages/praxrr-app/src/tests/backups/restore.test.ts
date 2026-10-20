@@ -3,71 +3,18 @@
  * at startup before the database is opened, instead of extracting over live data.
  */
 
-import { Database } from '@jsr/db__sqlite';
 import { assertEquals, assertRejects } from '@std/assert';
 import { BaseTest } from '../base/BaseTest.ts';
 import {
-  applyPendingRestore,
   BackupRestoreError,
   isValidBackupFilename,
-  RESTORE_FAILED_MANIFEST_FILENAME,
   RESTORE_MANIFEST_FILENAME,
   RESTORE_STAGING_DIRNAME,
   RESTORE_STAGING_TMP_PREFIX,
   stageRestore,
 } from '../../lib/server/backups/restore.ts';
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await Deno.lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function tar(args: string[]): Promise<void> {
-  const { code, stderr } = await new Deno.Command('tar', { args, stdout: 'piped', stderr: 'piped' }).output();
-  if (code !== 0) {
-    throw new Error(`tar failed: ${new TextDecoder().decode(stderr)}`);
-  }
-}
-
-function createSqliteDb(path: string, value: string): void {
-  const database = new Database(path);
-  try {
-    database.exec('CREATE TABLE marker (value TEXT)');
-    database.prepare('INSERT INTO marker (value) VALUES (?)').run(value);
-  } finally {
-    database.close();
-  }
-}
-
-function readMarker(path: string): string {
-  const database = new Database(path, { readonly: true });
-  try {
-    const row = database.prepare('SELECT value FROM marker').get() as { value: string };
-    return row.value;
-  } finally {
-    database.close();
-  }
-}
-
-/** Build `<root>/data/praxrr.db` (+ extra file) and archive it as `data/...`. */
-async function buildValidArchive(root: string, archivePath: string, marker: string): Promise<void> {
-  await Deno.mkdir(`${root}/data/databases`, { recursive: true });
-  createSqliteDb(`${root}/data/praxrr.db`, marker);
-  await Deno.writeTextFile(`${root}/data/databases/note.txt`, `${marker}\n`);
-  await tar(['-czf', archivePath, '-C', root, 'data']);
-}
-
-/** Build a live base dir with a WAL database plus stray -wal/-shm files. */
-async function buildLiveBase(basePath: string): Promise<void> {
-  await Deno.mkdir(`${basePath}/data`, { recursive: true });
-  createSqliteDb(`${basePath}/data/praxrr.db`, 'live');
-  await Deno.writeTextFile(`${basePath}/data/praxrr.db-wal`, 'stale-wal');
-  await Deno.writeTextFile(`${basePath}/data/praxrr.db-shm`, 'stale-shm');
-}
+import { applyPendingRestore, RESTORE_FAILED_MANIFEST_FILENAME } from '../../lib/server/backups/applyRestore.ts';
+import { buildLiveBase, buildValidArchive, createSqliteDb, exists, readMarker, tar } from './restoreTestHelpers.ts';
 
 async function assertStageRejected(basePath: string, archivePath: string, code: string): Promise<void> {
   const error = await assertRejects(
@@ -343,11 +290,13 @@ class RestoreTest extends BaseTest {
       assertEquals(await exists(liveData), false);
       assertEquals(readMarker(`${result.rollbackPath}/praxrr.db`), 'live');
 
-      // Marked failed: a later startup neither retries the restore nor prunes the real data
+      // Marked failed: a later startup does not retry the restore, keeps reporting dataMissing,
+      // and never prunes the real data
       const staging = `${basePath}/${RESTORE_STAGING_DIRNAME}`;
       assertEquals(await exists(`${staging}/${RESTORE_MANIFEST_FILENAME}`), false);
       assertEquals(await exists(`${staging}/${RESTORE_FAILED_MANIFEST_FILENAME}`), true);
-      assertEquals((await applyPendingRestore(basePath)).status, 'none');
+      const again = await applyPendingRestore(basePath);
+      assertEquals(again.status === 'failed' && 'dataMissing' in again, true);
       assertEquals(readMarker(`${result.rollbackPath}/praxrr.db`), 'live');
     });
   }

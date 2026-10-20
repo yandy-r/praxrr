@@ -36,6 +36,13 @@ class DatabaseManager {
   }
 
   /**
+   * Whether a healthy connection is already open (e.g. hooks re-evaluated by Vite HMR)
+   */
+  isInitialized(): boolean {
+    return this.initialized && this.isHealthy();
+  }
+
+  /**
    * Initialize the database connection
    */
   async initialize(): Promise<void> {

@@ -1,11 +1,11 @@
 /**
- * Staged backup restore.
+ * Staged backup restore: validation and staging.
  *
  * Restoring by extracting over the live, open WAL database corrupts it, so restores are split:
- * 1. `stageRestore` validates the archive in a private `.restore-staging-tmp-*` directory, writes
- *    `manifest.json` there, then renames the whole directory onto `<base>/.restore-staging`.
- * 2. `applyPendingRestore` runs at startup before the database is opened and swaps the staged
- *    `data/` directory in, keeping the previous `data/` as a rollback copy.
+ * 1. `stageRestore` (here) validates the archive in a private `.restore-staging-tmp-*` directory,
+ *    writes `manifest.json` there, then renames the whole directory onto `<base>/.restore-staging`.
+ * 2. `applyPendingRestore` (`applyRestore.ts`) runs at startup before the database is opened and
+ *    swaps the staged `data/` directory in, keeping the previous `data/` as a rollback copy.
  *
  * Paths are passed in so this module stays free of config/database dependencies.
  */
@@ -13,10 +13,9 @@
 export const RESTORE_STAGING_DIRNAME = '.restore-staging';
 export const RESTORE_STAGING_TMP_PREFIX = '.restore-staging-tmp-';
 export const RESTORE_MANIFEST_FILENAME = 'manifest.json';
-export const RESTORE_FAILED_MANIFEST_FILENAME = 'manifest.failed.json';
-const DATA_DIRNAME = 'data';
-const DATABASE_MEMBER = `${DATA_DIRNAME}/praxrr.db`;
-const ROLLBACK_PREFIX = `${DATA_DIRNAME}.pre-restore-`;
+export const DATA_DIRNAME = 'data';
+export const DATABASE_FILENAME = 'praxrr.db';
+const DATABASE_MEMBER = `${DATA_DIRNAME}/${DATABASE_FILENAME}`;
 const SQLITE_HEADER = new TextEncoder().encode('SQLite format 3\0');
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
@@ -47,23 +46,6 @@ export interface StageRestoreOptions {
   filename: string;
 }
 
-export type ApplyRestoreResult =
-  | { status: 'none' }
-  | { status: 'applied'; filename: string; rollbackPath: string | null }
-  | { status: 'failed'; error: string }
-  /** Neither the staged nor the previous data could be moved back into place; startup must abort. */
-  | { status: 'failed'; error: string; dataMissing: true; rollbackPath: string };
-
-export interface RestoreLogger {
-  info(message: string, meta?: Record<string, unknown>): void | Promise<void>;
-  error(message: string, meta?: Record<string, unknown>): void | Promise<void>;
-}
-
-/** Filesystem seam so tests can inject rename failures. */
-export interface ApplyRestoreDeps {
-  rename?: (from: string, to: string) => Promise<void>;
-}
-
 /**
  * Backup filenames are flat names `backup-*.tar.gz` (spaces and other printable characters
  * allowed, e.g. browser-renamed `backup-x (1).tar.gz`) without path separators, `..`, or
@@ -80,18 +62,8 @@ export function isValidBackupFilename(name: string): boolean {
   );
 }
 
-function describeError(error: unknown): string {
+export function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await Deno.lstat(path);
-    return true;
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return false;
-    throw error;
-  }
 }
 
 async function runTar(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -240,161 +212,5 @@ export async function stageRestore({ archivePath, basePath, filename }: StageRes
     if (tempDir) await Deno.remove(tempDir, { recursive: true }).catch(() => {});
     if (error instanceof BackupRestoreError) throw error;
     throw new BackupRestoreError('staging_failed', 'Failed to stage backup for restore', describeError(error));
-  }
-}
-
-async function readManifest(path: string): Promise<RestoreManifest | null> {
-  let raw: string;
-  try {
-    raw = await Deno.readTextFile(path);
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) return null;
-    throw error;
-  }
-  const parsed: unknown = JSON.parse(raw);
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    typeof (parsed as RestoreManifest).filename !== 'string' ||
-    typeof (parsed as RestoreManifest).stagedAt !== 'string'
-  ) {
-    throw new Error('Restore manifest is malformed');
-  }
-  return parsed as RestoreManifest;
-}
-
-/** Delete every `data.pre-restore-*` directory except `keepName`. */
-async function pruneRollbacks(basePath: string, keepName: string, log?: RestoreLogger): Promise<void> {
-  for await (const entry of Deno.readDir(basePath)) {
-    if (!entry.name.startsWith(ROLLBACK_PREFIX) || entry.name === keepName) continue;
-    try {
-      await Deno.remove(`${basePath}/${entry.name}`, { recursive: true });
-    } catch (error) {
-      await log?.error('Failed to remove old pre-restore data copy', {
-        path: `${basePath}/${entry.name}`,
-        error: describeError(error),
-      });
-    }
-  }
-}
-
-/** Remove temp dirs left by staging attempts that were killed mid-way. */
-async function removeStaleStagingTemps(basePath: string, log?: RestoreLogger): Promise<void> {
-  for await (const entry of Deno.readDir(basePath)) {
-    if (!entry.isDirectory || !entry.name.startsWith(RESTORE_STAGING_TMP_PREFIX)) continue;
-    await Deno.remove(`${basePath}/${entry.name}`, { recursive: true }).catch(async (error) => {
-      await log?.error('Failed to remove stale restore staging directory', {
-        path: `${basePath}/${entry.name}`,
-        error: describeError(error),
-      });
-    });
-  }
-}
-
-/** Mark a staged restore as failed so it is never retried automatically. */
-async function markRestoreFailed(stagingDir: string, log?: RestoreLogger): Promise<void> {
-  try {
-    await Deno.rename(
-      `${stagingDir}/${RESTORE_MANIFEST_FILENAME}`,
-      `${stagingDir}/${RESTORE_FAILED_MANIFEST_FILENAME}`
-    );
-  } catch (error) {
-    await log?.error('Failed to mark staged restore as failed', { stagingDir, error: describeError(error) });
-  }
-}
-
-async function safeLogError(log: RestoreLogger | undefined, message: string, meta: Record<string, unknown>) {
-  try {
-    await log?.error(message, meta);
-  } catch {
-    // Logging must never break startup
-  }
-}
-
-/**
- * Apply a staged restore. Must run before the application database is opened.
- * Never throws: failures are logged and reported. A failed restore is marked
- * (`manifest.failed.json`) and never retried. Live data stays in place unless both the swap and
- * the move back failed, which is reported as `dataMissing` so the caller can abort startup.
- */
-export async function applyPendingRestore(
-  basePath: string,
-  log?: RestoreLogger,
-  deps: ApplyRestoreDeps = {}
-): Promise<ApplyRestoreResult> {
-  const rename = deps.rename ?? Deno.rename;
-  const stagingDir = `${basePath}/${RESTORE_STAGING_DIRNAME}`;
-  const stagedData = `${stagingDir}/extract/${DATA_DIRNAME}`;
-  const liveData = `${basePath}/${DATA_DIRNAME}`;
-  let manifestFound = false;
-
-  try {
-    await removeStaleStagingTemps(basePath, log);
-
-    const manifest = await readManifest(`${stagingDir}/${RESTORE_MANIFEST_FILENAME}`);
-    if (!manifest) return { status: 'none' };
-    manifestFound = true;
-
-    const stagedInfo = await Deno.lstat(stagedData).catch(() => null);
-    if (!stagedInfo?.isDirectory) {
-      const error = 'Staged restore data is missing; live data left unchanged';
-      await log?.error(error, { filename: manifest.filename, stagingDir });
-      await markRestoreFailed(stagingDir, log);
-      return { status: 'failed', error };
-    }
-
-    const rollbackName = `${ROLLBACK_PREFIX}${new Date().toISOString().replace(/[:.]/g, '-')}`;
-    const rollbackPath = `${basePath}/${rollbackName}`;
-    const hadLiveData = await pathExists(liveData);
-
-    if (hadLiveData) {
-      await rename(liveData, rollbackPath);
-    }
-
-    try {
-      await rename(stagedData, liveData);
-    } catch (error) {
-      await markRestoreFailed(stagingDir, log);
-      if (hadLiveData) {
-        try {
-          await rename(rollbackPath, liveData);
-        } catch (rollbackError) {
-          const message = `Restore failed and the previous data could not be moved back; it is preserved at ${rollbackPath}`;
-          await safeLogError(log, message, {
-            filename: manifest.filename,
-            rollbackPath,
-            error: describeError(error),
-            rollbackError: describeError(rollbackError),
-          });
-          return { status: 'failed', error: message, dataMissing: true, rollbackPath };
-        }
-      }
-      const crossDevice = error instanceof Error && /EXDEV|cross-device/i.test(error.message);
-      const message = crossDevice
-        ? 'Restore staging is on a different filesystem than the data directory; live data left unchanged'
-        : 'Failed to move staged restore data into place; live data left unchanged';
-      await log?.error(message, { filename: manifest.filename, error: describeError(error) });
-      return { status: 'failed', error: message };
-    }
-
-    await Deno.remove(stagingDir, { recursive: true }).catch(async (error) => {
-      await log?.error('Failed to remove restore staging directory', { stagingDir, error: describeError(error) });
-    });
-    // Only prune older rollback copies after a successful swap
-    if (hadLiveData) {
-      await pruneRollbacks(basePath, rollbackName, log);
-    }
-
-    await log?.info('Applied staged backup restore', {
-      filename: manifest.filename,
-      stagedAt: manifest.stagedAt,
-      rollbackPath: hadLiveData ? rollbackPath : null,
-    });
-    return { status: 'applied', filename: manifest.filename, rollbackPath: hadLiveData ? rollbackPath : null };
-  } catch (error) {
-    const message = `Failed to apply staged restore: ${describeError(error)}`;
-    await safeLogError(log, message, { stagingDir });
-    if (manifestFound) await markRestoreFailed(stagingDir, log).catch(() => {});
-    return { status: 'failed', error: message };
   }
 }
