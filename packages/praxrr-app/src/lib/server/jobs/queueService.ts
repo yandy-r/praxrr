@@ -1,4 +1,5 @@
 import { jobQueueQueries, type CreateJobQueueInput } from '$db/queries/jobQueue.ts';
+import { publishJobQueued } from '$lib/server/events/publish.ts';
 import type { JobQueueRecord } from '$jobs/queueTypes.ts';
 import { jobDispatcher } from './dispatcher.ts';
 
@@ -9,11 +10,13 @@ export function enqueueJob(input: CreateJobQueueInput): JobQueueRecord {
     throw new Error('Failed to enqueue job');
   }
   jobDispatcher.notifyJobEnqueued(record.runAt);
+  publishJobQueued(record, { onlyIfDue: false });
   return record;
 }
 
 export function upsertScheduledJob(input: CreateJobQueueInput): JobQueueRecord {
   const record = jobQueueQueries.upsertScheduled(input);
   jobDispatcher.notifyJobEnqueued(record.runAt);
+  publishJobQueued(record, { onlyIfDue: true });
   return record;
 }

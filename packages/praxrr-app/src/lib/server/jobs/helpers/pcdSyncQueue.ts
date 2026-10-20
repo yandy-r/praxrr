@@ -1,5 +1,6 @@
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
+import { publishJobQueued } from '$lib/server/events/publish.ts';
 
 const PCD_SYNC_DEDUPE_KEY_PREFIX = 'pcd.sync:';
 
@@ -69,6 +70,7 @@ export function enqueueManualPcdSync(databaseId: number): EnqueueManualPcdSyncRe
   }
 
   jobDispatcher.notifyJobEnqueued(job.runAt);
+  publishJobQueued(job, { onlyIfDue: false });
 
   return {
     status: 'queued',

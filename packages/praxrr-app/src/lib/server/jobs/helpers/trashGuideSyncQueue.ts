@@ -3,7 +3,13 @@ import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { coerceTrashGuideSourceArrType } from '$shared/trashguide/types.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
-import type { TrashGuideSyncJobPayload, TrashGuideSyncRunEvidence, TrashGuideSyncStatusView } from '../queueTypes.ts';
+import { publishJobQueued } from '$lib/server/events/publish.ts';
+import type {
+  JobQueueRecord,
+  TrashGuideSyncJobPayload,
+  TrashGuideSyncRunEvidence,
+  TrashGuideSyncStatusView,
+} from '../queueTypes.ts';
 
 const TRASHGUIDE_SYNC_DEDUPE_KEY_PREFIX = 'trashguide.sync:';
 
@@ -112,15 +118,27 @@ export function enqueueTrashGuideSourceSync(input: {
   trigger: TrashGuideSyncEnqueueTrigger;
   runAt?: string;
 }): EnqueueTrashGuideSyncResult {
+  return enqueueTrashGuideSourceSyncRecord(input).result;
+}
+
+/** Enqueue core; also returns the persisted queue row so the manual path can publish without a re-read. */
+function enqueueTrashGuideSourceSyncRecord(input: {
+  sourceId: number;
+  trigger: TrashGuideSyncEnqueueTrigger;
+  runAt?: string;
+}): { result: EnqueueTrashGuideSyncResult; record: JobQueueRecord | null } {
   const { sourceId, trigger } = input;
   const dedupeKey = getTrashGuideSyncDedupeKey(sourceId);
   const existing = jobQueueQueries.getByDedupeKey(dedupeKey);
 
   if (existing?.status === 'running') {
     return {
-      status: 'already_running',
-      runToken: readRunToken(existing.payload) ?? '',
-      view: getTrashGuideSyncStatus(sourceId),
+      result: {
+        status: 'already_running',
+        runToken: readRunToken(existing.payload) ?? '',
+        view: getTrashGuideSyncStatus(sourceId),
+      },
+      record: null,
     };
   }
 
@@ -152,13 +170,16 @@ export function enqueueTrashGuideSourceSync(input: {
   // The slot may have started running between the read and the upsert; treat that as already-running.
   if (job.status === 'running') {
     return {
-      status: 'already_running',
-      runToken: readRunToken(job.payload) ?? runToken,
-      view: getTrashGuideSyncStatus(sourceId),
+      result: {
+        status: 'already_running',
+        runToken: readRunToken(job.payload) ?? runToken,
+        view: getTrashGuideSyncStatus(sourceId),
+      },
+      record: null,
     };
   }
 
-  return { status: 'queued', runToken, view: getTrashGuideSyncStatus(sourceId) };
+  return { result: { status: 'queued', runToken, view: getTrashGuideSyncStatus(sourceId) }, record: job };
 }
 
 /**
@@ -168,9 +189,10 @@ export function enqueueTrashGuideSourceSync(input: {
  * the dispatcher (scheduled sweeps are driven by the scheduler tick).
  */
 export function enqueueManualTrashGuideSourceSync(sourceId: number): EnqueueTrashGuideSyncResult {
-  const result = enqueueTrashGuideSourceSync({ sourceId, trigger: 'manual' });
+  const { result, record } = enqueueTrashGuideSourceSyncRecord({ sourceId, trigger: 'manual' });
   if (result.status === 'queued' && result.view.current) {
     jobDispatcher.notifyJobEnqueued(result.view.current.runAt);
+    if (record) publishJobQueued(record, { onlyIfDue: false });
   }
   return result;
 }

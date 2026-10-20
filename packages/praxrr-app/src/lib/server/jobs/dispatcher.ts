@@ -5,6 +5,7 @@ import { buildSafeJobEvidence, classifyJobFailure } from './evidence.ts';
 import { jobQueueRegistry } from './queueRegistry.ts';
 import type { JobHandlerResult, JobQueueRecord, JobStatus } from './queueTypes.ts';
 import { logger } from '$logger/logger.ts';
+import { publishJobFinished, publishJobRunning } from '$lib/server/events/publish.ts';
 import './handlers/index.ts';
 
 /**
@@ -66,6 +67,7 @@ class JobDispatcher {
       while (true) {
         const job = jobQueueQueries.claimNextDue();
         if (!job) break;
+        publishJobRunning(job);
         await this.executeJob(job);
       }
     } finally {
@@ -84,15 +86,26 @@ class JobDispatcher {
         meta: { jobId: job.id, jobType: job.jobType, displayName },
       });
       jobQueueQueries.markFinished(job.id, 'failed');
-      jobRunHistoryQueries.create(
+      const finishedAt = new Date().toISOString();
+      const runId = jobRunHistoryQueries.create(
         job.id,
         job.jobType,
         'failure',
-        job.startedAt ?? new Date().toISOString(),
-        new Date().toISOString(),
+        job.startedAt ?? finishedAt,
+        finishedAt,
         0,
         buildSafeJobEvidence(job, { status: 'failure', failureCode: 'handlerNotFound' })
       );
+      publishJobFinished(job, {
+        status: 'failed',
+        runStatus: 'failure',
+        rescheduled: false,
+        nextRunAt: null,
+        runId,
+        failureCode: 'handlerNotFound',
+        durationMs: 0,
+        finishedAt,
+      });
       return;
     }
 
@@ -127,7 +140,16 @@ class JobDispatcher {
     const durationMs = Date.now() - startMs;
     const evidence = buildSafeJobEvidence(job, result);
 
-    jobRunHistoryQueries.create(job.id, job.jobType, result.status, startedAt, finishedAt, durationMs, evidence);
+    const runId = jobRunHistoryQueries.create(
+      job.id,
+      job.jobType,
+      result.status,
+      startedAt,
+      finishedAt,
+      durationMs,
+      evidence
+    );
+    const failureCode = evidence.failure?.code ?? null;
 
     await logger.debug(`Job finished: ${job.jobType} (${result.status})`, {
       source: 'JobDispatcher',
@@ -138,12 +160,22 @@ class JobDispatcher {
         status: result.status,
         durationMs,
         rescheduleAt: result.rescheduleAt ?? null,
-        failureCode: evidence.failure?.code ?? null,
+        failureCode,
       },
     });
 
     if (result.rescheduleAt) {
       jobQueueQueries.reschedule(job.id, result.rescheduleAt, job.cooldownUntil);
+      publishJobFinished(job, {
+        status: 'queued',
+        runStatus: result.status,
+        rescheduled: true,
+        nextRunAt: result.rescheduleAt,
+        runId,
+        failureCode,
+        durationMs,
+        finishedAt,
+      });
       return;
     }
 
@@ -157,6 +189,16 @@ class JobDispatcher {
             : 'failed';
 
     jobQueueQueries.markFinished(job.id, status);
+    publishJobFinished(job, {
+      status,
+      runStatus: result.status,
+      rescheduled: false,
+      nextRunAt: null,
+      runId,
+      failureCode,
+      durationMs,
+      finishedAt,
+    });
   }
 }
 

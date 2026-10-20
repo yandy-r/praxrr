@@ -23,6 +23,7 @@ import { executeSyncJob } from '$jobs/handlers/arrSync.ts';
 import { enqueueJob } from '$jobs/queueService.ts';
 import type { JobRunStatus } from '$jobs/queueTypes.ts';
 import { logger } from '$logger/logger.ts';
+import { publishCanaryUpdated } from '$lib/server/events/publish.ts';
 import { sanitizeLogMeta } from '$logger/sanitizer.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
@@ -276,6 +277,7 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
     startedAt: new Date().toISOString(),
     stateToken: newStateToken(),
   });
+  publishCanaryUpdated(rolloutId);
 
   // Capture the canary window BEFORE dispatch so classification reads only this run's row.
   const now = new Date().toISOString();
@@ -303,6 +305,7 @@ export async function startRollout(input: CanaryStartInput): Promise<CanaryStart
   if (!recorded) {
     throw new CanaryStateError(`Canary rollout ${rolloutId} changed before its outcome could be recorded`);
   }
+  publishCanaryUpdated(rolloutId);
 
   const rollout = requireDetail(rolloutId);
 
@@ -372,6 +375,7 @@ export function proceedRollout(id: number, expectedToken: string): CanaryRollout
     runAt: new Date().toISOString(),
     dedupeKey: `canary.rollout:${id}`,
   });
+  publishCanaryUpdated(id);
 
   return requireDetail(id);
 }
@@ -394,6 +398,7 @@ export function abortRollout(id: number, expectedToken: string): CanaryRolloutDe
   if (!aborted) {
     throw new CanaryStaleTokenError(`Canary rollout ${id} state token is stale; refresh the gate and retry`);
   }
+  publishCanaryUpdated(id);
 
   return requireDetail(id);
 }
