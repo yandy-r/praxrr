@@ -237,7 +237,8 @@ export interface PostureInputs {
   readonly oidcConfigured: boolean;
   /** Some but not all OIDC settings present (a misconfiguration that weakens `oidc`). */
   readonly oidcPartiallyConfigured: boolean;
-  readonly apiTokens: ApiTokenFacts;
+  /** `null` when the token table could not be read (the check is then not measurable). */
+  readonly apiTokens: ApiTokenFacts | null;
   readonly instances: readonly InstanceFact[];
   readonly rotation: RotationFacts;
   /** Runtime self-verify: `sanitizeLogMeta` stripped a planted secret at gather time. */

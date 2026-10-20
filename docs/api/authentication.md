@@ -51,11 +51,11 @@ Recommended:
 - Use the `X-Api-Key` header
 - Avoid query-parameter auth in shared logs/history
 
-Example:
+Example (replace `<token>` with the full token value, which already starts with `prx_`):
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: prx_<token>' \
+  -H 'X-Api-Key: <token>' \
   http://localhost:5173/api/v1/arr/library?instanceId=1 | jq
 ```
 
@@ -114,8 +114,11 @@ MCP tools also declare a required scope. Every current tool needs `mcp`.
 
 ### Legacy API key
 
-Releases before scoped tokens had one global API key. On upgrade, that key becomes an `admin`
-token named **Legacy API key**. It keeps working with the same value, but it is deprecated.
+Releases before scoped tokens had one global API key. On upgrade, if at least one local
+(non-OIDC) user exists, that key becomes an `admin` token named **Legacy API key**. It keeps
+working with the same value, but it is deprecated. On installs with no local user (fresh or
+OIDC-only installs, where the key could not be used), the old key is discarded instead; create a
+new token in Settings → Security.
 Settings → Security shows a warning while it is active, and the Security Posture page flags it.
 Create scoped tokens for each integration, then revoke the legacy key.
 

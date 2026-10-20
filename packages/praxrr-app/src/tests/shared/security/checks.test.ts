@@ -424,6 +424,15 @@ Deno.test('app_key_at_rest: warns only while the legacy key is active; n/a under
   assertEquals([off.score, off.status], [null, 'na']);
 });
 
+Deno.test('app_key_at_rest: unreadable token state is not measurable, never a pass', () => {
+  for (const authMode of ['on', 'local', 'oidc'] as const) {
+    const unknown = runCheck('app_key_at_rest', makeInputs({ authMode, apiTokens: null }));
+    assertEquals([unknown.score, unknown.status], [null, 'na']);
+    assertEquals(unknown.detail, ['API token state could not be read; this check was not measured.']);
+    assertEquals(unknown.recommendations, []);
+  }
+});
+
 // --- credential_rotation ----------------------------------------------------------------------
 
 Deno.test('credential_rotation: null without rotation; penalizes stale rows; null keyVersion is not stale', () => {

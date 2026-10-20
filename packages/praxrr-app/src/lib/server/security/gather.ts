@@ -71,13 +71,19 @@ function gatherOidcState(): { configured: boolean; partiallyConfigured: boolean 
   return { configured: present === 3, partiallyConfigured: present > 0 && present < 3 };
 }
 
-/** Active token count + legacy flag ONLY — no secret or hash is carried into the engine. */
-function gatherApiTokenFacts(): ApiTokenFacts {
+/**
+ * Active token count + legacy flag ONLY — no secret or hash is carried into the engine. `null` when
+ * the token table cannot be read, so the check reports "not measurable" instead of a false pass.
+ */
+function gatherApiTokenFacts(): ApiTokenFacts | null {
   try {
     return { activeCount: apiTokensQueries.countActive(), legacyActive: apiTokensQueries.hasActiveLegacy() };
-  } catch {
-    // Token table unreadable (uninitialized DB): treat as "no tokens" rather than throwing.
-    return { activeCount: 0, legacyActive: false };
+  } catch (error) {
+    void logger.warn('Security posture: API token read failed; token check not measurable', {
+      source: SOURCE,
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    });
+    return null;
   }
 }
 

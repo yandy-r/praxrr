@@ -360,7 +360,7 @@ const controlPlaneAuth: SecurityCheck = {
           'pass',
           false,
           null,
-          ['Every request requires a signed-in user or the Praxrr API key.'],
+          ['Every page requires a signed-in user; API tokens authenticate only /api/v1/* requests.'],
           []
         );
       case 'oidc':
@@ -619,6 +619,19 @@ const appKeyAtRest: SecurityCheck = {
         false,
         null,
         ['API tokens are not an active authentication path in this mode.'],
+        []
+      );
+    }
+    if (inputs.apiTokens === null) {
+      return result(
+        ID_APP_KEY,
+        LABEL_APP_KEY,
+        null,
+        W,
+        'na',
+        false,
+        null,
+        ['API token state could not be read; this check was not measured.'],
         []
       );
     }

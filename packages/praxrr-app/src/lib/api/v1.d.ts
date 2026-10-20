@@ -5920,7 +5920,15 @@ export interface operations {
           'application/json':
             | components['schemas']['ScopeForbiddenResponse']
             | {
-                [key: string]: unknown;
+                /** @constant */
+                jsonrpc: '2.0';
+                id: string | number | null;
+                error: {
+                  /** @constant */
+                  code: -32003;
+                  message: string;
+                  data?: unknown;
+                };
               };
         };
       };

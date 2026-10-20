@@ -53,11 +53,12 @@ scrape_configs:
         files: ['/etc/prometheus/praxrr-api-token']
 ```
 
-If your scraper cannot set headers, pass the token as a query parameter instead:
+If your scraper cannot set headers, pass the full token (it already starts with
+`prx_`) as a query parameter instead:
 
 ```yaml
 params:
-  apikey: ['prx_<your read token>']
+  apikey: ['<your read token>']
 ```
 
 With `params`, the token becomes part of the request URL and can end up in

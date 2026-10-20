@@ -25,10 +25,11 @@ disable it.
 The MCP endpoint uses Praxrr API tokens. There is **no** OAuth or
 `Authorization: Bearer` support. Create a token in **Settings → Security** with
 the `mcp` scope (or `admin`, which includes it), copy it when it is shown (it is
-shown only once), and configure your client to send the header:
+shown only once), and configure your client to send the header with the full
+token value (it already starts with `prx_`):
 
 ```
-X-Api-Key: prx_<your token>
+X-Api-Key: <your token>
 ```
 
 Notes:
@@ -49,7 +50,7 @@ bridge with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
 
 ```bash
 npx mcp-remote https://<your-praxrr-host>/api/v1/mcp \
-  --header "X-Api-Key: prx_<your token>"
+  --header "X-Api-Key: <your token>"
 ```
 
 ## What is exposed

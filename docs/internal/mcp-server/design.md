@@ -495,7 +495,7 @@ prettier-gated, so run `prettier --write` on any hand-graft and regenerate types
 Add a short section to the user docs covering:
 
 - **Connecting a client (Streamable HTTP):** point the client at
-  `https://<praxrr-host>/api/v1/mcp` and configure it to send the header `X-Api-Key: prx_<token>`
+  `https://<praxrr-host>/api/v1/mcp` and configure it to send the header `X-Api-Key: <token>`
   using a token with the `mcp` scope (Settings → Security). Works under `AUTH=on`, `AUTH=oidc` and
   remote `AUTH=local`. There is **no** OAuth/Bearer support.
 - **stdio bridging via `mcp-remote`:** for clients that only speak stdio (e.g. Claude Desktop),
