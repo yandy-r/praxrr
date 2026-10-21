@@ -670,6 +670,19 @@ export class QualityProfileSyncer extends BaseSyncer {
         throw new Error('Reviewed quality profile batch order does not match its material plan');
       }
 
+      // Validate plan-unique synthetic ids before any DB or Arr write so a malformed plan fails
+      // with nothing persisted.
+      const plannedSyntheticIds = new Set<number>();
+      for (const batch of context.desired.batches) {
+        for (const { payload } of batch.customFormats) {
+          if (typeof payload.id !== 'number' || payload.id >= 0) continue;
+          if (plannedSyntheticIds.has(payload.id)) {
+            throw new Error(`Reviewed quality profile plan reuses synthetic custom format id ${payload.id}`);
+          }
+          plannedSyntheticIds.add(payload.id);
+        }
+      }
+
       // Persist reviewed TRaSH namespaces (in batch order) before any Arr write; a namespace that
       // changed since review fails the whole run instead of writing under the wrong suffix.
       for (const batch of context.desired.batches) {
@@ -692,18 +705,10 @@ export class QualityProfileSyncer extends BaseSyncer {
       );
 
       // Reviewed formatItems carry planned ids: real Arr ids (kept as is) or plan-unique synthetic
-      // ids for CFs created here. Resolve by id only — names are not unique in the Arr (#343).
+      // ids for CFs created here. Their names mix bare PCD names (explicit scores) and Arr names
+      // (zero-score filler), so a name can resolve to a different CF; resolve by planned id only
+      // (#343).
       const createdFormatIds = new Map<number, number>();
-      const plannedSyntheticIds = new Set<number>();
-      for (const batch of context.desired.batches) {
-        for (const { payload } of batch.customFormats) {
-          if (typeof payload.id !== 'number' || payload.id >= 0) continue;
-          if (plannedSyntheticIds.has(payload.id)) {
-            throw new Error(`Reviewed quality profile plan reuses synthetic custom format id ${payload.id}`);
-          }
-          plannedSyntheticIds.add(payload.id);
-        }
-      }
       for (const batch of context.desired.batches) {
         for (const prepared of batch.customFormats) {
           const payload = structuredClone(prepared.payload);

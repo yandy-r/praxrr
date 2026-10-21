@@ -2,10 +2,13 @@
  * Reviewed (preview → apply) quality-profile sync must resolve formatItems by the planned
  * custom-format id, never by bare name (YAN-445 / GitHub #343).
  */
-import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/assert';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrCustomFormat, ArrQualityProfilePayload, QualityProfileFormatItem } from '$arr/types.ts';
+import { previewCustomFormats } from '$sync/customFormats/syncer.ts';
 import type { PcdCustomFormat } from '$sync/customFormats/transformer.ts';
+import type { SyncArrType } from '$sync/mappings.ts';
+import type { SyncPreviewPreparedExecutionContext } from '$sync/preview/types.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 
@@ -43,6 +46,18 @@ function pcdProfile(name: string, scores: Readonly<Record<string, number>>, id: 
   };
 }
 
+/** `release_title` is supported by Radarr, Sonarr, and Lidarr custom formats alike. */
+function releaseTitleCondition(formatName: string): PcdCustomFormat['conditions'][number] {
+  return {
+    name: `${formatName} title`,
+    type: 'release_title',
+    arrType: 'all',
+    negate: false,
+    required: false,
+    patterns: [{ name: formatName, pattern: `\\b${formatName}\\b` }],
+  };
+}
+
 function makeClient(
   arrCustomFormats: readonly ArrCustomFormat[],
   recorded: Recorded,
@@ -71,8 +86,12 @@ function makeClient(
 }
 
 /** Build a syncer whose PCD batch resolution is stubbed; preview and apply logic run for real. */
-function makeSyncer(client: BaseArrClient, specs: readonly BatchSpec[]): QualityProfileSyncer {
-  const syncer = new QualityProfileSyncer(client, 7, 'Reviewed', 'radarr');
+function makeSyncer(
+  client: BaseArrClient,
+  specs: readonly BatchSpec[],
+  arrType: SyncArrType = 'radarr'
+): QualityProfileSyncer {
+  const syncer = new QualityProfileSyncer(client, 7, 'Reviewed', arrType);
   syncer.setPreviewConfig({
     selections: specs.flatMap((spec) =>
       spec.profiles.map((profile) => ({ databaseId: spec.databaseId, profileName: profile.name }))
@@ -89,7 +108,10 @@ function makeSyncer(client: BaseArrClient, specs: readonly BatchSpec[]): Quality
       referencedFormatNames: Object.keys(profile.scores),
     })),
     customFormats: new Map<string, PcdCustomFormat>(
-      spec.customFormats.map((name) => [name, { id: pcdId++, name, includeInRename: false, conditions: [] }])
+      spec.customFormats.map((name) => [
+        name,
+        { id: pcdId++, name, includeInRename: false, conditions: [releaseTitleCondition(name)] },
+      ])
     ),
     pcdFormatIdMap: new Map<string, number>(),
   }));
@@ -166,32 +188,45 @@ Deno.test('reviewed QP apply resolves a planned synthetic CF id to the created r
   assertEquals(scoreOf(items, 4), [0]);
 });
 
-Deno.test('reviewed QP apply keeps synthetic ids unique across batches', async () => {
-  const recorded = emptyRecorded();
-  const client = makeClient([], recorded);
-  const syncer = makeSyncer(client, [
-    { databaseId: 41, suffix: SUFFIX_A, customFormats: ['Alpha'], profiles: [{ name: 'A', scores: { Alpha: 10 } }] },
-    { databaseId: 42, suffix: SUFFIX_B, customFormats: ['Beta'], profiles: [{ name: 'B', scores: { Beta: 20 } }] },
-  ]);
+for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
+  Deno.test(`reviewed ${arrType} QP apply keeps synthetic ids unique across batches`, async () => {
+    const recorded = emptyRecorded();
+    const client = makeClient([], recorded);
+    const syncer = makeSyncer(
+      client,
+      [
+        {
+          databaseId: 41,
+          suffix: SUFFIX_A,
+          customFormats: ['Alpha'],
+          profiles: [{ name: 'A', scores: { Alpha: 10 } }],
+        },
+        { databaseId: 42, suffix: SUFFIX_B, customFormats: ['Beta'], profiles: [{ name: 'B', scores: { Beta: 20 } }] },
+      ],
+      arrType
+    );
 
-  await syncer.generatePreview();
-  const result = await syncer.sync();
+    await syncer.generatePreview();
+    const result = await syncer.sync();
 
-  assertEquals(result.success, true, result.error);
-  const createdIds = new Map(recorded.customFormatCreates.map((format, index) => [format.name, 101 + index] as const));
-  const alphaId = createdIds.get(`Alpha${SUFFIX_A}`)!;
-  const betaId = createdIds.get(`Beta${SUFFIX_B}`)!;
-  assertEquals(recorded.profileWrites.length, 2);
-  const [profileA, profileB] = recorded.profileWrites;
-  for (const profile of [profileA, profileB]) {
-    assertUniqueFormatIds(profile.formatItems);
-    assertEquals(profile.formatItems.map((item) => item.format).sort(), [alphaId, betaId].sort());
-  }
-  assertEquals(scoreOf(profileA.formatItems, alphaId), [10]);
-  assertEquals(scoreOf(profileA.formatItems, betaId), [0]);
-  assertEquals(scoreOf(profileB.formatItems, betaId), [20]);
-  assertEquals(scoreOf(profileB.formatItems, alphaId), [0]);
-});
+    assertEquals(result.success, true, result.error);
+    const createdIds = new Map(
+      recorded.customFormatCreates.map((format, index) => [format.name, 101 + index] as const)
+    );
+    const alphaId = createdIds.get(`Alpha${SUFFIX_A}`)!;
+    const betaId = createdIds.get(`Beta${SUFFIX_B}`)!;
+    assertEquals(recorded.profileWrites.length, 2);
+    const [profileA, profileB] = recorded.profileWrites;
+    for (const profile of [profileA, profileB]) {
+      assertUniqueFormatIds(profile.formatItems);
+      assertEquals(profile.formatItems.map((item) => item.format).sort(), [alphaId, betaId].sort());
+    }
+    assertEquals(scoreOf(profileA.formatItems, alphaId), [10]);
+    assertEquals(scoreOf(profileA.formatItems, betaId), [0]);
+    assertEquals(scoreOf(profileB.formatItems, betaId), [20]);
+    assertEquals(scoreOf(profileB.formatItems, alphaId), [0]);
+  });
+}
 
 Deno.test('reviewed QP apply fails only the profile that scores a CF whose create failed', async () => {
   const recorded = emptyRecorded();
@@ -230,4 +265,65 @@ Deno.test('reviewed QP apply fails only the profile that scores a CF whose creat
   assertEquals(failed.action, 'create');
   assertEquals(failed.remoteId, null);
   assertStringIncludes(failed.reason ?? '', 'Custom format "Broken" was not created');
+});
+
+function reviewedBatch(databaseId: number, suffix: string, formatName: string) {
+  return {
+    sourceKind: 'pcd' as const,
+    sourceLabel: `DB ${databaseId}`,
+    databaseId,
+    suffix,
+    customFormats: [{ pcdName: formatName, payload: { id: -1, name: `${formatName}${suffix}`, specifications: [] } }],
+    qualityProfiles: [
+      {
+        pcdName: `${formatName} Profile`,
+        payload: {
+          name: `${formatName} Profile${suffix}`,
+          items: [],
+          upgradeAllowed: true,
+          cutoff: 1,
+          minFormatScore: 0,
+          cutoffFormatScore: 100,
+          minUpgradeFormatScore: 1,
+          formatItems: [{ format: -1, name: formatName, score: 10 }],
+        },
+        remoteId: null,
+      },
+    ],
+  };
+}
+
+Deno.test('reviewed QP apply rejects a plan that reuses a synthetic CF id before any write', async () => {
+  const recorded = emptyRecorded();
+  const syncer = new QualityProfileSyncer(makeClient([], recorded), 7, 'Reviewed', 'radarr');
+  const context: SyncPreviewPreparedExecutionContext = {
+    section: 'qualityProfiles',
+    config: {
+      selections: [
+        { databaseId: 41, profileName: 'Alpha Profile' },
+        { databaseId: 42, profileName: 'Beta Profile' },
+      ],
+    },
+    desired: { batches: [reviewedBatch(41, SUFFIX_A, 'Alpha'), reviewedBatch(42, SUFFIX_B, 'Beta')] },
+    materialPlan: {
+      arrType: 'radarr',
+      batchOrder: [`pcd:41:DB 41:${SUFFIX_A}`, `pcd:42:DB 42:${SUFFIX_B}`],
+    },
+    currentGuards: { customFormats: [], qualityProfiles: [] },
+  };
+  syncer.setPreparedExecutionContext(context);
+
+  const result = await syncer.sync();
+
+  assertEquals(result.success, false);
+  assertStringIncludes(result.error ?? '', 'reuses synthetic custom format id -1');
+  assertEquals(recorded, emptyRecorded());
+});
+
+Deno.test('previewCustomFormats rejects a non-negative first synthetic id', async () => {
+  await assertRejects(
+    () => previewCustomFormats(makeClient([], emptyRecorded()), 7, 'radarr', new Map(), SUFFIX_A, 0),
+    Error,
+    'Synthetic custom format ids must be negative integers'
+  );
 });
