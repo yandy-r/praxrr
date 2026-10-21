@@ -35,6 +35,8 @@ interface PreparedCustomFormatResult {
   readonly preparedFormats: readonly PreparedCustomFormat[];
   readonly pcdFormatIdMap: Map<string, number>;
   readonly droppedFormats: readonly DroppedCustomFormat[];
+  /** Next unused synthetic id; thread it into the next preview call to keep ids plan-unique. */
+  readonly nextSyntheticId: number;
 }
 
 /** Confirmed custom-format sync outcomes plus the resolved PCD-name → arr-id map. */
@@ -131,6 +133,8 @@ export async function writeCustomFormatPayload(
 
 interface CompileCustomFormatsOptions {
   readonly includeSyntheticIds?: boolean;
+  /** First (negative) synthetic id to assign to formats missing from the Arr. */
+  readonly firstSyntheticId?: number;
 }
 
 async function buildCustomFormatPayloads(
@@ -147,7 +151,10 @@ async function buildCustomFormatPayloads(
   const preparedFormats: PreparedCustomFormat[] = [];
   const pcdFormatIdMap = new Map<string, number>();
   const droppedFormats: DroppedCustomFormat[] = [];
-  let syntheticId = -1;
+  let syntheticId = options.firstSyntheticId ?? -1;
+  if (!Number.isInteger(syntheticId) || syntheticId >= 0) {
+    throw new Error(`Synthetic custom format ids must be negative integers, got ${syntheticId}`);
+  }
 
   for (const [pcdName, pcdFormat] of pcdFormats) {
     const transformed = transformCustomFormatWithDiagnostics(pcdFormat, instanceType);
@@ -197,21 +204,27 @@ async function buildCustomFormatPayloads(
     });
   }
 
-  return { preparedFormats, pcdFormatIdMap, droppedFormats };
+  return { preparedFormats, pcdFormatIdMap, droppedFormats, nextSyntheticId: syntheticId };
 }
 
 /**
  * Prepare custom format payloads and synthetic IDs for preview generation only.
+ *
+ * @param firstSyntheticId - First negative id for formats missing from the Arr. Callers building
+ *                           one plan from several batches pass the previous result's
+ *                           `nextSyntheticId` so synthetic ids never collide across batches.
  */
 export async function previewCustomFormats(
   client: BaseArrClient,
   instanceId: number,
   instanceType: SyncArrType,
   pcdFormats: Map<string, PcdCustomFormat>,
-  suffix: string
+  suffix: string,
+  firstSyntheticId = -1
 ): Promise<PreparedCustomFormatResult> {
   return buildCustomFormatPayloads(client, instanceId, instanceType, pcdFormats, suffix, {
     includeSyntheticIds: true,
+    firstSyntheticId,
   });
 }
 

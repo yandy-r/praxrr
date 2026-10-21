@@ -512,14 +512,20 @@ export class QualityProfileSyncer extends BaseSyncer {
         getCustomFormats: async () => allArrCustomFormats,
       } as unknown as BaseArrClient;
 
+      // One running counter across batches: reviewed apply resolves formatItems by planned id,
+      // so synthetic ids must be unique across the whole plan, not per batch.
+      let nextSyntheticId = -1;
       for (const batch of batches) {
-        const { preparedFormats, pcdFormatIdMap } = await previewCustomFormats(
+        const preview = await previewCustomFormats(
           capturedCustomFormatClient,
           this.instanceId,
           this.instanceType,
           batch.customFormats,
-          batch.suffix
+          batch.suffix,
+          nextSyntheticId
         );
+        const { preparedFormats, pcdFormatIdMap } = preview;
+        nextSyntheticId = preview.nextSyntheticId;
 
         desiredCustomFormats.push(...preparedFormats.map((prepared) => prepared.arrFormat));
         preparedCustomFormatsByBatch.push(
@@ -685,10 +691,20 @@ export class QualityProfileSyncer extends BaseSyncer {
           .map((profile) => [profile.name, profile.id!])
       );
 
-      const resolvedFormatIdsByBatch = context.desired.batches.map(() => new Map<string, number>());
-      const resolvedFormatIdsByArrName = new Map<string, number>();
-      for (let batchIndex = 0; batchIndex < context.desired.batches.length; batchIndex += 1) {
-        const batch = context.desired.batches[batchIndex];
+      // Reviewed formatItems carry planned ids: real Arr ids (kept as is) or plan-unique synthetic
+      // ids for CFs created here. Resolve by id only — names are not unique in the Arr (#343).
+      const createdFormatIds = new Map<number, number>();
+      const plannedSyntheticIds = new Set<number>();
+      for (const batch of context.desired.batches) {
+        for (const { payload } of batch.customFormats) {
+          if (typeof payload.id !== 'number' || payload.id >= 0) continue;
+          if (plannedSyntheticIds.has(payload.id)) {
+            throw new Error(`Reviewed quality profile plan reuses synthetic custom format id ${payload.id}`);
+          }
+          plannedSyntheticIds.add(payload.id);
+        }
+      }
+      for (const batch of context.desired.batches) {
         for (const prepared of batch.customFormats) {
           const payload = structuredClone(prepared.payload);
           const plannedId = payload.id;
@@ -704,22 +720,15 @@ export class QualityProfileSyncer extends BaseSyncer {
             payload,
           });
           outcomes.push(write.outcome);
-          if (write.remoteId !== null) {
-            resolvedFormatIdsByBatch[batchIndex].set(prepared.pcdName, write.remoteId);
-            resolvedFormatIdsByArrName.set(payload.name, write.remoteId);
+          if (typeof plannedId === 'number' && plannedId < 0 && write.remoteId !== null) {
+            createdFormatIds.set(plannedId, write.remoteId);
           }
         }
       }
 
-      for (let batchIndex = 0; batchIndex < context.desired.batches.length; batchIndex += 1) {
-        const batch = context.desired.batches[batchIndex];
-        const batchFormatIds = resolvedFormatIdsByBatch[batchIndex];
+      for (const batch of context.desired.batches) {
         for (const prepared of batch.qualityProfiles) {
           const payload = structuredClone(prepared.payload);
-          payload.formatItems = payload.formatItems.map((item) => ({
-            ...item,
-            format: batchFormatIds.get(item.name) ?? resolvedFormatIdsByArrName.get(item.name) ?? item.format,
-          }));
           const guardedId = guardedProfileIds.get(payload.name);
           if (
             (prepared.remoteId !== null && guardedId !== prepared.remoteId) ||
@@ -728,6 +737,36 @@ export class QualityProfileSyncer extends BaseSyncer {
             throw new Error(`Reviewed current-value guard mismatch for quality profile "${payload.name}"`);
           }
 
+          // A CF that was never created is absent from the Arr, so its zero-score fill entry is
+          // dropped; a profile that actually scores it fails instead of sending a synthetic id.
+          const unresolved = payload.formatItems.find(
+            (item) => item.format < 0 && !createdFormatIds.has(item.format) && item.score !== 0
+          );
+          if (unresolved) {
+            const reason = `Custom format "${unresolved.name}" was not created; cannot score it`;
+            await logger.error(`Failed to sync quality profile "${prepared.pcdName}"`, {
+              source: 'Sync:QualityProfiles',
+              meta: { instanceId: this.instanceId, pcdName: prepared.pcdName, reason },
+            });
+            outcomes.push({
+              section: 'qualityProfiles',
+              arrType: this.instanceType,
+              entityType: 'qualityProfile',
+              name: prepared.pcdName,
+              action: prepared.remoteId === null ? 'create' : 'update',
+              status: 'failed',
+              remoteId: prepared.remoteId === null ? null : String(prepared.remoteId),
+              reason,
+            });
+            failedProfiles.add(prepared.pcdName);
+            continue;
+          }
+
+          payload.formatItems = payload.formatItems.flatMap((item) => {
+            if (item.format >= 0) return [item];
+            const remoteId = createdFormatIds.get(item.format);
+            return remoteId === undefined ? [] : [{ ...item, format: remoteId }];
+          });
           const write = await this.writeQualityProfilePayload({
             pcdName: prepared.pcdName,
             payload,
