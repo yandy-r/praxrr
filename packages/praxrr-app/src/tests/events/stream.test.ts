@@ -215,7 +215,7 @@ Deno.test('T-S7b: a replay longer than the queue sends resync gap and keeps the 
 
 Deno.test('T-S7c: a replay that fits the queue is sent in full', async () => {
   const bus = new EventBus(256, 'teststrm');
-  const total = LIVE_STREAM_QUEUE_HWM - 2;
+  const total = LIVE_STREAM_QUEUE_HWM - 3;
   for (let i = 1; i <= total; i++) bus.publish(driftEvent(i));
 
   const h = open({ lastEventId: 'teststrm-0' }, bus);
@@ -227,6 +227,23 @@ Deno.test('T-S7c: a replay that fits the queue is sent in full', async () => {
   h.abort.abort();
   assertEquals(h.releases(), 1);
 });
+
+Deno.test(
+  'T-S7d: a replay that would fill the queue sends resync so a following live event keeps the stream open',
+  async () => {
+    const bus = new EventBus(256, 'teststrm');
+    const total = LIVE_STREAM_QUEUE_HWM - 2;
+    for (let i = 1; i <= total; i++) bus.publish(driftEvent(i));
+
+    const h = open({ lastEventId: 'teststrm-0' }, bus);
+    bus.publish(driftEvent(total + 1));
+    assertEquals(bus.subscriberCount(), 1);
+    await skipPreamble(h);
+    assertEquals(await h.next(), `data: ${JSON.stringify({ type: 'resync', reason: 'gap' })}\n\n`);
+    h.abort.abort();
+    assertEquals(h.releases(), 1);
+  }
+);
 
 Deno.test('T-S8: a slow consumer is disconnected', () => {
   const h = open({ highWaterMark: 2 });

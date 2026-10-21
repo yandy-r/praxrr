@@ -15,6 +15,10 @@
   let politeQueue: string[] = [];
   let assertiveQueue: string[] = [];
   let flushScheduled = false;
+  // Per-region sequence: a newer flush supersedes only the region it rewrites.
+  let politeSeq = 0;
+  let assertiveSeq = 0;
+  const RESTORE_DELAY_MS = 50;
 
   async function flush() {
     flushScheduled = false;
@@ -22,12 +26,17 @@
     const assertive = assertiveQueue.join(' ');
     politeQueue = [];
     assertiveQueue = [];
-    // Clear first, then set on the next tick so identical messages are re-announced.
+    const pSeq = polite ? ++politeSeq : politeSeq;
+    const aSeq = assertive ? ++assertiveSeq : assertiveSeq;
+    // Clear first, then restore in a later task so identical messages are re-announced
+    // (same-tick DOM mutations can be coalesced by assistive tech).
     if (polite) politeText = '';
     if (assertive) assertiveText = '';
     await tick();
-    if (polite) politeText = polite;
-    if (assertive) assertiveText = assertive;
+    await new Promise<void>((resolve) => setTimeout(resolve, RESTORE_DELAY_MS));
+    // Skip stale restores superseded by a newer flush of the same region.
+    if (polite && pSeq === politeSeq) politeText = polite;
+    if (assertive && aSeq === assertiveSeq) assertiveText = assertive;
   }
 
   function announce(alert: Alert) {

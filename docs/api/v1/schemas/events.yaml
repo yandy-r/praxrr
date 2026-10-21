@@ -111,7 +111,7 @@ LiveResyncEvent:
     Replay of missed events is impossible; the client must refetch all state. `boot` means the
     client's last event id is from a previous server process, or is over-long or malformed. `gap`
     means the id is older than the 256-event replay buffer, or the backlog since it exceeds the
-    62 events replayed per connection.
+    61 events replayed per connection.
   properties:
     type:
       type: string

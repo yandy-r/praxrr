@@ -115,10 +115,10 @@ export interface paths {
      *
      *     Replay: send the last received id in the `Last-Event-ID` header (set automatically by
      *     `EventSource` on reconnect) or the `lastEventId` query parameter. Missed domain events are
-     *     replayed from a 256-event in-memory buffer, at most 62 events per connection. When replay is
+     *     replayed from a 256-event in-memory buffer, at most 61 events per connection. When replay is
      *     impossible the server sends `resync` and the client must refetch its state: `reason: boot`
      *     when the id is from a previous server process or is over-long or malformed; `reason: gap`
-     *     when the id is older than the buffer or the backlog exceeds 62 events.
+     *     when the id is older than the buffer or the backlog exceeds 61 events.
      *
      *     Session checks: each heartbeat re-validates the session or API token; when it is no longer
      *     valid the server sends `session.expired` and closes the stream. Streams are closed after a
@@ -3412,7 +3412,7 @@ export interface components {
      * @description Replay of missed events is impossible; the client must refetch all state. `boot` means the
      *     client's last event id is from a previous server process, or is over-long or malformed. `gap`
      *     means the id is older than the 256-event replay buffer, or the backlog since it exceeds the
-     *     62 events replayed per connection.
+     *     61 events replayed per connection.
      */
     LiveResyncEvent: {
       /**

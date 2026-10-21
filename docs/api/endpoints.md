@@ -150,9 +150,9 @@ Replay:
 
 - Reconnect with the `Last-Event-ID` header (browsers send it automatically) or the
   `lastEventId` query parameter. The server replays newer events from a 256-event buffer, at
-  most 62 events per connection.
+  most 61 events per connection.
 - If the id is from a previous process, or is malformed or over-long, the server sends `resync`
-  with `reason: "boot"`. If the id is older than the buffer, or more than 62 events were missed,
+  with `reason: "boot"`. If the id is older than the buffer, or more than 61 events were missed,
   it sends `resync` with `reason: "gap"`. Either way, re-read everything you display.
 
 Lifetime:

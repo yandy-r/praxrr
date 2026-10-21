@@ -97,7 +97,8 @@ export function createEventStream(opts: EventStreamOptions): ReadableStream<Uint
           const replay = bus.replaySince(opts.lastEventId);
           if (replay.kind === 'resync') {
             send(encodeEvent({ type: 'resync', reason: replay.reason }));
-          } else if (replay.events.length > highWaterMark - PREAMBLE_FRAMES) {
+          } else if (replay.events.length >= highWaterMark - PREAMBLE_FRAMES) {
+            // Keep at least one free slot so a live event right after the replay can't trip the slow-consumer check.
             send(encodeEvent({ type: 'resync', reason: 'gap' }));
           } else {
             for (const envelope of replay.events) {
