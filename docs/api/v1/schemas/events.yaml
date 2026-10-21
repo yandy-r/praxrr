@@ -1,0 +1,417 @@
+LiveJobType:
+  type: string
+  enum:
+    - arr.upgrade
+    - arr.rename
+    - arr.sync
+    - arr.sync.qualityProfiles
+    - arr.sync.delayProfiles
+    - arr.sync.mediaManagement
+    - arr.sync.metadataProfiles
+    - arr.pull.startup
+    - pcd.sync
+    - trashguide.sync
+    - backup.create
+    - backup.cleanup
+    - logs.cleanup
+    - drift.check
+    - sync.history.cleanup
+    - sync.canary.rollout
+    - config-health.snapshot
+    - config-health.cleanup
+  description: Job type of the queue row the event describes. Mirrors the server `JOB_TYPES` inventory.
+
+LiveJobStatus:
+  type: string
+  enum:
+    - queued
+    - running
+    - success
+    - failed
+    - cancelled
+  description: Queue-row status after the event.
+
+LiveJobRunStatus:
+  type: string
+  enum:
+    - success
+    - failure
+    - skipped
+    - cancelled
+  description: Terminal status of the job run that just finished.
+
+LiveJobSource:
+  type: string
+  enum:
+    - schedule
+    - manual
+    - system
+  description: How the job was enqueued.
+
+LiveJobFailureCode:
+  type: string
+  enum:
+    - invalidPayload
+    - targetNotFound
+    - unsupported
+    - precondition
+    - credential
+    - upstream
+    - timeout
+    - gitNetwork
+    - filesystem
+    - database
+    - validation
+    - handlerNotFound
+    - internalError
+  description: Closed, safe failure classification of a failed job run. Never raw error text.
+
+LiveArrType:
+  type: string
+  enum:
+    - radarr
+    - sonarr
+    - lidarr
+  description: Arr family the event is scoped to.
+
+LiveHelloEvent:
+  type: object
+  required:
+    - type
+    - bootId
+    - headId
+    - serverTime
+    - heartbeatMs
+  additionalProperties: false
+  description: First frame of every stream. Not buffered for replay and carries no SSE `id`.
+  properties:
+    type:
+      type: string
+      const: hello
+    bootId:
+      type: string
+      description: Identifier of the current server process. Changes on every restart.
+    headId:
+      type: string
+      description: Latest published event id when the stream opened, or an empty string when none exists yet.
+    serverTime:
+      type: string
+      format: date-time
+    heartbeatMs:
+      type: integer
+      description: 'Interval between `: ping` heartbeat comments, in milliseconds.'
+
+LiveResyncEvent:
+  type: object
+  required:
+    - type
+    - reason
+  additionalProperties: false
+  description: |
+    Replay of missed events is impossible; the client must refetch all state. `boot` means the
+    client's last event id is from a previous server process, or is over-long or malformed. `gap`
+    means the id is older than the 256-event replay buffer, or the backlog since it exceeds the
+    61 events replayed per connection.
+  properties:
+    type:
+      type: string
+      const: resync
+    reason:
+      type: string
+      enum:
+        - boot
+        - gap
+
+LiveJobQueuedEvent:
+  type: object
+  required:
+    - type
+    - jobId
+    - jobType
+    - source
+    - displayName
+    - instanceId
+    - arrType
+    - databaseId
+    - runAt
+  additionalProperties: false
+  description: A job was enqueued.
+  properties:
+    type:
+      type: string
+      const: job.queued
+    jobId:
+      type: integer
+    jobType:
+      $ref: '#/LiveJobType'
+    source:
+      $ref: '#/LiveJobSource'
+    displayName:
+      type: string
+    instanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    arrType:
+      oneOf:
+        - $ref: '#/LiveArrType'
+        - type: 'null'
+    databaseId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    runAt:
+      type: string
+      format: date-time
+
+LiveJobRunningEvent:
+  type: object
+  required:
+    - type
+    - jobId
+    - jobType
+    - source
+    - displayName
+    - instanceId
+    - arrType
+    - databaseId
+    - startedAt
+  additionalProperties: false
+  description: A job was claimed by the dispatcher and started running.
+  properties:
+    type:
+      type: string
+      const: job.running
+    jobId:
+      type: integer
+    jobType:
+      $ref: '#/LiveJobType'
+    source:
+      $ref: '#/LiveJobSource'
+    displayName:
+      type: string
+    instanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    arrType:
+      oneOf:
+        - $ref: '#/LiveArrType'
+        - type: 'null'
+    databaseId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    startedAt:
+      type: string
+      format: date-time
+
+LiveJobFinishedEvent:
+  type: object
+  required:
+    - type
+    - jobId
+    - jobType
+    - source
+    - displayName
+    - instanceId
+    - arrType
+    - databaseId
+    - status
+    - runStatus
+    - rescheduled
+    - nextRunAt
+    - runId
+    - failureCode
+    - durationMs
+    - finishedAt
+  additionalProperties: false
+  description: A job run finished. `rescheduled` is true when a recurring job was re-queued.
+  properties:
+    type:
+      type: string
+      const: job.finished
+    jobId:
+      type: integer
+    jobType:
+      $ref: '#/LiveJobType'
+    source:
+      $ref: '#/LiveJobSource'
+    displayName:
+      type: string
+    instanceId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    arrType:
+      oneOf:
+        - $ref: '#/LiveArrType'
+        - type: 'null'
+    databaseId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    status:
+      $ref: '#/LiveJobStatus'
+    runStatus:
+      $ref: '#/LiveJobRunStatus'
+    rescheduled:
+      type: boolean
+    nextRunAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    runId:
+      type: integer
+    failureCode:
+      oneOf:
+        - $ref: '#/LiveJobFailureCode'
+        - type: 'null'
+    durationMs:
+      type: integer
+    finishedAt:
+      type: string
+      format: date-time
+
+LiveSyncRecordedEvent:
+  type: object
+  required:
+    - type
+    - syncHistoryId
+    - jobId
+    - instanceId
+    - arrType
+    - status
+    - trigger
+    - finishedAt
+  additionalProperties: false
+  description: A sync history row was recorded. Published before the owning job's `job.finished`.
+  properties:
+    type:
+      type: string
+      const: sync.recorded
+    syncHistoryId:
+      type: integer
+    jobId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+    instanceId:
+      type: integer
+    arrType:
+      $ref: '#/LiveArrType'
+    status:
+      $ref: './sync-history.yaml#/SyncOperationStatus'
+    trigger:
+      $ref: './sync-history.yaml#/SyncTrigger'
+    finishedAt:
+      type: string
+      format: date-time
+
+LiveCanaryUpdatedEvent:
+  type: object
+  required:
+    - type
+    - rolloutId
+    - arrType
+    - status
+    - canaryStatus
+    - completedCount
+    - remainingCount
+  additionalProperties: false
+  description: A canary rollout changed state or progressed.
+  properties:
+    type:
+      type: string
+      const: canary.updated
+    rolloutId:
+      type: integer
+    arrType:
+      $ref: '#/LiveArrType'
+    status:
+      $ref: './canary.yaml#/CanaryRolloutStatus'
+    canaryStatus:
+      oneOf:
+        - $ref: './canary.yaml#/CanaryOutcomeStatus'
+        - type: 'null'
+    completedCount:
+      type: integer
+    remainingCount:
+      type: integer
+      minimum: 0
+      description: |
+        Targets not yet completed in this rollout (remaining targets minus recorded results).
+        Distinct from the rollout summary's `remainingCount`, which counts all remaining targets
+        including those already completed.
+
+LiveDriftUpdatedEvent:
+  type: object
+  required:
+    - type
+    - instanceId
+    - arrType
+    - status
+    - driftedCount
+    - missingCount
+    - unmanagedCount
+    - checkedAt
+  additionalProperties: false
+  description: A drift check result was persisted for an instance.
+  properties:
+    type:
+      type: string
+      const: drift.updated
+    instanceId:
+      type: integer
+    arrType:
+      $ref: '#/LiveArrType'
+    status:
+      $ref: './drift.yaml#/DriftStatus'
+    driftedCount:
+      type: integer
+    missingCount:
+      type: integer
+    unmanagedCount:
+      type: integer
+    checkedAt:
+      type: string
+      format: date-time
+
+LiveSessionExpiredEvent:
+  type: object
+  required:
+    - type
+  additionalProperties: false
+  description: The session or API token is no longer valid. The server closes the stream after this frame.
+  properties:
+    type:
+      type: string
+      const: session.expired
+
+LiveEvent:
+  oneOf:
+    - $ref: '#/LiveHelloEvent'
+    - $ref: '#/LiveResyncEvent'
+    - $ref: '#/LiveJobQueuedEvent'
+    - $ref: '#/LiveJobRunningEvent'
+    - $ref: '#/LiveJobFinishedEvent'
+    - $ref: '#/LiveSyncRecordedEvent'
+    - $ref: '#/LiveCanaryUpdatedEvent'
+    - $ref: '#/LiveDriftUpdatedEvent'
+    - $ref: '#/LiveSessionExpiredEvent'
+  discriminator:
+    propertyName: type
+    mapping:
+      hello: '#/LiveHelloEvent'
+      resync: '#/LiveResyncEvent'
+      job.queued: '#/LiveJobQueuedEvent'
+      job.running: '#/LiveJobRunningEvent'
+      job.finished: '#/LiveJobFinishedEvent'
+      sync.recorded: '#/LiveSyncRecordedEvent'
+      canary.updated: '#/LiveCanaryUpdatedEvent'
+      drift.updated: '#/LiveDriftUpdatedEvent'
+      session.expired: '#/LiveSessionExpiredEvent'
+  description: |
+    JSON payload of one `data:` frame on `GET /api/v1/events`. Payloads are allow-listed summaries;
+    they never contain Arr URLs, API keys, job payloads, or raw error text.

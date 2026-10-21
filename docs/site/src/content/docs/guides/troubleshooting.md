@@ -166,6 +166,36 @@ an old runtime from source.
 2. Do not run older binaries against a database migrated by a newer version.
 3. Restore backup and upgrade again after reviewing release notes.
 
+## Live updates paused or not arriving
+
+**Symptoms:** The **Reconnecting…** or **Live updates paused** indicator stays
+visible, or job and sync pages only change after a reload.
+
+**Checks:**
+
+1. **Signed out** — Live updates stop when your session expires. Log in again;
+   the connection resumes on its own.
+2. **Reverse proxy buffering** — Proxies must not buffer `text/event-stream`
+   responses from `/api/v1/events`. For nginx:
+
+   ```nginx
+   location /api/v1/events {
+     proxy_pass http://praxrr:6868;
+     proxy_http_version 1.1;
+     proxy_set_header Connection '';
+     proxy_buffering off;
+     proxy_read_timeout 1h;
+   }
+   ```
+
+   Caddy streams these responses without extra configuration.
+
+3. **Too many tabs** — Over HTTP/1.1, browsers allow about 6 connections per
+   host, and each Praxrr tab holds one for live updates. With more than 6 tabs
+   open, page loads can stall. Close extra tabs or serve Praxrr over HTTP/2.
+
+Pages keep working without live updates; reload to see the latest state.
+
 ## Getting more help
 
 - [Architecture Overview](/app/architecture/) — module boundaries

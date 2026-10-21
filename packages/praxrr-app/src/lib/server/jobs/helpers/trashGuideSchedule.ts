@@ -1,4 +1,5 @@
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { publishJobsCancelled } from '$lib/server/events/publish.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { parseUTC } from '$shared/utils/dates.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
@@ -25,7 +26,7 @@ export function scheduleTrashGuideSyncSources(): string[] {
 
   for (const source of sources) {
     if (!source.enabled || source.sync_strategy <= 0) {
-      jobQueueQueries.unscheduleByDedupeKey(getTrashGuideSyncDedupeKey(source.id));
+      publishJobsCancelled(jobQueueQueries.unscheduleByDedupeKey(getTrashGuideSyncDedupeKey(source.id)));
       continue;
     }
 

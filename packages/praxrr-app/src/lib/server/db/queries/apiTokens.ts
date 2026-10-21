@@ -107,6 +107,13 @@ export const apiTokensQueries = {
     return row ? toSummary(row, sqliteNow()) : undefined;
   },
 
+  /** True when the token id exists and is neither revoked nor expired. */
+  isActiveById(id: number): boolean {
+    return (
+      db.queryFirst<{ id: number }>(`SELECT id FROM api_tokens WHERE id = ? AND ${ACTIVE_PREDICATE}`, id) !== undefined
+    );
+  },
+
   /** Record use; a single conditional UPDATE throttles writes to one per 60s per token. */
   touchLastUsed(id: number): void {
     db.execute(

@@ -14,6 +14,7 @@
  */
 
 import { logger } from '$logger/logger.ts';
+import { publishSyncRecorded } from '$lib/server/events/publish.ts';
 import { notify, createEmbed, Colors, getInstanceIcon } from '$notifications/builder.ts';
 import { NotificationTypes } from '$notifications/types.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
@@ -196,6 +197,7 @@ export function recordSyncHistory(input: SyncHistoryInput): number | null {
     }
     const id = syncHistoryQueries.insert(input);
     fireNotification(id, input);
+    publishSyncRecorded(id, input);
     return id;
   } catch (error) {
     // A silently-dropped audit record is bad, but breaking the sync is worse.

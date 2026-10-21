@@ -58,7 +58,7 @@
       initEdit({ enabled, dryRun, schedule, filterMode, filters: JSON.stringify(filters) });
     }
     if (form.success && form.queued) {
-      alertStore.add('success', 'Upgrade run queued');
+      alertStore.add('info', 'Upgrade run queued');
     }
     if (form.success && form.cacheCleared) {
       alertStore.add('success', 'Dry run cache cleared');

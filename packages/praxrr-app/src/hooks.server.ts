@@ -20,6 +20,7 @@ import { trashGuideManager } from '$trashguide/index.ts';
 import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
 import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
+import { LIVE_EVENTS_PATH } from '$shared/events/types.ts';
 import { enforceTokenScope } from '$auth/scopePolicy.ts';
 import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
@@ -300,8 +301,10 @@ const authHandle: Handle = async ({ event, resolve }) => {
   const scopeDenied = enforceTokenScope(event, auth.principal);
   if (scopeDenied) return scopeDenied;
 
-  // Sliding expiration: extend session if past halfway point
-  if (auth.session) {
+  // Sliding expiration: extend session past halfway point. The live events stream (GET and its
+  // HEAD probe) and live-triggered `__data.json` refetches (`x-praxrr-live: 1`) are skipped so an
+  // idle background tab cannot keep the session alive forever.
+  if (auth.session && event.url.pathname !== LIVE_EVENTS_PATH && event.request.headers.get('x-praxrr-live') !== '1') {
     maybeExtendSession(auth.session);
   }
 

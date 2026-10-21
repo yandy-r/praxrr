@@ -6,6 +6,7 @@
   import NarrationBlock from '$ui/narration/NarrationBlock.svelte';
   import { DRIFT_STATUS_LABEL, driftStatusVariant } from '$ui/drift/driftStatus.ts';
   import { alertStore } from '$alerts/store';
+  import { eventsStore } from '$stores/events';
   import { narrateDriftReason, narrateDriftCounts, narrateDriftEntity } from '$shared/narration/index.ts';
   import type { NarrationLevel } from '$shared/narration/index.ts';
   import type { DriftDetailResponse } from '$sync/drift/responses.ts';
@@ -97,8 +98,32 @@
     }
   }
 
+  // Drift data is client-fetched (no `depends()`), so live events re-run the guarded loader directly.
+  const LIVE_RELOAD_DEBOUNCE_MS = 500;
+
   onMount(() => {
     void loadDetail();
+
+    let timer: number | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        // A manual refresh already returns fresh detail; skip so it is not superseded.
+        if (refreshing) return;
+        void loadDetail();
+      }, LIVE_RELOAD_DEBOUNCE_MS);
+    };
+    const off = eventsStore.on('drift.updated', (e) => {
+      if (e.instanceId === data.instanceId) schedule();
+    });
+    const offResync = eventsStore.onResync(schedule);
+
+    return () => {
+      off();
+      offResync();
+      clearTimeout(timer);
+    };
   });
 </script>
 

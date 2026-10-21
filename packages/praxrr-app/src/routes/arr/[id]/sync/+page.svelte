@@ -18,6 +18,7 @@
   import type { SyncPreviewSummary } from '$sync/preview/types.ts';
   import { initEdit, update, clear } from '$lib/client/stores/dirty';
   import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { subscribeInstanceSync, toSectionLiveStatus } from './liveSync.ts';
 
   type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
@@ -131,7 +132,11 @@
   // Initialize dirty tracking on mount
   onMount(() => {
     initEdit({ anyDirty: false });
-    return () => clear();
+    const stopLive = subscribeInstanceSync(data.instance.id);
+    return () => {
+      clear();
+      stopLive();
+    };
   });
 
   // Sync combined dirty state to global dirty store for DirtyModal
@@ -360,7 +365,7 @@
 
       if (response.ok) {
         const data = await response.json();
-        alertStore.add('success', data?.message ?? 'Sync queued');
+        alertStore.add('info', data?.message ?? 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
         const payload = await extractFormError(response, 'Sync failed');
@@ -403,6 +408,7 @@
     bind:hasTrashNaming
     bind:hasTrashQualityDefinitions
     lastSyncedAt={data.syncData.mediaManagement.lastSyncedAt ?? null}
+    liveStatus={toSectionLiveStatus(data.sectionStatus?.mediaManagement)}
     previewConfig={mediaManagementPreviewConfig}
     previewSection="mediaManagement"
     bind:previewEnabled={mediaManagementPreviewEnabled}
@@ -420,6 +426,7 @@
     canSave={qualityProfilesCanSave}
     warning={qualityProfilesWarning}
     lastSyncedAt={data.syncData.qualityProfiles.config.lastSyncedAt ?? null}
+    liveStatus={toSectionLiveStatus(data.sectionStatus?.qualityProfiles)}
     previewConfig={qualityProfilesPreviewConfig}
     previewSection="qualityProfiles"
     bind:previewEnabled={qualityProfilesPreviewEnabled}
@@ -434,6 +441,7 @@
     bind:cronExpression={delayProfileCron}
     bind:isDirty={delayProfilesDirty}
     lastSyncedAt={data.syncData.delayProfiles.lastSyncedAt ?? null}
+    liveStatus={toSectionLiveStatus(data.sectionStatus?.delayProfiles)}
     previewConfig={delayProfilesPreviewConfig}
     previewSection="delayProfiles"
     bind:previewEnabled={delayProfilesPreviewEnabled}
@@ -487,6 +495,7 @@
         saving={metadataProfileSaving}
         syncing={metadataProfileSyncing}
         isDirty={metadataProfilesDirty}
+        liveStatus={toSectionLiveStatus(data.sectionStatus?.metadataProfiles)}
         previewConfig={metadataProfilePreviewConfig}
         previewEnabled={metadataProfilesPreviewEnabled}
         previewSection="metadataProfiles"

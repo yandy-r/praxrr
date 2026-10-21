@@ -13,7 +13,12 @@
 
 import { logger } from '$logger/logger.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
-import { driftStatusQueries, type DriftInstanceStatusDetail } from '$db/queries/driftStatus.ts';
+import {
+  driftStatusQueries,
+  type DriftInstanceStatusDetail,
+  type UpsertDriftStatusInput,
+} from '$db/queries/driftStatus.ts';
+import { publishDriftUpdated } from '$lib/server/events/publish.ts';
 import { notify, createEmbed, Colors, getInstanceIcon } from '$notifications/builder.ts';
 import { checkInstanceDrift, type DriftCheckDeps } from './check.ts';
 import type { InstanceDriftResult } from './types.ts';
@@ -108,7 +113,7 @@ export async function checkAndPersistInstance(
 
     // On a failed/degraded check (no fresh diff) preserve the last-known content so the UI
     // shows "last good check at X; currently <status>" rather than blanking known drift.
-    driftStatusQueries.upsert({
+    const upsertInput: UpsertDriftStatusInput = {
       arrInstanceId: next.instanceId,
       arrType: next.arrType,
       status: next.status,
@@ -122,7 +127,9 @@ export async function checkAndPersistInstance(
       checkedAt: next.checkedAt,
       contentCheckedAt: contentRefresh ? next.contentCheckedAt : (prior?.contentCheckedAt ?? null),
       durationMs: next.durationMs,
-    });
+    };
+    driftStatusQueries.upsert(upsertInput);
+    publishDriftUpdated(upsertInput);
 
     // Genuine recovery: a fresh clean check (no alerting drift) clears the last-notified
     // signature so an identical drift that returns later re-fires. No-op if nothing was notified.

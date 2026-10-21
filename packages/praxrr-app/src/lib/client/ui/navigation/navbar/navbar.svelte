@@ -31,7 +31,14 @@
     <!-- Center: Mobile alerts -->
     <div class="flex min-w-0 justify-center md:hidden">
       {#if latestAlert}
-        <MobileNavAlert id={latestAlert.id} type={latestAlert.type} message={latestAlert.message} />
+        {#key latestAlert.id}
+          <MobileNavAlert
+            id={latestAlert.id}
+            type={latestAlert.type}
+            message={latestAlert.message}
+            action={latestAlert.action}
+          />
+        {/key}
       {/if}
     </div>
 

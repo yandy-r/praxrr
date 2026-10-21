@@ -535,7 +535,7 @@
         if (alreadyRunning) {
           alertStore.add('info', 'Sync already running in background');
         } else if (queued) {
-          alertStore.add('success', `Sync queued${queuedJobId ? ` (job #${queuedJobId})` : ''}`);
+          alertStore.add('info', `Sync queued${queuedJobId ? ` (job #${queuedJobId})` : ''}`);
         } else {
           alertStore.add('success', 'Sync requested');
         }

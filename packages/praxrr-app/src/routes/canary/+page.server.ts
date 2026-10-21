@@ -4,6 +4,7 @@ import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { canarySettingsQueries } from '$db/queries/canarySettings.ts';
 import { isSyncPreviewArrType, type SyncPreviewArrType } from '$sync/preview/types.ts';
 import type { CanaryRolloutSummary, CanarySettings } from '$sync/canary/types.ts';
+import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
 /** Eligible canary-target option (id/name/type only — never credentials). */
 interface CanaryInstanceOption {
@@ -29,7 +30,9 @@ const RECENT_LIMIT = 50;
  * (`radarr|sonarr|lidarr`), never credentials — plus the most recent rollouts and
  * the canary settings singleton so the page can gate its own empty state.
  */
-export const load: ServerLoad = () => {
+export const load: ServerLoad = ({ depends }) => {
+  depends(LIVE_DEPENDENCY_KEYS.canary);
+
   const instances: CanaryInstanceOption[] = arrInstancesQueries
     .getEnabled()
     .filter((instance) => isSyncPreviewArrType(instance.type))

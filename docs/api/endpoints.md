@@ -17,6 +17,8 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | ------ | ------------------------------------------------- | ------------------------------------- |
 | GET    | `/health`                                         | Service/component health check        |
 | GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                  |
+| GET    | `/events`                                         | Live event stream (SSE)               |
+| HEAD   | `/events`                                         | Event stream availability probe       |
 | GET    | `/ui-preferences`                                 | Read per-user section disclosure mode |
 | PATCH  | `/ui-preferences`                                 | Save per-user section disclosure mode |
 | GET    | `/complexity-tiers`                               | Read per-user section complexity tier |
@@ -95,6 +97,90 @@ Returns the parsed OpenAPI document served by the app.
 ```bash
 curl -sS -H 'X-Api-Key: <token>' http://localhost:5173/api/v1/openapi.json | jq '.info'
 ```
+
+## Live events
+
+### `GET /events`
+
+Streams job and sync lifecycle events as Server-Sent Events
+(`Content-Type: text/event-stream`). The stream carries notifications only; clients re-read the
+matching REST or page data when an event arrives.
+
+Authentication:
+
+- Browser: the session cookie (`EventSource` sends it automatically on the same origin).
+- API clients: `X-Api-Key: prx_…` with the `read` scope. `?apikey=prx_…` also works, but the
+  token then appears in proxy and access logs; prefer the header.
+- An unauthenticated request returns `401` before a stream opens; a token without the `read`
+  scope returns `403`.
+
+Framing: the stream starts with `retry: 5000`, then a `hello` event, then any replayed events
+(or a `resync`), then live events. Each event is one `data:` line of JSON with a `type`
+discriminator. Domain events also carry an `id:` of the form `<bootId>-<seq>`.
+
+```text
+retry: 5000
+
+data: {"type":"hello","bootId":"k3x9","headId":"k3x9-41","serverTime":"2026-10-20T12:00:00.000Z","heartbeatMs":20000}
+
+id: k3x9-42
+data: {"type":"job.finished","jobId":118,"jobType":"arr.sync","source":"manual","displayName":"Arr Sync - Radarr","instanceId":1,"arrType":"radarr","databaseId":null,"status":"success","runStatus":"success","rescheduled":false,"nextRunAt":null,"runId":907,"failureCode":null,"durationMs":1840,"finishedAt":"2026-10-20T12:00:03.000Z"}
+
+: ping
+```
+
+Event types:
+
+| `type`            | `id:` | Meaning                                                              |
+| ----------------- | ----- | -------------------------------------------------------------------- |
+| `hello`           | no    | Stream opened; carries `bootId`, `headId`, `serverTime`, heartbeat   |
+| `resync`          | no    | Replay impossible (`reason`: `boot` or `gap`); re-read all data      |
+| `job.queued`      | yes   | A job was enqueued (`jobId`, `jobType`, `source`, `runAt`)           |
+| `job.running`     | yes   | A job started (`startedAt`)                                          |
+| `job.finished`    | yes   | A job run ended (`status`, `runStatus`, `failureCode`, `durationMs`) |
+| `sync.recorded`   | yes   | A sync history entry was written (`syncHistoryId`, `status`)         |
+| `canary.updated`  | yes   | A canary rollout changed state (`rolloutId`, `status`)               |
+| `drift.updated`   | yes   | A drift check result was saved (`instanceId`, `status`, counts)      |
+| `session.expired` | no    | The credential is no longer valid; the server closes the stream      |
+
+Job events share `jobId`, `jobType`, `source`, `displayName`, `instanceId`, `arrType` and
+`databaseId`. The full payload schemas live in `docs/api/v1/schemas/events.yaml`.
+
+Replay:
+
+- Reconnect with the `Last-Event-ID` header (browsers send it automatically) or the
+  `lastEventId` query parameter. The server replays newer events from a 256-event buffer, at
+  most 61 events per connection.
+- If the id is from a previous process, or is malformed or over-long, the server sends `resync`
+  with `reason: "boot"`. If the id is older than the buffer, or more than 61 events were missed,
+  it sends `resync` with `reason: "gap"`. Either way, re-read everything you display.
+
+Lifetime:
+
+- Every 20 s the server sends a `: ping` comment and re-checks the session or token. If it is no
+  longer valid, the server sends `session.expired` and closes the stream. Heartbeats never
+  extend a session.
+- Each stream closes after 60 minutes; clients reconnect with `Last-Event-ID`.
+- A consumer that stops reading is disconnected rather than buffered without limit.
+
+Connection caps:
+
+| Status | Cause                                              | Recovery                                 |
+| ------ | -------------------------------------------------- | ---------------------------------------- |
+| `429`  | More than 8 open streams for one session or token  | Close other streams; honor `Retry-After` |
+| `503`  | More than 100 open streams across the whole server | Honor `Retry-After` (30 s) and retry     |
+
+Existing streams are never evicted to make room for a new one.
+
+```bash
+curl -N -H 'X-Api-Key: prx_…' http://localhost:6868/api/v1/events
+```
+
+### `HEAD /events`
+
+Checks authentication and capacity without opening a stream. Returns `204` when a stream would be
+accepted, otherwise the same `401`, `403`, `429` or `503` as `GET` (with `Retry-After` on `429`
+and `503`). It accepts the same `X-Api-Key` header or `apikey` query parameter.
 
 ## User Interface Preferences
 

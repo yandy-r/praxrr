@@ -54,6 +54,13 @@ export interface CreateJobQueueInput<T extends JobType = JobType> {
   cooldownUntil?: string | null;
 }
 
+/**
+ * Running, or queued and due now, for every source. Uses the same `run_at` comparison as
+ * `getNextDueQueued`/`claimNextDue`, so "active" matches what the dispatcher would pick up.
+ */
+const ACTIVE_DUE_PREDICATE = `(status = 'running'
+  OR (status = 'queued' AND datetime(replace(replace(run_at, 'T', ' '), 'Z', '')) <= datetime('now')))`;
+
 export const jobQueueQueries = {
   create(input: CreateJobQueueInput): number {
     const payload = JSON.stringify(input.payload ?? {});
@@ -140,6 +147,18 @@ export const jobQueueQueries = {
     return rows.map(rowToRecord);
   },
 
+  /** Running jobs plus queued jobs that are due now (any source); future-dated rows are excluded. */
+  listActive(limit: number = 50): JobQueueRecord[] {
+    const rows = db.query<JobQueueRow>(
+      `SELECT * FROM job_queue
+       WHERE ${ACTIVE_DUE_PREDICATE}
+       ORDER BY CASE status WHEN 'running' THEN 0 ELSE 1 END, run_at ASC
+       LIMIT ?`,
+      limit
+    );
+    return rows.map(rowToRecord);
+  },
+
   listScheduled(): JobQueueRecord[] {
     const rows = db.query<JobQueueRow>(
       `SELECT * FROM job_queue WHERE dedupe_key IS NOT NULL AND source = 'schedule' ORDER BY job_type`
@@ -160,6 +179,25 @@ export const jobQueueQueries = {
 			 WHERE job_type = ? AND status = 'queued'
 			 AND (json_extract(payload, '$.instanceId') = ? OR json_extract(payload, '$.instanceId') = ?)`,
       jobType,
+      instanceId,
+      String(instanceId)
+    );
+    return rows.map(rowToRecord);
+  },
+
+  /**
+   * Active jobs of the given types for one instance (`payload.instanceId`): running jobs plus
+   * queued jobs that are due now. Future-dated rows are excluded, matching `listActive`.
+   */
+  listActiveByJobTypesAndInstanceId(jobTypes: readonly JobType[], instanceId: number): JobQueueRecord[] {
+    if (jobTypes.length === 0) return [];
+    const placeholders = jobTypes.map(() => '?').join(', ');
+    const rows = db.query<JobQueueRow>(
+      `SELECT * FROM job_queue
+       WHERE job_type IN (${placeholders})
+       AND (json_extract(payload, '$.instanceId') = ? OR json_extract(payload, '$.instanceId') = ?)
+       AND ${ACTIVE_DUE_PREDICATE}`,
+      ...jobTypes,
       instanceId,
       String(instanceId)
     );
@@ -241,11 +279,19 @@ export const jobQueueQueries = {
     db.execute(`UPDATE job_queue SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, status, id);
   },
 
-  cancelByDedupeKey(dedupeKey: string): void {
+  /**
+   * Cancels every row with `dedupeKey`; returns the rows that were queued beforehand (a running row's
+   * terminal event comes from the dispatcher).
+   */
+  cancelByDedupeKey(dedupeKey: string): JobQueueRecord[] {
+    const affected = db
+      .query<JobQueueRow>(`SELECT * FROM job_queue WHERE dedupe_key = ? AND status = 'queued'`, dedupeKey)
+      .map(rowToRecord);
     db.execute(
       `UPDATE job_queue SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE dedupe_key = ?`,
       dedupeKey
     );
+    return affected;
   },
 
   deleteByIds(ids: number[]): number {
@@ -254,7 +300,11 @@ export const jobQueueQueries = {
     return db.execute(`DELETE FROM job_queue WHERE id IN (${placeholders})`, ...ids);
   },
 
-  unscheduleByDedupeKey(dedupeKey: string): void {
+  /** Detaches the `dedupeKey` slot; returns the queued rows it cancelled (running rows keep running). */
+  unscheduleByDedupeKey(dedupeKey: string): JobQueueRecord[] {
+    const affected = db
+      .query<JobQueueRow>(`SELECT * FROM job_queue WHERE dedupe_key = ? AND status = 'queued'`, dedupeKey)
+      .map(rowToRecord);
     db.execute(
       `UPDATE job_queue
 			 SET status = CASE WHEN status = 'running' THEN status ELSE 'cancelled' END,
@@ -264,6 +314,7 @@ export const jobQueueQueries = {
 			 WHERE dedupe_key = ?`,
       dedupeKey
     );
+    return affected;
   },
 
   recoverRunning(): number {

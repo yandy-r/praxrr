@@ -51,7 +51,7 @@
       initEdit({ enabled, dryRun, renameFolders, ignoreTag, schedule, summaryNotifications });
     }
     if (form.success && form.queued) {
-      alertStore.add('success', 'Rename run queued');
+      alertStore.add('info', 'Rename run queued');
       if (form.warning) {
         alertStore.add('warning', form.warning);
       }

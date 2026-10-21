@@ -10,6 +10,7 @@ import { clearDryRunExclusions } from '$lib/server/upgrades/processor.ts';
 import { logDryRunCacheCleared } from '$lib/server/upgrades/logger.ts';
 import { scheduleUpgradeForInstance } from '$lib/server/jobs/init.ts';
 import { upsertScheduledJob } from '$lib/server/jobs/queueService.ts';
+import { publishJobsCancelled } from '$lib/server/events/publish.ts';
 import { calculateCooldownUntil } from '$lib/server/jobs/scheduleUtils.ts';
 import { buildJobDisplayName } from '$lib/server/jobs/display.ts';
 import { isArrAppType, supportsArrWorkflow, ARR_APPS } from '$shared/arr/capabilities.ts';
@@ -30,8 +31,10 @@ function getUpgradeUnsupportedError(instanceType: string): string | null {
 }
 
 function cancelQueuedUpgrades(instanceId: number): void {
-  jobQueueQueries.cancelByDedupeKey(`arr.upgrade:${instanceId}`);
-  jobQueueQueries.cancelByDedupeKey(`arr.upgrade.manual:${instanceId}`);
+  publishJobsCancelled([
+    ...jobQueueQueries.cancelByDedupeKey(`arr.upgrade:${instanceId}`),
+    ...jobQueueQueries.cancelByDedupeKey(`arr.upgrade.manual:${instanceId}`),
+  ]);
 }
 
 function getUpgradeUnsupportedErrorAndCancel(instanceId: number, instanceType: string): string | null {

@@ -103,6 +103,25 @@ exportable audit entry for every run across all instances.
 
 ![Sync history](../../../assets/screenshots/sync-history.png)
 
+### Live progress
+
+The sync page updates on its own while a job runs; you do not need to reload.
+
+- **Section chip:** each section's footer shows **Queued** when a sync is
+  waiting, **Syncing…** while it runs, and **Last sync failed** when the most
+  recent run failed.
+- **Completion toasts:** when a job finishes, a toast reports the result with
+  a **View details** link to its Sync History entry or to **Settings → Jobs**.
+  Failure toasts stay until you dismiss them.
+- **Which jobs toast:** jobs you start manually always toast. Background sync
+  failures toast too, at most one per minute for each job type and target
+  (instance or database). A toast for a repeated failure replaces the previous
+  one instead of stacking. Successful background runs stay quiet.
+- **Connection indicator:** if the live connection drops, a small
+  **Reconnecting…** indicator appears. If Praxrr cannot reconnect, it shows
+  **Live updates paused**. Pages keep working without live updates; reload or
+  navigate to see the latest state.
+
 ## Base ops vs user ops
 
 PCD state has two layers:

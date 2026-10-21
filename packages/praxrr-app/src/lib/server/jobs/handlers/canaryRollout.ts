@@ -9,6 +9,7 @@ import { notifyCanaryFailed, notifyCanaryPromoted } from '$sync/canary/notify.ts
 import type { CanaryInstanceResult, CanaryTarget } from '$sync/canary/types.ts';
 import type { SectionType } from '$sync/types.ts';
 import { logger } from '$logger/logger.ts';
+import { publishCanaryUpdated } from '$lib/server/events/publish.ts';
 
 /**
  * Canary rollout handler (issue #19).
@@ -90,6 +91,7 @@ const canaryRolloutHandler: JobHandler = async (job) => {
   const accumulatedResults: CanaryInstanceResult[] = [...rollout.rolloutResults, ...batchResults];
   const nextCursor = batchCursor + slice.length;
   canaryRolloutQueries.recordBatchProgress(rolloutId, nextCursor, accumulatedResults);
+  publishCanaryUpdated(rolloutId);
 
   // Resumable: reschedule UNCONDITIONALLY while targets remain (no schedule-source guard),
   // yielding the serialized dispatcher between batches. The dispatcher honors `rescheduleAt`
@@ -110,6 +112,7 @@ const canaryRolloutHandler: JobHandler = async (job) => {
   );
   const finishedAt = new Date().toISOString();
   canaryRolloutQueries.finishRollout(rolloutId, rolloutFailed ? 'failed' : 'completed', finishedAt);
+  publishCanaryUpdated(rolloutId);
 
   const finished = canaryRolloutQueries.getById(rolloutId) ?? rollout;
   if (rolloutFailed) {

@@ -22,6 +22,7 @@ const aliases: Record<string, string> = {
   complexity:
     'packages/praxrr-app/src/tests/complexity,packages/praxrr-app/src/tests/routes/complexityTiersApi.test.ts',
   'env-instances': 'packages/praxrr-app/src/tests/base/envInstances.test.ts',
+  events: 'packages/praxrr-app/src/tests/events,packages/praxrr-app/src/tests/jobs/dispatcherEvents.test.ts',
   filters: 'packages/praxrr-app/src/tests/upgrades/filters.test.ts',
   impactSimulator:
     'packages/praxrr-app/src/tests/routes/impactSimulatorRoute.test.ts,packages/praxrr-app/src/tests/pcd/sandbox,packages/praxrr-app/src/tests/pcd/simulate,packages/praxrr-app/src/tests/pcd/scoring,packages/praxrr-app/src/tests/shared/thresholdState.test.ts',

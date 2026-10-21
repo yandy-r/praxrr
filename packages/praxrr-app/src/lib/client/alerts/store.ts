@@ -1,14 +1,27 @@
 import { get, writable } from 'svelte/store';
 import { uuid } from '$shared/utils/uuid';
 import { alertSettingsStore } from './settings';
+import { pushAlert } from './stack';
 
 export type AlertType = 'success' | 'error' | 'warning' | 'info';
+
+export interface AlertAction {
+  label: string;
+  href: string;
+}
 
 export interface Alert {
   id: string;
   type: AlertType;
   message: string;
   duration?: number; // Auto-dismiss duration in ms (default: 5000)
+  action?: AlertAction; // Optional navigation link rendered alongside the message
+  key?: string; // Alerts sharing a key replace each other instead of stacking
+}
+
+export interface AlertOptions {
+  /** A new alert with the same key replaces the previous one. */
+  key?: string;
 }
 
 function createAlertStore() {
@@ -16,13 +29,15 @@ function createAlertStore() {
 
   return {
     subscribe,
-    add: (type: AlertType, message: string, duration?: number) => {
+    add: (type: AlertType, message: string, duration?: number, action?: AlertAction, options?: AlertOptions) => {
       const settingsDuration = get(alertSettingsStore).durationMs;
       const resolvedDuration = typeof duration === 'number' ? duration : settingsDuration;
       const id = uuid();
       const alert: Alert = { id, type, message, duration: resolvedDuration };
+      if (action) alert.action = action;
+      if (options?.key !== undefined) alert.key = options.key;
 
-      update((alerts) => [...alerts, alert]);
+      update((alerts) => pushAlert(alerts, alert));
 
       // Auto-dismiss after duration
       if (resolvedDuration > 0) {

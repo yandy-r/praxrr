@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { History, Download, ChevronLeft, ChevronRight, X } from 'lucide-svelte';
@@ -22,8 +23,12 @@
     type SyncHistoryBadgeVariant,
   } from '$ui/sync-history/syncHistoryStatus.ts';
   import type { PageData } from './$types';
+  import { subscribeLive } from '$lib/client/events/liveInvalidate';
+  import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
   export let data: PageData;
+
+  onMount(() => subscribeLive({ key: LIVE_DEPENDENCY_KEYS.syncHistory, types: ['sync.recorded'] }));
 
   // --- Filter option catalogs -------------------------------------------------
 

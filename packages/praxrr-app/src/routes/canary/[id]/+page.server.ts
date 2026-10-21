@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
+import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 
 /**
  * Canary rollout detail load (issue #19).
@@ -13,7 +14,9 @@ import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
  * proceed/abort. An invalid id resolves to 400 and an unknown rollout to 404, mirroring the
  * server-loading detail routes (`quality-profiles/[databaseId]`).
  */
-export const load: ServerLoad = ({ params }) => {
+export const load: ServerLoad = ({ params, depends }) => {
+  depends(LIVE_DEPENDENCY_KEYS.canary);
+
   const raw = params.id;
 
   // Strict digits-only: reject leading-numeric junk like "1e5"/"1abc"/" 1" outright.
