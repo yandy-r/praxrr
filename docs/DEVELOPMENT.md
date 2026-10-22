@@ -18,6 +18,17 @@
 - Use `deno task dev`, `deno task lint`, `deno task check`, and `deno task test` during feature
   development before release tagging.
 
+## Client Form Actions and Reactive Lists
+
+Use `submitFormAction` from `lib/client/utils/submitFormAction.ts` for manually fetched SvelteKit
+form actions. It deserializes the action envelope before checking success: an HTTP 200 response can
+still contain a failed action. Only update saved state or invalidate successful submissions; show the
+returned failure message without marking the form clean.
+
+In legacy Svelte reactive list updates, pass page data explicitly into list builders (for example,
+`$: setItems(buildUnifiedItems(data))`) so invalidated page data refreshes the displayed list after
+unlinking a source.
+
 ## Documentation Site
 
 The Starlight docs site lives in `docs/site/`. `npm run build` there is **versioned**: it runs

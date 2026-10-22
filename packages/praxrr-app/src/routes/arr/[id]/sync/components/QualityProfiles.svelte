@@ -9,7 +9,7 @@
   import type { TrashGuideSyncTrigger } from '$shared/trashguide/types.ts';
   import type { SectionType } from '$sync/types.ts';
   import type { SectionLiveStatus } from '../liveSync.ts';
-  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
 
   type UnifiedSourceType = 'pcd' | 'trash';
 
@@ -437,14 +437,14 @@
       }
       formData.set('selections', JSON.stringify(selectedQualityProfiles));
 
-      const response = await fetch('?/saveTrashGuideSource', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveTrashGuideSource',
+        formData,
+        'Failed to save quality profiles sync config'
+      );
 
-      if (!response.ok) {
-        const payload = await extractFormError(response, 'Failed to save quality profiles sync config');
-        throw new Error(payload);
+      if (!result.ok) {
+        throw new Error(result.message);
       }
     }
   }
@@ -465,13 +465,14 @@
       formData.set('trigger', syncTrigger);
       formData.set('cron', cronExpression);
 
-      const response = await fetch('?/saveQualityProfiles', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveQualityProfiles',
+        formData,
+        'Failed to save quality profiles sync config'
+      );
 
-      if (!response.ok) {
-        alertStore.add('error', 'Failed to save quality profiles sync config');
+      if (!result.ok) {
+        alertStore.add('error', result.message);
         return;
       }
 
@@ -494,17 +495,13 @@
         return;
       }
 
-      const response = await fetch('?/syncQualityProfiles', {
-        method: 'POST',
-        body: new FormData(),
-      });
+      const result = await submitFormAction('syncQualityProfiles', new FormData(), 'Quality profile sync failed');
 
-      if (!response.ok) {
-        const payload = await extractFormError(response, 'Quality profile sync failed');
-        throw new Error(payload);
+      if (!result.ok) {
+        throw new Error(result.message);
       }
 
-      alertStore.add('info', 'Quality profiles sync queued');
+      alertStore.add('info', typeof result.data.message === 'string' ? result.data.message : 'Sync queued');
       await invalidateAll().catch(() => undefined);
     } catch (error) {
       alertStore.add('error', error instanceof Error ? error.message : 'Sync failed');

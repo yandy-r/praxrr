@@ -6,6 +6,7 @@
   import { alertStore } from '$lib/client/alerts/store.ts';
   import type { SectionType } from '$sync/types.ts';
   import type { SectionLiveStatus } from '../liveSync.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
 
   interface DatabaseWithProfiles {
     id: number;
@@ -81,18 +82,15 @@
       formData.set('trigger', syncTrigger);
       formData.set('cron', cronExpression);
 
-      const response = await fetch('?/saveDelayProfiles', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction('saveDelayProfiles', formData, 'Failed to save delay profile sync config');
 
-      if (response.ok) {
+      if (result.ok) {
         alertStore.add('success', 'Delay profile sync config saved');
         // Update saved state to current
         savedState = JSON.stringify({ state, syncTrigger, cronExpression });
         await invalidateAll().catch(() => undefined);
       } else {
-        alertStore.add('error', 'Failed to save delay profile sync config');
+        alertStore.add('error', result.message);
       }
     } catch {
       alertStore.add('error', 'Failed to save delay profile sync config');
@@ -104,17 +102,13 @@
   async function handleSync() {
     syncing = true;
     try {
-      const response = await fetch('?/syncDelayProfiles', {
-        method: 'POST',
-        body: new FormData(),
-      });
+      const result = await submitFormAction('syncDelayProfiles', new FormData(), 'Sync failed');
 
-      if (response.ok) {
-        const data = await response.json();
-        alertStore.add('info', data?.message ?? 'Sync queued');
+      if (result.ok) {
+        alertStore.add('info', typeof result.data.message === 'string' ? result.data.message : 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
-        alertStore.add('error', 'Sync failed');
+        alertStore.add('error', result.message);
       }
     } catch {
       alertStore.add('error', 'Sync failed');

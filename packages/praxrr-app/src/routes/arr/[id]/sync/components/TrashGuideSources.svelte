@@ -14,7 +14,7 @@
     TrashGuideSyncTrigger,
   } from '$shared/trashguide/types.ts';
   import { parseUTC } from '$shared/utils/dates';
-  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
 
   type ViewState = 'loading' | 'server-error' | 'no-sources' | 'filtered-empty' | 'ready';
 
@@ -332,14 +332,14 @@
       }
       formData.set('selections', JSON.stringify(selections));
 
-      const response = await fetch('?/saveTrashGuideSource', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveTrashGuideSource',
+        formData,
+        'Failed to save TRaSH source sync config'
+      );
 
-      if (!response.ok) {
-        const message = await extractFormError(response, 'Failed to save TRaSH source sync config');
-        alertStore.add('error', message);
+      if (!result.ok) {
+        alertStore.add('error', result.message);
         return false;
       }
 
