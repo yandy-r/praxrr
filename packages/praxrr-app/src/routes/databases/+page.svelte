@@ -21,18 +21,18 @@
   export let data: PageData;
 
   // Build unified items
-  function buildUnifiedItems(): UnifiedDatabaseItem[] {
+  function buildUnifiedItems(data: PageData): UnifiedDatabaseItem[] {
     const pcdItems = (data.databases || []).map(pcdToUnifiedItem);
     const trashItems = (data.trashSources || []).map(trashToUnifiedItem);
     return [...pcdItems, ...trashItems];
   }
 
-  const { search, view, filtered, setItems } = createDataPageStore(buildUnifiedItems(), {
+  const { search, view, filtered, setItems } = createDataPageStore(buildUnifiedItems(data), {
     storageKey: 'databasesView',
     searchKeys: ['name', 'repositoryUrl'],
   });
 
-  $: setItems(buildUnifiedItems());
+  $: setItems(buildUnifiedItems(data));
 
   // Modal state
   let showUnlinkModal = false;

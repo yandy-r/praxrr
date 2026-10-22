@@ -17,13 +17,13 @@
   import type { SyncTrigger } from '$db/queries/arrSync.ts';
   import type { SyncPreviewSummary } from '$sync/preview/types.ts';
   import { initEdit, update, clear } from '$lib/client/stores/dirty';
-  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
   import { subscribeInstanceSync, toSectionLiveStatus } from './liveSync.ts';
 
   type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
   type SyncSectionActions = {
-    saveSection: () => Promise<void>;
+    saveSection: () => Promise<boolean>;
     syncSection: () => Promise<void>;
   };
 
@@ -278,8 +278,10 @@
 
     isPreviewSectionActioning = true;
     try {
-      await actions.saveSection();
-      await actions.syncSection();
+      const saved = await actions.saveSection();
+      if (saved) {
+        await actions.syncSection();
+      }
     } finally {
       isPreviewSectionActioning = false;
     }
@@ -312,10 +314,10 @@
     return `Quality profiles require ${issues.join(' and ')}.`;
   })();
 
-  async function handleMetadataProfileSave() {
+  async function handleMetadataProfileSave(): Promise<boolean> {
     if (!metadataProfilesSupported) {
       alertStore.add('error', 'Metadata profile sync is only available for Lidarr instances');
-      return;
+      return false;
     }
 
     metadataProfileSaving = true;
@@ -326,12 +328,13 @@
       formData.set('trigger', metadataProfileTrigger);
       formData.set('cron', metadataProfileCron);
 
-      const response = await fetch('?/saveMetadataProfiles', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveMetadataProfiles',
+        formData,
+        'Failed to save metadata profiles sync config'
+      );
 
-      if (response.ok) {
+      if (result.ok) {
         alertStore.add('success', 'Metadata profiles sync config saved');
         metadataProfileSavedState = JSON.stringify({
           state: metadataProfileState,
@@ -339,12 +342,13 @@
           cronExpression: metadataProfileCron,
         });
         await invalidateAll().catch(() => undefined);
-      } else {
-        const payload = await extractFormError(response, 'Failed to save metadata profiles sync config');
-        alertStore.add('error', payload);
+        return true;
       }
+      alertStore.add('error', result.message);
+      return false;
     } catch {
       alertStore.add('error', 'Failed to save metadata profiles sync config');
+      return false;
     } finally {
       metadataProfileSaving = false;
     }
@@ -358,18 +362,13 @@
 
     metadataProfileSyncing = true;
     try {
-      const response = await fetch('?/syncMetadataProfiles', {
-        method: 'POST',
-        body: new FormData(),
-      });
+      const result = await submitFormAction('syncMetadataProfiles', new FormData(), 'Sync failed');
 
-      if (response.ok) {
-        const data = await response.json();
-        alertStore.add('info', data?.message ?? 'Sync queued');
+      if (result.ok) {
+        alertStore.add('info', typeof result.data.message === 'string' ? result.data.message : 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
-        const payload = await extractFormError(response, 'Sync failed');
-        alertStore.add('error', payload);
+        alertStore.add('error', result.message);
       }
     } catch {
       alertStore.add('error', 'Sync failed');

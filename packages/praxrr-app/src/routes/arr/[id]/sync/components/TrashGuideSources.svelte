@@ -1,7 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { deserialize } from '$app/forms';
-  import type { ActionResult } from '@sveltejs/kit';
+
   import { AlertTriangle, FilterX, Loader2, RefreshCw, Save, Search } from 'lucide-svelte';
   import { alertStore } from '$alerts/store.ts';
   import Badge from '$ui/badge/Badge.svelte';
@@ -14,7 +13,7 @@
     TrashGuideSyncTrigger,
   } from '$shared/trashguide/types.ts';
   import { parseUTC } from '$shared/utils/dates';
-  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
 
   type ViewState = 'loading' | 'server-error' | 'no-sources' | 'filtered-empty' | 'ready';
 
@@ -332,14 +331,14 @@
       }
       formData.set('selections', JSON.stringify(selections));
 
-      const response = await fetch('?/saveTrashGuideSource', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveTrashGuideSource',
+        formData,
+        'Failed to save TRaSH source sync config'
+      );
 
-      if (!response.ok) {
-        const message = await extractFormError(response, 'Failed to save TRaSH source sync config');
-        alertStore.add('error', message);
+      if (!result.ok) {
+        alertStore.add('error', result.message);
         return false;
       }
 
@@ -382,26 +381,18 @@
     try {
       const formData = new FormData();
       formData.set('sourceId', String(sourceId));
-      const response = await fetch('?/syncTrashGuideSource', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction('syncTrashGuideSource', formData, 'TRaSH sync failed');
 
-      // Form-action responses are wrapped in an ActionResult envelope; deserialize before reading data.
-      const result = deserialize(await response.text()) as ActionResult;
-      if (result.type === 'success') {
-        const view = (result.data as { view?: { sourceName?: string | null } } | undefined)?.view;
+      if (result.ok) {
+        const view = result.data.view as { sourceName?: string | null } | undefined;
         const label = view?.sourceName ?? null;
         alertStore.add(
           'success',
           label ? `TRaSH sync queued for "${label}" — open the source to follow the run` : 'TRaSH source sync queued'
         );
         await invalidateAll().catch(() => undefined);
-      } else if (result.type === 'failure') {
-        const error = (result.data as { error?: string } | undefined)?.error;
-        alertStore.add('error', error ?? 'TRaSH sync failed');
       } else {
-        alertStore.add('error', 'TRaSH sync failed');
+        alertStore.add('error', result.message);
       }
     } catch {
       alertStore.add('error', 'TRaSH sync failed');

@@ -3,7 +3,7 @@
   import SearchDropdown from '$ui/form/SearchDropdown.svelte';
   import SyncFooter from './SyncFooter.svelte';
   import { alertStore } from '$lib/client/alerts/store.ts';
-  import { extractFormError } from '$lib/client/utils/extractFormError.ts';
+  import { submitFormAction } from '$lib/client/utils/submitFormAction.ts';
   import type { SectionType } from '$sync/types.ts';
   import type { TrashGuideSourceArrType } from '$shared/trashguide/types.ts';
   import type { SectionLiveStatus } from '../liveSync.ts';
@@ -283,8 +283,8 @@
     };
   }
 
-  export async function saveSection() {
-    await handleSave();
+  export async function saveSection(): Promise<boolean> {
+    return await handleSave();
   }
 
   export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
@@ -367,19 +367,19 @@
       formData.set('mergeMediaManagementSelections', 'true');
       formData.set('selections', JSON.stringify(newSelections ?? []));
 
-      const response = await fetch('?/saveTrashGuideSource', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveTrashGuideSource',
+        formData,
+        'Failed to save TRaSH media management selections'
+      );
 
-      if (!response.ok) {
-        const payload = await extractFormError(response, 'Failed to save TRaSH media management selections');
-        throw new Error(payload);
+      if (!result.ok) {
+        throw new Error(result.message);
       }
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     saving = true;
     try {
       const formData = new FormData();
@@ -392,22 +392,25 @@
       formData.set('trigger', syncTrigger);
       formData.set('cron', cronExpression);
 
-      const response = await fetch('?/saveMediaManagement', {
-        method: 'POST',
-        body: formData,
-      });
+      const result = await submitFormAction(
+        'saveMediaManagement',
+        formData,
+        'Failed to save media management sync config'
+      );
 
-      if (!response.ok) {
-        alertStore.add('error', 'Failed to save media management sync config');
-        return;
+      if (!result.ok) {
+        alertStore.add('error', result.message);
+        return false;
       }
 
       await saveTrashGuideMediaManagementSelections();
       alertStore.add('success', 'Media management sync config saved');
       savedState = buildCurrentState();
       await invalidateAll().catch(() => undefined);
+      return true;
     } catch (error) {
       alertStore.add('error', error instanceof Error ? error.message : 'Failed to save media management sync config');
+      return false;
     } finally {
       saving = false;
     }
@@ -416,17 +419,13 @@
   async function handleSync() {
     syncing = true;
     try {
-      const response = await fetch('?/syncMediaManagement', {
-        method: 'POST',
-        body: new FormData(),
-      });
+      const result = await submitFormAction('syncMediaManagement', new FormData(), 'Sync failed');
 
-      if (response.ok) {
-        const data = await response.json();
-        alertStore.add('info', data?.message ?? 'Sync queued');
+      if (result.ok) {
+        alertStore.add('info', typeof result.data.message === 'string' ? result.data.message : 'Sync queued');
         await invalidateAll().catch(() => undefined);
       } else {
-        alertStore.add('error', 'Sync failed');
+        alertStore.add('error', result.message);
       }
     } catch {
       alertStore.add('error', 'Sync failed');
