@@ -69,11 +69,11 @@
     }
   }
 
-  export async function saveSection() {
-    await handleSave();
+  export async function saveSection(): Promise<boolean> {
+    return await handleSave();
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     saving = true;
     try {
       const formData = new FormData();
@@ -89,11 +89,13 @@
         // Update saved state to current
         savedState = JSON.stringify({ state, syncTrigger, cronExpression });
         await invalidateAll().catch(() => undefined);
-      } else {
-        alertStore.add('error', result.message);
+        return true;
       }
+      alertStore.add('error', result.message);
+      return false;
     } catch {
       alertStore.add('error', 'Failed to save delay profile sync config');
+      return false;
     } finally {
       saving = false;
     }

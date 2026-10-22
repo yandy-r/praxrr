@@ -283,8 +283,8 @@
     };
   }
 
-  export async function saveSection() {
-    await handleSave();
+  export async function saveSection(): Promise<boolean> {
+    return await handleSave();
   }
 
   export let syncTrigger: 'manual' | 'on_pull' | 'on_change' | 'schedule' = 'manual';
@@ -379,7 +379,7 @@
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     saving = true;
     try {
       const formData = new FormData();
@@ -400,15 +400,17 @@
 
       if (!result.ok) {
         alertStore.add('error', result.message);
-        return;
+        return false;
       }
 
       await saveTrashGuideMediaManagementSelections();
       alertStore.add('success', 'Media management sync config saved');
       savedState = buildCurrentState();
       await invalidateAll().catch(() => undefined);
+      return true;
     } catch (error) {
       alertStore.add('error', error instanceof Error ? error.message : 'Failed to save media management sync config');
+      return false;
     } finally {
       saving = false;
     }

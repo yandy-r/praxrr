@@ -23,7 +23,7 @@
   type SyncPreviewSection = 'qualityProfiles' | 'delayProfiles' | 'mediaManagement' | 'metadataProfiles';
 
   type SyncSectionActions = {
-    saveSection: () => Promise<void>;
+    saveSection: () => Promise<boolean>;
     syncSection: () => Promise<void>;
   };
 
@@ -278,8 +278,10 @@
 
     isPreviewSectionActioning = true;
     try {
-      await actions.saveSection();
-      await actions.syncSection();
+      const saved = await actions.saveSection();
+      if (saved) {
+        await actions.syncSection();
+      }
     } finally {
       isPreviewSectionActioning = false;
     }
@@ -312,10 +314,10 @@
     return `Quality profiles require ${issues.join(' and ')}.`;
   })();
 
-  async function handleMetadataProfileSave() {
+  async function handleMetadataProfileSave(): Promise<boolean> {
     if (!metadataProfilesSupported) {
       alertStore.add('error', 'Metadata profile sync is only available for Lidarr instances');
-      return;
+      return false;
     }
 
     metadataProfileSaving = true;
@@ -340,11 +342,13 @@
           cronExpression: metadataProfileCron,
         });
         await invalidateAll().catch(() => undefined);
-      } else {
-        alertStore.add('error', result.message);
+        return true;
       }
+      alertStore.add('error', result.message);
+      return false;
     } catch {
       alertStore.add('error', 'Failed to save metadata profiles sync config');
+      return false;
     } finally {
       metadataProfileSaving = false;
     }

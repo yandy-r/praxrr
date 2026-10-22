@@ -449,15 +449,15 @@
     }
   }
 
-  export async function saveSection() {
-    await handleSave();
+  export async function saveSection(): Promise<boolean> {
+    return await handleSave();
   }
 
   export async function syncSection() {
     await handleSync();
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     saving = true;
     try {
       const formData = new FormData();
@@ -473,15 +473,17 @@
 
       if (!result.ok) {
         alertStore.add('error', result.message);
-        return;
+        return false;
       }
 
       await saveTrashGuideQualityProfiles();
       alertStore.add('success', 'Quality profiles sync config saved');
       savedState = currentState;
       await invalidateAll().catch(() => undefined);
+      return true;
     } catch (error) {
       alertStore.add('error', error instanceof Error ? error.message : 'Failed to save quality profiles sync config');
+      return false;
     } finally {
       saving = false;
     }
