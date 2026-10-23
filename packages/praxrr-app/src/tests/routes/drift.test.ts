@@ -170,7 +170,7 @@ migratedTest(
     const neverChecked = body.instances.find((instance) => instance.instanceId === neverCheckedId);
     assert(neverChecked);
     assertEquals(neverChecked.status, 'never-checked');
-    assertEquals(neverChecked.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+    assertEquals(neverChecked.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
     assertEquals(neverChecked.checkedAt, null);
 
     const unreachable = body.instances.find((instance) => instance.instanceId === unreachableId);
@@ -212,13 +212,14 @@ migratedTest('GET /drift/{instanceId}: 200 never-checked for a valid but uncheck
   assertEquals(body.instanceId, id);
   assertEquals(body.arrType, 'radarr');
   assertEquals(body.status, 'never-checked');
-  assertEquals(body.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+  assertEquals(body.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
   assertEquals(body.drift, []);
   assertEquals(body.missing, []);
   assertEquals(body.unmanaged, []);
+  assertEquals(body.prune, []);
 });
 
-migratedTest('GET /drift/{instanceId}: 200 groups stored changes into drift / missing / unmanaged', async () => {
+migratedTest('GET /drift/{instanceId}: groups drift, missing, unmanaged and pending prunes', async () => {
   const id = createInstance({ name: 'Radarr Grouped Detail' });
 
   await driftStatusQueries.upsert({
@@ -235,6 +236,7 @@ migratedTest('GET /drift/{instanceId}: 200 groups stored changes into drift / mi
       driftChange({ name: 'Changed CF', action: 'update', category: 'drift', remoteId: 1 }),
       driftChange({ entityType: 'qualityProfile', name: 'Missing QP', action: 'create', category: 'missing' }),
       driftChange({ name: 'Unmanaged CF', action: 'delete', category: 'unmanaged', remoteId: 2 }),
+      driftChange({ name: 'Removed CF', action: 'delete', category: 'prune', remoteId: 3 }),
     ],
     checkedAt: new Date().toISOString(),
     contentCheckedAt: new Date().toISOString(),
@@ -246,13 +248,15 @@ migratedTest('GET /drift/{instanceId}: 200 groups stored changes into drift / mi
 
   const body = (await response.json()) as DriftDetailResponse;
   assertEquals(body.status, 'drifted');
-  assertEquals(body.counts, { drifted: 1, missing: 1, unmanaged: 1 });
+  assertEquals(body.counts, { drifted: 1, missing: 1, unmanaged: 1, prune: 1 });
   assertEquals(body.drift.length, 1);
   assertEquals(body.drift[0].name, 'Changed CF');
   assertEquals(body.missing.length, 1);
   assertEquals(body.missing[0].name, 'Missing QP');
   assertEquals(body.unmanaged.length, 1);
   assertEquals(body.unmanaged[0].name, 'Unmanaged CF');
+  assertEquals(body.prune.length, 1);
+  assertEquals(body.prune[0].name, 'Removed CF');
 });
 
 // ============================================================================

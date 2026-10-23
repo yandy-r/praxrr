@@ -552,6 +552,9 @@ CleanupScanRequest:
     instanceId:
       type: integer
       description: Arr instance ID
+    includeUnmanaged:
+      type: boolean
+      description: Include entities outside the ownership ledger. Defaults to false (managed entities only).
     action:
       type: string
       enum:
@@ -567,6 +570,9 @@ CleanupExecuteRequest:
     instanceId:
       type: integer
       description: Arr instance ID
+    includeUnmanaged:
+      type: boolean
+      description: Include entities outside the ownership ledger. Defaults to false (managed entities only).
     action:
       type: string
       enum:

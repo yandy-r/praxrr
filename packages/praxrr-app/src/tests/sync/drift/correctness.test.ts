@@ -112,7 +112,7 @@ Deno.test('drift: namespace-suffixed entity correlated as unchanged does NOT sur
   const result = aggregateDrift(preview, QP_SECTIONS);
 
   assertEquals(result.changes.length, 0);
-  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
   // The section ran and produced a successful diff — this is a real "no drift", not a
   // degraded/errored pass.
   assertEquals(result.comparedAny, true);
@@ -213,7 +213,7 @@ Deno.test('drift: an entity the diff engine resolved as unchanged (reordered-but
   const result = aggregateDrift(preview, QP_SECTIONS);
 
   assertEquals(result.changes.length, 0);
-  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
   assertEquals(result.comparedAny, true);
   assertEquals(driftSignature(result.changes), null);
 });

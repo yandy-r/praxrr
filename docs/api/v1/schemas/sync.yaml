@@ -477,6 +477,9 @@ EntityChange:
       type: integer
       nullable: true
       description: Arr entity ID when present
+    managed:
+      type: boolean
+      description: True only for deletes of entities Praxrr created (ownership ledger); only these execute on reviewed apply.
     fields:
       type: array
       description: Field-level diff; empty for unchanged/create where no deltas are tracked
@@ -489,7 +492,7 @@ SyncEntityOutcomeAction:
     - create
     - update
     - delete
-  description: The write attempted for an entity (intent). `delete` is reserved; no syncer emits it yet.
+  description: The write attempted for an entity (intent). `delete` is emitted only for reviewed prunes of ledger-owned entities.
 
 SyncEntityOutcomeStatus:
   type: string
@@ -579,6 +582,32 @@ QualityProfilesPreview:
       items:
         $ref: '#/EntityChange'
       description: Quality-profile change set
+
+    blockedPrunes:
+      type: array
+      description: Ledger-owned entities kept because pruning is blocked.
+      items:
+        $ref: '#/BlockedPrune'
+
+BlockedPrune:
+  type: object
+  required:
+    - entityType
+    - remoteId
+    - name
+    - reason
+  properties:
+    entityType:
+      type: string
+      enum:
+        - customFormat
+        - qualityProfile
+    remoteId:
+      type: integer
+    name:
+      type: string
+    reason:
+      type: string
 
 DelayProfilesPreview:
   type: object

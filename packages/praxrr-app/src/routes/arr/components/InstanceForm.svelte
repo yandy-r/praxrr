@@ -18,6 +18,7 @@
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
   import Button from '$ui/button/Button.svelte';
   import StickyCard from '$ui/card/StickyCard.svelte';
+  import Toggle from '$ui/toggle/Toggle.svelte';
   import {
     ARR_APP_OPTIONS,
     isArrAppType,
@@ -84,6 +85,7 @@
         apiKey: '', // Never pre-populate for security
         enabled: instance.enabled ? 'true' : 'false',
         tags: JSON.stringify(parseTags(instance.tags)),
+        pruneRemovedManaged: instance.prune_removed_managed === 1,
       });
     } else {
       // Treat create mode as clean until the user actually edits fields.
@@ -109,6 +111,7 @@
   $: apiKey = ($current.apiKey ?? '') as string;
   $: enabled = ($current.enabled ?? 'true') as string;
   $: tags = JSON.parse(($current.tags ?? '[]') as string) as string[];
+  $: pruneRemovedManaged = ($current.pruneRemovedManaged ?? false) as boolean;
   $: externalUrlValidationError = isValidExternalUrl(externalUrl) ? '' : 'External URL must be a valid http(s) URL.';
   $: lockCoreFields = mode === 'edit' && !canEditCoreConnectionFields;
   $: canSubmit =
@@ -364,6 +367,7 @@
         apiKey: '',
         enabled,
         tags: JSON.stringify(tags),
+        pruneRemovedManaged,
       });
     }
     if (form.error) {
@@ -523,6 +527,21 @@
       {#if enabled === 'false'}
         <p class="text-xs text-amber-600 dark:text-amber-400">Disabled instances are excluded from sync operations</p>
       {/if}
+      {#if mode === 'edit'}
+        <div class="space-y-2">
+          <Toggle
+            checked={pruneRemovedManaged}
+            label="Prune removed managed entities"
+            ariaLabel="Prune removed managed entities"
+            on:change={(event) => update('pruneRemovedManaged', event.detail)}
+          />
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            When on, reviewed syncs delete custom formats and quality profiles that Praxrr created and that are no
+            longer in your database. You always see deletions in the preview first. Items you made in Arr are never
+            touched.
+          </p>
+        </div>
+      {/if}
       <!-- URL Row -->
       <FormInput
         label="URL"
@@ -680,6 +699,9 @@
   <input type="hidden" name="api_key" value={lockCoreFields ? '' : apiKey} />
   <input type="hidden" name="enabled" value={enabled === 'true' ? '1' : '0'} />
   <input type="hidden" name="tags" value={JSON.stringify(tags)} />
+  {#if mode === 'edit'}
+    <input type="hidden" name="prune_removed_managed" value={pruneRemovedManaged ? '1' : '0'} />
+  {/if}
 </form>
 
 <!-- Hidden delete form (edit mode only) -->

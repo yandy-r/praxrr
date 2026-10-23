@@ -337,7 +337,7 @@ Deno.test('review binding fails closed on unsupported, non-finite, missing, and 
   );
 
   const binding = await buildBinding(['qualityProfiles']);
-  const unknownVersion = { ...binding, version: 2 };
+  const unknownVersion = { ...binding, version: 1 };
   assertEquals(compareReviewedEvidence(binding, unknownVersion, ['qualityProfiles']), {
     kind: 'invalidated',
     reason: 'unverifiable_review',

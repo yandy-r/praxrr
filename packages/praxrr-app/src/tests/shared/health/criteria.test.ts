@@ -53,6 +53,7 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
       drifted: 0,
       missing: 0,
       unmanaged: 0,
+      prune: 0,
       checkedAt: 't',
       contentCheckedAt: 't',
     },
@@ -106,6 +107,7 @@ Deno.test('drift: drifted with a fresh content check is penalized per entity, un
     drifted: 2,
     missing: 0,
     unmanaged: 10,
+    prune: 10,
     checkedAt: 't',
     contentCheckedAt: 't',
   };
@@ -120,6 +122,7 @@ Deno.test('drift: drifted but stale (no fresh content check) is null, not real d
     drifted: 5,
     missing: 5,
     unmanaged: 0,
+    prune: 0,
     checkedAt: 't',
     contentCheckedAt: null,
   };
@@ -134,6 +137,7 @@ Deno.test('drift: environment states (unreachable/never-checked) are null, not a
       drifted: 0,
       missing: 0,
       unmanaged: 0,
+      prune: 0,
       checkedAt: null,
       contentCheckedAt: null,
     };

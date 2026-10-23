@@ -14,6 +14,7 @@ import { logger } from '$logger/logger.ts';
 import type { SyncArrType } from '../mappings.ts';
 import type { SyncEntityOutcome } from '../types.ts';
 import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
+import { recordConfirmedWrite } from '../ownership/record.ts';
 import { type ArrCustomFormat, transformCustomFormatWithDiagnostics, type PcdCustomFormat } from './transformer.ts';
 
 /** A Lidarr custom format dropped before write because no conditions are supported (issue #232). */
@@ -232,6 +233,8 @@ export async function previewCustomFormats(
  * Sync custom formats for a single database to an arr instance.
  *
  * @param suffix - Zero-width namespace suffix for this database
+ * @param provenance - Source of this batch; when given, confirmed writes are recorded in the
+ *          ownership ledger.
  * @returns The PCD-name → arr-id map (used to resolve CF scores in quality
  *          profiles) plus one confirmed {@link SyncEntityOutcome} per attempted
  *          CF: `success` on a resolved create/update, `failed` on a thrown write
@@ -243,7 +246,8 @@ export async function syncCustomFormats(
   instanceId: number,
   instanceType: SyncArrType,
   pcdFormats: Map<string, PcdCustomFormat>,
-  suffix: string
+  suffix: string,
+  provenance?: { readonly sourceKind: 'pcd' | 'trash'; readonly databaseId: number }
 ): Promise<SyncCustomFormatsResult> {
   const { preparedFormats, pcdFormatIdMap, droppedFormats } = await buildCustomFormatPayloads(
     client,
@@ -284,6 +288,9 @@ export async function syncCustomFormats(
       payload: arrFormat,
     });
     outcomes.push(write.outcome);
+    if (provenance) {
+      recordConfirmedWrite(instanceId, write.outcome, { ...provenance, arrName: arrFormat.name });
+    }
     if (write.remoteId !== null) {
       pcdFormatIdMap.set(pcdName, write.remoteId);
     }

@@ -114,7 +114,51 @@ Deno.test('parseCleanupRequest: rejects malformed stale items', () => {
     request: {
       action: 'execute',
       instanceId: 1,
+      includeUnmanaged: false,
       scanResult: { staleCustomFormats: [{ id: 1, name: 'CF\u200B', strippedName: 'CF' }], staleQualityProfiles: [] },
     },
   });
+});
+
+Deno.test('parseCleanupRequest: includeUnmanaged defaults to false, accepts booleans, rejects non-booleans', () => {
+  const scan = parseCleanupRequest({ instanceId: 1, action: 'scan' });
+  assertEquals(scan, { ok: true, request: { action: 'scan', instanceId: 1, includeUnmanaged: false } });
+
+  const scanOptIn = parseCleanupRequest({ instanceId: 1, action: 'scan', includeUnmanaged: true });
+  assertEquals(scanOptIn, { ok: true, request: { action: 'scan', instanceId: 1, includeUnmanaged: true } });
+
+  const executeOptIn = parseCleanupRequest({
+    instanceId: 1,
+    action: 'execute',
+    includeUnmanaged: true,
+    scanResult: { staleCustomFormats: [], staleQualityProfiles: [] },
+  });
+  assertEquals(executeOptIn, {
+    ok: true,
+    request: {
+      action: 'execute',
+      instanceId: 1,
+      includeUnmanaged: true,
+      scanResult: { staleCustomFormats: [], staleQualityProfiles: [] },
+    },
+  });
+
+  for (const includeUnmanaged of ['true', 'false', 1, 0, null, [], {}]) {
+    const scanRejected = parseCleanupRequest({ instanceId: 1, action: 'scan', includeUnmanaged });
+    assertEquals(scanRejected, {
+      ok: false,
+      error: 'includeUnmanaged must be a boolean',
+    });
+
+    const executeRejected = parseCleanupRequest({
+      instanceId: 1,
+      action: 'execute',
+      includeUnmanaged,
+      scanResult: { staleCustomFormats: [], staleQualityProfiles: [] },
+    });
+    assertEquals(executeRejected, {
+      ok: false,
+      error: 'includeUnmanaged must be a boolean',
+    });
+  }
 });

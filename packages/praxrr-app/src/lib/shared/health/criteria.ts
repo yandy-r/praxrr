@@ -164,7 +164,7 @@ const drift: Criterion = {
         'Drift',
         score,
         config,
-        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged)`],
+        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged, ${d.prune} pending removal)`],
         [
           line(
             `${magnitude} managed entit${magnitude === 1 ? 'y has' : 'ies have'} drifted from the desired configuration`,

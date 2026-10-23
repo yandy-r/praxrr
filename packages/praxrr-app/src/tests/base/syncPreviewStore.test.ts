@@ -153,7 +153,7 @@ Deno.test('generation completion rejects malformed or mismatched bindings withou
   store.create(previewInput(id), NOW_MS);
   const unknownVersion = {
     ...(await binding()),
-    version: 2,
+    version: 1,
   } as unknown as SyncPreviewReviewBinding;
 
   assertThrows(

@@ -14,6 +14,7 @@
   export let section: SyncPreviewSection;
   export let level: NarrationLevel;
   export let defaultExpanded = false;
+  export let keptInUse = false;
 
   let expanded = defaultExpanded;
 
@@ -70,7 +71,25 @@
     },
   };
 
-  $: actionMeta = ACTION_META[entity.action];
+  const LEFT_IN_ARR: ActionMeta = {
+    icon: '-',
+    label: 'Left in Arr',
+    bgClass: 'bg-neutral-100 dark:bg-neutral-800',
+    textClass: 'text-neutral-600 dark:text-neutral-300',
+  };
+  const KEPT_IN_USE: ActionMeta = {
+    icon: '-',
+    label: 'Managed — kept (in use)',
+    bgClass: 'bg-amber-100 dark:bg-amber-900/30',
+    textClass: 'text-amber-800 dark:text-amber-200',
+  };
+
+  $: actionMeta =
+    entity.action === 'delete' && keptInUse
+      ? KEPT_IN_USE
+      : entity.action === 'delete' && entity.managed !== true
+        ? LEFT_IN_ARR
+        : ACTION_META[entity.action];
   $: narration = narrateEntityChange(entity, arrType, section, level);
   $: entityLabel = `${entity.name}`;
   $: entityMeta = `${entity.entityType}${entity.remoteId ? ` (id: ${entity.remoteId})` : ''}`;
@@ -110,6 +129,13 @@
           {actionMeta.icon}
           {actionMeta.label}
         </span>
+        {#if entity.action === 'delete' && entity.managed === true && !keptInUse}
+          <span
+            class="inline-flex shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300"
+          >
+            Managed — will be deleted
+          </span>
+        {/if}
       </div>
       <div class="text-xs text-neutral-500 dark:text-neutral-400">{entityMeta}</div>
     </div>

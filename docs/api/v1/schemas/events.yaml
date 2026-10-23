@@ -355,6 +355,7 @@ LiveDriftUpdatedEvent:
     - driftedCount
     - missingCount
     - unmanagedCount
+    - pruneCount
     - checkedAt
   additionalProperties: false
   description: A drift check result was persisted for an instance.
@@ -374,6 +375,9 @@ LiveDriftUpdatedEvent:
       type: integer
     unmanagedCount:
       type: integer
+    pruneCount:
+      type: integer
+      description: Ledger-owned entities pending reviewed removal (non-alerting).
     checkedAt:
       type: string
       format: date-time

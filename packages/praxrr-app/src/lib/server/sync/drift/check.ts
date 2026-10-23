@@ -158,7 +158,7 @@ function toDriftChange(section: SyncPreviewSection, entity: EntityChange): Drift
     entityType: entity.entityType,
     name: entity.name,
     action: entity.action,
-    category: ACTION_CATEGORY[entity.action],
+    category: entity.action === 'delete' && entity.managed === true ? 'prune' : ACTION_CATEGORY[entity.action],
     remoteId: entity.remoteId,
     fields: entity.fields,
   };
@@ -185,7 +185,7 @@ function collectSection(
 
 export interface AggregateResult {
   changes: DriftEntityChange[];
-  counts: { drifted: number; missing: number; unmanaged: number };
+  counts: { drifted: number; missing: number; unmanaged: number; prune: number };
   /** Every available section that ran errored (none produced a result). */
   allSectionsErrored: boolean;
   /** At least one available section errored (partial OR total failure). */
@@ -223,10 +223,11 @@ export function aggregateDrift(
     collectSection('metadataProfiles', [preview.metadataProfiles.profile], changes);
   }
 
-  const counts = { drifted: 0, missing: 0, unmanaged: 0 };
+  const counts = { drifted: 0, missing: 0, unmanaged: 0, prune: 0 };
   for (const change of changes) {
     if (change.category === 'drift') counts.drifted += 1;
     else if (change.category === 'missing') counts.missing += 1;
+    else if (change.category === 'prune') counts.prune += 1;
     else counts.unmanaged += 1;
   }
 
@@ -257,12 +258,16 @@ function stableHash(input: string): string {
 /**
  * Stable hash over the sorted ALERTING (update+create) changes only, each remoteId-qualified
  * so two same-named managed entities from different databases do not collapse. `null` when
- * there is no alerting drift. `delete`/`unchanged` are excluded so unmanaged churn never
- * perturbs the notification dedup key.
+ * there is no alerting drift. `prune` and `unmanaged` deletes are excluded so planned removal
+ * and unmanaged churn never perturb the notification dedup key.
  */
 export function driftSignature(changes: readonly DriftEntityChange[]): string | null {
   const tokens = changes
-    .filter((change) => change.action === 'update' || change.action === 'create')
+    .filter(
+      (change) =>
+        (change.category === 'drift' || change.category === 'missing') &&
+        (change.action === 'update' || change.action === 'create')
+    )
     .map(
       (change) => `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`
     )
@@ -322,7 +327,7 @@ export async function checkInstanceDrift(
     status,
     reason,
     detectedVersion: null,
-    counts: { drifted: 0, missing: 0, unmanaged: 0 },
+    counts: { drifted: 0, missing: 0, unmanaged: 0, prune: 0 },
     changes: [],
     driftSignature: null,
     checkedAt,

@@ -378,6 +378,7 @@ Deno.test('reviewed apply contract source, bundle, and generated declarations st
     '400': ['ErrorResponse'],
     '404': ['ErrorResponse'],
     '409': ['ErrorResponse'],
+    '403': ['ScopeForbiddenResponse'],
     '422': ['SyncPreviewApplyInvalidatedResponse', 'SyncPreviewApplyErrorResponse'],
     '500': ['SyncPreviewApplyResponse', 'SyncPreviewApplyErrorResponse'],
   } satisfies Record<string, string[]>;

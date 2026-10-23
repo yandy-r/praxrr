@@ -2663,12 +2663,16 @@ export interface components {
     CleanupScanRequest: {
       /** @description Arr instance ID */
       instanceId: number;
+      /** @description Include entities outside the ownership ledger. Defaults to false (managed entities only). */
+      includeUnmanaged?: boolean;
       /** @enum {string} */
       action: 'scan';
     };
     CleanupExecuteRequest: {
       /** @description Arr instance ID */
       instanceId: number;
+      /** @description Include entities outside the ownership ledger. Defaults to false (managed entities only). */
+      includeUnmanaged?: boolean;
       /** @enum {string} */
       action: 'execute';
       scanResult: components['schemas']['CleanupScanResult'];
@@ -2905,11 +2909,13 @@ export interface components {
       action: components['schemas']['SyncPreviewAction'];
       /** @description Arr entity ID when present */
       remoteId: number | null;
+      /** @description True only for deletes of entities Praxrr created (ownership ledger); only these execute on reviewed apply. */
+      managed?: boolean;
       /** @description Field-level diff; empty for unchanged/create where no deltas are tracked */
       fields: components['schemas']['FieldChange'][];
     };
     /**
-     * @description The write attempted for an entity (intent). `delete` is reserved; no syncer emits it yet.
+     * @description The write attempted for an entity (intent). `delete` is emitted only for reviewed prunes of ledger-owned entities.
      * @enum {string}
      */
     SyncEntityOutcomeAction: 'create' | 'update' | 'delete';
@@ -2960,6 +2966,15 @@ export interface components {
       customFormats: components['schemas']['EntityChange'][];
       /** @description Quality-profile change set */
       qualityProfiles: components['schemas']['EntityChange'][];
+      /** @description Ledger-owned entities kept because pruning is blocked. */
+      blockedPrunes?: components['schemas']['BlockedPrune'][];
+    };
+    BlockedPrune: {
+      /** @enum {string} */
+      entityType: 'customFormat' | 'qualityProfile';
+      remoteId: number;
+      name: string;
+      reason: string;
     };
     DelayProfilesPreview: {
       /** @enum {string} */
@@ -3061,8 +3076,10 @@ export interface components {
       drifted: number;
       /** @description Managed entities absent on the Arr (alerting). */
       missing: number;
-      /** @description Live Arr entities not in the resolved desired set (non-alerting). */
+      /** @description Live Arr entities not owned by Praxrr and not in the resolved desired set (non-alerting). */
       unmanaged: number;
+      /** @description Ledger-owned entities pending reviewed removal (non-alerting). */
+      prune: number;
     };
     DriftSettings: {
       enabled: boolean;
@@ -3078,8 +3095,11 @@ export interface components {
       /** @description Entity display name (namespace-stripped). */
       name: string;
       action: components['schemas']['SyncPreviewAction'];
-      /** @enum {string} */
-      category: 'drift' | 'missing' | 'unmanaged';
+      /**
+       * @description Changed or missing desired entities are alerting; unmanaged entities and pending managed prunes are non-alerting.
+       * @enum {string}
+       */
+      category: 'drift' | 'missing' | 'unmanaged' | 'prune';
       /** @description Live Arr entity id, or null for a create/missing entity. */
       remoteId: number | null;
       /** @description Field-level diff (`current` = live, `desired` = PCD); empty for create/delete. */
@@ -3127,8 +3147,10 @@ export interface components {
       drift: components['schemas']['DriftEntityChange'][];
       /** @description Managed entities absent on the Arr (action = create). */
       missing: components['schemas']['DriftEntityChange'][];
-      /** @description Live Arr entities not in the desired set (action = delete, non-alerting). */
+      /** @description Live Arr entities not owned by Praxrr and not in the desired set (action = delete, non-alerting). */
       unmanaged: components['schemas']['DriftEntityChange'][];
+      /** @description Ledger-owned entities pending reviewed removal (action = delete, non-alerting). */
+      prune: components['schemas']['DriftEntityChange'][];
     };
     DriftSettingsUpdateRequest: {
       enabled?: boolean;
@@ -3161,6 +3183,8 @@ export interface components {
       name: string;
       action: components['schemas']['SyncPreviewAction'];
       remoteId: number | null;
+      /** @description True only for deletes of entities Praxrr created (ownership ledger). Absent means the delete is not managed. */
+      managed?: boolean;
       /** @description Field-level diff (`current` = live/old, `desired` = PCD/new). */
       fields: components['schemas']['FieldChange'][];
     };
@@ -3529,6 +3553,8 @@ export interface components {
       driftedCount: number;
       missingCount: number;
       unmanagedCount: number;
+      /** @description Ledger-owned entities pending reviewed removal (non-alerting). */
+      pruneCount: number;
       /** Format: date-time */
       checkedAt: string;
     };
@@ -7698,6 +7724,18 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /**
+       * @description The sections being applied include a ledger-owned delete, and the API
+       *     token does not have the admin scope.
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
         };
       };
       /** @description Preview is missing, evicted, or no longer retained */

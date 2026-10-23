@@ -14,7 +14,7 @@ import type { SyncPreviewArrType, SyncPreviewSectionResult } from './preview/typ
 /**
  * The write that was attempted for an entity. Distinct from {@link SyncEntityOutcomeStatus}:
  * `action` is intent (what we tried to do), `status` is the terminal result of the Arr write.
- * `delete` is reserved for contract completeness; no section syncer currently emits it.
+ * `delete` is emitted only for reviewed prunes of ledger-owned entities.
  */
 export type SyncEntityAction = 'create' | 'update' | 'delete';
 

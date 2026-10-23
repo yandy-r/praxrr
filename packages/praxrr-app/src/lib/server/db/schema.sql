@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS migrations (
 -- ==============================================================================
 -- TABLE: arr_instances
 -- Purpose: Store configuration for *arr application instances (Radarr, Sonarr, etc.)
--- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts, 20260221_encrypt_arr_api_keys.ts
+-- Migration: 001_create_arr_instances.ts, 20260216_add_arr_instance_external_url.ts, 20260220_add_arr_instance_source.ts, 20260221_encrypt_arr_api_keys.ts, 20261025_create_arr_managed_entities.ts
 -- ==============================================================================
 
 CREATE TABLE arr_instances (
@@ -38,6 +38,7 @@ CREATE TABLE arr_instances (
     tags TEXT,                              -- JSON array of tags (e.g., '["movies","4k"]')
     enabled INTEGER NOT NULL DEFAULT 1,     -- 1=enabled, 0=disabled
     source TEXT NOT NULL DEFAULT 'ui',      -- Provenance: ui or env
+    prune_removed_managed INTEGER NOT NULL DEFAULT 0 CHECK (prune_removed_managed IN (0, 1)),
 
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1110,4 +1111,24 @@ CREATE TABLE canary_settings (
     default_partial_policy     TEXT NOT NULL DEFAULT 'gate' CHECK (default_partial_policy IN ('gate', 'abort')),
     created_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- TABLE: arr_managed_entities
+-- Purpose: Track custom formats and quality profiles Praxrr created in each Arr instance
+-- Migration: 20261025_create_arr_managed_entities.ts (no backfill of existing Arr entities)
+-- ==============================================================================
+
+CREATE TABLE arr_managed_entities (
+    instance_id INTEGER NOT NULL REFERENCES arr_instances(id) ON DELETE CASCADE,
+    section TEXT NOT NULL CHECK (section = 'qualityProfiles'),
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('customFormat', 'qualityProfile')),
+    remote_id INTEGER NOT NULL CHECK (remote_id > 0),
+    arr_name TEXT NOT NULL,
+    pcd_name TEXT NOT NULL,
+    database_id INTEGER NOT NULL CHECK (database_id > 0),
+    source_kind TEXT NOT NULL CHECK (source_kind IN ('pcd', 'trash')),
+    first_synced_at TEXT NOT NULL,
+    last_synced_at TEXT NOT NULL,
+    PRIMARY KEY (instance_id, entity_type, remote_id)
 );

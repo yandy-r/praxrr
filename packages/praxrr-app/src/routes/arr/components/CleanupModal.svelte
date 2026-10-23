@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Loader2, AlertTriangle, Check } from 'lucide-svelte';
   import Modal from '$ui/modal/Modal.svelte';
+  import Toggle from '$ui/toggle/Toggle.svelte';
 
   export let open = false;
   export let instanceId: number;
@@ -18,6 +19,8 @@
   type Phase = 'idle' | 'scanning' | 'preview' | 'executing' | 'results';
 
   let phase: Phase = 'idle';
+  let scanRequestId = 0;
+  let includeUnmanaged = false;
   let scanResult: ScanResult | null = null;
   let deleteResult: DeleteResult | null = null;
   let error: string | null = null;
@@ -48,9 +51,13 @@
     scanResult = null;
     deleteResult = null;
     error = null;
+    includeUnmanaged = false;
+    scanRequestId += 1;
   }
 
   async function scan() {
+    const requestId = ++scanRequestId;
+    const scopeUnmanaged = includeUnmanaged;
     phase = 'scanning';
     error = null;
 
@@ -58,8 +65,9 @@
       const res = await fetch('/api/v1/arr/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instanceId, action: 'scan' }),
+        body: JSON.stringify({ instanceId, action: 'scan', includeUnmanaged: scopeUnmanaged }),
       });
+      if (requestId !== scanRequestId) return;
 
       if (!res.ok) {
         const data = await res.json();
@@ -69,6 +77,7 @@
       scanResult = await res.json();
       phase = 'preview';
     } catch (err) {
+      if (requestId !== scanRequestId) return;
       error = err instanceof Error ? err.message : 'Scan failed';
       phase = 'preview';
     }
@@ -82,7 +91,7 @@
       const res = await fetch('/api/v1/arr/cleanup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instanceId, action: 'execute', scanResult }),
+        body: JSON.stringify({ instanceId, action: 'execute', includeUnmanaged, scanResult }),
       });
 
       if (!res.ok) {
@@ -96,6 +105,12 @@
       error = err instanceof Error ? err.message : 'Cleanup failed';
       phase = 'results';
     }
+  }
+
+  function setIncludeUnmanaged(checked: boolean) {
+    if (checked === includeUnmanaged || phase === 'executing') return;
+    includeUnmanaged = checked;
+    if (open && phase !== 'idle') void scan();
   }
 
   function handleConfirm() {
@@ -124,6 +139,18 @@
   on:cancel={handleCancel}
 >
   <div slot="body">
+    <div class="mb-4 space-y-2">
+      <Toggle
+        checked={includeUnmanaged}
+        label="Include unmanaged items"
+        ariaLabel="Include unmanaged items"
+        disabled={phase === 'scanning' || phase === 'executing'}
+        on:change={(event) => setIncludeUnmanaged(event.detail)}
+      />
+      <p class="text-xs text-neutral-500 dark:text-neutral-400">
+        Only Praxrr-managed items are shown until this is on.
+      </p>
+    </div>
     {#if error}
       <!-- Error state -->
       <div
@@ -145,13 +172,25 @@
       <!-- Nothing to clean -->
       <div class="flex flex-col items-center gap-3 py-8">
         <Check size={32} class="text-emerald-500" />
-        <p class="text-sm text-neutral-600 dark:text-neutral-400">No stale configs found. Everything is clean.</p>
+        <p class="max-w-md text-center text-sm text-neutral-600 dark:text-neutral-400">
+          {#if includeUnmanaged}
+            No stale configs found. Everything is clean.
+          {:else}
+            No stale configs found. Only Praxrr-managed items are shown. Turn on Include unmanaged items to scan configs
+            you created in Arr.
+          {/if}
+        </p>
       </div>
     {:else if phase === 'preview' && scanResult}
       <!-- Preview summary -->
       <div class="space-y-3">
         <p class="text-sm text-neutral-600 dark:text-neutral-400">
-          Found stale configs that are no longer in your sync selections:
+          {#if includeUnmanaged}
+            Found stale configs that are no longer in your sync selections, including ones you created in Arr:
+          {:else}
+            Found Praxrr-managed configs that are no longer in your sync selections. Only Praxrr-managed items are
+            shown.
+          {/if}
         </p>
         <div class="space-y-2">
           {#if scanResult.staleCustomFormats.length > 0}

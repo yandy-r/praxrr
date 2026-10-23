@@ -3,6 +3,9 @@
  * custom-format id, never by bare name (YAN-445 / GitHub #343).
  */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/assert';
+import { config } from '$config';
+import { db } from '$db/db.ts';
+import { runMigrations } from '$db/migrations.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrCustomFormat, ArrQualityProfilePayload, QualityProfileFormatItem } from '$arr/types.ts';
 import { previewCustomFormats } from '$sync/customFormats/syncer.ts';
@@ -11,6 +14,31 @@ import type { SyncArrType } from '$sync/mappings.ts';
 import type { SyncPreviewPreparedExecutionContext } from '$sync/preview/types.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
+
+/** Preview reads the instance prune policy, so every test here needs a migrated app DB. */
+function dbTest(name: string, fn: () => Promise<void> | void): void {
+  Deno.test({
+    name,
+    sanitizeResources: false,
+    sanitizeOps: false,
+    fn: async () => {
+      const originalBasePath = config.paths.base;
+      const tempBasePath = `/tmp/praxrr-tests/qp-format-remap-${crypto.randomUUID()}`;
+      await Deno.mkdir(tempBasePath, { recursive: true });
+      db.close();
+      config.setBasePath(tempBasePath);
+      try {
+        await db.initialize();
+        await runMigrations();
+        await fn();
+      } finally {
+        db.close();
+        config.setBasePath(originalBasePath);
+        await Deno.remove(tempBasePath, { recursive: true }).catch(() => {});
+      }
+    },
+  });
+}
 
 const SUFFIX_A = '\u200B';
 const SUFFIX_B = '\u200C';
@@ -138,7 +166,7 @@ function scoreOf(items: readonly QualityProfileFormatItem[], id: number): number
   return items.filter((item) => item.format === id).map((item) => item.score);
 }
 
-Deno.test('reviewed QP apply keeps an unmanaged same-name CF distinct from the managed CF', async () => {
+dbTest('reviewed QP apply keeps an unmanaged same-name CF distinct from the managed CF', async () => {
   const recorded = emptyRecorded();
   const client = makeClient(
     [
@@ -162,7 +190,7 @@ Deno.test('reviewed QP apply keeps an unmanaged same-name CF distinct from the m
   assertEquals(scoreOf(items, 4), [0]);
 });
 
-Deno.test('reviewed QP apply resolves a planned synthetic CF id to the created remote id', async () => {
+dbTest('reviewed QP apply resolves a planned synthetic CF id to the created remote id', async () => {
   const recorded = emptyRecorded();
   const client = makeClient([{ id: 4, name: 'Existing', specifications: [] }], recorded);
   const syncer = makeSyncer(client, [
@@ -189,7 +217,7 @@ Deno.test('reviewed QP apply resolves a planned synthetic CF id to the created r
 });
 
 for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
-  Deno.test(`reviewed ${arrType} QP apply keeps synthetic ids unique across batches`, async () => {
+  dbTest(`reviewed ${arrType} QP apply keeps synthetic ids unique across batches`, async () => {
     const recorded = emptyRecorded();
     const client = makeClient([], recorded);
     const syncer = makeSyncer(
@@ -228,7 +256,7 @@ for (const arrType of ['radarr', 'sonarr', 'lidarr'] as const) {
   });
 }
 
-Deno.test('reviewed QP apply fails only the profile that scores a CF whose create failed', async () => {
+dbTest('reviewed QP apply fails only the profile that scores a CF whose create failed', async () => {
   const recorded = emptyRecorded();
   const client = makeClient([], recorded, new Set([`Broken${SUFFIX_A}`]));
   const syncer = makeSyncer(client, [
@@ -293,7 +321,7 @@ function reviewedBatch(databaseId: number, suffix: string, formatName: string) {
   };
 }
 
-Deno.test('reviewed QP apply rejects a plan that reuses a synthetic CF id before any write', async () => {
+dbTest('reviewed QP apply rejects a plan that reuses a synthetic CF id before any write', async () => {
   const recorded = emptyRecorded();
   const syncer = new QualityProfileSyncer(makeClient([], recorded), 7, 'Reviewed', 'radarr');
   const context: SyncPreviewPreparedExecutionContext = {
@@ -308,6 +336,7 @@ Deno.test('reviewed QP apply rejects a plan that reuses a synthetic CF id before
     materialPlan: {
       arrType: 'radarr',
       batchOrder: [`pcd:41:DB 41:${SUFFIX_A}`, `pcd:42:DB 42:${SUFFIX_B}`],
+      prunes: [],
     },
     currentGuards: { customFormats: [], qualityProfiles: [] },
   };
@@ -320,7 +349,7 @@ Deno.test('reviewed QP apply rejects a plan that reuses a synthetic CF id before
   assertEquals(recorded, emptyRecorded());
 });
 
-Deno.test('previewCustomFormats rejects a non-negative first synthetic id', async () => {
+dbTest('previewCustomFormats rejects a non-negative first synthetic id', async () => {
   await assertRejects(
     () => previewCustomFormats(makeClient([], emptyRecorded()), 7, 'radarr', new Map(), SUFFIX_A, 0),
     Error,

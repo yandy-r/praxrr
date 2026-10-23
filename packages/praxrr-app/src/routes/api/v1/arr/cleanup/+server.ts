@@ -12,10 +12,13 @@ import type { ArrType } from '$utils/arr/types.ts';
  *
  * Scan or execute cleanup of stale namespace-suffixed configs.
  *
- * Body (scan):    { instanceId: number, action: 'scan' }
- * Body (execute): { instanceId: number, action: 'execute', scanResult: CleanupScanResult }
+ * Body (scan):    { instanceId: number, action: 'scan', includeUnmanaged?: boolean }
+ * Body (execute): { instanceId: number, action: 'execute', includeUnmanaged?: boolean, scanResult: CleanupScanResult }
  *
- * Execute re-scans server-side and deletes only requested items that are still stale.
+ * Execute re-scans server-side and deletes only requested items that are still stale
+ * under the same scope. By default only entities recorded in the ownership ledger
+ * (created by Praxrr) are considered; `includeUnmanaged: true` opts into the legacy
+ * everything-unexpected-is-stale scope.
  */
 export const POST: RequestHandler = async ({ request }) => {
   let body: unknown;
@@ -44,10 +47,17 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     if (cleanupRequest.action === 'scan') {
-      return json(await scanForStaleItems(client, cleanupRequest.instanceId));
+      return json(await scanForStaleItems(client, cleanupRequest.instanceId, cleanupRequest.includeUnmanaged));
     }
 
-    return json(await executeCleanup(client, cleanupRequest.instanceId, cleanupRequest.scanResult));
+    return json(
+      await executeCleanup(
+        client,
+        cleanupRequest.instanceId,
+        cleanupRequest.scanResult,
+        cleanupRequest.includeUnmanaged
+      )
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Cleanup failed';
     return json({ error: message }, { status: 500 });

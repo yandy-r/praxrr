@@ -124,6 +124,8 @@ export interface DriftFacts {
   readonly missing: number;
   /** Unmanaged (extra-on-Arr) entities — informational only; never lowers the drift sub-score. */
   readonly unmanaged: number;
+  /** Ledger-owned pending removals — informational only; never lowers the drift sub-score. */
+  readonly prune: number;
   readonly checkedAt: string | null;
   /** Freshest successful content diff; `null` => counts are not from a fresh check (drift then skips). */
   readonly contentCheckedAt: string | null;

@@ -35,9 +35,10 @@ export type DriftReason =
  * How an `EntityChange.action` is classified for drift:
  * - `drift`     (action `update`)  — a managed entity whose fields diverged on the Arr (ALERTING)
  * - `missing`   (action `create`)  — a managed entity absent on the Arr (ALERTING)
- * - `unmanaged` (action `delete`)  — a live Arr entity not in the resolved desired set (NON-ALERTING)
+ * - `unmanaged` (action `delete`)  — a live Arr entity not owned by Praxrr (NON-ALERTING)
+ * - `prune`     (managed `delete`) — a ledger-owned entity pending reviewed removal (NON-ALERTING)
  */
-export type DriftCategory = 'drift' | 'missing' | 'unmanaged';
+export type DriftCategory = 'drift' | 'missing' | 'unmanaged' | 'prune';
 
 /**
  * One non-`unchanged` entity difference, persisted verbatim in the `changes` JSON blob.
@@ -59,6 +60,7 @@ export interface DriftCounts {
   readonly drifted: number;
   readonly missing: number;
   readonly unmanaged: number;
+  readonly prune: number;
 }
 
 /**

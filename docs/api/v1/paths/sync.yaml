@@ -199,6 +199,14 @@ previewApply:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: |
+          The sections being applied include a ledger-owned delete, and the API
+          token does not have the admin scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
       '422':
         description: Preview age policy blocked apply or reviewed evidence was invalidated before writes
         content:

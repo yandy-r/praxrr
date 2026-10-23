@@ -19,7 +19,8 @@ import type {
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import type { ArrInstanceCredentialIdentity } from '$arr/arrInstanceClients.ts';
 
-export const SYNC_PREVIEW_REVIEW_BINDING_VERSION = 1 as const;
+// Delete rows can now execute; bindings reviewed under the non-executable contract are invalid.
+export const SYNC_PREVIEW_REVIEW_BINDING_VERSION = 2 as const;
 
 const HASH_DOMAIN = 'praxrr.sync-preview.review-binding';
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;

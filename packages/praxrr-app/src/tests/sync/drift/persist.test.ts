@@ -222,7 +222,7 @@ function driftResult(overrides: Partial<InstanceDriftResult> = {}): InstanceDrif
     status: 'drifted',
     reason: null,
     detectedVersion: '5.0.0',
-    counts: { drifted: 1, missing: 0, unmanaged: 0 },
+    counts: { drifted: 1, missing: 0, unmanaged: 0, prune: 0 },
     changes: [],
     driftSignature: 'sig-a',
     checkedAt: '2026-07-08T10:00:00.000Z',
@@ -238,7 +238,7 @@ function priorDetail(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftI
     arrType: 'radarr',
     status: 'drifted',
     reason: null,
-    counts: { drifted: 1, missing: 0, unmanaged: 0 },
+    counts: { drifted: 1, missing: 0, unmanaged: 0, prune: 0 },
     driftSignature: 'sig-a',
     notifiedSignature: 'sig-a',
     detectedVersion: '5.0.0',
@@ -284,7 +284,11 @@ Deno.test('shouldNotify never fires on a non-drifted status', () => {
   assertEquals(
     shouldNotify(
       priorDetail(),
-      driftResult({ status: 'in-sync', driftSignature: null, counts: { drifted: 0, missing: 0, unmanaged: 2 } })
+      driftResult({
+        status: 'in-sync',
+        driftSignature: null,
+        counts: { drifted: 0, missing: 0, unmanaged: 2, prune: 0 },
+      })
     ),
     false
   );
@@ -459,6 +463,25 @@ migratedTest('drift emit advances notified_signature; unmanaged-only never notif
   assertExists(unmanagedRow);
   assertEquals(unmanagedRow.counts.unmanaged, 1);
   assertEquals(unmanagedRow.notifiedSignature, null);
+});
+
+migratedTest('managed prunes persist counts without drift notification', async () => {
+  const instance = createInstance('Radarr Prune');
+  const result = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [{ ...DELETE_ENTITY, managed: true }], '2026-07-08T10:00:00.000Z')
+    )
+  );
+  assertEquals(result.status, 'in-sync');
+  assertEquals(result.counts.prune, 1);
+  assertEquals(result.driftSignature, null);
+  await flush();
+  const row = driftStatusQueries.getById(instance.id);
+  assertExists(row);
+  assertEquals(row.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 1 });
+  assertEquals(row.changes[0].category, 'prune');
+  assertEquals(row.notifiedSignature, null);
 });
 
 migratedTest('a changed drift set re-advances notified_signature after a new emit', async () => {

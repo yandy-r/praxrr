@@ -2196,6 +2196,16 @@
               }
             }
           },
+          "403": {
+            "description": "The sections being applied include a ledger-owned delete, and the API\ntoken does not have the admin scope.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Preview is missing, evicted, or no longer retained",
             "content": {
@@ -8652,6 +8662,10 @@
             "type": "integer",
             "description": "Arr instance ID"
           },
+          "includeUnmanaged": {
+            "type": "boolean",
+            "description": "Include entities outside the ownership ledger. Defaults to false (managed entities only)."
+          },
           "action": {
             "type": "string",
             "enum": ["scan"]
@@ -8665,6 +8679,10 @@
           "instanceId": {
             "type": "integer",
             "description": "Arr instance ID"
+          },
+          "includeUnmanaged": {
+            "type": "boolean",
+            "description": "Include entities outside the ownership ledger. Defaults to false (managed entities only)."
           },
           "action": {
             "type": "string",
@@ -9274,6 +9292,10 @@
             "nullable": true,
             "description": "Arr entity ID when present"
           },
+          "managed": {
+            "type": "boolean",
+            "description": "True only for deletes of entities Praxrr created (ownership ledger); only these execute on reviewed apply."
+          },
           "fields": {
             "type": "array",
             "description": "Field-level diff; empty for unchanged/create where no deltas are tracked",
@@ -9286,7 +9308,7 @@
       "SyncEntityOutcomeAction": {
         "type": "string",
         "enum": ["create", "update", "delete"],
-        "description": "The write attempted for an entity (intent). `delete` is reserved; no syncer emits it yet."
+        "description": "The write attempted for an entity (intent). `delete` is emitted only for reviewed prunes of ledger-owned entities."
       },
       "SyncEntityOutcomeStatus": {
         "type": "string",
@@ -9377,6 +9399,32 @@
               "$ref": "#/components/schemas/EntityChange"
             },
             "description": "Quality-profile change set"
+          },
+          "blockedPrunes": {
+            "type": "array",
+            "description": "Ledger-owned entities kept because pruning is blocked.",
+            "items": {
+              "$ref": "#/components/schemas/BlockedPrune"
+            }
+          }
+        }
+      },
+      "BlockedPrune": {
+        "type": "object",
+        "required": ["entityType", "remoteId", "name", "reason"],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": ["customFormat", "qualityProfile"]
+          },
+          "remoteId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -9657,7 +9705,7 @@
       },
       "DriftCounts": {
         "type": "object",
-        "required": ["drifted", "missing", "unmanaged"],
+        "required": ["drifted", "missing", "unmanaged", "prune"],
         "properties": {
           "drifted": {
             "type": "integer",
@@ -9672,7 +9720,12 @@
           "unmanaged": {
             "type": "integer",
             "minimum": 0,
-            "description": "Live Arr entities not in the resolved desired set (non-alerting)."
+            "description": "Live Arr entities not owned by Praxrr and not in the resolved desired set (non-alerting)."
+          },
+          "prune": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Ledger-owned entities pending reviewed removal (non-alerting)."
           }
         }
       },
@@ -9746,7 +9799,8 @@
           },
           "category": {
             "type": "string",
-            "enum": ["drift", "missing", "unmanaged"]
+            "enum": ["drift", "missing", "unmanaged", "prune"],
+            "description": "Changed or missing desired entities are alerting; unmanaged entities and pending managed prunes are non-alerting."
           },
           "remoteId": {
             "type": "integer",
@@ -9903,7 +9957,8 @@
           "counts",
           "drift",
           "missing",
-          "unmanaged"
+          "unmanaged",
+          "prune"
         ],
         "properties": {
           "instanceId": {
@@ -9980,7 +10035,14 @@
           },
           "unmanaged": {
             "type": "array",
-            "description": "Live Arr entities not in the desired set (action = delete, non-alerting).",
+            "description": "Live Arr entities not owned by Praxrr and not in the desired set (action = delete, non-alerting).",
+            "items": {
+              "$ref": "#/components/schemas/DriftEntityChange"
+            }
+          },
+          "prune": {
+            "type": "array",
+            "description": "Ledger-owned entities pending reviewed removal (action = delete, non-alerting).",
             "items": {
               "$ref": "#/components/schemas/DriftEntityChange"
             }
@@ -10067,6 +10129,10 @@
           "remoteId": {
             "type": "integer",
             "nullable": true
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "True only for deletes of entities Praxrr created (ownership ledger). Absent means the delete is not managed."
           },
           "fields": {
             "type": "array",
@@ -11044,6 +11110,7 @@
           "driftedCount",
           "missingCount",
           "unmanagedCount",
+          "pruneCount",
           "checkedAt"
         ],
         "additionalProperties": false,
@@ -11070,6 +11137,10 @@
           },
           "unmanagedCount": {
             "type": "integer"
+          },
+          "pruneCount": {
+            "type": "integer",
+            "description": "Ledger-owned entities pending reviewed removal (non-alerting)."
           },
           "checkedAt": {
             "type": "string",

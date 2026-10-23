@@ -69,6 +69,9 @@ SyncEntityChange:
     remoteId:
       type: integer
       nullable: true
+    managed:
+      type: boolean
+      description: True only for deletes of entities Praxrr created (ownership ledger). Absent means the delete is not managed.
     fields:
       type: array
       description: Field-level diff (`current` = live/old, `desired` = PCD/new).

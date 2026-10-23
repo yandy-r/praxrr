@@ -5,9 +5,15 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
 import { syncHistorySettingsQueries } from '$db/queries/syncHistorySettings.ts';
-import { deriveSyncHistoryStatus, isSyncHistoryEnabled, recordSyncHistory } from '$sync/syncHistory/record.ts';
+import {
+  deriveSyncHistoryStatus,
+  flattenSyncPreviewChanges,
+  isSyncHistoryEnabled,
+  recordSyncHistory,
+} from '$sync/syncHistory/record.ts';
 import type {
   SyncEntityChange,
+  SyncEntityOutcome,
   SyncHistoryInput,
   SyncOperationStatus,
   SyncPreviewArrType,
@@ -288,4 +294,83 @@ Deno.test('deriveSyncHistoryStatus discriminates partial vs failed on section su
 
   // Mirror: a single failed section reporting items>0 is FAILED, not partial.
   assertEquals(deriveSyncHistoryStatus(1, 1, [section('failed', 5)]), 'failed');
+});
+
+migratedTest('recordSyncHistory persists delete outcomes with the managed flag preserved in changes', () => {
+  const instanceId = seedInstance('radarr');
+
+  const managedDeleteChange: SyncEntityChange = {
+    section: 'qualityProfiles',
+    category: 'customFormats',
+    entityType: 'custom_format',
+    name: 'Orphaned Format',
+    action: 'delete',
+    remoteId: 42,
+    managed: true,
+    fields: [],
+  };
+  const deleteOutcome: SyncEntityOutcome = {
+    section: 'qualityProfiles',
+    arrType: 'radarr',
+    entityType: 'customFormat',
+    name: 'Orphaned Format',
+    action: 'delete',
+    status: 'success',
+    remoteId: '42',
+    reason: null,
+  };
+
+  const id = recordSyncHistory(
+    makeInput(instanceId, 'radarr', {
+      changes: [managedDeleteChange],
+      entityOutcomes: [deleteOutcome],
+    })
+  );
+  assertExists(id);
+
+  const detail = syncHistoryQueries.getById(id);
+  assertExists(detail);
+
+  // The delete change survives the JSON round trip with `managed` intact.
+  assertEquals(detail.changes.length, 1);
+  assertEquals(detail.changes[0].action, 'delete');
+  assertEquals(detail.changes[0].managed, true);
+
+  // The confirmed delete outcome persists verbatim.
+  assertEquals(detail.entityOutcomes.length, 1);
+  assertEquals(detail.entityOutcomes[0], deleteOutcome);
+});
+
+Deno.test('flattenSyncPreviewChanges keeps delete changes and the managed flag', () => {
+  const preview = {
+    qualityProfiles: {
+      customFormats: [
+        {
+          entityType: 'custom_format' as const,
+          name: 'Orphaned Format',
+          action: 'delete' as const,
+          remoteId: 42,
+          managed: true,
+          fields: [],
+        },
+        {
+          entityType: 'custom_format' as const,
+          name: 'Kept Format',
+          action: 'unchanged' as const,
+          remoteId: 7,
+          fields: [],
+        },
+      ],
+      qualityProfiles: [],
+    },
+  };
+
+  const changes = flattenSyncPreviewChanges(preview as never);
+
+  // Delete survives; unchanged is filtered out.
+  assertEquals(changes.length, 1);
+  assertEquals(changes[0].action, 'delete');
+  assertEquals(changes[0].managed, true);
+  assertEquals(changes[0].section, 'qualityProfiles');
+  assertEquals(changes[0].category, 'customFormats');
 });

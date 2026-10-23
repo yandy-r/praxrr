@@ -148,6 +148,7 @@ export const actions: Actions = {
     const externalUrl = parseOptionalAbsoluteHttpUrl(rawExternalUrl);
     const tagsJson = formData.get('tags')?.toString() || '';
     const enabled = formData.get('enabled')?.toString() === '1';
+    const pruneRemovedManaged = formData.get('prune_removed_managed')?.toString() === '1';
     let encryptedApiKey: Awaited<ReturnType<typeof encryptArrInstanceApiKey>> | undefined;
 
     // Validate required fields
@@ -221,6 +222,7 @@ export const actions: Actions = {
           apiKey: isEnvManaged ? undefined : apiKey,
           tags,
           enabled,
+          pruneRemovedManaged,
         },
         encryptedApiKey
           ? {

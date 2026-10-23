@@ -137,12 +137,13 @@ async function collectDrift(lines: string[]): Promise<void> {
       )
     );
   }
-  lines.push(header('praxrr_drift_items', 'Drifted/missing/unmanaged item counts per instance.', 'gauge'));
+  lines.push(header('praxrr_drift_items', 'Drifted/missing/unmanaged/prune item counts per instance.', 'gauge'));
   for (const row of rows) {
     const base = { instance_id: String(row.arrInstanceId), arr_type: row.arrType };
     lines.push(sample('praxrr_drift_items', { ...base, kind: 'drifted' }, row.counts.drifted));
     lines.push(sample('praxrr_drift_items', { ...base, kind: 'missing' }, row.counts.missing));
     lines.push(sample('praxrr_drift_items', { ...base, kind: 'unmanaged' }, row.counts.unmanaged));
+    lines.push(sample('praxrr_drift_items', { ...base, kind: 'prune' }, row.counts.prune));
   }
 }
 

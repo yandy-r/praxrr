@@ -243,6 +243,120 @@ migratedTest('recordCanaryOutcome atomically round-trips available zero-change e
   }
 });
 
+migratedTest('remaining preview round-trips managed deletes and blocked prunes', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const preview = zeroChangePreview(target);
+  const evidence: CanaryRemainingPreviewEvidence = {
+    version: 1,
+    availability: 'available',
+    generatedAt: '2026-07-08T10:01:00.000Z',
+    previews: [
+      {
+        ...preview,
+        qualityProfiles: {
+          section: 'qualityProfiles',
+          customFormats: [
+            {
+              entityType: 'customFormat',
+              name: 'Old CF',
+              action: 'delete',
+              remoteId: 9,
+              managed: true,
+              fields: [],
+            },
+            {
+              entityType: 'customFormat',
+              name: 'Kept',
+              action: 'unchanged',
+              remoteId: 10,
+              managed: false,
+              fields: [],
+            },
+          ],
+          qualityProfiles: [
+            {
+              entityType: 'qualityProfile',
+              name: 'Old HD',
+              action: 'delete',
+              remoteId: 3,
+              managed: true,
+              fields: [],
+            },
+          ],
+          blockedPrunes: [
+            {
+              entityType: 'qualityProfile',
+              remoteId: 4,
+              name: 'In Use',
+              reason: 'Quality profile is still assigned to media',
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const id = insertRollout({ remainingTargets: [target] });
+  moveToGate(id, 'tok-managed', evidence);
+  assertEquals(canaryRolloutQueries.getById(id)?.remainingPreview, evidence);
+});
+
+migratedTest('non-boolean managed and invalid blocked prunes fail closed', () => {
+  const target = { instanceId: 11, instanceName: 'Radarr B' };
+  const preview = zeroChangePreview(target);
+  const cases: Array<{ label: string; qualityProfiles: Record<string, unknown> }> = [
+    {
+      label: 'non-boolean managed',
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [
+          {
+            entityType: 'customFormat',
+            name: 'Bad',
+            action: 'delete',
+            remoteId: 9,
+            managed: 'yes',
+            fields: [],
+          },
+        ],
+        qualityProfiles: [],
+      },
+    },
+    {
+      label: 'invalid blocked prune',
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [],
+        qualityProfiles: [],
+        blockedPrunes: [{ entityType: 'qualityProfile', remoteId: 4, name: 'In Use' }],
+      },
+    },
+    {
+      label: 'blocked prunes not an array',
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [],
+        qualityProfiles: [],
+        blockedPrunes: { entityType: 'qualityProfile' },
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const id = insertRollout({
+      remainingTargets: [target],
+      stateToken: `tok-${testCase.label}`,
+    });
+    const evidence = {
+      version: 1,
+      availability: 'available',
+      generatedAt: '2026-07-08T10:01:00.000Z',
+      previews: [{ ...preview, qualityProfiles: testCase.qualityProfiles }],
+    };
+    db.execute('UPDATE canary_rollouts SET remaining_preview_evidence = ? WHERE id = ?', JSON.stringify(evidence), id);
+    assertUnavailable(canaryRolloutQueries.getById(id));
+  }
+});
+
 migratedTest('available evidence must match the persisted explicit section sequence', () => {
   const target = { instanceId: 11, instanceName: 'Radarr B' };
   const id = insertRollout({ remainingTargets: [target] });

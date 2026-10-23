@@ -85,6 +85,72 @@ APIs do not provide one shared transaction or conditional-write mechanism. A sep
 external Arr editor can still race between Praxrr's final read and write. If you expect
 concurrent edits, coordinate them and generate a fresh preview immediately before Apply.
 
+## Pruning removed entities
+
+When you remove a custom format or quality profile from your database, sync normally
+just stops pushing it — the copy already in Arr stays behind. **Pruning** is an
+opt-in, per-instance policy that deletes those leftovers, but only the ones Praxrr
+itself created.
+
+### What the ownership ledger records
+
+Praxrr keeps an **ownership ledger** per instance. A row is written only when a sync
+**creates** a custom format or quality profile on that instance. A successful update
+merely refreshes the existing row — it never adopts an entity Praxrr did not create.
+Anything you made by hand in Arr is never recorded and never pruned.
+
+The ledger starts empty and there is **no backfill**: custom formats and profiles
+that already existed in Arr before this feature (or before you connected the
+instance) stay _unmanaged_ forever. To find and remove those, use the instance's
+**Cleanup** tool with **Include unmanaged items** turned on.
+
+### Enabling pruning
+
+Pruning is off by default. Enable it per instance under
+**Arr → {instance} → Settings** with the **Prune removed managed entities** toggle.
+
+### When deletions happen
+
+Deletes run **only** when you apply a reviewed sync preview. You always see the
+exact list of deletions first:
+
+- Ledger-owned items that will be removed appear as **Managed — will be deleted**.
+- Items Praxrr did not create appear as **Left in Arr**. They are not removed.
+- A quality profile that is still assigned to media, or whose media use could not
+  be checked, appears as **Managed — kept (in use)** and is listed under
+  **Kept (in use)**.
+
+Scheduled, `on_pull`, `on_change`, and canary syncs never delete. Applying the
+sections that contain managed deletions also requires an API token with the
+**admin** scope; a sync-only token can still apply other sections in the same
+preview.
+
+### What is kept
+
+Praxrr does not delete a quality profile that is still assigned to media. On a
+reviewed preview it checks the library before planning that delete. Drift checks
+and other non-reviewed previews do not download the library; those profiles stay
+listed as kept because their use was not verified.
+
+A custom format that any remaining quality profile still scores is kept. It is
+not listed under **Kept (in use)**; it is simply not deleted. That includes a
+format scored by a profile this apply did not remove. Quality profiles are
+deleted before custom formats, so a format referenced only by a profile removed
+in the same apply can still be pruned.
+
+Before each delete, Praxrr reads the live entity again. If the name no longer
+matches, the item is left in place. If Arr already removed it, the delete counts
+as done.
+
+### Housekeeping
+
+- Changing an instance's **URL** or **type** clears its ledger, since the recorded
+  remote ids no longer refer to the same server. Pruning starts fresh from the next
+  creates.
+- Planned managed deletions also show on the **Drift** pages as **Pending removal**.
+- The **Cleanup** tool scans only ledger-managed items by default; toggle
+  **Include unmanaged items** to scan everything.
+
 ## Run a sync
 
 - **Sync now** on a section pushes pending changes immediately.

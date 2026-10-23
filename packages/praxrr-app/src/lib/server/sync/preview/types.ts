@@ -85,13 +85,23 @@ export interface EntityChange {
   readonly name: string;
   readonly action: SyncPreviewAction;
   readonly remoteId: number | null;
+  /** True only for ledger-owned deletes that execute on reviewed apply. */
+  readonly managed?: boolean;
   readonly fields: readonly FieldChange[];
+}
+
+export interface BlockedPrune {
+  readonly entityType: 'customFormat' | 'qualityProfile';
+  readonly remoteId: number;
+  readonly name: string;
+  readonly reason: string;
 }
 
 export interface QualityProfilesPreview extends SyncPreviewSectionMetadata {
   readonly section: 'qualityProfiles';
   readonly customFormats: readonly EntityChange[];
   readonly qualityProfiles: readonly EntityChange[];
+  readonly blockedPrunes?: readonly BlockedPrune[];
 }
 
 export interface DelayProfilesPreview extends SyncPreviewSectionMetadata {
@@ -204,7 +214,7 @@ export interface SyncPreviewReviewTargetInput {
  * or effective execution configuration accidentally.
  */
 export interface SyncPreviewReviewBinding {
-  readonly version: 1;
+  readonly version: 2;
   readonly instanceId: number;
   readonly arrType: SyncPreviewArrType;
   /** Hash only: raw target URLs and credential identifiers never enter public snapshots. */

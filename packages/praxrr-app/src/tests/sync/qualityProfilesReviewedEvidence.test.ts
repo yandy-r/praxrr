@@ -64,6 +64,7 @@ function buildContext(arrType: SyncArrType): SyncPreviewPreparedExecutionContext
     materialPlan: {
       arrType,
       batchOrder: [`pcd:41:Reviewed DB:${suffix}`],
+      prunes: [],
     },
     currentGuards: {
       customFormats: [{ id: 55, name: 'Existing CF', specifications: [] }],
