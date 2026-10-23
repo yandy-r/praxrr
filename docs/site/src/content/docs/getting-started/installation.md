@@ -14,6 +14,7 @@ remote PCD, outbound Git or HTTPS access to the configuration repository.
 - **Docker:** Docker Engine with Compose v2
 - **From source:** [Git](https://git-scm.com/), [Deno](https://deno.com/) 2.x
 - **Toolchain manager:** [mise](https://mise.jdx.dev/) for repository-pinned tools
+  (Node.js 24.22.1 and Go 1.26.10)
 - **Parser development (optional):** [Go](https://go.dev/) 1.26.10, pinned in
   `mise.toml`
 
@@ -101,7 +102,7 @@ mise install
 deno task dev
 ```
 
-This installs the pinned Go 1.26.10 toolchain and runs the Go parser plus Vite dev
+This installs the pinned Node.js 24.22.1 and Go 1.26.10 toolchains and runs the Go parser plus Vite dev
 server on port **6969**. Use
 `deno task dev:noauth` when you want authentication disabled for local testing.
 

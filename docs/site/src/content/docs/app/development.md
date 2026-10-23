@@ -9,13 +9,13 @@ files are documented there, not duplicated here.
 
 ## Prerequisites
 
-| Requirement       | Notes                                                                        |
-| ----------------- | ---------------------------------------------------------------------------- |
-| **Deno 2.x**      | Primary runtime; invoke tooling through `deno task …`, not npm for app code. |
-| **Go 1.26.10**    | Pinned parser toolchain; install it with `mise install`.                     |
-| **mise**          | Installs the repository-pinned Go toolchain.                                 |
-| **Node.js + npm** | Required for the docs site (`docs/site`) and Svelte client type-check.       |
-| **Git**           | PCD repositories and export flows depend on Git.                             |
+| Requirement         | Notes                                                                           |
+| ------------------- | ------------------------------------------------------------------------------- |
+| **Deno 2.x**        | Primary runtime; invoke tooling through `deno task …`, not npm for app code.    |
+| **Go 1.26.10**      | Pinned parser toolchain; install it with `mise install`.                        |
+| **mise**            | Installs the pinned Node.js 24.22.1 and Go 1.26.10 toolchains.                  |
+| **Node.js 24.22.1** | Pinned in `mise.toml`. Required for the docs site and Svelte client type-check. |
+| **Git**             | PCD repositories and export flows depend on Git.                                |
 
 ## Monorepo Layout
 
