@@ -131,7 +131,7 @@ function seedHistory(instanceId: number): void {
     `INSERT INTO drift_instance_status (
 			 arr_instance_id, arr_type, status, reason, drifted_count, missing_count, unmanaged_count,
 			 drift_signature, notified_signature, detected_version, changes, checked_at, content_checked_at, duration_ms
-		 ) VALUES (?, 'radarr', 'drifted', NULL, 3, 2, 1, NULL, NULL, NULL, '[]', '2026-10-08T10:00:00Z', NULL, 500)`,
+		 ) VALUES (?, 'radarr', 'drifted', NULL, 3, 2, 1, NULL, NULL, NULL, '[{"section":"qualityProfiles","entityType":"customFormat","name":"Pending CF","action":"delete","category":"prune","remoteId":9,"fields":[]}]', '2026-10-08T10:00:00Z', NULL, 500)`,
     instanceId
   );
 
@@ -214,6 +214,7 @@ migratedTest('GET /api/v1/metrics renders Prometheus exposition without leaking 
       `praxrr_drift_items{instance_id="${instanceId}",arr_type="radarr",kind="drifted"} 3`,
       `praxrr_drift_items{instance_id="${instanceId}",arr_type="radarr",kind="missing"} 2`,
       `praxrr_drift_items{instance_id="${instanceId}",arr_type="radarr",kind="unmanaged"} 1`,
+      `praxrr_drift_items{instance_id="${instanceId}",arr_type="radarr",kind="prune"} 1`,
       `praxrr_config_health_score{instance_id="${instanceId}",instance_name="${escapedName}",arr_type="radarr"} 95`,
       `praxrr_config_health_band{instance_id="${instanceId}",instance_name="${escapedName}",arr_type="radarr",band="healthy"} 1`,
       'praxrr_notifications_total{service_id="discord",status="success"} 2',

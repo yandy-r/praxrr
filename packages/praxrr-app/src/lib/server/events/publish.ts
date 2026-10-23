@@ -211,6 +211,7 @@ export function publishDriftUpdated(input: UpsertDriftStatusInput): void {
       driftedCount: input.driftedCount,
       missingCount: input.missingCount,
       unmanagedCount: input.unmanagedCount,
+      pruneCount: input.changes.filter((change) => change.category === 'prune').length,
       checkedAt: rfc3339(input.checkedAt),
     });
   } catch (error) {

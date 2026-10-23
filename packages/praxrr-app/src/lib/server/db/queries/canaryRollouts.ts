@@ -14,6 +14,7 @@ import type {
 import { buildPreviewFailure } from '$sync/preview/failureReason.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type {
+  BlockedPrune,
   DelayProfilesPreview,
   EntityChange,
   MediaManagementPreview,
@@ -239,6 +240,9 @@ function decodeEntityChange(value: unknown): EntityChange | null {
   ) {
     return null;
   }
+  if ('managed' in value && typeof value.managed !== 'boolean') {
+    return null;
+  }
   const fields = value.fields.map(decodeFieldChange);
   if (fields.some((field) => field === null)) {
     return null;
@@ -248,6 +252,7 @@ function decodeEntityChange(value: unknown): EntityChange | null {
     name: value.name,
     action: value.action,
     remoteId: value.remoteId as number | null,
+    ...(typeof value.managed === 'boolean' ? { managed: value.managed } : {}),
     fields: fields as EntityChange['fields'],
   };
 }
@@ -264,12 +269,47 @@ function decodeNullableEntity(value: unknown): EntityChange | null | undefined {
   return value === null ? null : (decodeEntityChange(value) ?? undefined);
 }
 
+function decodeBlockedPrune(value: unknown): BlockedPrune | null {
+  if (
+    !isRecord(value) ||
+    (value.entityType !== 'customFormat' && value.entityType !== 'qualityProfile') ||
+    !Number.isSafeInteger(value.remoteId) ||
+    typeof value.name !== 'string' ||
+    typeof value.reason !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    entityType: value.entityType,
+    remoteId: value.remoteId as number,
+    name: value.name,
+    reason: value.reason,
+  };
+}
+
+function decodeBlockedPrunes(value: unknown): readonly BlockedPrune[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const blocked: BlockedPrune[] = [];
+  for (const item of value) {
+    const decoded = decodeBlockedPrune(item);
+    if (decoded === null) return null;
+    blocked.push(decoded);
+  }
+  return blocked;
+}
+
 function decodeQualityProfiles(value: unknown): QualityProfilesPreview | null | undefined {
   if (value === null) return null;
   if (!isRecord(value) || value.section !== 'qualityProfiles') return undefined;
   const customFormats = decodeEntities(value.customFormats);
   const qualityProfiles = decodeEntities(value.qualityProfiles);
-  return customFormats && qualityProfiles ? { section: 'qualityProfiles', customFormats, qualityProfiles } : undefined;
+  const blockedPrunes = decodeBlockedPrunes(value.blockedPrunes);
+  if (!customFormats || !qualityProfiles || blockedPrunes === null) return undefined;
+  if (blockedPrunes === undefined) {
+    return { section: 'qualityProfiles', customFormats, qualityProfiles };
+  }
+  return { section: 'qualityProfiles', customFormats, qualityProfiles, blockedPrunes };
 }
 
 function decodeDelayProfiles(value: unknown): DelayProfilesPreview | null | undefined {

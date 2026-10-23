@@ -6,7 +6,13 @@ import { isRecord } from '$lib/server/trashguide/utils.ts';
 import type { CleanupScanResult, StaleItem } from './cleanup.ts';
 
 export type CleanupRequest =
-  { action: 'scan'; instanceId: number } | { action: 'execute'; instanceId: number; scanResult: CleanupScanResult };
+  | { action: 'scan'; instanceId: number; includeUnmanaged: boolean }
+  | {
+      action: 'execute';
+      instanceId: number;
+      includeUnmanaged: boolean;
+      scanResult: CleanupScanResult;
+    };
 
 export type CleanupRequestParseResult = { ok: true; request: CleanupRequest } | { ok: false; error: string };
 
@@ -31,6 +37,13 @@ function parseStaleItems(value: unknown): StaleItem[] | null {
   return items;
 }
 
+/** `includeUnmanaged` is optional and defaults to false; any non-boolean value is rejected. */
+function parseIncludeUnmanaged(value: unknown): boolean | null {
+  if (value === undefined) return false;
+  if (typeof value === 'boolean') return value;
+  return null;
+}
+
 /** Validate an already JSON-decoded cleanup request body. */
 export function parseCleanupRequest(body: unknown): CleanupRequestParseResult {
   if (!isRecord(body)) {
@@ -44,8 +57,12 @@ export function parseCleanupRequest(body: unknown): CleanupRequestParseResult {
   if (action !== 'scan' && action !== 'execute') {
     return { ok: false, error: 'action must be "scan" or "execute"' };
   }
+  const includeUnmanaged = parseIncludeUnmanaged(body.includeUnmanaged);
+  if (includeUnmanaged === null) {
+    return { ok: false, error: 'includeUnmanaged must be a boolean' };
+  }
   if (action === 'scan') {
-    return { ok: true, request: { action, instanceId } };
+    return { ok: true, request: { action, instanceId, includeUnmanaged } };
   }
 
   const { scanResult } = body;
@@ -62,5 +79,8 @@ export function parseCleanupRequest(body: unknown): CleanupRequestParseResult {
   const staleQualityProfiles = parseStaleItems(scanResult.staleQualityProfiles);
   if (!staleCustomFormats || !staleQualityProfiles) return invalidScanResult;
 
-  return { ok: true, request: { action, instanceId, scanResult: { staleCustomFormats, staleQualityProfiles } } };
+  return {
+    ok: true,
+    request: { action, instanceId, includeUnmanaged, scanResult: { staleCustomFormats, staleQualityProfiles } },
+  };
 }

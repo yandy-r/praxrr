@@ -45,6 +45,7 @@ function gatherDrift(instanceId: number): DriftFacts {
       drifted: 0,
       missing: 0,
       unmanaged: 0,
+      prune: 0,
       checkedAt: null,
       contentCheckedAt: null,
     };
@@ -55,6 +56,7 @@ function gatherDrift(instanceId: number): DriftFacts {
     drifted: detail.counts.drifted,
     missing: detail.counts.missing,
     unmanaged: detail.counts.unmanaged,
+    prune: detail.counts.prune,
     checkedAt: detail.checkedAt,
     contentCheckedAt: detail.contentCheckedAt,
   };

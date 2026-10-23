@@ -101,6 +101,7 @@ export interface LiveDriftUpdatedEvent {
   driftedCount: number;
   missingCount: number;
   unmanagedCount: number;
+  pruneCount: number;
   checkedAt: string;
 }
 

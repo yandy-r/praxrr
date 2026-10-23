@@ -127,6 +127,10 @@ export abstract class BaseSyncer {
   public clearPreviewEvidenceRecorder(): void {
     this.previewEvidenceRecorder = null;
   }
+  /** Only reviewed materializations may incur full-library prune safety reads. */
+  protected hasPreviewReviewRecorder(): boolean {
+    return this.previewEvidenceRecorder !== null;
+  }
 
   /**
    * Record one bounded evidence value beside the authoritative read that produced it.

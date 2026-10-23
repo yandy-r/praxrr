@@ -125,6 +125,55 @@ In prose: both preview and execution read compiled PCD state. Preview diffs agai
 without writes. Reviewed Preview Apply adds the private validation boundary above before
 calling the existing writers. Jobs and matched reviewed applies perform the actual push.
 
+## Ownership Ledger and Pruning
+
+The `arr_managed_entities` table is a per-instance **ownership ledger**. Only a
+confirmed `create` outcome for a custom format or quality profile inserts a row;
+a confirmed `update` refreshes `last_synced_at`/`arr_name` on an existing row but
+never adopts a same-named foreign entity (`sync/ownership/record.ts`). There is no
+backfill: entities that predate the ledger stay unmanaged and are reachable only
+through cleanup with `includeUnmanaged`.
+
+When an instance has `prune_removed_managed = 1`, the quality-profiles section plans
+deletions for ledger-owned entities that are no longer in the expected configuration
+(`sync/ownership/planPrunes.ts`):
+
+- A ledger row becomes a prune candidate only when the live entity with the same
+  remote id still carries the exact recorded `arr_name` (guards against id reuse).
+- Quality profiles still assigned to media are blocked and listed as
+  **Kept (in use)**. That media lookup runs only while building a reviewed
+  preview or re-materializing it for apply. Drift checks, sync-history
+  capture, MCP previews, and canary previews do not download the library;
+  those quality profiles stay blocked as unverified and are not deleted.
+- A custom format scored by any surviving live quality profile, or by any
+  desired profile, is kept. It is not listed under Kept (in use). A blocked
+  or skipped quality-profile delete also keeps the formats that profile scores.
+- If a selected PCD profile is missing from its source, that database keeps
+  its namespace so a later sync does not collide with another source.
+- Prunes appear in the preview as `action: 'delete', managed: true` and are hashed
+  into the review binding's `planHash`, so they exist **only** inside the reviewed
+  preview → apply path. Scheduled, `on_pull`, `on_change`, and canary syncs never
+  delete.
+
+On a matched apply, `sync/ownership/executePrunes.ts` deletes quality profiles
+before custom formats. Each item is re-read with a fresh GET immediately before
+DELETE. A name that no longer matches is skipped (`Arr entity changed since review;
+not deleted`) and the ledger row is kept. HTTP 404 counts as success and drops
+the row. Any other failure keeps the row. If an earlier write in the section
+failed, every reviewed delete is skipped with an explicit outcome and the section
+fails. When sync history is disabled, the deletes still run and a warning is
+logged because they will have no history record. Applying sections that contain
+managed deletes requires the `admin` scope for API tokens.
+
+Confirmed prune deletes flow into Sync History like other outcomes, and planned
+managed deletes appear in drift under the `prune` category. That includes ledger-owned
+quality profiles listed in the preview's `blockedPrunes` (in use, or in-use status
+unverified): drift classifies their delete rows as `prune`, not `unmanaged`, even though
+they will not be deleted until a reviewed preview verifies them. Changing an instance's
+`url` or `type` clears its ledger rows. The cleanup API (`POST /api/v1/arr/cleanup`)
+scans ledger-managed items by default; `includeUnmanaged: true` restores the legacy
+full scan.
+
 ## Contract Notes
 
 - Do not assume cross-Arr field parity when reading or extending syncers.
@@ -145,6 +194,10 @@ calling the existing writers. Jobs and matched reviewed applies perform the actu
 - `packages/praxrr-app/src/lib/server/sync/preview/store.ts`
 - `packages/praxrr-app/src/lib/server/sync/mappings.ts`
 - `packages/praxrr-app/src/lib/server/sync/registry.ts`
+- `packages/praxrr-app/src/lib/server/sync/ownership/record.ts`
+- `packages/praxrr-app/src/lib/server/sync/ownership/planPrunes.ts`
+- `packages/praxrr-app/src/lib/server/sync/ownership/executePrunes.ts`
+- `packages/praxrr-app/src/lib/server/db/queries/arrManagedEntities.ts`
 - `packages/praxrr-app/src/lib/server/jobs/handlers/arrSync.ts`
 
 ## Related

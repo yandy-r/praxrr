@@ -161,12 +161,14 @@ Deno.test({
     ]);
 
     const originalGetById = arrInstancesQueries.getById;
+    const originalIsPruneEnabled = arrInstancesQueries.isPruneRemovedManagedEnabled;
     const originalGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
     const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
     const originalGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
     const originalGetTrashHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
 
     arrInstancesQueries.getById = (id: number) => instances.get(id);
+    arrInstancesQueries.isPruneRemovedManagedEnabled = () => false;
     arrSyncQueries.getSyncConfigStatus = () => ({
       qualityProfiles: {
         trigger: 'manual',
@@ -215,6 +217,7 @@ Deno.test({
       }
     } finally {
       arrInstancesQueries.getById = originalGetById;
+      arrInstancesQueries.isPruneRemovedManagedEnabled = originalIsPruneEnabled;
       arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
       arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
       arrSyncQueries.getNextScheduledRunAt = originalGetNextScheduledRunAt;
@@ -236,6 +239,7 @@ Deno.test({
     ]);
 
     const originalGetById = arrInstancesQueries.getById;
+    const originalIsPruneEnabled = arrInstancesQueries.isPruneRemovedManagedEnabled;
     const originalGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
     const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
     const originalGetDelayProfilesSync = arrSyncQueries.getDelayProfilesSync;
@@ -245,6 +249,7 @@ Deno.test({
     const originalGetTrashHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
 
     arrInstancesQueries.getById = (id: number) => instances.get(id);
+    arrInstancesQueries.isPruneRemovedManagedEnabled = () => false;
     arrSyncQueries.getSyncConfigStatus = () => ({
       qualityProfiles: {
         trigger: 'manual',
@@ -319,6 +324,7 @@ Deno.test({
       assertEquals(sonarrResult.status, 'skipped');
     } finally {
       arrInstancesQueries.getById = originalGetById;
+      arrInstancesQueries.isPruneRemovedManagedEnabled = originalIsPruneEnabled;
       arrSyncQueries.getSyncConfigStatus = originalGetSyncConfigStatus;
       arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
       arrSyncQueries.getDelayProfilesSync = originalGetDelayProfilesSync;

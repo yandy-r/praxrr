@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import { arrInstanceCredentialsQueries, type ArrInstanceCredentialWriteInput } from './arrInstanceCredentials.ts';
+import { arrManagedEntitiesQueries } from './arrManagedEntities.ts';
 
 /**
  * Types for arr_instances table
@@ -15,6 +16,7 @@ export interface ArrInstance {
   tags: string | null;
   enabled: number;
   source?: ArrInstanceSource;
+  prune_removed_managed?: number;
   // Always present on DB reads (see arrInstanceSelect), NULL until first detected.
   // Optional so hand-built test mocks need not restate them.
   detected_version?: string | null;
@@ -46,6 +48,7 @@ export interface UpdateArrInstanceInput {
   apiKey?: string;
   tags?: string[];
   enabled?: boolean;
+  pruneRemovedManaged?: boolean;
   source?: ArrInstanceSource;
 }
 
@@ -61,6 +64,7 @@ const arrInstanceSelect = `
     tags,
     enabled,
     source,
+    prune_removed_managed,
     detected_version,
     detected_at,
     created_at,
@@ -128,6 +132,10 @@ function collectArrInstanceUpdates(
     updates.push('enabled = ?');
     params.push(patch.enabled ? 1 : 0);
   }
+  if (patch.pruneRemovedManaged !== undefined) {
+    updates.push('prune_removed_managed = ?');
+    params.push(patch.pruneRemovedManaged ? 1 : 0);
+  }
   if (patch.source !== undefined) {
     updates.push('source = ?');
     params.push(patch.source);
@@ -159,7 +167,19 @@ function updateArrInstance(
 
   db.beginTransaction();
   try {
+    const current =
+      patch.url !== undefined || patch.type !== undefined
+        ? db.queryFirst<{ url: string; type: string }>('SELECT url, type FROM arr_instances WHERE id = ?', instanceId)
+        : undefined;
+    const identityChanged =
+      current !== undefined &&
+      ((patch.url !== undefined && patch.url !== current.url) ||
+        (patch.type !== undefined && patch.type !== current.type));
     let updated = db.execute(`UPDATE arr_instances SET ${updates.join(', ')} WHERE id = ?`, ...params) > 0;
+
+    if (updated && identityChanged) {
+      arrManagedEntitiesQueries.clearInstance(instanceId);
+    }
 
     if (credentialInput !== undefined) {
       arrInstanceCredentialsQueries.upsert({
@@ -233,6 +253,15 @@ export const arrInstancesQueries = {
    */
   getById(id: number): ArrInstance | undefined {
     return db.queryFirst<ArrInstance>(`${arrInstanceSelect} WHERE id = ?`, id);
+  },
+
+  /** Whether the opt-in "prune removed managed entities" policy is on (YAN-516). Missing → off. */
+  isPruneRemovedManagedEnabled(id: number): boolean {
+    const row = db.queryFirst<{ prune_removed_managed: number }>(
+      'SELECT prune_removed_managed FROM arr_instances WHERE id = ?',
+      id
+    );
+    return row?.prune_removed_managed === 1;
   },
 
   /**

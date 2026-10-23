@@ -93,7 +93,7 @@ function makeNext(overrides: Partial<InstanceDriftResult> = {}): InstanceDriftRe
     status: 'in-sync',
     reason: null,
     detectedVersion: null,
-    counts: { drifted: 0, missing: 0, unmanaged: 0 },
+    counts: { drifted: 0, missing: 0, unmanaged: 0, prune: 0 },
     changes: [],
     driftSignature: null,
     checkedAt: '2026-01-01T00:00:00.000Z',
@@ -109,7 +109,7 @@ function makePrior(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftIns
     arrType: 'radarr',
     status: 'in-sync',
     reason: null,
-    counts: { drifted: 0, missing: 0, unmanaged: 0 },
+    counts: { drifted: 0, missing: 0, unmanaged: 0, prune: 0 },
     driftSignature: null,
     notifiedSignature: null,
     detectedVersion: null,
@@ -155,7 +155,7 @@ Deno.test('aggregateDrift maps update→drift, create→missing, delete→unmana
   assertEquals(byName.get('Unmanaged CF')?.action, 'delete');
   assertEquals(byName.get('Unmanaged CF')?.category, 'unmanaged');
 
-  assertEquals(result.counts, { drifted: 1, missing: 1, unmanaged: 1 });
+  assertEquals(result.counts, { drifted: 1, missing: 1, unmanaged: 1, prune: 0 });
   assertEquals(result.comparedAny, true);
   assertEquals(result.allSectionsErrored, false);
   // All available outcomes succeeded → no section errored.
@@ -181,7 +181,7 @@ Deno.test("aggregateDrift never emits 'unchanged' entities into changes or count
   assertEquals(result.changes.length, 1);
   assertEquals(result.changes[0].name, 'Drifted CF');
   assert(!result.changes.some((c) => c.action === ('unchanged' as string)));
-  assertEquals(result.counts, { drifted: 1, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 1, missing: 0, unmanaged: 0, prune: 0 });
 });
 
 // ============================================================================
@@ -241,7 +241,7 @@ Deno.test('aggregateDrift reads every nested section payload (QP, delay, media, 
   const result = aggregateDrift(preview, all);
 
   // CF + QP + delay + naming + media + QD + metadata = 7 update entities.
-  assertEquals(result.counts, { drifted: 7, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 7, missing: 0, unmanaged: 0, prune: 0 });
   assertEquals(result.changes.length, 7);
 });
 
@@ -473,4 +473,67 @@ Deno.test('shouldNotify does NOT fire on reachability/error statuses (unreachabl
     const next = makeNext({ status, reason: 'error', driftSignature: null });
     assertEquals(shouldNotify(prior, next), false, `status=${status} must not notify`);
   }
+});
+
+Deno.test('managed deletes map to prune without changing the alerting signature', () => {
+  const alerting = driftChange('update', { name: 'Desired CF', remoteId: 1 });
+  const result = aggregateDrift(
+    makePreview({
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [
+          entity('update', { name: 'Desired CF', remoteId: 1 }),
+          entity('delete', { name: 'Removed CF', remoteId: 2, managed: true }),
+          entity('delete', { name: 'Manual CF', remoteId: 3, managed: false }),
+        ],
+        qualityProfiles: [],
+      },
+    }),
+    new Set(['qualityProfiles'])
+  );
+  assertEquals(result.counts, { drifted: 1, missing: 0, unmanaged: 1, prune: 1 });
+  assertEquals(result.changes[1].category, 'prune');
+  assertEquals(result.changes[2].category, 'unmanaged');
+  assertEquals(driftSignature(result.changes), driftSignature([alerting]));
+});
+
+Deno.test('blocked QP prunes map to prune (not unmanaged) and stay out of the signature', () => {
+  const alerting = driftChange('update', { name: 'Desired CF', remoteId: 1 });
+  const result = aggregateDrift(
+    makePreview({
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [entity('update', { name: 'Desired CF', remoteId: 1 })],
+        qualityProfiles: [
+          entity('delete', { entityType: 'qualityProfile', name: 'In Use QP', remoteId: 10 }),
+          entity('delete', { entityType: 'qualityProfile', name: 'Unverified QP', remoteId: 11 }),
+          entity('delete', { entityType: 'qualityProfile', name: 'Manual QP', remoteId: 12 }),
+          // Same remoteId as a blocked QP but a different entity type: must stay unmanaged.
+          entity('delete', { entityType: 'customFormat', name: 'Unrelated CF', remoteId: 10 }),
+        ],
+        blockedPrunes: [
+          {
+            entityType: 'qualityProfile',
+            remoteId: 10,
+            name: 'In Use QP',
+            reason: 'Quality profile is still assigned to media',
+          },
+          {
+            entityType: 'qualityProfile',
+            remoteId: 11,
+            name: 'Unverified QP',
+            reason: 'Could not verify that the quality profile is unused',
+          },
+        ],
+      },
+    }),
+    new Set(['qualityProfiles'])
+  );
+  const byName = new Map(result.changes.map((c) => [c.name, c]));
+  assertEquals(byName.get('In Use QP')?.category, 'prune');
+  assertEquals(byName.get('Unverified QP')?.category, 'prune');
+  assertEquals(byName.get('Manual QP')?.category, 'unmanaged');
+  assertEquals(byName.get('Unrelated CF')?.category, 'unmanaged');
+  assertEquals(result.counts, { drifted: 1, missing: 0, unmanaged: 2, prune: 2 });
+  assertEquals(driftSignature(result.changes), driftSignature([alerting]));
 });

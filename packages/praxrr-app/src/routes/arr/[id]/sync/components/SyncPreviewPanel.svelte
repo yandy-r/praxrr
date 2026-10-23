@@ -11,6 +11,7 @@
   import { narrateSyncPreviewSummary, narrateSyncSectionOutcome } from '$shared/narration/index.ts';
   import type { NarrationLevel, NarrationLine } from '$shared/narration/index.ts';
   import SyncPreviewEntityDiff from './SyncPreviewEntityDiff.svelte';
+  import { countManagedDeletes, isBlockedPruneRow } from '$shared/sync/managedDeletes.ts';
   import type { SyncPreviewSection, SyncPreviewSummary, SyncPreviewResult, EntityChange } from '$sync/preview/types.ts';
   import type { SectionType, SyncEntityOutcome } from '$sync/types.ts';
   import SyncOutcomeList from '$ui/sync-history/SyncOutcomeList.svelte';
@@ -87,7 +88,8 @@
   let activePreviewId: string | null = null;
   let sectionGroups: SectionGroup[] = [];
   let summary: SyncPreviewSummary = EMPTY_PREVIEW_SUMMARY;
-  let hasDeletes = false;
+  let managedDeleteCount = 0;
+  let hasManagedDeletes = false;
   let hasApplyPermission = false;
 
   let stalenessNow = Date.now();
@@ -194,12 +196,13 @@
     }).format(date);
   }
 
-  function formatSummary(summary: SyncPreviewSummary): string {
+  function formatSummary(values: SyncPreviewSummary): string {
+    const deletes = preview ? managedDeleteCount : values.totalDeletes;
     const parts = [
-      `${summary.totalCreates} create${summary.totalCreates === 1 ? '' : 's'}`,
-      `${summary.totalUpdates} update${summary.totalUpdates === 1 ? '' : 's'}`,
-      `${summary.totalDeletes} delete${summary.totalDeletes === 1 ? '' : 's'}`,
-      `${summary.totalUnchanged} unchanged`,
+      `${values.totalCreates} create${values.totalCreates === 1 ? '' : 's'}`,
+      `${values.totalUpdates} update${values.totalUpdates === 1 ? '' : 's'}`,
+      `${deletes} to delete`,
+      `${values.totalUnchanged} unchanged`,
     ];
     return parts.join(' · ');
   }
@@ -222,7 +225,7 @@
           values.update++;
           break;
         case 'delete':
-          values.delete++;
+          if (entity.managed === true) values.delete++;
           break;
         case 'unchanged':
           values.unchanged++;
@@ -252,7 +255,8 @@
 
     if (snapshot.qualityProfiles) {
       const entities = [...snapshot.qualityProfiles.customFormats, ...snapshot.qualityProfiles.qualityProfiles];
-      if (entities.length > 0) {
+      const blockedCount = snapshot.qualityProfiles.blockedPrunes?.length ?? 0;
+      if (entities.length > 0 || blockedCount > 0) {
         groups.push({
           section: 'qualityProfiles',
           title: sectionLabels.qualityProfiles,
@@ -306,7 +310,7 @@
   }
 
   function getSectionSummaryText(values: SectionGroup['actionSummary']): string {
-    return `${pluralize(values.create, 'create')}, ${pluralize(values.update, 'update')}, ${pluralize(values.delete, 'delete')}, ${pluralize(values.unchanged, 'unchanged')}`;
+    return `${pluralize(values.create, 'create')}, ${pluralize(values.update, 'update')}, ${values.delete} to delete, ${pluralize(values.unchanged, 'unchanged')}`;
   }
 
   function resolveCoverage(snapshot: SyncPreviewResult): PreviewCoverage {
@@ -456,8 +460,7 @@
   async function handleApply() {
     if (!preview || applying || reviewInvalidation) return;
 
-    const hasDeletes = preview.summary.totalDeletes > 0;
-    if (hasDeletes && deleteConfirmText !== preview.instanceName) return;
+    if (countManagedDeletes(preview) > 0 && deleteConfirmText !== preview.instanceName) return;
 
     showApplyModal = false;
     applying = true;
@@ -602,7 +605,10 @@
 
   $: summary = preview?.summary ?? previewState.summary ?? EMPTY_PREVIEW_SUMMARY;
   $: narrationLevel = showExplanationDetails ? 'verbose' : 'summary';
-  $: summaryNarration = narrateSyncPreviewSummary(summary, narrationLevel);
+  $: summaryNarration = narrateSyncPreviewSummary(
+    preview ? { ...summary, totalDeletes: managedDeleteCount } : summary,
+    narrationLevel
+  );
   $: coverage = preview ? resolveCoverage(preview) : UNAVAILABLE_PREVIEW_COVERAGE;
   $: sectionNarrations = preview
     ? preview.sectionOutcomes
@@ -630,7 +636,8 @@
     !regenerating &&
     !reviewInvalidation &&
     !staleness?.shouldBlock;
-  $: hasDeletes = summary.totalDeletes > 0;
+  $: managedDeleteCount = preview ? countManagedDeletes(preview) : 0;
+  $: hasManagedDeletes = managedDeleteCount > 0;
 
   $: if (previewState.status === 'ready' && previewState.previewId) {
     if (previewState.previewId !== observedRoutePreviewId) {
@@ -798,14 +805,18 @@
           </div>
         {/if}
 
-        {#if hasDeletes}
+        {#if hasManagedDeletes}
           <div
             class="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300"
           >
             <AlertTriangle size={16} class="mt-0.5" />
             <div>
-              <p class="font-medium">Destructive changes detected.</p>
-              <p>This preview includes delete actions and will use additional confirmation before apply.</p>
+              <p class="font-medium">Managed deletions will be applied.</p>
+              <p>
+                This preview deletes {managedDeleteCount} Praxrr-managed
+                {managedDeleteCount === 1 ? 'item' : 'items'}. You will confirm before anything is removed. Items you
+                made in Arr are left untouched.
+              </p>
             </div>
           </div>
         {/if}
@@ -856,7 +867,7 @@
           </div>
         </section>
 
-        {#if coverage.status === 'complete' && summary.totalCreates === 0 && summary.totalUpdates === 0 && summary.totalDeletes === 0 && summary.totalUnchanged > 0}
+        {#if coverage.status === 'complete' && summary.totalCreates === 0 && summary.totalUpdates === 0 && (preview ? managedDeleteCount : summary.totalDeletes) === 0 && summary.totalUnchanged > 0}
           <div
             class="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200"
           >
@@ -896,9 +907,31 @@
                       section={sectionGroup.section}
                       level={narrationLevel}
                       defaultExpanded={entity.action !== 'unchanged'}
+                      keptInUse={sectionGroup.section === 'qualityProfiles' &&
+                        isBlockedPruneRow(entity, preview.qualityProfiles?.blockedPrunes)}
                     />
                   {/each}
                 </div>
+                {#if sectionGroup.section === 'qualityProfiles' && (preview.qualityProfiles?.blockedPrunes?.length ?? 0) > 0}
+                  <div class="mt-3 space-y-2">
+                    <h4 class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      Kept (in use)
+                      <span class="text-neutral-500 dark:text-neutral-400">
+                        ({preview.qualityProfiles?.blockedPrunes?.length ?? 0})
+                      </span>
+                    </h4>
+                    <ul class="space-y-1">
+                      {#each preview.qualityProfiles?.blockedPrunes ?? [] as blocked (`${blocked.entityType}:${blocked.remoteId}`)}
+                        <li
+                          class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100"
+                        >
+                          <span class="font-medium">{blocked.name}</span>
+                          <span class="text-amber-800 dark:text-amber-200"> — {blocked.reason}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -964,10 +997,10 @@
 
 <Modal
   open={showApplyModal}
-  header={hasDeletes ? 'Confirm Destructive Preview Apply' : 'Confirm Preview Apply'}
-  confirmText={hasDeletes ? 'Apply Deletions' : 'Apply Changes'}
-  confirmDanger={hasDeletes}
-  confirmDisabled={applying || !!reviewInvalidation || (hasDeletes && !confirmationMatches)}
+  header={hasManagedDeletes ? 'Confirm Destructive Preview Apply' : 'Confirm Preview Apply'}
+  confirmText={hasManagedDeletes ? 'Apply Deletions' : 'Apply Changes'}
+  confirmDanger={hasManagedDeletes}
+  confirmDisabled={applying || !!reviewInvalidation || (hasManagedDeletes && !confirmationMatches)}
   loading={applying}
   on:confirm={handleApply}
   on:cancel={closeApplyModal}
@@ -1000,10 +1033,12 @@
       </div>
     {/if}
 
-    {#if hasDeletes}
+    {#if hasManagedDeletes}
       <div class="space-y-2">
         <p class="text-sm text-red-700 dark:text-red-200">
-          Destructive deletes are included. To continue, type the instance name exactly:
+          This will delete {managedDeleteCount} Praxrr-managed
+          {managedDeleteCount === 1 ? 'item' : 'items'}. Items you made in Arr are left untouched. To continue, type the
+          instance name exactly:
           <strong class="ml-1">{preview?.instanceName ?? (instanceName || 'instance')}</strong>
         </p>
         <FormInput

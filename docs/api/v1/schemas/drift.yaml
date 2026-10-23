@@ -40,6 +40,7 @@ DriftCounts:
     - drifted
     - missing
     - unmanaged
+    - prune
   properties:
     drifted:
       type: integer
@@ -52,7 +53,11 @@ DriftCounts:
     unmanaged:
       type: integer
       minimum: 0
-      description: Live Arr entities not in the resolved desired set (non-alerting).
+      description: Live Arr entities not owned by Praxrr and not in the resolved desired set (non-alerting).
+    prune:
+      type: integer
+      minimum: 0
+      description: Ledger-owned entities pending reviewed removal (non-alerting).
 
 DriftSettings:
   type: object
@@ -115,6 +120,8 @@ DriftEntityChange:
         - drift
         - missing
         - unmanaged
+        - prune
+      description: Changed or missing desired entities are alerting; unmanaged entities and pending managed prunes are non-alerting.
     remoteId:
       type: integer
       nullable: true
@@ -236,6 +243,7 @@ DriftDetailResponse:
     - drift
     - missing
     - unmanaged
+    - prune
   properties:
     instanceId:
       type: integer
@@ -281,7 +289,13 @@ DriftDetailResponse:
         $ref: '#/DriftEntityChange'
     unmanaged:
       type: array
-      description: Live Arr entities not in the desired set (action = delete, non-alerting).
+      description: Live Arr entities not owned by Praxrr and not in the desired set (action = delete, non-alerting).
+      items:
+        $ref: '#/DriftEntityChange'
+
+    prune:
+      type: array
+      description: Ledger-owned entities pending reviewed removal (action = delete, non-alerting).
       items:
         $ref: '#/DriftEntityChange'
 

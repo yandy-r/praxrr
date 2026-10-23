@@ -56,7 +56,7 @@ function buildDriftNotification(next: InstanceDriftResult): {
   const message = `${next.counts.drifted} changed, ${next.counts.missing} missing on Arr`;
 
   const alertingLines = next.changes
-    .filter((change) => change.action === 'update' || change.action === 'create')
+    .filter((change) => change.category === 'drift' || change.category === 'missing')
     .slice(0, MAX_EMBED_CHANGE_LINES)
     .map((change) => `• ${change.entityType} "${change.name}" — ${change.category}`);
 

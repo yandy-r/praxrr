@@ -93,6 +93,7 @@ import { migration as migration20261021CreateApiTokens } from './migrations/2026
 import { migration as migration20261022AddNotificationHistoryAttempts } from './migrations/20261022_add_notification_history_attempts.ts';
 import { migration as migration20261023CreateArrTrashGuideNamespaces } from './migrations/20261023_create_arr_trash_guide_namespaces.ts';
 import { migration as migration20261024BoundScheduleIntervals } from './migrations/20261024_bound_schedule_intervals.ts';
+import { migration as migration20261025CreateArrManagedEntities } from './migrations/20261025_create_arr_managed_entities.ts';
 
 export interface Migration {
   version: number;
@@ -420,6 +421,7 @@ export function loadMigrations(): Migration[] {
     migration20261022AddNotificationHistoryAttempts,
     migration20261023CreateArrTrashGuideNamespaces,
     migration20261024BoundScheduleIntervals,
+    migration20261025CreateArrManagedEntities,
   ];
 
   // Sort by version number

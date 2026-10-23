@@ -53,6 +53,7 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
       drifted: 0,
       missing: 0,
       unmanaged: 0,
+      prune: 0,
       checkedAt: 't',
       contentCheckedAt: 't',
     },
@@ -99,6 +100,22 @@ Deno.test('drift: in-sync scores 100', () => {
   assertEquals(score('drift', makeInputs(), INSTANCE_SCOPE).score, 100);
 });
 
+Deno.test('drift: in-sync with pending removals still scores 100 and reports the pending count', () => {
+  const drift: DriftFacts = {
+    status: 'in-sync',
+    reason: null,
+    drifted: 0,
+    missing: 0,
+    unmanaged: 0,
+    prune: 3,
+    checkedAt: 't',
+    contentCheckedAt: 't',
+  };
+  const result = score('drift', makeInputs({ drift }), INSTANCE_SCOPE);
+  assertEquals(result.score, 100);
+  assertEquals(result.detail, ['Live configuration matches the desired state (3 pending removal)']);
+});
+
 Deno.test('drift: drifted with a fresh content check is penalized per entity, unmanaged excluded', () => {
   const drift: DriftFacts = {
     status: 'drifted',
@@ -106,6 +123,7 @@ Deno.test('drift: drifted with a fresh content check is penalized per entity, un
     drifted: 2,
     missing: 0,
     unmanaged: 10,
+    prune: 10,
     checkedAt: 't',
     contentCheckedAt: 't',
   };
@@ -120,6 +138,7 @@ Deno.test('drift: drifted but stale (no fresh content check) is null, not real d
     drifted: 5,
     missing: 5,
     unmanaged: 0,
+    prune: 0,
     checkedAt: 't',
     contentCheckedAt: null,
   };
@@ -134,6 +153,7 @@ Deno.test('drift: environment states (unreachable/never-checked) are null, not a
       drifted: 0,
       missing: 0,
       unmanaged: 0,
+      prune: 0,
       checkedAt: null,
       contentCheckedAt: null,
     };

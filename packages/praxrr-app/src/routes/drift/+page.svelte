@@ -237,6 +237,7 @@
                   <span>Drifted {instance.counts.drifted}</span>
                   <span>Missing {instance.counts.missing}</span>
                   <span>Unmanaged {instance.counts.unmanaged}</span>
+                  <span>Pending removal {instance.counts.prune}</span>
                   <span>Checked {formatWhen(instance.checkedAt)}</span>
                 </div>
               </div>

@@ -1,6 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { components } from '$api/v1.d.ts';
+import { hasScope } from '$shared/auth/apiTokenScopes.ts';
+import type { AuthPrincipal } from '$auth/principal.ts';
 import { logger } from '$logger/logger.ts';
 import { getSectionsInProgress, executeReviewedSyncJob } from '$lib/server/jobs/handlers/arrSync.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
@@ -14,6 +16,7 @@ import {
 } from '$lib/server/sync/preview/store.ts';
 import { buildPreviewFailure, classifyPreviewFailure } from '$lib/server/sync/preview/failureReason.ts';
 import type { SyncPreviewResult, SyncPreviewReviewInvalidationReason } from '$lib/server/sync/preview/types.ts';
+import { sectionsIncludeManagedDelete } from '$shared/sync/managedDeletes.ts';
 
 type ErrorResponse = components['schemas']['ErrorResponse'];
 type SyncPreviewApplyResponse = components['schemas']['SyncPreviewApplyResponse'];
@@ -72,6 +75,13 @@ function staleWarningMessage(previewAgeMs: number): string {
 
 function getBodyByteLength(rawBody: string): number {
   return textEncoder.encode(rawBody).length;
+}
+
+function forbiddenAdminResponse(): Response {
+  return new Response(JSON.stringify({ error: 'Forbidden', requiredScope: 'admin' }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 function resolveEligibleSections(snapshot: SyncPreviewResult): SectionType[] {
@@ -133,7 +143,8 @@ function invalidatedResponse(
 export async function _handleSyncPreviewApplyRequest(
   previewId: string | undefined,
   request: Request,
-  dependencies: SyncPreviewApplyDependencies = DEFAULT_DEPENDENCIES
+  dependencies: SyncPreviewApplyDependencies = DEFAULT_DEPENDENCIES,
+  principal: AuthPrincipal | null = null
 ): Promise<Response> {
   if (!previewId) {
     return json({ error: 'previewId is required' } satisfies ErrorResponse, { status: 400 });
@@ -230,6 +241,14 @@ export async function _handleSyncPreviewApplyRequest(
       } satisfies SyncPreviewApplyErrorResponse,
       { status: 422 }
     );
+  }
+
+  if (
+    principal?.kind === 'token' &&
+    sectionsIncludeManagedDelete(snapshot, sectionsToApply) &&
+    !hasScope(principal.scopes, 'admin')
+  ) {
+    return forbiddenAdminResponse();
   }
 
   const inProgressSections = dependencies.getSectionsInProgress(snapshot.instanceId);
@@ -379,4 +398,11 @@ export async function _handleSyncPreviewApplyRequest(
   }
 }
 
-export const POST: RequestHandler = ({ params, request }) => _handleSyncPreviewApplyRequest(params.previewId, request);
+function principalFromLocals(locals: object | null | undefined): AuthPrincipal | null {
+  if (locals == null || !('principal' in locals)) return null;
+  const principal = (locals as { principal?: AuthPrincipal | null }).principal;
+  return principal ?? null;
+}
+
+export const POST: RequestHandler = ({ params, request, locals }) =>
+  _handleSyncPreviewApplyRequest(params.previewId, request, DEFAULT_DEPENDENCIES, principalFromLocals(locals));

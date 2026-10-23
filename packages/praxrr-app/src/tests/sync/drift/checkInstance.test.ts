@@ -95,7 +95,7 @@ Deno.test('heartbeat {ok:false,status:401} → unauthorized, no preview, no thro
   assertEquals(result.reason, 'unauthorized');
   assertEquals(previewCalled, false); // heartbeat short-circuits: no preview, no notify path reached
   assertEquals(result.detectedVersion, null);
-  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
   assertEquals(result.changes, []);
   assertEquals(result.driftSignature, null);
   assertEquals(result.contentCheckedAt, null);
@@ -235,7 +235,7 @@ Deno.test('generatePreview drift fixtures → drifted (update+create counted, si
 
   assertEquals(result.status, 'drifted');
   assertEquals(result.reason, null);
-  assertEquals(result.counts, { drifted: 1, missing: 1, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 1, missing: 1, unmanaged: 0, prune: 0 });
   assertEquals(result.changes.length, 2); // 'unchanged' entity is never emitted
   assertEquals(result.detectedVersion, VERSION);
   assertEquals(result.contentCheckedAt, FIXED_ISO);
@@ -259,7 +259,7 @@ Deno.test('clean preview (compared, no changes) → in-sync', async () => {
 
   assertEquals(result.status, 'in-sync');
   assertEquals(result.reason, null);
-  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0 });
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 0 });
   assertEquals(result.changes, []);
   assertEquals(result.driftSignature, null);
   assertEquals(result.contentCheckedAt, FIXED_ISO);
@@ -280,11 +280,29 @@ Deno.test('unmanaged-only preview → in-sync (delete does not count as drift)',
 
   assertEquals(result.status, 'in-sync');
   assertEquals(result.reason, null);
-  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 1 });
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 1, prune: 0 });
   assertEquals(result.changes.length, 1);
   assertEquals(result.changes[0].category, 'unmanaged');
   assertEquals(result.driftSignature, null); // delete excluded from signature
   assertEquals(result.contentCheckedAt, FIXED_ISO);
+});
+
+Deno.test('managed prune-only preview stays in-sync with no alerting signature', async () => {
+  const preview = makePreview({
+    qualityProfiles: {
+      section: 'qualityProfiles',
+      customFormats: [entity({ action: 'delete', managed: true, remoteId: 99 })],
+      qualityProfiles: [],
+    },
+  });
+  const result = await checkInstanceDrift(
+    makeInstance(),
+    baseDeps({ generatePreview: () => Promise.resolve(preview) })
+  );
+  assertEquals(result.status, 'in-sync');
+  assertEquals(result.counts, { drifted: 0, missing: 0, unmanaged: 0, prune: 1 });
+  assertEquals(result.changes[0].category, 'prune');
+  assertEquals(result.driftSignature, null);
 });
 
 Deno.test('throwing generatePreview → error / error (version carried, never rejects)', async () => {

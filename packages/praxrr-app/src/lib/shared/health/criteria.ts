@@ -142,7 +142,18 @@ const drift: Criterion = {
     const d = inputs.drift;
 
     if (d.status === 'in-sync') {
-      return result('drift', 'Drift', 100, config, ['Live configuration matches the desired state'], []);
+      return result(
+        'drift',
+        'Drift',
+        100,
+        config,
+        [
+          d.prune > 0
+            ? `Live configuration matches the desired state (${d.prune} pending removal)`
+            : 'Live configuration matches the desired state',
+        ],
+        []
+      );
     }
 
     if (d.status === 'drifted') {
@@ -164,7 +175,7 @@ const drift: Criterion = {
         'Drift',
         score,
         config,
-        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged)`],
+        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged, ${d.prune} pending removal)`],
         [
           line(
             `${magnitude} managed entit${magnitude === 1 ? 'y has' : 'ies have'} drifted from the desired configuration`,

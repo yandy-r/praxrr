@@ -37,6 +37,7 @@ const DRIFT_CATEGORY_TONE: Readonly<Record<DriftCategory, NarrationTone>> = {
   drift: 'warning',
   missing: 'warning',
   unmanaged: 'neutral',
+  prune: 'neutral',
 };
 
 /**
@@ -92,8 +93,13 @@ export function narrateEntityChange(
       tone = 'info';
       break;
     case 'delete':
-      headline = `Praxrr plans to remove ${label} "${change.name}".`;
-      tone = 'info';
+      if (change.managed === true) {
+        headline = `Praxrr plans to remove ${label} "${change.name}".`;
+        tone = 'info';
+      } else {
+        headline = `Praxrr will not remove ${label} "${change.name}".`;
+        tone = 'neutral';
+      }
       break;
     case 'unchanged':
       headline = `${label} "${change.name}" already matches the resolved config.`;
@@ -274,8 +280,8 @@ export function narrateDriftCounts(
     };
   }
 
-  const { drifted, missing, unmanaged } = counts;
-  if (drifted === 0 && missing === 0 && unmanaged === 0) {
+  const { drifted, missing, unmanaged, prune } = counts;
+  if (drifted === 0 && missing === 0 && unmanaged === 0 && prune === 0) {
     return {
       headline: 'No drift detected — this instance matches the resolved configuration.',
       detail: [],
@@ -288,6 +294,7 @@ export function narrateDriftCounts(
   if (drifted > 0) parts.push(`${drifted} drifted`);
   if (missing > 0) parts.push(`${missing} missing`);
   if (unmanaged > 0) parts.push(`${unmanaged} unmanaged`);
+  if (prune > 0) parts.push(`${prune} pending removal`);
 
   const detail: string[] = [];
   if (level === 'verbose') {
@@ -295,6 +302,7 @@ export function narrateDriftCounts(
     if (missing > 0) detail.push(`${missing} managed ${pluralEntities(missing)} not present on the instance.`);
     if (unmanaged > 0)
       detail.push(`${unmanaged} unmanaged ${pluralEntities(unmanaged)} present on the instance (info only).`);
+    if (prune > 0) detail.push(`${prune} ledger-owned ${pluralEntities(prune)} pending reviewed removal (info only).`);
   }
 
   return {

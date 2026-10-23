@@ -149,16 +149,30 @@ const ACTION_CATEGORY: Record<'create' | 'update' | 'delete', DriftCategory> = {
   delete: 'unmanaged',
 };
 
-function toDriftChange(section: SyncPreviewSection, entity: EntityChange): DriftEntityChange | null {
+function blockedPruneKey(entityType: string, remoteId: number): string {
+  return `${entityType}:${remoteId}`;
+}
+
+function toDriftChange(
+  section: SyncPreviewSection,
+  entity: EntityChange,
+  blockedPruneKeys: ReadonlySet<string>
+): DriftEntityChange | null {
   if (entity.action === 'unchanged') {
     return null;
   }
+  // A ledger-owned delete is a pending removal even when its in-use check is blocked/unverified:
+  // the preview carries no `managed` delete row for it, only a `blockedPrunes` entry.
+  const isPrune =
+    entity.action === 'delete' &&
+    (entity.managed === true ||
+      (entity.remoteId !== null && blockedPruneKeys.has(blockedPruneKey(entity.entityType, entity.remoteId))));
   return {
     section,
     entityType: entity.entityType,
     name: entity.name,
     action: entity.action,
-    category: ACTION_CATEGORY[entity.action],
+    category: isPrune ? 'prune' : ACTION_CATEGORY[entity.action],
     remoteId: entity.remoteId,
     fields: entity.fields,
   };
@@ -167,7 +181,8 @@ function toDriftChange(section: SyncPreviewSection, entity: EntityChange): Drift
 function collectSection(
   section: SyncPreviewSection,
   entities: ReadonlyArray<EntityChange | null> | null | undefined,
-  out: DriftEntityChange[]
+  out: DriftEntityChange[],
+  blockedPruneKeys: ReadonlySet<string> = new Set()
 ): void {
   if (!entities) {
     return;
@@ -176,7 +191,7 @@ function collectSection(
     if (!entity) {
       continue;
     }
-    const change = toDriftChange(section, entity);
+    const change = toDriftChange(section, entity, blockedPruneKeys);
     if (change) {
       out.push(change);
     }
@@ -185,7 +200,7 @@ function collectSection(
 
 export interface AggregateResult {
   changes: DriftEntityChange[];
-  counts: { drifted: number; missing: number; unmanaged: number };
+  counts: { drifted: number; missing: number; unmanaged: number; prune: number };
   /** Every available section that ran errored (none produced a result). */
   allSectionsErrored: boolean;
   /** At least one available section errored (partial OR total failure). */
@@ -208,8 +223,13 @@ export function aggregateDrift(
   const changes: DriftEntityChange[] = [];
 
   if (availableSections.has('qualityProfiles') && preview.qualityProfiles) {
-    collectSection('qualityProfiles', preview.qualityProfiles.customFormats, changes);
-    collectSection('qualityProfiles', preview.qualityProfiles.qualityProfiles, changes);
+    const blockedPruneKeys = new Set(
+      (preview.qualityProfiles.blockedPrunes ?? []).map((blocked) =>
+        blockedPruneKey(blocked.entityType, blocked.remoteId)
+      )
+    );
+    collectSection('qualityProfiles', preview.qualityProfiles.customFormats, changes, blockedPruneKeys);
+    collectSection('qualityProfiles', preview.qualityProfiles.qualityProfiles, changes, blockedPruneKeys);
   }
   if (availableSections.has('delayProfiles') && preview.delayProfiles) {
     collectSection('delayProfiles', [preview.delayProfiles.profile], changes);
@@ -223,10 +243,11 @@ export function aggregateDrift(
     collectSection('metadataProfiles', [preview.metadataProfiles.profile], changes);
   }
 
-  const counts = { drifted: 0, missing: 0, unmanaged: 0 };
+  const counts = { drifted: 0, missing: 0, unmanaged: 0, prune: 0 };
   for (const change of changes) {
     if (change.category === 'drift') counts.drifted += 1;
     else if (change.category === 'missing') counts.missing += 1;
+    else if (change.category === 'prune') counts.prune += 1;
     else counts.unmanaged += 1;
   }
 
@@ -257,12 +278,16 @@ function stableHash(input: string): string {
 /**
  * Stable hash over the sorted ALERTING (update+create) changes only, each remoteId-qualified
  * so two same-named managed entities from different databases do not collapse. `null` when
- * there is no alerting drift. `delete`/`unchanged` are excluded so unmanaged churn never
- * perturbs the notification dedup key.
+ * there is no alerting drift. `prune` and `unmanaged` deletes are excluded so planned removal
+ * and unmanaged churn never perturb the notification dedup key.
  */
 export function driftSignature(changes: readonly DriftEntityChange[]): string | null {
   const tokens = changes
-    .filter((change) => change.action === 'update' || change.action === 'create')
+    .filter(
+      (change) =>
+        (change.category === 'drift' || change.category === 'missing') &&
+        (change.action === 'update' || change.action === 'create')
+    )
     .map(
       (change) => `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`
     )
@@ -322,7 +347,7 @@ export async function checkInstanceDrift(
     status,
     reason,
     detectedVersion: null,
-    counts: { drifted: 0, missing: 0, unmanaged: 0 },
+    counts: { drifted: 0, missing: 0, unmanaged: 0, prune: 0 },
     changes: [],
     driftSignature: null,
     checkedAt,

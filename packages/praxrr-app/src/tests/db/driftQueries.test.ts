@@ -185,7 +185,7 @@ migratedTest('driftStatus.upsert then getById round-trips the changes JSON blob 
   assertEquals(detail.arrType, 'radarr');
   assertEquals(detail.status, 'drifted');
   assertEquals(detail.reason, null);
-  assertEquals(detail.counts, { drifted: 1, missing: 1, unmanaged: 0 });
+  assertEquals(detail.counts, { drifted: 1, missing: 1, unmanaged: 0, prune: 0 });
   assertEquals(detail.driftSignature, 'sig-round-trip');
   assertEquals(detail.detectedVersion, '5.14.0.9383');
   assertEquals(detail.checkedAt, '2026-07-08T10:00:00.000Z');

@@ -1,6 +1,6 @@
 import { db } from '../db.ts';
 import type { SyncPreviewArrType } from '$sync/preview/types.ts';
-import type { DriftEntityChange, DriftReason, DriftStatus } from '$sync/drift/types.ts';
+import type { DriftCounts, DriftEntityChange, DriftReason, DriftStatus } from '$sync/drift/types.ts';
 
 /**
  * Row shape for drift_instance_status (byte-aligned to the migration columns).
@@ -32,7 +32,7 @@ export interface DriftInstanceStatusDetail {
   arrType: SyncPreviewArrType;
   status: DriftStatus;
   reason: DriftReason | null;
-  counts: { drifted: number; missing: number; unmanaged: number };
+  counts: DriftCounts;
   driftSignature: string | null;
   notifiedSignature: string | null;
   detectedVersion: string | null;
@@ -75,6 +75,7 @@ function parseChanges(raw: string): DriftEntityChange[] {
 }
 
 function toDetail(row: DriftInstanceStatusRow): DriftInstanceStatusDetail {
+  const changes = parseChanges(row.changes);
   return {
     arrInstanceId: row.arr_instance_id,
     arrType: row.arr_type as SyncPreviewArrType,
@@ -84,11 +85,12 @@ function toDetail(row: DriftInstanceStatusRow): DriftInstanceStatusDetail {
       drifted: row.drifted_count,
       missing: row.missing_count,
       unmanaged: row.unmanaged_count,
+      prune: changes.filter((change) => change.category === 'prune').length,
     },
     driftSignature: row.drift_signature,
     notifiedSignature: row.notified_signature,
     detectedVersion: row.detected_version,
-    changes: parseChanges(row.changes),
+    changes,
     checkedAt: row.checked_at,
     contentCheckedAt: row.content_checked_at,
     durationMs: row.duration_ms,

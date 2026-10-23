@@ -9,11 +9,14 @@ import {
   POST as applyPreviewPost,
   type SyncPreviewApplyDependencies,
 } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
+import type { ApiTokenScope } from '$shared/auth/apiTokenScopes.ts';
+import type { AuthPrincipal } from '$auth/principal.ts';
 import type { components } from '$api/v1.d.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import {
   PREVIEW_STATUS_GENERATING,
   PREVIEW_STATUS_READY,
+  PREVIEW_STATUS_APPLIED,
   previewStore,
   type SyncPreviewCreateInput,
 } from '../../lib/server/sync/preview/store.ts';
@@ -187,6 +190,53 @@ function createApplyRequest(previewId: string, body: string = '{}'): Request {
     headers: { 'content-type': 'application/json' },
     body,
   });
+}
+
+function tokenPrincipal(scopes: readonly ApiTokenScope[]): AuthPrincipal {
+  return {
+    kind: 'token',
+    tokenId: 7,
+    tokenName: 'apply-test',
+    isLegacy: false,
+    scopes,
+  };
+}
+
+function successfulApplyDependencies(): SyncPreviewApplyDependencies {
+  return {
+    getSectionsInProgress: () => [],
+    executeReviewedSyncJob: () =>
+      Promise.resolve({
+        kind: 'executed',
+        result: {
+          status: 'success',
+          output: 'Synced',
+          outcomes: [],
+          syncHistoryId: null,
+        },
+      }),
+    now: Date.now,
+  };
+}
+
+function installManagedDelete(previewId: string, managed: true | undefined): void {
+  const updated = previewStore.updateResult(previewId, {
+    qualityProfiles: {
+      section: 'qualityProfiles',
+      customFormats: [
+        {
+          entityType: 'customFormat',
+          name: 'Removed CF',
+          action: 'delete',
+          remoteId: 41,
+          ...(managed === undefined ? {} : { managed }),
+          fields: [],
+        },
+      ],
+      qualityProfiles: [],
+    },
+  });
+  assert(updated !== null, 'expected the reviewed preview to accept the delete change');
 }
 
 async function createReviewedSnapshot(id: string, createdAtMs: number = Date.now()): Promise<void> {
@@ -1409,4 +1459,90 @@ Deno.test('classifyPreviewFailure maps error TYPE/status to closed codes without
   const timeoutNamed = new Error('slow');
   timeoutNamed.name = 'TimeoutError';
   assertEquals(classifyPreviewFailure(timeoutNamed, 'sonarr').code, 'timeout');
+});
+
+Deno.test('sync preview apply rejects a sync:apply token when the plan has a managed delete', async () => {
+  const previewId = `preview-apply-managed-forbidden-${crypto.randomUUID()}`;
+  await createReviewedSnapshot(previewId);
+  installManagedDelete(previewId, true);
+
+  try {
+    const response = await applyPreviewPost({
+      params: { previewId },
+      locals: { principal: tokenPrincipal(['sync:apply']) },
+      request: createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+    } as unknown as Parameters<typeof applyPreviewPost>[0]);
+
+    assertEquals(response.status, 403);
+    assertEquals(await response.json(), { error: 'Forbidden', requiredScope: 'admin' });
+    assertEquals(previewStore.get(previewId)?.status, PREVIEW_STATUS_READY);
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply allows an admin token to apply a managed delete', async () => {
+  const previewId = `preview-apply-managed-admin-${crypto.randomUUID()}`;
+  await createReviewedSnapshot(previewId);
+  installManagedDelete(previewId, true);
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      successfulApplyDependencies(),
+      tokenPrincipal(['admin'])
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as { success: boolean };
+    assertEquals(payload.success, true);
+    assertEquals(previewStore.get(previewId)?.status, PREVIEW_STATUS_APPLIED);
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply leaves a sync:apply token unchanged when no delete is managed', async () => {
+  const previewId = `preview-apply-unmanaged-delete-${crypto.randomUUID()}`;
+  await createReviewedSnapshot(previewId);
+  installManagedDelete(previewId, undefined);
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['qualityProfiles'] })),
+      successfulApplyDependencies(),
+      tokenPrincipal(['sync:apply'])
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as { success: boolean };
+    assertEquals(payload.success, true);
+    assertEquals(previewStore.get(previewId)?.status, PREVIEW_STATUS_APPLIED);
+  } finally {
+    previewStore.delete(previewId);
+  }
+});
+
+Deno.test('sync preview apply allows a sync:apply token to apply a section without the managed delete', async () => {
+  const previewId = `preview-apply-other-section-${crypto.randomUUID()}`;
+  await createOrderedReviewedSnapshot(previewId, ['qualityProfiles', 'delayProfiles']);
+  installManagedDelete(previewId, true);
+
+  try {
+    const response = await _handleSyncPreviewApplyRequest(
+      previewId,
+      createApplyRequest(previewId, JSON.stringify({ sections: ['delayProfiles'] })),
+      successfulApplyDependencies(),
+      tokenPrincipal(['sync:apply'])
+    );
+
+    assertEquals(response.status, 200);
+    const payload = (await response.json()) as { success: boolean };
+    assertEquals(payload.success, true);
+    assertEquals(previewStore.get(previewId)?.status, PREVIEW_STATUS_APPLIED);
+  } finally {
+    previewStore.delete(previewId);
+  }
 });

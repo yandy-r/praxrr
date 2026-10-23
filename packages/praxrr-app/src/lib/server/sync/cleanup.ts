@@ -6,25 +6,17 @@
  * expected names cannot be determined right now. Those namespaces are kept
  * (fail-safe) so a missing cache never deletes live configs.
  * QPs assigned to media will be skipped (arr returns HTTP 500).
+ *
+ * Scope: by default stale items are additionally limited to ids recorded in the
+ * `arr_managed_entities` ownership ledger (entities Praxrr created). Passing
+ * `includeUnmanaged` restores the legacy everything-unexpected-is-stale scope.
  */
 
 import type { BaseArrClient } from '$utils/arr/base.ts';
-import {
-  getNamespaceSuffix,
-  getTrailingNamespaceSuffix,
-  hasNamespaceSuffix,
-  getTrashGuideNamespaceSuffix,
-  isTrashGuideNamespaceSuffix,
-  stripNamespaceSuffix,
-} from './namespace.ts';
-import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
-import { arrTrashNamespaceQueries } from '$db/queries/arrTrashNamespaces.ts';
+import { hasNamespaceSuffix, stripNamespaceSuffix } from './namespace.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
-import { getCache } from '$pcd/index.ts';
-import { getReferencedCustomFormatNames } from './qualityProfiles/transformer.ts';
-import { resolveTrashSourceProfiles } from './trashSourceProfiles.ts';
+import { arrManagedEntitiesQueries } from '$db/queries/arrManagedEntities.ts';
+import { resolveExpectedArrConfig } from './ownership/expectedConfig.ts';
 import type { SyncArrType } from './mappings.ts';
 import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
@@ -53,148 +45,31 @@ export interface CleanupDeleteResult {
  * Scan an Arr instance for stale configs.
  * Stale = not in the current sync selections and not in a namespace whose
  * expected contents are currently undeterminable.
+ *
+ * With `includeUnmanaged` false (the default) stale items are also limited to
+ * ids in the ownership ledger, so hand-made entities are never listed.
  */
-export async function scanForStaleItems(client: BaseArrClient, instanceId: number): Promise<CleanupScanResult> {
+export async function scanForStaleItems(
+  client: BaseArrClient,
+  instanceId: number,
+  includeUnmanaged = false
+): Promise<CleanupScanResult> {
   const instance = arrInstancesQueries.getById(instanceId);
   if (!instance) throw new Error(`Instance ${instanceId} not found`);
   const arrType = instance.type as SyncArrType;
 
-  // 1. Build expected suffixed QP names and expected CF names from PCD cache
-  const { selections } = arrSyncQueries.getQualityProfilesSync(instanceId);
-  const expectedQPNames = new Set<string>();
-  const expectedCFNames = new Set<string>();
-  const expectedProfiles: { profileName: string; databaseId: number; namespaceIndex: number }[] = [];
-  // Exact trailing suffix runs whose items must all be kept: a selected DB whose cache is
-  // unavailable, or a TRaSH source with a selected profile that no longer resolves.
-  const keepSuffixes = new Set<string>();
-
-  for (const sel of selections) {
-    const nsIndex = arrNamespaceQueries.get(instanceId, sel.databaseId);
-    if (nsIndex === null) continue;
-    const suffix = getNamespaceSuffix(nsIndex);
-
-    expectedQPNames.add(sel.profileName + suffix);
-    expectedProfiles.push({ profileName: sel.profileName, databaseId: sel.databaseId, namespaceIndex: nsIndex });
-
-    // Get CF names from PCD cache for this profile
-    const cache = getCache(sel.databaseId);
-    if (!cache) {
-      if (!keepSuffixes.has(suffix)) {
-        keepSuffixes.add(suffix);
-        await logger.warn('PCD cache unavailable during cleanup scan; keeping all items in its namespace', {
-          source: SOURCE,
-          meta: { instanceId, databaseId: sel.databaseId, namespaceIndex: nsIndex },
-        });
-      }
-      continue;
-    }
-    const cfNames = await getReferencedCustomFormatNames(cache, sel.profileName, arrType);
-    for (const name of cfNames) {
-      expectedCFNames.add(name + suffix);
-    }
-  }
-
-  // 1b. Also include expected names from TRaSH Guide selections. Suffixes are read (never
-  // assigned) from the same persisted per-(instance, source) index the syncer uses.
-  const trashSourceHydrations = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance(instanceId);
-  let keepAllTrashSuffixed = false;
-  // Resolvable sources that have never been synced since persisted TRaSH namespaces shipped.
-  const unassignedTrashSources: { sourceId: number; sourceName: string }[] = [];
-
-  for (const sourceHydration of trashSourceHydrations) {
-    if (sourceHydration.selectedQualityProfiles.length === 0) continue;
-
-    const resolution = await resolveTrashSourceProfiles(sourceHydration, arrType, {
-      logSource: SOURCE,
-      instanceId,
-      rowParseFailedMessage: 'Failed to parse TRaSH cache row during cleanup scan',
-      allRowsMalformedMessage: (sourceName) =>
-        `Failed to parse all TRaSH cache rows for source "${sourceName}" during cleanup scan`,
-      someRowsMalformedMessage:
-        'Some TRaSH cache rows were malformed during cleanup scan; using successfully parsed rows',
-    });
-
-    if (resolution.status === 'no_cache' || resolution.status === 'transform_failed') {
-      // This source's expected contents are unknowable, so no TRaSH namespace can be trusted.
-      keepAllTrashSuffixed = true;
-      await logger.warn('TRaSH source undeterminable during cleanup scan; keeping all TRaSH-suffixed items', {
-        source: SOURCE,
-        meta: {
-          instanceId,
-          sourceId: resolution.source.id,
-          sourceName: resolution.source.name,
-          reason: resolution.status,
-        },
-      });
-      continue;
-    }
-
-    if (resolution.status !== 'resolved') continue;
-
-    // Read-only: cleanup never assigns indexes (YAN-443).
-    const trashIndex = arrTrashNamespaceQueries.get(instanceId, resolution.source.id);
-    if (trashIndex === null) {
-      // Nothing to sync and never synced: this source owns no Arr items.
-      if (resolution.resolvedProfileNames.length === 0) continue;
-      // Resolvable but not yet synced since persisted namespaces shipped: items synced under the
-      // old positional scheme cannot be attributed yet, so keep them until the next sync.
-      keepAllTrashSuffixed = true;
-      unassignedTrashSources.push({ sourceId: resolution.source.id, sourceName: resolution.source.name });
-      continue;
-    }
-    const trashSuffix = getTrashGuideNamespaceSuffix(trashIndex);
-
-    if (resolution.missingProfileNames.length > 0) {
-      // Previously synced copies of the missing profiles (and their CFs) still carry this
-      // suffix; their expected contents are unknown, so keep the whole namespace.
-      keepSuffixes.add(trashSuffix);
-      await logger.warn('TRaSH selected profiles missing from source during cleanup scan; keeping its namespace', {
-        source: SOURCE,
-        meta: {
-          instanceId,
-          sourceId: resolution.source.id,
-          sourceName: resolution.source.name,
-          missingProfiles: resolution.missingProfileNames,
-        },
-      });
-    }
-
-    for (const profileName of resolution.resolvedProfileNames) {
-      const portable = resolution.portableProfilesByName.get(profileName);
-      if (!portable) continue;
-
-      expectedQPNames.add(profileName + trashSuffix);
-
-      for (const score of portable.customFormatScores) {
-        if (score.arrType === arrType || score.arrType === 'all') {
-          expectedCFNames.add(score.customFormatName + trashSuffix);
-        }
-      }
-    }
-  }
-
-  if (unassignedTrashSources.length > 0) {
-    await logger.warn(
-      'TRaSH sources have no namespace assigned yet; keeping all TRaSH-suffixed items until they are synced',
-      { source: SOURCE, meta: { instanceId, sources: unassignedTrashSources } }
-    );
-  }
-
-  // Exact trailing-run comparison: `endsWith` would wrongly match TRaSH suffixes (which end in U+200B).
-  const inKeptNamespace = (name: string): boolean => {
-    const suffix = getTrailingNamespaceSuffix(name);
-    return keepSuffixes.has(suffix) || (keepAllTrashSuffixed && isTrashGuideNamespaceSuffix(suffix));
-  };
+  const { expectedQPNames, expectedCFNames, isKept, expectedProfiles, keptNamespaces, keptAllTrashNamespaces } =
+    await resolveExpectedArrConfig(instanceId, arrType);
 
   // 2. Fetch all CFs and QPs from the arr
   const [remoteCFs, remoteQPs] = await Promise.all([client.getCustomFormats(), client.getQualityProfiles()]);
 
   // 3. Stale QPs = everything not expected and not in a kept namespace
-  const staleQualityProfiles: StaleItem[] = [];
+  let staleQualityProfiles: StaleItem[] = [];
   const qpDecisions: { name: string; id: number; decision: string }[] = [];
 
   for (const qp of remoteQPs) {
-    if (expectedQPNames.has(qp.name) || inKeptNamespace(qp.name)) {
+    if (expectedQPNames.has(qp.name) || isKept(qp.name)) {
       qpDecisions.push({ name: stripNamespaceSuffix(qp.name), id: qp.id, decision: 'keep' });
     } else {
       const displayName = hasNamespaceSuffix(qp.name) ? stripNamespaceSuffix(qp.name) : qp.name;
@@ -204,22 +79,29 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   }
 
   // 4. Stale CFs = everything not expected and not in a kept namespace
-  const staleCustomFormats: StaleItem[] = [];
+  let staleCustomFormats: StaleItem[] = [];
   for (const cf of remoteCFs) {
     if (cf.id == null) continue;
-    if (expectedCFNames.has(cf.name) || inKeptNamespace(cf.name)) continue;
+    if (expectedCFNames.has(cf.name) || isKept(cf.name)) continue;
     const displayName = hasNamespaceSuffix(cf.name) ? stripNamespaceSuffix(cf.name) : cf.name;
     staleCustomFormats.push({ id: cf.id, name: cf.name, strippedName: displayName });
+  }
+
+  if (!includeUnmanaged) {
+    const scoped = await scopeStaleItemsToManaged(instanceId, staleCustomFormats, staleQualityProfiles);
+    staleCustomFormats = scoped.staleCustomFormats;
+    staleQualityProfiles = scoped.staleQualityProfiles;
   }
 
   await logger.debug('Scan complete', {
     source: SOURCE,
     meta: {
       instanceId,
+      includeUnmanaged,
       expectedProfiles,
       expectedCFs: expectedCFNames.size,
-      keptNamespaces: keepSuffixes.size,
-      keptAllTrashNamespaces: keepAllTrashSuffixed,
+      keptNamespaces,
+      keptAllTrashNamespaces,
       qualityProfiles: qpDecisions,
       staleCFs: staleCustomFormats.length,
       staleQPs: staleQualityProfiles.length,
@@ -227,6 +109,33 @@ export async function scanForStaleItems(client: BaseArrClient, instanceId: numbe
   });
 
   return { staleCustomFormats, staleQualityProfiles };
+}
+
+/**
+ * Managed-only scope: require ownership ledger type, id, and exact live name.
+ * A ledger read failure fails closed: no stale items are returned and the error is logged.
+ */
+async function scopeStaleItemsToManaged(
+  instanceId: number,
+  staleCustomFormats: StaleItem[],
+  staleQualityProfiles: StaleItem[]
+): Promise<{ staleCustomFormats: StaleItem[]; staleQualityProfiles: StaleItem[] }> {
+  const managedNames = new Map<string, string>();
+  try {
+    for (const row of arrManagedEntitiesQueries.listForInstance(instanceId)) {
+      managedNames.set(`${row.entityType}:${row.remoteId}`, row.arrName);
+    }
+  } catch (err) {
+    await logger.error('Failed to read the managed entities ledger; reporting no stale items', {
+      source: SOURCE,
+      meta: { instanceId, error: err instanceof Error ? err.message : String(err) },
+    });
+    return { staleCustomFormats: [], staleQualityProfiles: [] };
+  }
+  return {
+    staleCustomFormats: staleCustomFormats.filter((cf) => managedNames.get(`customFormat:${cf.id}`) === cf.name),
+    staleQualityProfiles: staleQualityProfiles.filter((qp) => managedNames.get(`qualityProfile:${qp.id}`) === qp.name),
+  };
 }
 
 /** Reason reported for requested items that a fresh server-side scan no longer considers stale. */
@@ -240,13 +149,17 @@ const REJECTED_LOG_SAMPLE_SIZE = 20;
  * items whose `id` AND `name` match a currently stale item of the same kind.
  * Requested items that are not currently stale are reported (CFs in
  * `failedCustomFormats`, QPs in `skippedQualityProfiles`) and never deleted.
+ *
+ * The re-scan uses the same `includeUnmanaged` scope as the request (YAN-471),
+ * so a managed-only execute can never delete ids outside the ledger.
  */
 export async function executeCleanup(
   client: BaseArrClient,
   instanceId: number,
-  requested: CleanupScanResult
+  requested: CleanupScanResult,
+  includeUnmanaged = false
 ): Promise<CleanupDeleteResult> {
-  const fresh = await scanForStaleItems(client, instanceId);
+  const fresh = await scanForStaleItems(client, instanceId, includeUnmanaged);
 
   const partition = (requestedItems: StaleItem[], freshItems: StaleItem[]) => {
     const freshById = new Map(freshItems.map((item) => [item.id, item]));
@@ -296,7 +209,34 @@ export async function executeCleanup(
   for (const item of qps.rejected) {
     result.skippedQualityProfiles.push({ item, reason: NO_LONGER_STALE_REASON });
   }
+  await dropDeletedFromLedger(instanceId, result);
   return result;
+}
+
+/**
+ * Remove ledger rows for entities that were actually deleted, in both scopes, so
+ * the ledger never claims ownership of remote ids that no longer exist.
+ */
+async function dropDeletedFromLedger(instanceId: number, result: CleanupDeleteResult): Promise<void> {
+  const removals: { entityType: 'customFormat' | 'qualityProfile'; remoteId: number }[] = [
+    ...result.deletedCustomFormats.map((cf) => ({ entityType: 'customFormat' as const, remoteId: cf.id })),
+    ...result.deletedQualityProfiles.map((qp) => ({ entityType: 'qualityProfile' as const, remoteId: qp.id })),
+  ];
+  for (const removal of removals) {
+    try {
+      arrManagedEntitiesQueries.deleteConfirmed(instanceId, removal.entityType, removal.remoteId);
+    } catch (err) {
+      await logger.error('Failed to remove a deleted entity from the managed entities ledger', {
+        source: SOURCE,
+        meta: {
+          instanceId,
+          entityType: removal.entityType,
+          remoteId: removal.remoteId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      });
+    }
+  }
 }
 
 /**

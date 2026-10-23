@@ -25,6 +25,13 @@ import { type TrashGuideSyncQualityProfileSourceHydration, trashGuideSyncQueries
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
+import { recordConfirmedWrite } from '../ownership/record.ts';
+import { executePrunes } from '../ownership/executePrunes.ts';
+import { isSyncHistoryEnabled } from '../syncHistory/record.ts';
+import type { PrunePlanItem } from '../ownership/planPrunes.ts';
+import { blockedPrunesField, markManagedDeletes, planPreviewPrunes } from '../ownership/previewPrunes.ts';
+import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { type ArrManagedEntity, arrManagedEntitiesQueries } from '$db/queries/arrManagedEntities.ts';
 import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
 import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
 import { getAllQualities, type SyncArrType } from '../mappings.ts';
@@ -162,6 +169,7 @@ interface QualityProfilesPreparedExecutionContext extends SyncPreviewPreparedExe
   readonly materialPlan: {
     readonly arrType: SyncArrType;
     readonly batchOrder: readonly string[];
+    readonly prunes: readonly PrunePlanItem[];
   };
   readonly currentGuards: {
     readonly customFormats: readonly ArrCustomFormat[];
@@ -199,6 +207,7 @@ function isQualityProfilesPreparedContext(
   return (
     (materialPlan.arrType === 'radarr' || materialPlan.arrType === 'sonarr' || materialPlan.arrType === 'lidarr') &&
     Array.isArray(materialPlan.batchOrder) &&
+    Array.isArray(materialPlan.prunes) &&
     Array.isArray(desired.batches)
   );
 }
@@ -385,7 +394,8 @@ export class QualityProfileSyncer extends BaseSyncer {
           this.instanceId,
           this.instanceType,
           batch.customFormats,
-          batch.suffix
+          batch.suffix,
+          { sourceKind: batch.sourceKind, databaseId: batch.databaseId }
         );
         batch.pcdFormatIdMap = cfResult.pcdFormatIdMap;
         outcomes.push(...cfResult.outcomes);
@@ -413,7 +423,8 @@ export class QualityProfileSyncer extends BaseSyncer {
           qualityMappings,
           existingMap,
           failedProfiles,
-          outcomes
+          outcomes,
+          { sourceKind: batch.sourceKind, databaseId: batch.databaseId }
         );
         allSyncedProfiles.push(...synced);
       }
@@ -473,12 +484,37 @@ export class QualityProfileSyncer extends BaseSyncer {
       const batches = await this.fetchSyncBatches(undefined, effectiveConfig, 'predict');
       this.recordPreviewEvidence('qualityProfiles', 'pcd', 'sourceBatches', batches.map(projectBatchEvidence));
       const totalProfiles = batches.reduce((sum, batch) => sum + batch.profiles.length, 0);
+
+      // Opt-in pruning policy is read fresh for every preview so a toggle takes effect on the next
+      // review. Evidence binds both the policy and the ledger the plan was derived from.
+      const pruneEnabled = arrInstancesQueries.isPruneRemovedManagedEnabled(this.instanceId);
+      this.recordPreviewEvidence('qualityProfiles', 'pcd', 'pruneEnabled', pruneEnabled);
+      const ledger = pruneEnabled ? arrManagedEntitiesQueries.listForInstance(this.instanceId) : [];
+      if (pruneEnabled) {
+        // Timestamps change on every confirmed write; only identity fields bind the review.
+        this.recordPreviewEvidence(
+          'qualityProfiles',
+          'pcd',
+          'managedLedger',
+          ledger.map(({ entityType, remoteId, arrName, pcdName, databaseId, sourceKind }) => ({
+            entityType,
+            remoteId,
+            arrName,
+            pcdName,
+            databaseId,
+            sourceKind,
+          }))
+        );
+      }
+      const pruneLedger = pruneEnabled && ledger.length > 0 ? ledger : null;
+
       if (totalProfiles === 0) {
+        if (pruneLedger) return await this.generateEmptySelectionPrunePreview(effectiveConfig, pruneLedger);
         this.preparePreviewExecution({
           section: 'qualityProfiles',
           config: effectiveConfig,
           desired: { batches: [] },
-          materialPlan: { arrType: this.instanceType, batchOrder: [] },
+          materialPlan: { arrType: this.instanceType, batchOrder: [], prunes: [] },
           currentGuards: { customFormats: [], qualityProfiles: [] },
         });
         return {
@@ -595,10 +631,32 @@ export class QualityProfileSyncer extends BaseSyncer {
         arrayKeyStrategies: QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
       });
 
+      const prunePlan = pruneLedger
+        ? await planPreviewPrunes({
+            client: this.client,
+            instanceId: this.instanceId,
+            instanceType: this.instanceType,
+            reviewed: this.hasPreviewReviewRecorder(),
+            ledger: pruneLedger,
+            desiredCustomFormats,
+            desiredProfiles,
+            liveCustomFormats: allArrCustomFormats,
+            liveQualityProfiles: allArrProfiles,
+          })
+        : null;
+
+      const markedCustomFormatChanges = prunePlan
+        ? markManagedDeletes(customFormatChanges, 'customFormat', prunePlan.prunes)
+        : customFormatChanges;
+      const markedQualityProfileChanges = prunePlan
+        ? markManagedDeletes(qualityProfileChanges, 'qualityProfile', prunePlan.prunes)
+        : qualityProfileChanges;
+
       const result: QualityProfilesPreview = {
         section: 'qualityProfiles',
-        customFormats: customFormatChanges,
-        qualityProfiles: qualityProfileChanges,
+        customFormats: markedCustomFormatChanges,
+        qualityProfiles: markedQualityProfileChanges,
+        ...blockedPrunesField(prunePlan?.blocked ?? []),
       };
 
       this.preparePreviewExecution({
@@ -610,6 +668,7 @@ export class QualityProfileSyncer extends BaseSyncer {
           batchOrder: preparedBatches.map(
             (batch) => `${batch.sourceKind}:${batch.databaseId}:${batch.sourceLabel}:${batch.suffix}`
           ),
+          prunes: prunePlan?.prunes ?? [],
         },
         currentGuards: {
           customFormats: allArrCustomFormats,
@@ -641,6 +700,78 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       throw error;
     }
+  }
+
+  /**
+   * No profile is selected but the policy is on and the ledger is non-empty: everything Praxrr
+   * created and no longer desires may still be pruned. Live Arr evidence is recorded under the same
+   * keys as the normal path so a reviewed apply binds to it.
+   */
+  private async generateEmptySelectionPrunePreview(
+    effectiveConfig: QualityProfilesPreviewConfig,
+    ledger: readonly ArrManagedEntity[]
+  ): Promise<QualityProfilesPreview> {
+    const allArrCustomFormats = await this.client.getCustomFormats();
+    this.recordPreviewEvidence('qualityProfiles', 'arr', 'customFormats', allArrCustomFormats);
+    const allArrProfiles = await this.client.getQualityProfiles();
+    this.recordPreviewEvidence('qualityProfiles', 'arr', 'qualityProfiles', allArrProfiles);
+
+    const prunePlan = await planPreviewPrunes({
+      client: this.client,
+      instanceId: this.instanceId,
+      instanceType: this.instanceType,
+      reviewed: this.hasPreviewReviewRecorder(),
+      ledger,
+      desiredCustomFormats: [],
+      desiredProfiles: [],
+      liveCustomFormats: allArrCustomFormats,
+      liveQualityProfiles: allArrProfiles,
+    });
+
+    const customFormats = markManagedDeletes(
+      diffEntityCollection<PreviewComparableCustomFormat, PreviewComparableCustomFormat>({
+        entityType: 'customFormat',
+        desiredEntities: [],
+        currentEntities: allArrCustomFormats as unknown as readonly PreviewComparableCustomFormat[],
+        desiredName: (entity) => entity.name,
+        currentName: (entity) => entity.name,
+        currentRemoteId: (entity) => entity.id ?? null,
+        arrayKeyStrategies: CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
+      }),
+      'customFormat',
+      prunePlan.prunes
+    );
+    const qualityProfiles = markManagedDeletes(
+      diffEntityCollection<PreviewComparableQualityProfile, PreviewComparableQualityProfile>({
+        entityType: 'qualityProfile',
+        desiredEntities: [],
+        currentEntities: allArrProfiles as unknown as readonly PreviewComparableQualityProfile[],
+        desiredName: (entity) => entity.name,
+        currentName: (entity) => entity.name,
+        currentRemoteId: (entity) => entity.id ?? null,
+        arrayKeyStrategies: QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
+      }),
+      'qualityProfile',
+      prunePlan.prunes
+    );
+
+    this.preparePreviewExecution({
+      section: 'qualityProfiles',
+      config: effectiveConfig,
+      desired: { batches: [] },
+      materialPlan: { arrType: this.instanceType, batchOrder: [], prunes: prunePlan.prunes },
+      currentGuards: {
+        customFormats: allArrCustomFormats,
+        qualityProfiles: allArrProfiles as unknown as PreviewComparableQualityProfile[],
+      },
+    });
+
+    return {
+      section: 'qualityProfiles',
+      customFormats,
+      qualityProfiles,
+      ...blockedPrunesField(prunePlan.blocked),
+    };
   }
 
   /** Execute a reviewed plan without resolving config, PCD entities, mappings, or live Arr state again. */
@@ -725,6 +856,11 @@ export class QualityProfileSyncer extends BaseSyncer {
             payload,
           });
           outcomes.push(write.outcome);
+          recordConfirmedWrite(this.instanceId, write.outcome, {
+            sourceKind: batch.sourceKind,
+            databaseId: batch.databaseId,
+            arrName: payload.name,
+          });
           if (typeof plannedId === 'number' && plannedId < 0 && write.remoteId !== null) {
             createdFormatIds.set(plannedId, write.remoteId);
           }
@@ -778,17 +914,32 @@ export class QualityProfileSyncer extends BaseSyncer {
             remoteId: prepared.remoteId,
           });
           outcomes.push(write.outcome);
+          recordConfirmedWrite(this.instanceId, write.outcome, {
+            sourceKind: batch.sourceKind,
+            databaseId: batch.databaseId,
+            arrName: payload.name,
+          });
           if (write.summary) syncedProfiles += 1;
           else failedProfiles.add(prepared.pcdName);
         }
       }
 
-      return failedProfiles.size > 0
+      const pruneResult = await this.pruneReviewedEntities(context, outcomes, failedProfiles);
+      const errors: string[] = [];
+      if (failedProfiles.size > 0) errors.push(`Failed to sync ${failedProfiles.size} quality profile(s)`);
+      if (pruneResult.failedDeletes > 0) {
+        errors.push(`Failed to delete ${pruneResult.failedDeletes} managed entity(ies)`);
+      }
+      if (pruneResult.skippedDeletes > 0) {
+        errors.push(pruneResult.skipReason ?? `Skipped ${pruneResult.skippedDeletes} reviewed deletion(s)`);
+      }
+
+      return errors.length > 0
         ? {
             success: false,
             itemsSynced: syncedProfiles,
-            failedProfiles: [...failedProfiles],
-            error: `Failed to sync ${failedProfiles.size} quality profile(s)`,
+            ...(failedProfiles.size > 0 ? { failedProfiles: [...failedProfiles] } : {}),
+            error: errors.join('; '),
             outcomes,
           }
         : { success: true, itemsSynced: syncedProfiles, outcomes };
@@ -805,6 +956,67 @@ export class QualityProfileSyncer extends BaseSyncer {
         outcomes,
       };
     }
+  }
+
+  /** Reviewed deletes fail closed after any write failure and produce explicit outcomes. */
+  private async pruneReviewedEntities(
+    context: Readonly<QualityProfilesPreparedExecutionContext>,
+    outcomes: SyncEntityOutcome[],
+    failedProfiles: ReadonlySet<string>
+  ): Promise<{ failedDeletes: number; skippedDeletes: number; skipReason?: string }> {
+    const prunes = context.materialPlan.prunes;
+    if (prunes.length === 0) return { failedDeletes: 0, skippedDeletes: 0 };
+
+    if (failedProfiles.size > 0 || outcomes.some((outcome) => outcome.status === 'failed')) {
+      await logger.warn(`Skipping reviewed prunes for "${this.instanceName}": a write failed in this run`, {
+        source: 'Sync:QualityProfiles',
+        meta: { instanceId: this.instanceId, plannedPrunes: prunes.length },
+      });
+      const reason = `Skipped ${prunes.length} reviewed deletion(s) because a write failed`;
+      for (const item of prunes) {
+        outcomes.push({
+          section: 'qualityProfiles',
+          arrType: this.instanceType,
+          entityType: item.entityType,
+          name: item.pcdName,
+          action: 'delete',
+          status: 'skipped',
+          remoteId: String(item.remoteId),
+          reason,
+        });
+      }
+      return { failedDeletes: 0, skippedDeletes: prunes.length, skipReason: reason };
+    }
+
+    if (!isSyncHistoryEnabled()) {
+      await logger.warn('Reviewed deletions will have no sync history record because sync history is disabled', {
+        source: 'Sync:QualityProfiles',
+        meta: { instanceId: this.instanceId, plannedPrunes: prunes.length },
+      });
+    }
+    const pruneOutcomes = await executePrunes(this.client, this.instanceId, this.instanceType, prunes, {
+      customFormats: context.currentGuards.customFormats,
+      qualityProfiles: context.currentGuards.qualityProfiles.map(({ id, name, formatItems }) => ({
+        id,
+        name,
+        formatItems: Array.isArray(formatItems)
+          ? formatItems.map((value: unknown) => {
+              if (typeof value !== 'object' || value === null) throw new Error('Invalid reviewed format reference');
+              const item = value as Record<string, unknown>;
+              return {
+                ...(typeof item.format === 'number' ? { format: item.format } : {}),
+                ...(typeof item.name === 'string' ? { name: item.name } : {}),
+                ...(typeof item.score === 'number' ? { score: item.score } : {}),
+              };
+            })
+          : undefined,
+      })),
+    });
+    outcomes.push(...pruneOutcomes);
+    return {
+      failedDeletes: pruneOutcomes.filter((outcome) => outcome.status === 'failed').length,
+      skippedDeletes: pruneOutcomes.filter((outcome) => outcome.status === 'skipped').length,
+    };
   }
 
   /**
@@ -1261,7 +1473,8 @@ export class QualityProfileSyncer extends BaseSyncer {
     qualityMappings: Map<string, string>,
     existingMap: Map<string, number>,
     failedProfiles: Set<string>,
-    outcomes: SyncEntityOutcome[]
+    outcomes: SyncEntityOutcome[],
+    provenance: { readonly sourceKind: 'pcd' | 'trash'; readonly databaseId: number }
   ): Promise<SyncedProfileSummary[]> {
     const syncedProfiles: SyncedProfileSummary[] = [];
 
@@ -1303,6 +1516,7 @@ export class QualityProfileSyncer extends BaseSyncer {
         remoteId: existingMap.get(suffixedName) ?? null,
       });
       outcomes.push(write.outcome);
+      recordConfirmedWrite(this.instanceId, write.outcome, { ...provenance, arrName: suffixedName });
       if (write.summary && write.remoteId !== null) {
         syncedProfiles.push(write.summary);
         existingMap.set(suffixedName, write.remoteId);

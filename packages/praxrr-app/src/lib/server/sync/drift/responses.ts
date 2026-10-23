@@ -12,7 +12,7 @@ import type { DriftCounts, DriftEntityChange, DriftReason, DriftStatus } from '.
 
 export type DriftSummaryStatus = DriftStatus | 'never-checked';
 
-const ZERO_COUNTS: DriftCounts = { drifted: 0, missing: 0, unmanaged: 0 };
+const ZERO_COUNTS: DriftCounts = { drifted: 0, missing: 0, unmanaged: 0, prune: 0 };
 
 export interface DriftSettingsResponse {
   enabled: boolean;
@@ -89,6 +89,7 @@ export interface DriftDetailResponse {
   drift: DriftEntityChange[];
   missing: DriftEntityChange[];
   unmanaged: DriftEntityChange[];
+  prune: DriftEntityChange[];
 }
 
 export function toDriftDetail(instance: ArrInstance, row: DriftInstanceStatusDetail | undefined): DriftDetailResponse {
@@ -106,6 +107,7 @@ export function toDriftDetail(instance: ArrInstance, row: DriftInstanceStatusDet
       drift: [],
       missing: [],
       unmanaged: [],
+      prune: [],
     };
   }
   return {
@@ -121,5 +123,6 @@ export function toDriftDetail(instance: ArrInstance, row: DriftInstanceStatusDet
     drift: row.changes.filter((change) => change.category === 'drift'),
     missing: row.changes.filter((change) => change.category === 'missing'),
     unmanaged: row.changes.filter((change) => change.category === 'unmanaged'),
+    prune: row.changes.filter((change) => change.category === 'prune'),
   };
 }

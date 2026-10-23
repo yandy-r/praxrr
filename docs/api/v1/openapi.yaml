@@ -969,6 +969,8 @@ components:
       $ref: './schemas/sync.yaml#/SyncEntityOutcome'
     QualityProfilesPreview:
       $ref: './schemas/sync.yaml#/QualityProfilesPreview'
+    BlockedPrune:
+      $ref: './schemas/sync.yaml#/BlockedPrune'
     DelayProfilesPreview:
       $ref: './schemas/sync.yaml#/DelayProfilesPreview'
     MediaManagementPreview:

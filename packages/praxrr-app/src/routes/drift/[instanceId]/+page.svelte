@@ -189,6 +189,7 @@
         <span>Drifted {detail.counts.drifted}</span>
         <span>Missing {detail.counts.missing}</span>
         <span>Unmanaged {detail.counts.unmanaged}</span>
+        <span>Pending removal {detail.counts.prune}</span>
         <span>Checked {formatWhen(detail.checkedAt)}</span>
       </div>
 
@@ -203,12 +204,12 @@
             {verbose ? 'Hide details' : 'Show details'}
           </button>
         </div>
-        {#if detail.counts.drifted > 0 || detail.counts.missing > 0 || detail.counts.unmanaged > 0}
+        {#if detail.counts.drifted > 0 || detail.counts.missing > 0 || detail.counts.unmanaged > 0 || detail.counts.prune > 0}
           <NarrationBlock line={narrateDriftCounts(detail.counts, detail.status, level)} {verbose} />
         {/if}
       </div>
 
-      {#if detail.drift.length === 0 && detail.missing.length === 0 && detail.unmanaged.length === 0}
+      {#if detail.drift.length === 0 && detail.missing.length === 0 && detail.unmanaged.length === 0 && detail.prune.length === 0}
         <div
           class="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-200"
         >
@@ -265,6 +266,25 @@
             {/each}
           </div>
         </details>
+      {/if}
+      {#if detail.prune.length > 0}
+        <section class="space-y-3">
+          <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+            Pending removal <span class="text-neutral-500 dark:text-neutral-400">({detail.prune.length})</span>
+          </h2>
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            Praxrr-managed entities that are no longer in your database. A reviewed sync deletes them when pruning is
+            on.
+          </p>
+          <div class="space-y-2">
+            {#each detail.prune as change (`${change.section}:${change.entityType}:${change.name}:${change.remoteId ?? ''}`)}
+              <div class="space-y-2">
+                <NarrationBlock line={narrateDriftEntity(change, detail.arrType, level)} {verbose} />
+                <DriftFieldDiff {change} />
+              </div>
+            {/each}
+          </div>
+        </section>
       {/if}
     {/if}
   {/if}

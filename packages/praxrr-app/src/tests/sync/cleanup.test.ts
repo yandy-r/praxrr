@@ -14,6 +14,8 @@ import type { PCDCache } from '$pcd/index.ts';
 import { clearAllCaches, setCache } from '$pcd/database/registry.ts';
 import { logger } from '$logger/logger.ts';
 import { deleteStaleItems, executeCleanup, NO_LONGER_STALE_REASON, scanForStaleItems } from '$sync/cleanup.ts';
+import { arrManagedEntitiesQueries } from '$db/queries/arrManagedEntities.ts';
+import type { ArrManagedEntity, ManagedEntityType } from '$db/queries/arrManagedEntities.ts';
 
 const INSTANCE_ID = 3;
 const INSTANCE_TYPE = 'radarr';
@@ -65,9 +67,15 @@ function withCleanupQueryStubs(setup: () => void): () => void {
   const originalTrashSources = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
   const originalTrashSourceById = trashGuideSourcesQueries.getById;
   const originalTrashCacheBySource = trashGuideEntityCacheQueries.getBySource;
+  const originalManagedListForInstance = arrManagedEntitiesQueries.listForInstance;
+  const originalManagedDeleteConfirmed = arrManagedEntitiesQueries.deleteConfirmed;
   const restoreLogger = withNoopLogger();
   // Default: every TRaSH source already holds persisted index 1; tests override per source.
   arrTrashNamespaceQueries.get = () => 1;
+  // Default ledger: nothing is Praxrr-managed, and confirmed deletes are recorded nowhere.
+  // Tests that exercise the managed scope override these inside `setup`.
+  arrManagedEntitiesQueries.listForInstance = () => [];
+  arrManagedEntitiesQueries.deleteConfirmed = () => {};
 
   setup();
 
@@ -79,18 +87,22 @@ function withCleanupQueryStubs(setup: () => void): () => void {
     trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = originalTrashSources;
     trashGuideSourcesQueries.getById = originalTrashSourceById;
     trashGuideEntityCacheQueries.getBySource = originalTrashCacheBySource;
+    arrManagedEntitiesQueries.listForInstance = originalManagedListForInstance;
+    arrManagedEntitiesQueries.deleteConfirmed = originalManagedDeleteConfirmed;
     clearAllCaches();
     restoreLogger();
   };
 }
 
-function createFakePcdCache(customFormatNames: string[]): PCDCache {
+function createFakePcdCache(customFormatNames: string[], profileExists = true): PCDCache {
   const names = [...customFormatNames];
   return {
     kb: {
-      selectFrom: () => ({
+      selectFrom: (table: string) => ({
         select: () => ({
           where: () => ({
+            executeTakeFirst: async () =>
+              table === 'quality_profiles' && profileExists ? { name: 'Profile' } : undefined,
             where: () => ({
               execute: async () => names.map((customFormatName) => ({ custom_format_name: customFormatName })),
             }),
@@ -210,7 +222,7 @@ Deno.test('scanForStaleItems: keeps expected names from both PCD and TRaSH scope
       ],
     } as unknown as BaseArrClient;
 
-    const result = await scanForStaleItems(client, INSTANCE_ID);
+    const result = await scanForStaleItems(client, INSTANCE_ID, true);
 
     assertEquals(result.staleCustomFormats, [{ id: 503, name: 'Unrelated CF', strippedName: 'Unrelated CF' }]);
     assertEquals(result.staleQualityProfiles, [
@@ -460,7 +472,8 @@ Deno.test('scanForStaleItems: keeps exact namespace of a PCD selection whose cac
           { id: 604, name: `Old Cached Profile${cachedSuffix}` },
         ]
       ),
-      INSTANCE_ID
+      INSTANCE_ID,
+      true
     );
 
     assertEquals(
@@ -513,7 +526,8 @@ Deno.test('scanForStaleItems: TRaSH suffixes come from persisted per-source inde
           { id: 603, name: `Removed Profile${sourceASuffix}` },
         ]
       ),
-      INSTANCE_ID
+      INSTANCE_ID,
+      true
     );
 
     assertEquals(
@@ -552,7 +566,8 @@ Deno.test('scanForStaleItems: resolvable TRaSH source with no persisted index ke
         ],
         [{ id: 601, name: `P1${getTrashGuideNamespaceSuffix(1)}` }]
       ),
-      INSTANCE_ID
+      INSTANCE_ID,
+      true
     );
 
     assertEquals(
@@ -595,7 +610,8 @@ Deno.test('scanForStaleItems: keeps the namespace of a TRaSH source with a selec
           { id: 604, name: 'Unrelated Profile' },
         ]
       ),
-      INSTANCE_ID
+      INSTANCE_ID,
+      true
     );
 
     assertEquals(
@@ -635,7 +651,8 @@ Deno.test('scanForStaleItems: TRaSH source with empty cache keeps every TRaSH-su
           { id: 602, name: `DB Profile${ZWSP}` },
         ]
       ),
-      INSTANCE_ID
+      INSTANCE_ID,
+      true
     );
 
     assertEquals(
@@ -684,20 +701,25 @@ Deno.test('executeCleanup: does not delete requested items that are no longer st
   const liveCf = { id: 501, name: `Live CF${ZWSP}`, strippedName: 'Live CF' };
   const liveQp = { id: 601, name: `Live Profile${ZWSP}`, strippedName: 'Live Profile' };
   try {
-    const result = await executeCleanup(client, INSTANCE_ID, {
-      // Duplicates keep the first entry: neither deleted twice nor reported as rejected.
-      staleCustomFormats: [
-        liveCf,
-        { id: 502, name: 'Old CF', strippedName: 'Old CF' },
-        { id: 502, name: 'Old CF', strippedName: 'Old CF' },
-        { id: 501, name: 'Mismatched Duplicate', strippedName: 'Mismatched Duplicate' },
-      ],
-      staleQualityProfiles: [
-        liveQp,
-        { id: 602, name: 'Old Profile', strippedName: 'Old Profile' },
-        { id: 602, name: 'Old Profile', strippedName: 'Old Profile' },
-      ],
-    });
+    const result = await executeCleanup(
+      client,
+      INSTANCE_ID,
+      {
+        // Duplicates keep the first entry: neither deleted twice nor reported as rejected.
+        staleCustomFormats: [
+          liveCf,
+          { id: 502, name: 'Old CF', strippedName: 'Old CF' },
+          { id: 502, name: 'Old CF', strippedName: 'Old CF' },
+          { id: 501, name: 'Mismatched Duplicate', strippedName: 'Mismatched Duplicate' },
+        ],
+        staleQualityProfiles: [
+          liveQp,
+          { id: 602, name: 'Old Profile', strippedName: 'Old Profile' },
+          { id: 602, name: 'Old Profile', strippedName: 'Old Profile' },
+        ],
+      },
+      true
+    );
 
     assertEquals(deleted, { cfs: [502], qps: [602] });
     assertEquals(result.deletedCustomFormats, [{ id: 502, name: 'Old CF', strippedName: 'Old CF' }]);
@@ -716,10 +738,15 @@ Deno.test('executeCleanup: does not delete items whose id and name do not both m
   const replayedCf = { id: 502, name: 'Other Instance CF', strippedName: 'Other Instance CF' };
   const replayedQp = { id: 602, name: 'Other Instance Profile', strippedName: 'Other Instance Profile' };
   try {
-    const result = await executeCleanup(client, INSTANCE_ID, {
-      staleCustomFormats: [replayedCf],
-      staleQualityProfiles: [replayedQp],
-    });
+    const result = await executeCleanup(
+      client,
+      INSTANCE_ID,
+      {
+        staleCustomFormats: [replayedCf],
+        staleQualityProfiles: [replayedQp],
+      },
+      true
+    );
 
     assertEquals(deleted, { cfs: [], qps: [] });
     assertEquals(result.deletedCustomFormats, []);
@@ -728,5 +755,221 @@ Deno.test('executeCleanup: does not delete items whose id and name do not both m
     assertEquals(result.skippedQualityProfiles, [{ item: replayedQp, reason: NO_LONGER_STALE_REASON }]);
   } finally {
     restore();
+  }
+});
+
+// --- YAN-516: cleanup scoped to the ownership ledger by default ---
+
+/**
+ * Live instance state: 'Live CF'/'Live Profile' are expected (current selection),
+ * 'Old CF'/'Old Profile' and 'Unrelated CF' are unexpected. `managed` controls
+ * which remote ids the ownership ledger claims.
+ */
+function scopedFixture(managed: Partial<Record<ManagedEntityType, number[]>>): {
+  restore: () => void;
+  client: BaseArrClient;
+  deleted: { entityType: ManagedEntityType; remoteId: number }[];
+} {
+  const deleted: { entityType: ManagedEntityType; remoteId: number }[] = [];
+  const restore = withCleanupQueryStubs(() => {
+    stubInstance();
+    stubPcdSelections([{ databaseId: PCD_DATABASE_ID, profileName: 'Live Profile' }]);
+    arrNamespaceQueries.get = () => 1;
+    stubTrashHydrations([]);
+    setCache(PCD_DATABASE_ID, createFakePcdCache(['Live CF']));
+    arrManagedEntitiesQueries.listForInstance = () =>
+      Object.entries(managed).flatMap(([entityType, ids]) =>
+        ids.map(
+          (remoteId) =>
+            ({
+              entityType,
+              remoteId,
+              arrName: remoteId === 502 ? 'Old CF' : remoteId === 602 ? 'Old Profile' : 'Unrelated CF',
+            }) as ArrManagedEntity
+        )
+      );
+    arrManagedEntitiesQueries.deleteConfirmed = (
+      _instanceId: number,
+      entityType: ManagedEntityType,
+      remoteId: number
+    ) => {
+      deleted.push({ entityType, remoteId });
+    };
+  });
+  const client = {
+    getCustomFormats: async () => [
+      { id: 501, name: `Live CF${ZWSP}` },
+      { id: 502, name: 'Old CF' },
+      { id: 503, name: 'Unrelated CF' },
+    ],
+    getQualityProfiles: async () => [
+      { id: 601, name: `Live Profile${ZWSP}` },
+      { id: 602, name: 'Old Profile' },
+    ],
+    deleteCustomFormat: async (_id: number) => {},
+    deleteQualityProfile: async (_id: number) => {},
+  } as unknown as BaseArrClient;
+  return { restore, client, deleted };
+}
+
+Deno.test('scanForStaleItems: default scope excludes hand-made unexpected items', async () => {
+  const { restore, client } = scopedFixture({ customFormat: [502] });
+  try {
+    const result = await scanForStaleItems(client, INSTANCE_ID);
+
+    // Only the ledger-managed 'Old CF' is stale; hand-made 'Unrelated CF' and the
+    // unmanaged 'Old Profile' are outside the default scope.
+    assertEquals(result.staleCustomFormats, [{ id: 502, name: 'Old CF', strippedName: 'Old CF' }]);
+    assertEquals(result.staleQualityProfiles, []);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('scanForStaleItems: includeUnmanaged lists hand-made unexpected items', async () => {
+  const { restore, client } = scopedFixture({ customFormat: [502] });
+  try {
+    const result = await scanForStaleItems(client, INSTANCE_ID, true);
+
+    assertEquals(
+      result.staleCustomFormats.map((item) => item.id),
+      [502, 503]
+    );
+    assertEquals(
+      result.staleQualityProfiles.map((item) => item.id),
+      [602]
+    );
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('scanForStaleItems: ledger read failure fails closed with an empty stale list', async () => {
+  const restore = withCleanupQueryStubs(() => {
+    stubInstance();
+    stubPcdSelections([{ databaseId: PCD_DATABASE_ID, profileName: 'Live Profile' }]);
+    arrNamespaceQueries.get = () => 1;
+    stubTrashHydrations([]);
+    setCache(PCD_DATABASE_ID, createFakePcdCache(['Live CF']));
+    arrManagedEntitiesQueries.listForInstance = () => {
+      throw new Error('ledger unavailable');
+    };
+  });
+
+  try {
+    const result = await scanForStaleItems(remoteClient([{ id: 502, name: 'Old CF' }], []), INSTANCE_ID);
+
+    assertEquals(result.staleCustomFormats, []);
+    assertEquals(result.staleQualityProfiles, []);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('executeCleanup: default scope cannot delete an unmanaged id', async () => {
+  const { restore, client, deleted } = scopedFixture({ customFormat: [502] });
+  try {
+    const result = await executeCleanup(client, INSTANCE_ID, {
+      staleCustomFormats: [
+        { id: 502, name: 'Old CF', strippedName: 'Old CF' },
+        { id: 503, name: 'Unrelated CF', strippedName: 'Unrelated CF' },
+      ],
+      staleQualityProfiles: [{ id: 602, name: 'Old Profile', strippedName: 'Old Profile' }],
+    });
+
+    // The fresh re-scan under the same managed-only scope is the deletion authority:
+    // only the ledger-owned 'Old CF' is deleted.
+    assertEquals(result.deletedCustomFormats, [{ id: 502, name: 'Old CF', strippedName: 'Old CF' }]);
+    assertEquals(result.deletedQualityProfiles, []);
+    assertEquals(result.failedCustomFormats, [
+      { item: { id: 503, name: 'Unrelated CF', strippedName: 'Unrelated CF' }, reason: NO_LONGER_STALE_REASON },
+    ]);
+    assertEquals(result.skippedQualityProfiles, [
+      { item: { id: 602, name: 'Old Profile', strippedName: 'Old Profile' }, reason: NO_LONGER_STALE_REASON },
+    ]);
+    assertEquals(deleted, [{ entityType: 'customFormat', remoteId: 502 }]);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('scanForStaleItems: ledger id with a different recorded name is not managed', async () => {
+  const { restore, client } = scopedFixture({ customFormat: [502], qualityProfile: [602] });
+  arrManagedEntitiesQueries.listForInstance = () =>
+    [
+      { entityType: 'customFormat', remoteId: 502, arrName: 'Original CF' },
+      { entityType: 'qualityProfile', remoteId: 602, arrName: 'Original Profile' },
+    ] as ArrManagedEntity[];
+  try {
+    const result = await scanForStaleItems(client, INSTANCE_ID);
+    assertEquals(result.staleCustomFormats, []);
+    assertEquals(result.staleQualityProfiles, []);
+    const execution = await executeCleanup(client, INSTANCE_ID, {
+      staleCustomFormats: [{ id: 502, name: 'Old CF', strippedName: 'Old CF' }],
+      staleQualityProfiles: [{ id: 602, name: 'Old Profile', strippedName: 'Old Profile' }],
+    });
+    assertEquals(execution.deletedCustomFormats, []);
+    assertEquals(execution.deletedQualityProfiles, []);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('scanForStaleItems: missing selected PCD profile keeps its whole namespace', async () => {
+  const restore = withCleanupQueryStubs(() => {
+    stubInstance();
+    stubPcdSelections([{ databaseId: PCD_DATABASE_ID, profileName: 'Missing' }]);
+    arrNamespaceQueries.get = () => 1;
+    stubTrashHydrations([]);
+    setCache(PCD_DATABASE_ID, createFakePcdCache([], false));
+  });
+  try {
+    const result = await scanForStaleItems(
+      remoteClient([{ id: 502, name: `Old CF${ZWSP}` }], [{ id: 602, name: `Missing${ZWSP}` }]),
+      INSTANCE_ID,
+      true
+    );
+    assertEquals(result.staleCustomFormats, []);
+    assertEquals(result.staleQualityProfiles, []);
+  } finally {
+    restore();
+  }
+});
+
+Deno.test('executeCleanup: removes ledger rows for deleted ids in both scopes', async () => {
+  // Managed-only: the ledger row for the deleted managed CF is dropped.
+  const managedScope = scopedFixture({ customFormat: [502] });
+  try {
+    await executeCleanup(managedScope.client, INSTANCE_ID, {
+      staleCustomFormats: [{ id: 502, name: 'Old CF', strippedName: 'Old CF' }],
+      staleQualityProfiles: [],
+    });
+    assertEquals(managedScope.deleted, [{ entityType: 'customFormat', remoteId: 502 }]);
+  } finally {
+    managedScope.restore();
+  }
+
+  // Unmanaged: rows drop for every deleted id, including hand-made entities.
+  const unmanagedScope = scopedFixture({ customFormat: [502, 503], qualityProfile: [602] });
+  try {
+    await executeCleanup(
+      unmanagedScope.client,
+      INSTANCE_ID,
+      {
+        staleCustomFormats: [
+          { id: 502, name: 'Old CF', strippedName: 'Old CF' },
+          { id: 503, name: 'Unrelated CF', strippedName: 'Unrelated CF' },
+        ],
+        staleQualityProfiles: [{ id: 602, name: 'Old Profile', strippedName: 'Old Profile' }],
+      },
+      true
+    );
+    assertEquals(unmanagedScope.deleted, [
+      { entityType: 'customFormat', remoteId: 502 },
+      { entityType: 'customFormat', remoteId: 503 },
+      { entityType: 'qualityProfile', remoteId: 602 },
+    ]);
+  } finally {
+    unmanagedScope.restore();
   }
 });

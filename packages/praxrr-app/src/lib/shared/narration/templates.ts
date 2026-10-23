@@ -158,6 +158,8 @@ export function resolveDriftCategoryPhrase(category: DriftCategory): string {
       return 'is missing on this instance';
     case 'unmanaged':
       return 'exists on this instance but is not managed by Praxrr';
+    case 'prune':
+      return 'is managed by Praxrr and pending reviewed removal';
   }
 }
 

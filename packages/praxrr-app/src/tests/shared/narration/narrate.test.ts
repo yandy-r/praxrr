@@ -82,8 +82,23 @@ Deno.test('narrateEntityChange: update summary keeps detail empty', () => {
   assertEquals(line.headline, 'Praxrr plans to update Quality Profile "HD" (1 field differs).');
 });
 
-Deno.test('narrateEntityChange: delete does not over-explain (no verbose detail)', () => {
+Deno.test('narrateEntityChange: unmanaged delete is not described as a planned removal', () => {
   const change: EntityChange = { entityType: 'customFormat', name: 'Old', action: 'delete', remoteId: 5, fields: [] };
+  const line = narrateEntityChange(change, 'radarr', 'qualityProfiles', 'verbose');
+  assertEquals(line.headline, 'Praxrr will not remove Custom Format "Old".');
+  assertEquals(line.detail, []);
+  assertEquals(line.tone, 'neutral');
+});
+
+Deno.test('narrateEntityChange: a managed delete is a planned removal with no verbose detail', () => {
+  const change: EntityChange = {
+    entityType: 'customFormat',
+    name: 'Old',
+    action: 'delete',
+    remoteId: 5,
+    managed: true,
+    fields: [],
+  };
   const line = narrateEntityChange(change, 'radarr', 'qualityProfiles', 'verbose');
   assertEquals(line.headline, 'Praxrr plans to remove Custom Format "Old".');
   assertEquals(line.detail, []);
@@ -393,14 +408,14 @@ Deno.test('narrateDriftReason: tone reflects severity across statuses', () => {
 // --- narrateDriftCounts (rollup headline; reads counts, never re-tallies) ----------------
 
 Deno.test('narrateDriftCounts: mixed counts read straight from DriftCounts', () => {
-  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 3 }, 'drifted', 'summary');
+  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 3, prune: 0 }, 'drifted', 'summary');
   assertEquals(line.headline, 'Praxrr found 2 drifted, 1 missing, and 3 unmanaged.');
   assertEquals(line.tone, 'warning');
   assertEquals(line.detail, []);
 });
 
 Deno.test('narrateDriftCounts: verbose explains each non-zero category', () => {
-  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 3 }, 'drifted', 'verbose');
+  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 3, prune: 0 }, 'drifted', 'verbose');
   assertEquals(line.detail, [
     '2 managed entities drifted from the resolved config.',
     '1 managed entity not present on the instance.',
@@ -409,30 +424,30 @@ Deno.test('narrateDriftCounts: verbose explains each non-zero category', () => {
 });
 
 Deno.test('narrateDriftCounts: two non-zero categories join without an Oxford comma', () => {
-  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 0 }, 'drifted', 'summary');
+  const line = narrateDriftCounts({ drifted: 2, missing: 1, unmanaged: 0, prune: 0 }, 'drifted', 'summary');
   assertEquals(line.headline, 'Praxrr found 2 drifted and 1 missing.');
   assertEquals(line.tone, 'warning');
 });
 
 Deno.test('narrateDriftCounts: unmanaged-only stays neutral (non-alerting)', () => {
-  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 2 }, 'in-sync', 'summary');
+  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 2, prune: 0 }, 'in-sync', 'summary');
   assertEquals(line.headline, 'Praxrr found 2 unmanaged.');
   assertEquals(line.tone, 'neutral');
 });
 
 Deno.test('narrateDriftCounts: zero counts report a clean in-sync headline', () => {
-  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0 }, 'in-sync', 'summary');
+  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0, prune: 0 }, 'in-sync', 'summary');
   assertEquals(line.headline, 'No drift detected — this instance matches the resolved configuration.');
   assertEquals(line.tone, 'neutral');
 });
 
 Deno.test('narrateDriftCounts: never-checked and failed checks do not claim in-sync', () => {
   assertEquals(
-    narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0 }, 'never-checked', 'summary').headline,
+    narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0, prune: 0 }, 'never-checked', 'summary').headline,
     'This instance has not been checked for drift yet.'
   );
   assertEquals(
-    narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0 }, 'unreachable', 'summary').headline,
+    narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0, prune: 0 }, 'unreachable', 'summary').headline,
     'Drift could not be determined because the last check did not complete.'
   );
 });
@@ -457,9 +472,31 @@ Deno.test('every NarrationLine stamps the current template version', () => {
     narrateSyncPreviewError('opaque detail', 'verbose'),
     narrateDriftEntity(drift, 'radarr', 'verbose'),
     narrateDriftReason('drifted', null, 'summary'),
-    narrateDriftCounts({ drifted: 1, missing: 0, unmanaged: 0 }, 'drifted', 'verbose'),
+    narrateDriftCounts({ drifted: 1, missing: 0, unmanaged: 0, prune: 0 }, 'drifted', 'verbose'),
   ];
   for (const line of lines) {
     assertEquals(line.templateVersion, NARRATION_TEMPLATE_VERSION);
   }
+});
+
+Deno.test('pending managed removals are narrated neutrally', () => {
+  const line = narrateDriftCounts({ drifted: 0, missing: 0, unmanaged: 0, prune: 2 }, 'in-sync', 'verbose');
+  assertEquals(line.headline, 'Praxrr found 2 pending removal.');
+  assertEquals(line.tone, 'neutral');
+  assertEquals(line.detail, ['2 ledger-owned entities pending reviewed removal (info only).']);
+  const entity = narrateDriftEntity(
+    {
+      section: 'qualityProfiles',
+      entityType: 'customFormat',
+      name: 'Old CF',
+      action: 'delete',
+      category: 'prune',
+      remoteId: 2,
+      fields: [],
+    },
+    'radarr',
+    'summary'
+  );
+  assertEquals(entity.tone, 'neutral');
+  assertEquals(entity.headline.includes('pending reviewed removal'), true);
 });

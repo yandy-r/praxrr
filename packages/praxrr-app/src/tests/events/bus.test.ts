@@ -25,6 +25,7 @@ function driftEvent(instanceId: number): LiveDomainEvent {
     driftedCount: 0,
     missingCount: 0,
     unmanagedCount: 0,
+    pruneCount: 0,
     checkedAt: '2026-10-20T00:00:00.000Z',
   };
 }
