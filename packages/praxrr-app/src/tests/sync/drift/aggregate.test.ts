@@ -496,3 +496,44 @@ Deno.test('managed deletes map to prune without changing the alerting signature'
   assertEquals(result.changes[2].category, 'unmanaged');
   assertEquals(driftSignature(result.changes), driftSignature([alerting]));
 });
+
+Deno.test('blocked QP prunes map to prune (not unmanaged) and stay out of the signature', () => {
+  const alerting = driftChange('update', { name: 'Desired CF', remoteId: 1 });
+  const result = aggregateDrift(
+    makePreview({
+      qualityProfiles: {
+        section: 'qualityProfiles',
+        customFormats: [entity('update', { name: 'Desired CF', remoteId: 1 })],
+        qualityProfiles: [
+          entity('delete', { entityType: 'qualityProfile', name: 'In Use QP', remoteId: 10 }),
+          entity('delete', { entityType: 'qualityProfile', name: 'Unverified QP', remoteId: 11 }),
+          entity('delete', { entityType: 'qualityProfile', name: 'Manual QP', remoteId: 12 }),
+          // Same remoteId as a blocked QP but a different entity type: must stay unmanaged.
+          entity('delete', { entityType: 'customFormat', name: 'Unrelated CF', remoteId: 10 }),
+        ],
+        blockedPrunes: [
+          {
+            entityType: 'qualityProfile',
+            remoteId: 10,
+            name: 'In Use QP',
+            reason: 'Quality profile is still assigned to media',
+          },
+          {
+            entityType: 'qualityProfile',
+            remoteId: 11,
+            name: 'Unverified QP',
+            reason: 'Could not verify that the quality profile is unused',
+          },
+        ],
+      },
+    }),
+    new Set(['qualityProfiles'])
+  );
+  const byName = new Map(result.changes.map((c) => [c.name, c]));
+  assertEquals(byName.get('In Use QP')?.category, 'prune');
+  assertEquals(byName.get('Unverified QP')?.category, 'prune');
+  assertEquals(byName.get('Manual QP')?.category, 'unmanaged');
+  assertEquals(byName.get('Unrelated CF')?.category, 'unmanaged');
+  assertEquals(result.counts, { drifted: 1, missing: 0, unmanaged: 2, prune: 2 });
+  assertEquals(driftSignature(result.changes), driftSignature([alerting]));
+});

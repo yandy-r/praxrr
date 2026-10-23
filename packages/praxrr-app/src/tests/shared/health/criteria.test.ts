@@ -100,6 +100,22 @@ Deno.test('drift: in-sync scores 100', () => {
   assertEquals(score('drift', makeInputs(), INSTANCE_SCOPE).score, 100);
 });
 
+Deno.test('drift: in-sync with pending removals still scores 100 and reports the pending count', () => {
+  const drift: DriftFacts = {
+    status: 'in-sync',
+    reason: null,
+    drifted: 0,
+    missing: 0,
+    unmanaged: 0,
+    prune: 3,
+    checkedAt: 't',
+    contentCheckedAt: 't',
+  };
+  const result = score('drift', makeInputs({ drift }), INSTANCE_SCOPE);
+  assertEquals(result.score, 100);
+  assertEquals(result.detail, ['Live configuration matches the desired state (3 pending removal)']);
+});
+
 Deno.test('drift: drifted with a fresh content check is penalized per entity, unmanaged excluded', () => {
   const drift: DriftFacts = {
     status: 'drifted',

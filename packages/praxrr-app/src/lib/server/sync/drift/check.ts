@@ -149,16 +149,30 @@ const ACTION_CATEGORY: Record<'create' | 'update' | 'delete', DriftCategory> = {
   delete: 'unmanaged',
 };
 
-function toDriftChange(section: SyncPreviewSection, entity: EntityChange): DriftEntityChange | null {
+function blockedPruneKey(entityType: string, remoteId: number): string {
+  return `${entityType}:${remoteId}`;
+}
+
+function toDriftChange(
+  section: SyncPreviewSection,
+  entity: EntityChange,
+  blockedPruneKeys: ReadonlySet<string>
+): DriftEntityChange | null {
   if (entity.action === 'unchanged') {
     return null;
   }
+  // A ledger-owned delete is a pending removal even when its in-use check is blocked/unverified:
+  // the preview carries no `managed` delete row for it, only a `blockedPrunes` entry.
+  const isPrune =
+    entity.action === 'delete' &&
+    (entity.managed === true ||
+      (entity.remoteId !== null && blockedPruneKeys.has(blockedPruneKey(entity.entityType, entity.remoteId))));
   return {
     section,
     entityType: entity.entityType,
     name: entity.name,
     action: entity.action,
-    category: entity.action === 'delete' && entity.managed === true ? 'prune' : ACTION_CATEGORY[entity.action],
+    category: isPrune ? 'prune' : ACTION_CATEGORY[entity.action],
     remoteId: entity.remoteId,
     fields: entity.fields,
   };
@@ -167,7 +181,8 @@ function toDriftChange(section: SyncPreviewSection, entity: EntityChange): Drift
 function collectSection(
   section: SyncPreviewSection,
   entities: ReadonlyArray<EntityChange | null> | null | undefined,
-  out: DriftEntityChange[]
+  out: DriftEntityChange[],
+  blockedPruneKeys: ReadonlySet<string> = new Set()
 ): void {
   if (!entities) {
     return;
@@ -176,7 +191,7 @@ function collectSection(
     if (!entity) {
       continue;
     }
-    const change = toDriftChange(section, entity);
+    const change = toDriftChange(section, entity, blockedPruneKeys);
     if (change) {
       out.push(change);
     }
@@ -208,8 +223,13 @@ export function aggregateDrift(
   const changes: DriftEntityChange[] = [];
 
   if (availableSections.has('qualityProfiles') && preview.qualityProfiles) {
-    collectSection('qualityProfiles', preview.qualityProfiles.customFormats, changes);
-    collectSection('qualityProfiles', preview.qualityProfiles.qualityProfiles, changes);
+    const blockedPruneKeys = new Set(
+      (preview.qualityProfiles.blockedPrunes ?? []).map((blocked) =>
+        blockedPruneKey(blocked.entityType, blocked.remoteId)
+      )
+    );
+    collectSection('qualityProfiles', preview.qualityProfiles.customFormats, changes, blockedPruneKeys);
+    collectSection('qualityProfiles', preview.qualityProfiles.qualityProfiles, changes, blockedPruneKeys);
   }
   if (availableSections.has('delayProfiles') && preview.delayProfiles) {
     collectSection('delayProfiles', [preview.delayProfiles.profile], changes);

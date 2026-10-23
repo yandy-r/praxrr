@@ -142,7 +142,18 @@ const drift: Criterion = {
     const d = inputs.drift;
 
     if (d.status === 'in-sync') {
-      return result('drift', 'Drift', 100, config, ['Live configuration matches the desired state'], []);
+      return result(
+        'drift',
+        'Drift',
+        100,
+        config,
+        [
+          d.prune > 0
+            ? `Live configuration matches the desired state (${d.prune} pending removal)`
+            : 'Live configuration matches the desired state',
+        ],
+        []
+      );
     }
 
     if (d.status === 'drifted') {

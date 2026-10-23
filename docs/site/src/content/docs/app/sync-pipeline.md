@@ -166,7 +166,10 @@ logged because they will have no history record. Applying sections that contain
 managed deletes requires the `admin` scope for API tokens.
 
 Confirmed prune deletes flow into Sync History like other outcomes, and planned
-managed deletes appear in drift under the `prune` category. Changing an instance's
+managed deletes appear in drift under the `prune` category. That includes ledger-owned
+quality profiles listed in the preview's `blockedPrunes` (in use, or in-use status
+unverified): drift classifies their delete rows as `prune`, not `unmanaged`, even though
+they will not be deleted until a reviewed preview verifies them. Changing an instance's
 `url` or `type` clears its ledger rows. The cleanup API (`POST /api/v1/arr/cleanup`)
 scans ledger-managed items by default; `includeUnmanaged: true` restores the legacy
 full scan.

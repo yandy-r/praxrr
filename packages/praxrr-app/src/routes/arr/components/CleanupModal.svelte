@@ -108,7 +108,7 @@
   }
 
   function setIncludeUnmanaged(checked: boolean) {
-    if (checked === includeUnmanaged || phase === 'executing') return;
+    if (checked === includeUnmanaged || phase === 'executing' || phase === 'results') return;
     includeUnmanaged = checked;
     if (open && phase !== 'idle') void scan();
   }
@@ -144,7 +144,7 @@
         checked={includeUnmanaged}
         label="Include unmanaged items"
         ariaLabel="Include unmanaged items"
-        disabled={phase === 'scanning' || phase === 'executing'}
+        disabled={phase === 'scanning' || phase === 'executing' || phase === 'results'}
         on:change={(event) => setIncludeUnmanaged(event.detail)}
       />
       <p class="text-xs text-neutral-500 dark:text-neutral-400">

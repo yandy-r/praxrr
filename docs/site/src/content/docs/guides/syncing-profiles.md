@@ -147,7 +147,10 @@ as done.
 - Changing an instance's **URL** or **type** clears its ledger, since the recorded
   remote ids no longer refer to the same server. Pruning starts fresh from the next
   creates.
-- Planned managed deletions also show on the **Drift** pages as **Pending removal**.
+- Planned managed deletions also show on the **Drift** pages as **Pending removal**. This
+  includes Praxrr-created quality profiles that are blocked because they are still
+  assigned to media or because their usage could not be verified. They are not deleted
+  until a reviewed preview confirms they are unused.
 - The **Cleanup** tool scans only ledger-managed items by default; toggle
   **Include unmanaged items** to scan everything.
 
