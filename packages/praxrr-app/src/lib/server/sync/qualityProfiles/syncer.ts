@@ -54,7 +54,6 @@ import type {
   SyncPreviewSectionResult,
 } from '../preview/types.ts';
 import type { PortableCustomFormat, PortableQualityProfile } from '$shared/pcd/portable.ts';
-import { omitUndefinedReviewProperties } from '../preview/reviewBinding.ts';
 import {
   CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
   diffEntityCollection,
@@ -183,7 +182,7 @@ function mapEntries<K, V>(map: ReadonlyMap<K, V>): readonly (readonly [K, V])[] 
 }
 
 function projectBatchEvidence(batch: DatabaseSyncBatch): unknown {
-  return omitUndefinedReviewProperties({
+  return {
     sourceKind: batch.sourceKind,
     sourceLabel: batch.sourceLabel,
     databaseId: batch.databaseId,
@@ -193,7 +192,7 @@ function projectBatchEvidence(batch: DatabaseSyncBatch): unknown {
       referencedFormatNames,
     })),
     customFormats: mapEntries(batch.customFormats),
-  });
+  };
 }
 
 function isQualityProfilesPreparedContext(

@@ -92,4 +92,8 @@ Deno.test('diffToFieldChanges represents missing keyed-array entries as null', (
   assertEquals(diffToFieldChanges({ formatItems: [item] }, {}, options), [
     { field: 'formatItems["1"]', type: 'removed', current: item, desired: null },
   ]);
+  const addedDuplicate = { format: 1, score: 200 };
+  assertEquals(diffToFieldChanges({ formatItems: [item] }, { formatItems: [item, addedDuplicate] }, options), [
+    { field: 'formatItems["1"][1]', type: 'added', current: null, desired: addedDuplicate },
+  ]);
 });

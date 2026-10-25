@@ -135,7 +135,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 export function omitUndefinedReviewProperties(value: unknown): unknown {
   const copies = new WeakMap<object, object>();
+  let nodes = 0;
   const project = (candidate: unknown, depth: number): unknown => {
+    nodes += 1;
+    if (nodes > REVIEW_CANONICAL_LIMITS.maxNodes) return candidate;
     if ((!Array.isArray(candidate) && !isPlainObject(candidate)) || depth > REVIEW_CANONICAL_LIMITS.maxDepth) {
       return candidate;
     }
@@ -145,10 +148,14 @@ export function omitUndefinedReviewProperties(value: unknown): unknown {
     const copy = array ? new Array(candidate.length) : Object.create(Object.getPrototypeOf(candidate));
     copies.set(candidate, copy);
     for (const key of Reflect.ownKeys(candidate)) {
+      if (nodes >= REVIEW_CANONICAL_LIMITS.maxNodes) return candidate;
       if (array && key === 'length') continue;
       const descriptor = Object.getOwnPropertyDescriptor(candidate, key)!;
       if ('value' in descriptor) {
-        if (!array && typeof key === 'string' && descriptor.enumerable && descriptor.value === undefined) continue;
+        if (!array && typeof key === 'string' && descriptor.enumerable && descriptor.value === undefined) {
+          nodes += 1;
+          continue;
+        }
         descriptor.value = project(descriptor.value, depth + 1);
       }
       Object.defineProperty(copy, key, descriptor);

@@ -5,6 +5,7 @@ import {
   compareReviewedEvidence,
   sortReviewEvidenceSet,
   omitUndefinedReviewProperties,
+  REVIEW_CANONICAL_LIMITS,
   type SyncPreviewSectionReviewEvidenceInput,
 } from '$sync/preview/reviewBinding.ts';
 import type {
@@ -103,6 +104,11 @@ Deno.test('review evidence projection omits only optional plain-object propertie
   assertEquals(projected, { nested: [{ present: null }] });
   assertEquals(Object.hasOwn(source, 'omitted'), true, 'projection must not mutate its source');
   assertEquals(canonicalizeReviewValue(projected), '{"nested":[{"present":null}]}');
+  const frozen = Object.freeze(Object.assign(Object.create(null), { absent: undefined, present: 'kept' }));
+  const frozenProjection = omitUndefinedReviewProperties(frozen);
+  assertEquals(Object.getPrototypeOf(frozenProjection), null);
+  assertEquals(canonicalizeReviewValue(frozenProjection), '{"present":"kept"}');
+  assertEquals(Object.hasOwn(frozen, 'absent'), true);
   assertThrows(() => canonicalizeReviewValue(source), TypeError, 'undefined values');
   assertThrows(
     () => canonicalizeReviewValue(omitUndefinedReviewProperties({ entries: [undefined] })),
@@ -120,6 +126,13 @@ Deno.test('review evidence projection omits only optional plain-object propertie
   const cycle: Record<string, unknown> = {};
   cycle.self = cycle;
   assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties(cycle)), TypeError, 'cyclic');
+});
+
+Deno.test('review evidence projection leaves over-budget breadth for canonical rejection', () => {
+  const oversized = Array.from({ length: 100 }, () => Array(1_001).fill(0));
+  const projected = omitUndefinedReviewProperties(oversized);
+  assert(100 * 1_001 > REVIEW_CANONICAL_LIMITS.maxNodes);
+  assertThrows(() => canonicalizeReviewValue(projected), TypeError, 'node limit exceeded');
 });
 
 Deno.test('review binding canonicalizes target URLs and invalidates retarget or credential rotation', async () => {
