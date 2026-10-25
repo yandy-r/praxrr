@@ -1,3 +1,4 @@
+import type { Cookies } from '@sveltejs/kit';
 import { config } from '$config';
 import type { SessionRequestContext } from '$shared/security/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from '$lib/server/security/sessionTransport.ts';
@@ -22,4 +23,15 @@ export function sessionCookieOptions(ctx: CookieRequestContext | undefined, expi
     secure,
     expires,
   };
+}
+
+/** Options for deleting the session cookie: same hardening as setting it, minus the expiry. */
+export function clearSessionCookieOptions(ctx: CookieRequestContext | undefined) {
+  const { expires: _expires, ...rest } = sessionCookieOptions(ctx, new Date(0));
+  return rest;
+}
+
+/** Delete the session cookie on the response using the same Secure/HttpOnly/SameSite policy. */
+export function clearSessionCookie(ctx: CookieRequestContext | undefined, cookies: Cookies): void {
+  cookies.delete('session', clearSessionCookieOptions(ctx));
 }

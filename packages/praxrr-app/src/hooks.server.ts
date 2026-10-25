@@ -18,7 +18,15 @@ import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { trashGuideManager } from '$trashguide/index.ts';
 import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
-import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
+import {
+  getAuthState,
+  isPublicPath,
+  maybeExtendSession,
+  cleanupExpiredSessions,
+  cleanupModeMismatchedSessions,
+  shouldClearSessionCookie,
+} from '$auth/middleware.ts';
+import { clearSessionCookie, clearSessionCookieOptions } from '$auth/sessionCookie.ts';
 import { getClientIp } from '$auth/network.ts';
 import { LIVE_EVENTS_PATH } from '$shared/events/types.ts';
 import { enforceTokenScope } from '$auth/scopePolicy.ts';
@@ -236,6 +244,18 @@ if (expiredCount > 0) {
   });
 }
 
+// Remove sessions whose user kind doesn't match the current auth mode
+const mismatchedCount = cleanupModeMismatchedSessions();
+if (mismatchedCount > 0) {
+  await logger.info(
+    `Removed ${mismatchedCount} session${mismatchedCount === 1 ? '' : 's'} from a different auth mode`,
+    {
+      source: 'Auth:Session',
+      meta: { count: mismatchedCount },
+    }
+  );
+}
+
 // Log server ready
 await logger.info('Server ready', {
   source: 'Startup',
@@ -255,6 +275,13 @@ const authHandle: Handle = async ({ event, resolve }) => {
   event.locals.session = auth.session;
   event.locals.authBypass = auth.skipAuth;
   event.locals.principal = auth.principal;
+
+  // A session cookie on an unauthenticated request (expired or wrong-mode user) is stale: drop it.
+  // Bypass and API-token requests never resolve a session, so leave their cookies alone.
+  const clearCookie = shouldClearSessionCookie(auth, !!event.cookies.get('session'));
+  if (clearCookie) {
+    clearSessionCookie(event, event.cookies);
+  }
 
   // First-run setup flow (applies to all auth modes except AUTH=off)
   if (auth.needsSetup) {
@@ -290,16 +317,29 @@ const authHandle: Handle = async ({ event, resolve }) => {
         source: 'Auth',
         meta: { ip, endpoint: event.url.pathname, method: event.request.method },
       });
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      // A returned Response bypasses SvelteKit's cookie queue: emit the deletion ourselves
+      if (clearCookie) {
+        headers.append(
+          'set-cookie',
+          event.cookies.serialize('session', '', { ...clearSessionCookieOptions(event), maxAge: 0 })
+        );
+      }
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
     }
     throw redirect(303, '/auth/login');
   }
 
   const scopeDenied = enforceTokenScope(event, auth.principal);
-  if (scopeDenied) return scopeDenied;
+  if (scopeDenied) {
+    if (clearCookie) {
+      scopeDenied.headers.append(
+        'set-cookie',
+        event.cookies.serialize('session', '', { ...clearSessionCookieOptions(event), maxAge: 0 })
+      );
+    }
+    return scopeDenied;
+  }
 
   // Sliding expiration: extend session past halfway point. The live events stream (GET and its
   // HEAD probe) and live-triggered `__data.json` refetches (`x-praxrr-live: 1`) are skipped so an

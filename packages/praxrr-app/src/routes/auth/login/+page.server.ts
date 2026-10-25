@@ -1,7 +1,7 @@
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { fail, redirect } from '@sveltejs/kit';
 import { config } from '$config';
-import { usersQueries } from '$db/queries/users.ts';
+import { usersQueries, isOidcUser } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { webauthnCredentialsQueries } from '$db/queries/webauthnCredentials.ts';
@@ -30,6 +30,11 @@ export const load: ServerLoad = () => {
 
 export const actions: Actions = {
   default: async (event) => {
+    // Password login is disabled entirely under SSO
+    if (config.authMode === 'oidc') {
+      return fail(403, { error: 'Password login is disabled when SSO is enabled', username: '' });
+    }
+
     const { request, cookies } = event;
     const formData = await request.formData();
     const username = (formData.get('username') as string)?.trim();
@@ -40,9 +45,9 @@ export const actions: Actions = {
       return fail(400, { error: 'Username and password are required', username });
     }
 
-    // Find user
+    // Find user (OIDC identities are passwordless: treat them as unknown)
     const user = usersQueries.getByUsername(username);
-    if (!user) {
+    if (!user || isOidcUser(user)) {
       const ip = getClientIp(event);
       const allUsernames = usersQueries.getAllUsernames();
       const analysis = analyzeLoginFailure(username, allUsernames, false);

@@ -1,6 +1,6 @@
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
-import { usersQueries } from '$db/queries/users.ts';
+import { usersQueries, isOidcUser } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { apiTokensQueries } from '$db/queries/apiTokens.ts';
 import { ApiTokenValidationError, createApiToken } from '$auth/apiTokens.ts';
@@ -53,8 +53,7 @@ export const load: ServerLoad = async ({ locals, setHeaders }) => {
   const principal = getSessionPrincipal(locals);
 
   const authedUser = locals.user;
-  const passkeysEnabled =
-    config.authMode === 'on' && !!authedUser && authedUser.id > 0 && !authedUser.username.startsWith('oidc:');
+  const passkeysEnabled = config.authMode === 'on' && !!authedUser && authedUser.id > 0 && !isOidcUser(authedUser);
   const passkeys =
     passkeysEnabled && authedUser
       ? webauthnCredentialsQueries.listByUserId(authedUser.id).map(toCredentialSummary)
@@ -65,7 +64,7 @@ export const load: ServerLoad = async ({ locals, setHeaders }) => {
     apiTokens: apiTokensQueries.list(),
     hasLegacyApiToken: apiTokensQueries.hasActiveLegacy(),
     canManageSessions: !!principal,
-    passwordEnabled: !!principal && !principal.user.username.startsWith('oidc:'),
+    passwordEnabled: !!principal && !isOidcUser(principal.user),
     passkeys,
     passkeysEnabled,
   };
@@ -78,7 +77,7 @@ export const actions: Actions = {
       return fail(401, { passwordError: 'Not authenticated' });
     }
 
-    if (principal.user.username.startsWith('oidc:')) {
+    if (isOidcUser(principal.user)) {
       return fail(403, { passwordError: 'Password change is not available for this account' });
     }
 
@@ -270,7 +269,7 @@ export const actions: Actions = {
 
   deletePasskey: async ({ request, locals }) => {
     const user = locals.user;
-    if (!user || user.id <= 0 || user.username.startsWith('oidc:')) {
+    if (!user || user.id <= 0 || isOidcUser(user)) {
       return fail(401, { passkeyError: 'Not authenticated' });
     }
 
@@ -293,7 +292,7 @@ export const actions: Actions = {
 
   renamePasskey: async ({ request, locals }) => {
     const user = locals.user;
-    if (!user || user.id <= 0 || user.username.startsWith('oidc:')) {
+    if (!user || user.id <= 0 || isOidcUser(user)) {
       return fail(401, { passkeyError: 'Not authenticated' });
     }
 

@@ -5,7 +5,7 @@
 
 import type { RequestEvent } from '@sveltejs/kit';
 import { config } from '$config';
-import { usersQueries, type User } from '$db/queries/users.ts';
+import { usersQueries, isOidcUser, type User } from '$db/queries/users.ts';
 import { sessionsQueries, type Session } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { isLocalAddress, getClientIp } from './network.ts';
@@ -23,6 +23,15 @@ export interface AuthState {
   session: Session | null;
   skipAuth: boolean; // true when AUTH=off or AUTH=local+local IP
   principal: AuthPrincipal | null; // null when unauthenticated
+}
+
+/**
+ * A session cookie is stale when the request didn't authenticate a session: expired, revoked,
+ * or belonging to a user of the other auth mode. Bypass and API-token requests never resolve
+ * a session, so their cookie (if any) is left alone.
+ */
+export function shouldClearSessionCookie(auth: AuthState, hasCookie: boolean): boolean {
+  return hasCookie && !auth.skipAuth && !auth.principal;
 }
 
 const BYPASS_PRINCIPAL: AuthPrincipal = { kind: 'bypass', scopes: API_TOKEN_SCOPES };
@@ -134,15 +143,18 @@ export function getAuthState(event: RequestEvent): AuthState {
   const tokenState = authenticateApiToken(event);
   if (tokenState) return tokenState;
 
-  // Session cookie (oidc: no local user/password; on/local-remote: username/password)
+  // Session cookie (oidc: no local user/password; on/local-remote: username/password).
+  // Sessions only authenticate when the user kind matches the mode: oidc sessions exist only
+  // under AUTH=oidc, local sessions only under AUTH=on/local.
   const sessionId = event.cookies.get('session');
   const session = sessionId ? (sessionsQueries.getValidById(sessionId) ?? null) : null;
-  const user = session ? (usersQueries.getById(session.user_id) ?? null) : null;
+  const resolvedUser = session ? (usersQueries.getById(session.user_id) ?? null) : null;
+  const user = resolvedUser && (config.authMode === 'oidc') === isOidcUser(resolvedUser) ? resolvedUser : null;
 
   return {
     needsSetup: config.authMode === 'oidc' ? false : !hasLocalUsers, // No setup needed for OIDC
     user,
-    session,
+    session: user ? session : null,
     skipAuth: false,
     principal: user ? SESSION_PRINCIPAL : null,
   };
@@ -173,4 +185,11 @@ export function maybeExtendSession(session: Session): void {
  */
 export function cleanupExpiredSessions(): number {
   return sessionsQueries.deleteExpired();
+}
+
+/**
+ * Remove sessions whose user kind doesn't match the current auth mode (startup cleanup)
+ */
+export function cleanupModeMismatchedSessions(): number {
+  return sessionsQueries.deleteModeMismatched(config.authMode);
 }

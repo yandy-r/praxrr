@@ -115,6 +115,18 @@ migratedTest('migrateLegacyApiKey with only OIDC users clears the key and create
   assertEquals(db.queryFirst<{ api_key: string | null }>('SELECT api_key FROM auth_settings')!.api_key, null);
 });
 
+migratedTest('migrateLegacyApiKey with an oidc:-prefixed local account (real hash) creates the token', async () => {
+  const legacyKey = 'cdef0123456789abcdef0123456789ef';
+  db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', 'oidc:admin', 'bcrypt-hash');
+  db.execute('UPDATE auth_settings SET api_key = ? WHERE id = 1', legacyKey);
+
+  await migrateLegacyApiKey();
+
+  const row = db.queryFirst<{ token_hash: string }>('SELECT token_hash FROM api_tokens')!;
+  assertEquals(row.token_hash, createHash('sha256').update(legacyKey).digest('hex'));
+  assertEquals(db.queryFirst<{ api_key: string | null }>('SELECT api_key FROM auth_settings')!.api_key, null);
+});
+
 // ---------------------------------------------------------------------------
 // Token creation
 // ---------------------------------------------------------------------------

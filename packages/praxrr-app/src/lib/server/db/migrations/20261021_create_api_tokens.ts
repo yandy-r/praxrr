@@ -57,8 +57,9 @@ export async function migrateLegacyApiKey(): Promise<void> {
   const row = db.queryFirst<{ api_key: string | null }>('SELECT api_key FROM auth_settings WHERE id = 1');
   const legacyKey = row?.api_key ?? null;
   const userCount =
-    db.queryFirst<{ count: number }>("SELECT COUNT(*) AS count FROM users WHERE username NOT LIKE 'oidc:%'")?.count ??
-    0;
+    db.queryFirst<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM users WHERE NOT (substr(username, 1, 5) = 'oidc:' AND password_hash = 'OIDC_NO_PASSWORD')"
+    )?.count ?? 0;
 
   await db.transaction(() => {
     if (legacyKey !== null && legacyKey.length > 0 && userCount > 0) {

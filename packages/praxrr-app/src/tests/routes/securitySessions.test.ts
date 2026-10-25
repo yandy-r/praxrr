@@ -5,7 +5,7 @@ import { assert, assertEquals, assertFalse, assertNotEquals } from '@std/assert'
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { usersQueries, type User } from '$db/queries/users.ts';
+import { usersQueries, isOidcUser, type User } from '$db/queries/users.ts';
 import { sessionsQueries, type Session } from '$db/queries/sessions.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { actions, load } from '../../routes/settings/security/+page.server.ts';
@@ -61,7 +61,7 @@ interface Fixture {
 async function seed(): Promise<Fixture> {
   const a = usersQueries.getById(usersQueries.create('alice', await hashPassword('alice-pass-1')))!;
   const b = usersQueries.getById(usersQueries.create('bob', await hashPassword('bob-pass-123')))!;
-  const c = usersQueries.getById(usersQueries.create('oidc:carol', 'OIDC_NO_PASSWORD'))!;
+  const c = usersQueries.getById(usersQueries.getOrCreateOidcUser('carol'))!;
 
   const aCurrent = sessionsQueries.create(a.id, 1, { ipAddress: '10.0.0.1', browser: 'Firefox', os: 'Linux' });
   const aOther = sessionsQueries.create(a.id, 1, { ipAddress: '10.0.0.2', browser: 'Chrome', os: 'Windows' });
@@ -155,7 +155,7 @@ migratedTest('load: own unexpired rows only, exact keys, no bearer, flags and no
   ];
 
   for (const [user, sessionId, expectedPublicIds, currentPublicId] of matrix) {
-    const passwordEnabled = !user.username.startsWith('oidc:');
+    const passwordEnabled = !isOidcUser(user);
     const { payload, headers } = await loadPayload(localsOf(user, sessionId));
 
     assertEquals(headers['cache-control'], 'no-store');

@@ -1,4 +1,6 @@
 import { db } from '../db.ts';
+import type { AuthMode } from '$config';
+import { OIDC_USER_SQL, OIDC_USER_SQL_PARAMS } from './users.ts';
 
 /**
  * Types for sessions table
@@ -156,6 +158,20 @@ export const sessionsQueries = {
    */
   deleteExpired(): number {
     return db.execute(`DELETE FROM sessions WHERE datetime(expires_at) <= datetime('now')`);
+  },
+
+  /**
+   * Delete sessions whose user kind disagrees with the auth mode:
+   * AUTH=oidc keeps only OIDC-user sessions; on/local/off keep only local-user sessions
+   * (off intentionally drops OIDC sessions: password mode is the fallback identity).
+   * OIDC users are rows matching OIDC_USER_SQL (exact prefix AND placeholder hash).
+   */
+  deleteModeMismatched(authMode: AuthMode): number {
+    const mismatch = authMode === 'oidc' ? `NOT ${OIDC_USER_SQL}` : OIDC_USER_SQL;
+    return db.execute(
+      `DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE ${mismatch})`,
+      ...OIDC_USER_SQL_PARAMS
+    );
   },
 
   /**
