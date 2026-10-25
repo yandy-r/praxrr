@@ -17,7 +17,7 @@ export const GET: RequestHandler = async (event) => {
 
   // Validate OIDC configuration
   if (config.authMode !== 'oidc') {
-    throw error(400, 'OIDC authentication is not enabled');
+    throw error(404, 'Not found');
   }
 
   if (!config.oidc.discoveryUrl || !config.oidc.clientId || !config.oidc.clientSecret) {

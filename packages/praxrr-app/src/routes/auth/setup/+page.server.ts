@@ -1,6 +1,6 @@
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { fail, redirect } from '@sveltejs/kit';
-import { usersQueries } from '$db/queries/users.ts';
+import { usersQueries, isReservedLocalUsername } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { hashPassword } from '$auth/password.ts';
@@ -8,8 +8,14 @@ import { sessionCookieOptions } from '$auth/sessionCookie.ts';
 import { getClientIp } from '$auth/network.ts';
 import { parseUserAgent } from '$auth/userAgent.ts';
 import { logger } from '$logger/logger.ts';
+import { config } from '$config';
 
 export const load: ServerLoad = () => {
+  // Setup creates a password account; it has no meaning under SSO
+  if (config.authMode === 'oidc') {
+    throw redirect(303, '/');
+  }
+
   // If local users already exist, redirect to home
   // (OIDC users don't count - they need to create a local account to use password auth)
   if (usersQueries.existsLocal()) {
@@ -21,6 +27,10 @@ export const load: ServerLoad = () => {
 
 export const actions: Actions = {
   default: async (event) => {
+    if (config.authMode === 'oidc') {
+      throw redirect(303, '/');
+    }
+
     const { request, cookies } = event;
 
     // Double-check no local users exist (race condition protection)
@@ -40,6 +50,10 @@ export const actions: Actions = {
 
     if (username.length < 3) {
       return fail(400, { error: 'Username must be at least 3 characters', username });
+    }
+
+    if (isReservedLocalUsername(username)) {
+      return fail(400, { error: 'Usernames starting with "oidc:" are reserved', username });
     }
 
     if (!password) {

@@ -61,7 +61,7 @@ interface Fixture {
 async function seed(): Promise<Fixture> {
   const a = usersQueries.getById(usersQueries.create('alice', await hashPassword('alice-pass-1')))!;
   const b = usersQueries.getById(usersQueries.create('bob', await hashPassword('bob-pass-123')))!;
-  const c = usersQueries.getById(usersQueries.create('oidc:carol', 'OIDC_NO_PASSWORD'))!;
+  const c = usersQueries.getById(usersQueries.getOrCreateOidcUser('carol'))!;
 
   const aCurrent = sessionsQueries.create(a.id, 1, { ipAddress: '10.0.0.1', browser: 'Firefox', os: 'Linux' });
   const aOther = sessionsQueries.create(a.id, 1, { ipAddress: '10.0.0.2', browser: 'Chrome', os: 'Windows' });

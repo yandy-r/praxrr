@@ -159,6 +159,17 @@ export const sessionsQueries = {
   },
 
   /**
+   * Delete sessions whose user kind disagrees with the auth mode:
+   * AUTH=oidc keeps only OIDC-user sessions; on/local keep only local-user sessions.
+   * OIDC users are rows with the exact 'oidc:' prefix AND the placeholder hash.
+   */
+  deleteModeMismatched(authMode: 'oidc' | 'on' | 'local' | 'off'): number {
+    const oidcExpr = `(substr(u.username, 1, 5) = 'oidc:' AND u.password_hash = 'OIDC_NO_PASSWORD')`;
+    const keep = authMode === 'oidc' ? oidcExpr : `NOT ${oidcExpr}`;
+    return db.execute(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users u WHERE NOT ${keep})`);
+  },
+
+  /**
    * Extend session expiration (sliding expiration)
    * Also updates last_active_at for activity tracking
    */

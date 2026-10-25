@@ -17,6 +17,11 @@ import { logger } from '$logger/logger.ts';
  * validate state/code, exchange tokens, verify ID token, create session, and redirect home.
  */
 export const GET: RequestHandler = async (event) => {
+  // OIDC callback only exists in OIDC mode; other modes get a plain 404
+  if (config.authMode !== 'oidc') {
+    throw error(404, 'Not found');
+  }
+
   const { url, cookies, request } = event;
 
   // Get code and state from query params
@@ -88,8 +93,18 @@ export const GET: RequestHandler = async (event) => {
     throw error(500, 'Failed to verify ID token');
   }
 
-  // Get or create OIDC user (using 'sub' as unique identifier)
-  const userId = usersQueries.getOrCreateOidcUser(claims.sub);
+  let userId: number;
+  try {
+    userId = usersQueries.getOrCreateOidcUser(claims.sub);
+  } catch (err) {
+    // A local account already owns this identifier's username: never merge identities
+    const ip = getClientIp(event);
+    await logger.error(`OIDC identifier '${claims.sub}' collides with a local account`, {
+      source: 'Auth:OIDC',
+      meta: { ip, error: err instanceof Error ? err.message : String(err) },
+    });
+    throw error(409, 'This account identifier is unavailable');
+  }
 
   // Capture session metadata
   const ipAddress = getClientIp(event);

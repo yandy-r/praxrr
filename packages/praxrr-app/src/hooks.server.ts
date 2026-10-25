@@ -18,7 +18,13 @@ import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { trashGuideManager } from '$trashguide/index.ts';
 import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
-import { getAuthState, isPublicPath, maybeExtendSession, cleanupExpiredSessions } from '$auth/middleware.ts';
+import {
+  getAuthState,
+  isPublicPath,
+  maybeExtendSession,
+  cleanupExpiredSessions,
+  cleanupModeMismatchedSessions,
+} from '$auth/middleware.ts';
 import { getClientIp } from '$auth/network.ts';
 import { LIVE_EVENTS_PATH } from '$shared/events/types.ts';
 import { enforceTokenScope } from '$auth/scopePolicy.ts';
@@ -236,6 +242,18 @@ if (expiredCount > 0) {
   });
 }
 
+// Remove sessions whose user kind doesn't match the current auth mode
+const mismatchedCount = cleanupModeMismatchedSessions();
+if (mismatchedCount > 0) {
+  await logger.info(
+    `Removed ${mismatchedCount} session${mismatchedCount === 1 ? '' : 's'} from a different auth mode`,
+    {
+      source: 'Auth:Session',
+      meta: { count: mismatchedCount },
+    }
+  );
+}
+
 // Log server ready
 await logger.info('Server ready', {
   source: 'Startup',
@@ -255,6 +273,12 @@ const authHandle: Handle = async ({ event, resolve }) => {
   event.locals.session = auth.session;
   event.locals.authBypass = auth.skipAuth;
   event.locals.principal = auth.principal;
+
+  // A session cookie on an unauthenticated request (expired or wrong-mode user) is stale: drop it.
+  // Bypass and API-token requests never resolve a session, so leave their cookies alone.
+  if (event.cookies.get('session') && !auth.skipAuth && !auth.principal) {
+    event.cookies.delete('session', { path: '/' });
+  }
 
   // First-run setup flow (applies to all auth modes except AUTH=off)
   if (auth.needsSetup) {

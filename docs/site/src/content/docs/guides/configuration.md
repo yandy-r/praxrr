@@ -114,6 +114,11 @@ returns 404. See [Metrics](./metrics/).
 
 OIDC requires `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 
+Mode boundaries: OIDC and local accounts are separate identities. Under `AUTH=oidc`,
+password login and first-run setup are disabled and the OIDC endpoints are the only way
+in; in other modes the OIDC endpoints return 404. Sessions created in the other mode are
+cleared at startup, and switching back to `AUTH=on` restores local (password) access.
+
 API automation uses the `X-Api-Key` header or `?apikey=` query parameter.
 
 ## Trusted proxy

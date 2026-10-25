@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { config } from '$config';
+import { isOidcUser } from '$db/queries/users.ts';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 import type { AuthenticatorTransport } from '@simplewebauthn/server';
 import { resolveWebAuthnRp } from '$lib/server/webauthn/rp.ts';
@@ -25,7 +26,7 @@ export const POST: RequestHandler = async (event) => {
   }
 
   const user = event.locals.user;
-  if (!user || user.id <= 0 || user.username.startsWith('oidc:')) {
+  if (!user || user.id <= 0 || isOidcUser(user)) {
     return json({ error: 'Unauthorized' } satisfies ErrorResponse, { status: 401 });
   }
 
