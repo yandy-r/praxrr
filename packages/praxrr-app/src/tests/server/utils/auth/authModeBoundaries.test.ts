@@ -14,7 +14,13 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { usersQueries, isOidcUser, OIDC_PASSWORD_PLACEHOLDER } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
-import { getAuthState, cleanupModeMismatchedSessions } from '$auth/middleware.ts';
+import {
+  getAuthState,
+  cleanupModeMismatchedSessions,
+  shouldClearSessionCookie,
+  type AuthState,
+} from '$auth/middleware.ts';
+import { clearSessionCookie, clearSessionCookieOptions } from '$auth/sessionCookie.ts';
 import { hashPassword } from '$auth/password.ts';
 import { GET as oidcCallbackGet } from '../../../../routes/auth/oidc/callback/+server.ts';
 import { actions as loginActions } from '../../../../routes/auth/login/+page.server.ts';
@@ -253,13 +259,19 @@ migratedTest('login action fails 403 under AUTH=oidc and creates no session', as
 
 migratedTest('login with an OIDC username under AUTH=on fails like an unknown user (400)', async () => {
   usersQueries.getOrCreateOidcUser('sub1');
-  const result = (await loginActions.default(
-    eventStub({
-      path: '/auth/login',
-      form: { username: 'oidc:sub1', password: 'whatever-pass' },
-    }) as unknown as Parameters<typeof loginActions.default>[0]
-  )) as ActionFailure;
+  const before = sessionCount();
+  let result: ActionFailure | undefined;
+  await withAuthMode('on', async () => {
+    result = (await loginActions.default(
+      eventStub({
+        path: '/auth/login',
+        form: { username: 'oidc:sub1', password: 'whatever-pass' },
+      }) as unknown as Parameters<typeof loginActions.default>[0]
+    )) as ActionFailure;
+  });
+  assert(result !== undefined, 'login action must return a failure');
   assertEquals(result.status, 400);
+  assertEquals(sessionCount(), before, 'no session row created');
 });
 
 // ---------------------------------------------------------------------------
@@ -267,35 +279,37 @@ migratedTest('login with an OIDC username under AUTH=on fails like an unknown us
 // ---------------------------------------------------------------------------
 
 migratedTest('setup action rejects oidc: prefixed usernames, then creates a valid account', async () => {
-  for (const username of ['OIDC:admin', 'oidc:admin']) {
-    const result = (await setupActions.default(
-      eventStub({
-        path: '/auth/setup',
-        form: { username, password: 'long-enough-pass', confirmPassword: 'long-enough-pass' },
-      }) as unknown as Parameters<typeof setupActions.default>[0]
-    )) as ActionFailure;
-    assertEquals(result.status, 400, username);
-    assertEquals(userCount(), 0, username);
-  }
+  await withAuthMode('on', async () => {
+    for (const username of ['OIDC:admin', 'oidc:admin']) {
+      const result = (await setupActions.default(
+        eventStub({
+          path: '/auth/setup',
+          form: { username, password: 'long-enough-pass', confirmPassword: 'long-enough-pass' },
+        }) as unknown as Parameters<typeof setupActions.default>[0]
+      )) as ActionFailure;
+      assertEquals(result.status, 400, username);
+      assertEquals(userCount(), 0, username);
+    }
 
-  const created = await setupActions
-    .default(
-      eventStub({
-        path: '/auth/setup',
-        form: { username: 'admin', password: 'long-enough-pass', confirmPassword: 'long-enough-pass' },
-      }) as unknown as Parameters<typeof setupActions.default>[0]
-    )
-    .then(
-      (value) => value,
-      (err: unknown) => {
-        assert(isRedirect(err), 'success path must redirect');
-        assertEquals(err.location, '/');
-        return undefined;
-      }
-    );
-  assertEquals(created, undefined);
-  assertEquals(usersQueries.existsLocal(), true);
-  assertEquals(userCount(), 1);
+    const created = await setupActions
+      .default(
+        eventStub({
+          path: '/auth/setup',
+          form: { username: 'admin', password: 'long-enough-pass', confirmPassword: 'long-enough-pass' },
+        }) as unknown as Parameters<typeof setupActions.default>[0]
+      )
+      .then(
+        (value) => value,
+        (err: unknown) => {
+          assert(isRedirect(err), 'success path must redirect');
+          assertEquals(err.location, '/');
+          return undefined;
+        }
+      );
+    assertEquals(created, undefined);
+    assertEquals(usersQueries.existsLocal(), true);
+    assertEquals(userCount(), 1);
+  });
 });
 
 migratedTest('setup action redirects to home under AUTH=oidc without creating a user', async () => {
@@ -347,21 +361,94 @@ migratedTest('usersQueries.create/updateUsername reject the reserved oidc: prefi
 migratedTest('cleanupModeMismatchedSessions deletes only mismatched rows per mode', async () => {
   const localId = usersQueries.create('admin', await hashPassword('admin-pass-123'));
   const oidcId = usersQueries.getOrCreateOidcUser('sub1');
-  const localSession = sessionEventWithId(localId).sessionId;
-  const oidcSession = sessionEventWithId(oidcId).sessionId;
-  assertEquals(sessionIds().sort(), [localSession, oidcSession].sort(), 'both sessions seeded');
 
+  const seed = () => {
+    db.execute('DELETE FROM sessions');
+    return { local: sessionsQueries.create(localId, 1), oidc: sessionsQueries.create(oidcId, 1) };
+  };
+
+  // oidc keeps only OIDC-user sessions
+  let s = seed();
   await withAuthMode('oidc', () => {
-    const removed = cleanupModeMismatchedSessions();
-    assertEquals(removed, 1);
-    assertEquals(sessionIds(), [oidcSession]);
+    assertEquals(cleanupModeMismatchedSessions(), 1);
+    assertEquals(sessionIds(), [s.oidc]);
   });
 
-  // Recreate the local session and flip the mode: now the OIDC session goes
-  const localSession2 = sessionsQueries.create(localId, 1);
-  await withAuthMode('on', () => {
-    const removed = cleanupModeMismatchedSessions();
-    assertEquals(removed, 1);
-    assertEquals(sessionIds(), [localSession2]);
+  // on / local / off keep only local-user sessions (off intentionally drops OIDC sessions)
+  for (const mode of ['on', 'local', 'off'] as const) {
+    s = seed();
+    await withAuthMode(mode, () => {
+      assertEquals(cleanupModeMismatchedSessions(), 1, mode);
+      assertEquals(sessionIds(), [s.local], mode);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Stale session-cookie clearing
+// ---------------------------------------------------------------------------
+
+migratedTest('shouldClearSessionCookie: only unauthenticated non-bypass requests with a cookie', () => {
+  const base = {
+    needsSetup: false,
+    user: null,
+    session: null,
+    skipAuth: false,
+    principal: null,
+  } satisfies AuthState;
+  const sessionUser = { id: 1, username: 'a', password_hash: 'h', created_at: '', updated_at: '' };
+  const liveSession = {
+    id: 's',
+    user_id: 1,
+    expires_at: '',
+    created_at: '',
+    ip_address: null,
+    user_agent: null,
+    browser: null,
+    os: null,
+    device_type: null,
+    last_active_at: null,
+    public_id: 'p',
+  };
+  const cases: Array<[AuthState, boolean, boolean]> = [
+    [{ ...base, skipAuth: true }, true, false], // bypass: cookie left alone
+    [{ ...base, principal: { kind: 'token', tokenId: 1, scopes: [] } }, true, false], // API token: cookie left alone
+    [
+      {
+        ...base,
+        user: sessionUser,
+        session: liveSession,
+        principal: { kind: 'session', scopes: [] },
+      },
+      true,
+      false,
+    ], // valid session: keep
+    [base, true, true], // expired/no session + cookie: stale
+    [base, false, false], // no cookie at all
+  ];
+  for (const [state, hasCookie, expected] of cases) {
+    assertEquals(shouldClearSessionCookie(state, hasCookie), expected);
+  }
+});
+
+migratedTest('clearSessionCookie: secure follows transport (plain http vs https)', () => {
+  const jar: Record<string, unknown> = {};
+  const cookies = { delete: (name: string, opts: Record<string, unknown>) => void (jar[name] = opts) };
+
+  clearSessionCookie({ url: new URL('http://praxrr.test/'), request: new Request('http://praxrr.test/') }, cookies);
+  const httpOpts = jar.session as { secure: boolean; httpOnly: boolean; sameSite: string; path: string };
+  assertEquals(httpOpts.secure, false, 'plain http non-localhost => secure:false');
+  assertEquals(httpOpts.httpOnly, true);
+  assertEquals(httpOpts.sameSite, 'lax');
+  assertEquals(httpOpts.path, '/');
+
+  clearSessionCookie({ url: new URL('https://praxrr.test/'), request: new Request('https://praxrr.test/') }, cookies);
+  assertEquals((jar.session as { secure: boolean }).secure, true, 'https => secure:true');
+
+  const opts = clearSessionCookieOptions({
+    url: new URL('https://praxrr.test/'),
+    request: new Request('https://praxrr.test/'),
   });
+  assertEquals('expires' in opts, false);
+  assertEquals(opts.secure, true);
 });

@@ -5,7 +5,7 @@ import { assert, assertEquals, assertFalse, assertNotEquals } from '@std/assert'
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { usersQueries, type User } from '$db/queries/users.ts';
+import { usersQueries, isOidcUser, type User } from '$db/queries/users.ts';
 import { sessionsQueries, type Session } from '$db/queries/sessions.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { actions, load } from '../../routes/settings/security/+page.server.ts';
@@ -155,7 +155,7 @@ migratedTest('load: own unexpired rows only, exact keys, no bearer, flags and no
   ];
 
   for (const [user, sessionId, expectedPublicIds, currentPublicId] of matrix) {
-    const passwordEnabled = !user.username.startsWith('oidc:');
+    const passwordEnabled = !isOidcUser(user);
     const { payload, headers } = await loadPayload(localsOf(user, sessionId));
 
     assertEquals(headers['cache-control'], 'no-store');

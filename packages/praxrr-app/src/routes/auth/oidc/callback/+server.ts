@@ -2,7 +2,7 @@ import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { config } from '$config';
 import { getDiscoveryDocument, exchangeCode, decodeIdToken, verifyIdToken } from '$auth/oidc.ts';
-import { usersQueries } from '$db/queries/users.ts';
+import { usersQueries, OidcIdentityConflictError } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getClientIp } from '$auth/network.ts';
@@ -98,10 +98,13 @@ export const GET: RequestHandler = async (event) => {
     userId = usersQueries.getOrCreateOidcUser(claims.sub);
   } catch (err) {
     // A local account already owns this identifier's username: never merge identities
+    if (!(err instanceof OidcIdentityConflictError)) {
+      throw err;
+    }
     const ip = getClientIp(event);
     await logger.error(`OIDC identifier '${claims.sub}' collides with a local account`, {
       source: 'Auth:OIDC',
-      meta: { ip, error: err instanceof Error ? err.message : String(err) },
+      meta: { ip, error: err.message },
     });
     throw error(409, 'This account identifier is unavailable');
   }

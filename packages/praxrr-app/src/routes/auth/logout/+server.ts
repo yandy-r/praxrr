@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { usersQueries } from '$db/queries/users.ts';
+import { clearSessionCookie } from '$auth/sessionCookie.ts';
 import { logger } from '$logger/logger.ts';
 
 /**
@@ -10,7 +11,8 @@ import { logger } from '$logger/logger.ts';
  * Clear the current session cookie and remove the matching session from storage.
  * Redirects the user to the login page afterward.
  */
-export const GET: RequestHandler = async ({ cookies }) => {
+export const GET: RequestHandler = async (event) => {
+  const { cookies } = event;
   const sessionId = cookies.get('session');
 
   if (sessionId) {
@@ -26,7 +28,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
     sessionsQueries.deleteById(sessionId);
   }
 
-  cookies.delete('session', { path: '/' });
+  clearSessionCookie(event, cookies);
 
   throw redirect(303, '/auth/login');
 };

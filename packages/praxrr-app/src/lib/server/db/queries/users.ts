@@ -7,6 +7,18 @@ export const OIDC_USERNAME_PREFIX = 'oidc:';
 /** Password hash placeholder marking a passwordless OIDC account. */
 export const OIDC_PASSWORD_PLACEHOLDER = 'OIDC_NO_PASSWORD';
 
+/** OIDC-user SQL predicate with bound params — pair with OIDC_USER_SQL_PARAMS. */
+export const OIDC_USER_SQL = '(substr(username, 1, ?) = ? AND password_hash = ?)';
+export const OIDC_USER_SQL_PARAMS = [OIDC_USERNAME_PREFIX.length, OIDC_USERNAME_PREFIX, OIDC_PASSWORD_PLACEHOLDER];
+
+/** Thrown when a local account already owns the username an OIDC identity would use. */
+export class OidcIdentityConflictError extends Error {
+  constructor(identifier: string) {
+    super(`Username 'oidc:${identifier}' is occupied by a local account`);
+    this.name = 'OidcIdentityConflictError';
+  }
+}
+
 /** True only for usernames written by getOrCreateOidcUser (case-sensitive). */
 export function isOidcUsername(username: string): boolean {
   return username.startsWith(OIDC_USERNAME_PREFIX);
@@ -52,7 +64,8 @@ export const usersQueries = {
    */
   existsLocal(): boolean {
     const result = db.queryFirst<{ count: number }>(
-      `SELECT COUNT(*) as count FROM users WHERE NOT (substr(username, 1, 5) = 'oidc:' AND password_hash = '${OIDC_PASSWORD_PLACEHOLDER}')`
+      `SELECT COUNT(*) as count FROM users WHERE NOT ${OIDC_USER_SQL}`,
+      ...OIDC_USER_SQL_PARAMS
     );
     return (result?.count ?? 0) > 0;
   },
@@ -77,7 +90,8 @@ export const usersQueries = {
    */
   getAllUsernames(): string[] {
     const results = db.query<{ username: string }>(
-      `SELECT username FROM users WHERE NOT (substr(username, 1, 5) = 'oidc:' AND password_hash = '${OIDC_PASSWORD_PLACEHOLDER}')`
+      `SELECT username FROM users WHERE NOT ${OIDC_USER_SQL}`,
+      ...OIDC_USER_SQL_PARAMS
     );
     return results.map((r) => r.username);
   },
@@ -135,7 +149,7 @@ export const usersQueries = {
     const existing = this.getByUsername(username);
     if (existing) {
       if (!isOidcUser(existing)) {
-        throw new Error(`Username '${username}' is occupied by a local account`);
+        throw new OidcIdentityConflictError(identifier);
       }
       return existing.id;
     }

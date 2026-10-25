@@ -25,6 +25,15 @@ export interface AuthState {
   principal: AuthPrincipal | null; // null when unauthenticated
 }
 
+/**
+ * A session cookie is stale when the request didn't authenticate a session: expired, revoked,
+ * or belonging to a user of the other auth mode. Bypass and API-token requests never resolve
+ * a session, so their cookie (if any) is left alone.
+ */
+export function shouldClearSessionCookie(auth: AuthState, hasCookie: boolean): boolean {
+  return hasCookie && !auth.skipAuth && !auth.principal;
+}
+
 const BYPASS_PRINCIPAL: AuthPrincipal = { kind: 'bypass', scopes: API_TOKEN_SCOPES };
 const SESSION_PRINCIPAL: AuthPrincipal = { kind: 'session', scopes: API_TOKEN_SCOPES };
 
