@@ -6,6 +6,7 @@
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
 import type { SyncResult } from './types.ts';
+import { omitUndefinedReviewProperties } from './preview/reviewBinding.ts';
 import type {
   SyncPreviewEvidenceClass,
   SyncPreviewEvidenceRecorder,
@@ -142,7 +143,8 @@ export abstract class BaseSyncer {
     key: string,
     value: unknown
   ): void {
-    this.previewEvidenceRecorder?.record(section, source, key, freezeContextValue(value));
+    if (!this.previewEvidenceRecorder) return;
+    this.previewEvidenceRecorder.record(section, source, key, freezeContextValue(omitUndefinedReviewProperties(value)));
   }
 
   /**

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertNotEquals, assertStringIncludes } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
@@ -20,6 +20,8 @@ import type {
 import { qualityProfilesHandler } from '$sync/qualityProfiles/handler.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
+import type { PcdCondition, PcdCustomFormat } from '$sync/customFormats/transformer.ts';
+import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
 
 const SUFFIX = '\u200B';
 const OLD_CF = { id: 10, name: `Old CF${SUFFIX}`, specifications: [] } as ArrCustomFormat;
@@ -94,7 +96,7 @@ interface StubBatch {
   databaseId: number;
   suffix: string;
   profiles: { pcdProfile: PcdQualityProfile; referencedFormatNames: string[] }[];
-  customFormats: Map<string, never>;
+  customFormats: Map<string, PcdCustomFormat>;
   pcdFormatIdMap: Map<string, number>;
 }
 
@@ -565,4 +567,119 @@ migratedTest('reviewed apply warns when sync history is disabled', async () => {
   } finally {
     logger.warn = originalWarn;
   }
+});
+
+migratedTest('reviewed create preview binds PCD condition evidence and applies CFs and profiles', async () => {
+  const instanceId = seedInstance(false);
+  const conditionData: Partial<PcdCondition>[] = [
+    { type: 'release_title', patterns: [{ name: 'Title', pattern: 'example' }] },
+    { type: 'release_group', patterns: [{ name: 'Group', pattern: 'group' }] },
+    { type: 'edition', patterns: [{ name: 'Edition', pattern: 'edition' }] },
+    { type: 'language', languages: [{ name: 'english', except: false }] },
+    { type: 'source', sources: ['web_dl'] },
+    { type: 'resolution', resolutions: ['1080p'] },
+    { type: 'quality_modifier', qualityModifiers: ['remux'] },
+    { type: 'release_type', releaseTypes: ['single_episode'] },
+    { type: 'indexer_flag', indexerFlags: ['freeleech'] },
+    { type: 'size', size: { minBytes: 0, maxBytes: null } },
+    { type: 'year', years: { minYear: 2000, maxYear: null } },
+  ];
+  const format: PcdCustomFormat = {
+    id: 1,
+    name: 'Reviewed CF',
+    includeInRename: false,
+    // Match the PCD reader: every type-specific property exists, but only its own is set.
+    conditions: conditionData.map((data, index) => ({
+      name: `Condition ${index}`,
+      type: '',
+      arrType: 'all',
+      negate: false,
+      required: false,
+      patterns: undefined,
+      languages: undefined,
+      sources: undefined,
+      resolutions: undefined,
+      qualityModifiers: undefined,
+      releaseTypes: undefined,
+      indexerFlags: undefined,
+      size: undefined,
+      years: undefined,
+      ...data,
+    })),
+  };
+  const batch = profileBatch(['Reviewed Profile']);
+  batch.customFormats.set(format.name, format);
+  batch.profiles[0].referencedFormatNames = [format.name];
+  batch.profiles[0].pcdProfile.customFormats = [{ formatId: 1, formatName: format.name, score: 100 }];
+  // TRaSH's profile projection also supplies undefined members on non-group qualities.
+  batch.profiles[0].pcdProfile.qualities = [
+    {
+      type: 'quality',
+      referenceId: 1,
+      name: 'Bluray-1080p',
+      position: 0,
+      enabled: true,
+      upgradeUntil: true,
+      members: undefined,
+    },
+  ];
+  const state = newState();
+  const client = makeClient(state, { liveCustomFormats: [] });
+  const materialize = async () => {
+    const { preview, captured, context } = await previewWithContext(instanceId, client, [batch]);
+    const sourceEvidence = (source: string) =>
+      Object.fromEntries(
+        [...captured.evidence]
+          .filter(([key]) => key.startsWith(`${source}.`))
+          .map(([key, value]) => [key.slice(source.length + 1), value])
+      );
+    const evidence = {
+      section: 'qualityProfiles' as const,
+      pcd: sourceEvidence('pcd'),
+      arr: sourceEvidence('arr'),
+      plan: { result: preview, outcome: { section: 'qualityProfiles', failure: null, skipped: false } },
+    };
+    const binding = await buildSyncPreviewReviewBinding({
+      instanceId,
+      arrType: 'radarr',
+      target: {
+        url: 'http://localhost:7878',
+        credentialFingerprint: 'test-fingerprint',
+        credentialKeyVersion: 'test-key-version',
+        credentialRevision: 'test-revision',
+      },
+      sections: ['qualityProfiles'],
+      sectionConfigs: { qualityProfiles: context.config },
+      evidence: [evidence],
+    });
+    return { preview, binding, context };
+  };
+  const { preview, binding, context } = await materialize();
+  assertEquals(
+    preview.customFormats.map(({ action }) => action),
+    ['create']
+  );
+  assertEquals(
+    preview.qualityProfiles.map(({ action }) => action),
+    ['create']
+  );
+  assertEquals(binding, (await materialize()).binding, 'rematerialization must hash identically');
+  format.conditions[0].patterns![0].pattern = 'changed';
+  assertNotEquals(
+    binding.evidence.qualityProfiles?.pcdHash,
+    (await materialize()).binding.evidence.qualityProfiles?.pcdHash
+  );
+  format.conditions[0].patterns![0].pattern = 'example';
+  const apply = new QualityProfileSyncer(client, instanceId, 'Reviewed', 'radarr');
+  apply.setPreparedExecutionContext(context);
+  const result = await apply.sync();
+  assertEquals(result.success, true);
+  assertEquals(state.writes, [
+    `createCustomFormat:${format.name}${SUFFIX}`,
+    `createQualityProfile:Reviewed Profile${SUFFIX}`,
+  ]);
+  assertEquals(
+    result.outcomes.map(({ status }) => status),
+    ['success', 'success']
+  );
 });

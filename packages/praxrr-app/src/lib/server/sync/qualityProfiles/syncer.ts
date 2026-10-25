@@ -482,7 +482,9 @@ export class QualityProfileSyncer extends BaseSyncer {
       this.recordPreviewEvidence('qualityProfiles', 'pcd', 'effectiveConfig', effectiveConfig);
       // Read-only: TRaSH namespaces are predicted, never persisted, while previewing.
       const batches = await this.fetchSyncBatches(undefined, effectiveConfig, 'predict');
-      this.recordPreviewEvidence('qualityProfiles', 'pcd', 'sourceBatches', batches.map(projectBatchEvidence));
+      if (this.hasPreviewReviewRecorder()) {
+        this.recordPreviewEvidence('qualityProfiles', 'pcd', 'sourceBatches', batches.map(projectBatchEvidence));
+      }
       const totalProfiles = batches.reduce((sum, batch) => sum + batch.profiles.length, 0);
 
       // Opt-in pruning policy is read fresh for every preview so a toggle takes effect on the next

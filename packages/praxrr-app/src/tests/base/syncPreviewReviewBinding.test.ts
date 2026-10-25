@@ -4,6 +4,8 @@ import {
   canonicalizeReviewValue,
   compareReviewedEvidence,
   sortReviewEvidenceSet,
+  omitUndefinedReviewProperties,
+  REVIEW_CANONICAL_LIMITS,
   type SyncPreviewSectionReviewEvidenceInput,
 } from '$sync/preview/reviewBinding.ts';
 import type {
@@ -94,6 +96,43 @@ Deno.test('review binding canonicalization is stable by object key and preserves
     reorderedSemanticArray.evidence.qualityProfiles?.pcdHash,
     orderedSemanticArray.evidence.qualityProfiles?.pcdHash
   );
+});
+
+Deno.test('review evidence projection omits only optional plain-object properties', () => {
+  const source = { omitted: undefined, nested: [{ present: null, absent: undefined }] };
+  const projected = omitUndefinedReviewProperties(source);
+  assertEquals(projected, { nested: [{ present: null }] });
+  assertEquals(Object.hasOwn(source, 'omitted'), true, 'projection must not mutate its source');
+  assertEquals(canonicalizeReviewValue(projected), '{"nested":[{"present":null}]}');
+  const frozen = Object.freeze(Object.assign(Object.create(null), { absent: undefined, present: 'kept' }));
+  const frozenProjection = omitUndefinedReviewProperties(frozen);
+  assertEquals(Object.getPrototypeOf(frozenProjection), null);
+  assertEquals(canonicalizeReviewValue(frozenProjection), '{"present":"kept"}');
+  assertEquals(Object.hasOwn(frozen, 'absent'), true);
+  assertThrows(() => canonicalizeReviewValue(source), TypeError, 'undefined values');
+  assertThrows(
+    () => canonicalizeReviewValue(omitUndefinedReviewProperties({ entries: [undefined] })),
+    TypeError,
+    'undefined values'
+  );
+  assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties(new Array(1))), TypeError, 'sparse');
+  for (const unsupported of [new Date(), new Map(), NaN, Infinity, 1n, () => 1]) {
+    assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties({ unsupported })), TypeError);
+  }
+  const accessor = Object.defineProperty({}, 'value', { enumerable: true, get: () => undefined });
+  assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties(accessor)), TypeError, 'accessor');
+  const symbol = { [Symbol('value')]: undefined };
+  assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties(symbol)), TypeError, 'symbol');
+  const cycle: Record<string, unknown> = {};
+  cycle.self = cycle;
+  assertThrows(() => canonicalizeReviewValue(omitUndefinedReviewProperties(cycle)), TypeError, 'cyclic');
+});
+
+Deno.test('review evidence projection leaves over-budget breadth for canonical rejection', () => {
+  const oversized = Array.from({ length: 100 }, () => Array(1_001).fill(0));
+  const projected = omitUndefinedReviewProperties(oversized);
+  assert(100 * 1_001 > REVIEW_CANONICAL_LIMITS.maxNodes);
+  assertThrows(() => canonicalizeReviewValue(projected), TypeError, 'node limit exceeded');
 });
 
 Deno.test('review binding canonicalizes target URLs and invalidates retarget or credential rotation', async () => {

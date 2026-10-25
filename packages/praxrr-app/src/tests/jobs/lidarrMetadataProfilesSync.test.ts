@@ -30,6 +30,7 @@ import type {
 } from '$sync/preview/types.ts';
 import { generatePreview } from '$sync/preview/orchestrator.ts';
 import { previewStore } from '$sync/preview/store.ts';
+import { buildSyncPreviewReviewBinding } from '$sync/preview/reviewBinding.ts';
 import { resetPreviewCreateRateLimitForTests } from '$sync/preview/limits.ts';
 import { _handleSyncPreviewCreateRequest } from '../../routes/api/v1/sync/preview/+server.ts';
 import { _handleSyncPreviewApplyRequest } from '../../routes/api/v1/sync/preview/[previewId]/apply/+server.ts';
@@ -411,6 +412,50 @@ Deno.test(
     }
   }
 );
+
+Deno.test('reviewed Lidarr metadata profile create preview builds its evidence binding', async () => {
+  setCache(REVIEW_DATABASE_ID, metadataReviewCache(metadataRows()));
+  const originalGetOrCreate = arrNamespaceQueries.getOrCreate;
+  arrNamespaceQueries.getOrCreate = () => 2;
+  const client = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
+  client.getMetadataProfileSchemaOrNull = () => Promise.resolve(null);
+  client.getMetadataProfiles = () => Promise.resolve([]);
+  const recorder = new MetadataEvidenceRecorder();
+  const syncer = new MetadataProfileSyncer(client, 701, 'Reviewed Lidarr');
+  syncer.setPreviewConfig({ databaseId: REVIEW_DATABASE_ID, profileName: REVIEW_PROFILE_NAME });
+  syncer.setPreviewEvidenceRecorder(recorder);
+  try {
+    const preview = await syncer.generatePreview();
+    assert(preview.section === 'metadataProfiles');
+    assertEquals(preview.profile?.action, 'create');
+    assert(recorder.prepared);
+    const binding = await buildSyncPreviewReviewBinding({
+      instanceId: 701,
+      arrType: 'lidarr',
+      target: {
+        url: 'http://lidarr.test',
+        credentialFingerprint: 'test-fingerprint',
+        credentialKeyVersion: 'test-version',
+        credentialRevision: 'test-revision',
+      },
+      sections: ['metadataProfiles'],
+      sectionConfigs: { metadataProfiles: recorder.prepared.config },
+      evidence: [
+        {
+          section: 'metadataProfiles',
+          pcd: recorder.evidence.pcd,
+          arr: recorder.evidence.arr,
+          plan: { result: preview, outcome: { section: 'metadataProfiles', failure: null, skipped: false } },
+        },
+      ],
+    });
+    assert(binding.evidence.metadataProfiles);
+  } finally {
+    client.close();
+    clearAllCaches();
+    arrNamespaceQueries.getOrCreate = originalGetOrCreate;
+  }
+});
 
 Deno.test('Lidarr metadata transient override fails closed when only one selection field is provided', async () => {
   const client = new LidarrClient('http://lidarr.test', 'key', { retries: 0 });
