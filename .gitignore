@@ -6,6 +6,15 @@ node_modules
 # Claude
 .claude/settings.local.json
 
+# Agents
+.claude/
+.codex/
+.agents/
+.cursor/
+.omp/
+.opencode/
+.pi/
+
 # Output
 .output
 .vercel
