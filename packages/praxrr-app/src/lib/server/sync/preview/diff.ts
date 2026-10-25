@@ -190,8 +190,8 @@ function diffValues(current: unknown, desired: unknown, path: string, context: D
             changes.push({
               field: childPath,
               type: currentItem === undefined ? 'added' : 'removed',
-              current: currentItem,
-              desired: desiredItem,
+              current: currentItem ?? null,
+              desired: desiredItem ?? null,
             });
             continue;
           }

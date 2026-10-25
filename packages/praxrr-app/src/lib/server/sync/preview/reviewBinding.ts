@@ -129,6 +129,35 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
+/**
+ * Project JSON-style optional object properties without weakening the hash boundary.
+ * Array holes/elements, accessors, symbols, cycles, and non-plain values remain unsupported.
+ */
+export function omitUndefinedReviewProperties(value: unknown): unknown {
+  const copies = new WeakMap<object, object>();
+  const project = (candidate: unknown, depth: number): unknown => {
+    if ((!Array.isArray(candidate) && !isPlainObject(candidate)) || depth > REVIEW_CANONICAL_LIMITS.maxDepth) {
+      return candidate;
+    }
+    const existing = copies.get(candidate);
+    if (existing) return existing;
+    const array = Array.isArray(candidate);
+    const copy = array ? new Array(candidate.length) : Object.create(Object.getPrototypeOf(candidate));
+    copies.set(candidate, copy);
+    for (const key of Reflect.ownKeys(candidate)) {
+      if (array && key === 'length') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key)!;
+      if ('value' in descriptor) {
+        if (!array && typeof key === 'string' && descriptor.enumerable && descriptor.value === undefined) continue;
+        descriptor.value = project(descriptor.value, depth + 1);
+      }
+      Object.defineProperty(copy, key, descriptor);
+    }
+    return copy;
+  };
+  return project(value, 0);
+}
+
 function compareCanonicalKeys(left: string, right: string): number {
   if (left === right) return 0;
   return left < right ? -1 : 1;

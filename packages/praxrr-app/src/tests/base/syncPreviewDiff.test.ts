@@ -80,3 +80,16 @@ Deno.test('diffToFieldChanges still reports scalar leaf changes', () => {
     },
   ]);
 });
+
+Deno.test('diffToFieldChanges represents missing keyed-array entries as null', () => {
+  const options = {
+    arrayKeyStrategies: [{ path: 'formatItems', selectKey: (item: Record<string, unknown>) => String(item.format) }],
+  };
+  const item = { format: 1, score: 100 };
+  assertEquals(diffToFieldChanges({}, { formatItems: [item] }, options), [
+    { field: 'formatItems["1"]', type: 'added', current: null, desired: item },
+  ]);
+  assertEquals(diffToFieldChanges({ formatItems: [item] }, {}, options), [
+    { field: 'formatItems["1"]', type: 'removed', current: item, desired: null },
+  ]);
+});
