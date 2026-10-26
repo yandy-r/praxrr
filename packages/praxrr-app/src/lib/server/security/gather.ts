@@ -87,8 +87,10 @@ async function ensureOidcDiscoveryObserved(oidcConfigured: boolean): Promise<voi
   if (discoveryUrl === null || !isSecureOidcEndpoint(discoveryUrl)) return;
   if (getLastDiscoveryEndpoints()?.url === discoveryUrl) return;
 
-  const { promise: deadline, resolve: expire } = Promise.withResolvers<void>();
-  const timer = setTimeout(expire, OIDC_DISCOVERY_REPORT_DEADLINE_MS);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, OIDC_DISCOVERY_REPORT_DEADLINE_MS);
+  });
   try {
     await Promise.race([getDiscoveryDocument(discoveryUrl).then(() => undefined), deadline]);
   } catch {
