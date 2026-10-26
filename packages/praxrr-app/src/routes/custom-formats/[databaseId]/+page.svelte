@@ -217,7 +217,11 @@
   <!-- Actions Bar -->
   <ActionsBar className="w-full justify-center mx-auto md:w-auto md:mx-0">
     <SearchAction searchStore={search} placeholder="Search custom formats..." responsive />
-    <ActionButton icon={Plus} on:click={() => goto(`/custom-formats/${data.currentDatabase.id}/new`)} />
+    <ActionButton
+      icon={Plus}
+      label="Add custom format"
+      on:click={() => goto(`/custom-formats/${data.currentDatabase.id}/new`)}
+    />
     <SearchFilterAction bind:options={searchOptions} />
     <div title={sourceFilterDisabledReason ?? undefined}>
       <SourceFilterAction
@@ -231,7 +235,7 @@
       />
     </div>
     <ViewToggle bind:value={$view} />
-    <ActionButton icon={Info} on:click={() => (infoModalOpen = true)} />
+    <ActionButton icon={Info} label="Custom formats info" on:click={() => (infoModalOpen = true)} />
   </ActionsBar>
 
   <!-- Custom Formats Content -->

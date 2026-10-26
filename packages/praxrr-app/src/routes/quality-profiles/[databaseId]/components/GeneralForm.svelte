@@ -322,6 +322,7 @@
           {#if availableLanguages.length > 0}
             <div class="space-y-2">
               <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <!-- Reason: onkeydown here only intercepts keys for the inner combobox input (ArrowUp/Down/Enter/Escape); the wrapper itself is not an interactive element -->
               <div class="relative" onkeydown={handleLanguageKeydown}>
                 <FormInput
                   label="Language"

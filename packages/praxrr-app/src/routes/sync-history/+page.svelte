@@ -364,6 +364,7 @@
       {columns}
       data={data.rows}
       rowHref={(row) => `/sync-history/${row.id}`}
+      rowLabel={(row) => `${row.instanceName} sync run #${row.id}`}
       emptyMessage="No sync runs match these filters."
       hoverable
       compact

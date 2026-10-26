@@ -1,10 +1,13 @@
 <script lang="ts">
   import { ArrowLeft } from 'lucide-svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import NotificationServiceForm from '../../components/NotificationServiceForm.svelte';
   import type { PageData } from './$types';
 
   export let data: PageData;
 </script>
+
+<PageTitle parts={[data.service.name, 'Notifications', 'Settings']} />
 
 <div class="p-8">
   <!-- Header -->

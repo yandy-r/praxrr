@@ -172,6 +172,7 @@
               type="button"
               onclick={btn.action}
               title={btn.title}
+              aria-label={btn.title}
               disabled={disabled || showPreview}
               class="rounded-md p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-100"
             >

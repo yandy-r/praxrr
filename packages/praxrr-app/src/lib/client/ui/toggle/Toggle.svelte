@@ -52,7 +52,9 @@
   {#if label}
     <span class="truncate">{label}</span>
   {/if}
+  <!-- The wrapper is the switch; the checkbox is visual only so it is not a second, unnamed control. -->
   <IconCheckbox
+    decorative
     {checked}
     {icon}
     color={resolvedCheckboxColor || 'accent'}
@@ -60,7 +62,5 @@
     {variant}
     {iconColor}
     {disabled}
-    stopPropagation
-    on:click={handleToggle}
   />
 </div>

@@ -25,6 +25,12 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(400, 'Invalid profile ID');
   }
 
+  // Get current database
+  const currentDatabase = pcdManager.getById(currentDatabaseId);
+  if (!currentDatabase) {
+    throw error(404, 'Database not found');
+  }
+
   // Get the cache for the database
   const cache = pcdManager.getCache(currentDatabaseId);
   if (!cache) {
@@ -45,6 +51,7 @@ export const load: ServerLoad = async ({ params }) => {
   const scoringData = await qualityProfileQueries.scoring(cache, currentDatabaseId, profile.name);
 
   return {
+    currentDatabase,
     profileName: profile.name,
     scoring: scoringData,
     canWriteToBase: canWriteToBase(currentDatabaseId),

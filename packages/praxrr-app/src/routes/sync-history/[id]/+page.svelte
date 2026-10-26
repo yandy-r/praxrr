@@ -77,7 +77,7 @@
 </script>
 
 <svelte:head>
-  <title>Sync History Detail - Praxrr</title>
+  <title>{detail?.instanceName ?? 'Run'} - Sync History Detail - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

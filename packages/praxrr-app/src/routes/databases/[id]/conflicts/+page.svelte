@@ -225,7 +225,7 @@
 
 <ActionsBar className="justify-end mt-6">
   <SearchAction {searchStore} placeholder="Search conflicts..." />
-  <ActionButton icon={Fingerprint} title="Filter entity" hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={Fingerprint} label="Filter entity" hasDropdown={true} dropdownPosition="right">
     <svelte:fragment slot="dropdown" let:dropdownPosition>
       <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter entity">
         <div class="max-h-64 overflow-y-auto">
@@ -265,7 +265,7 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={AlertTriangle} title="Filter reason" hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={AlertTriangle} label="Filter reason" hasDropdown={true} dropdownPosition="right">
     <svelte:fragment slot="dropdown" let:dropdownPosition>
       <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter reason">
         <div class="max-h-64 overflow-y-auto">

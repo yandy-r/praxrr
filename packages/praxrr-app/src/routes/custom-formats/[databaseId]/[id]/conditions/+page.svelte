@@ -211,7 +211,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.format.name} - Conditions - Praxrr</title>
+  <title>{data.format.name} - Conditions - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <form

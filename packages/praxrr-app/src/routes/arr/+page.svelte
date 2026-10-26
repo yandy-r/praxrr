@@ -64,8 +64,8 @@
     <!-- Actions Bar -->
     <ActionsBar>
       <SearchAction searchStore={search} placeholder="Search instances..." />
-      <ActionButton icon={Plus} title="Add Instance" on:click={() => goto('/arr/new')} />
-      <ActionButton icon={Info} title="Info" on:click={() => (showInfoModal = true)} />
+      <ActionButton icon={Plus} label="Add instance" on:click={() => goto('/arr/new')} />
+      <ActionButton icon={Info} label="Arr instances info" on:click={() => (showInfoModal = true)} />
       <ViewToggle bind:value={$view} />
     </ActionsBar>
 

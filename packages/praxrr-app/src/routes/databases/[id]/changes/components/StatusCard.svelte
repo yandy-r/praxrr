@@ -231,6 +231,7 @@
           target="_blank"
           rel="noopener noreferrer"
           title="Open in GitHub"
+          aria-label="Open in GitHub"
           class="flex items-center justify-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
         >
           <ExternalLink size={16} />
@@ -241,6 +242,7 @@
           on:click={handleSync}
           disabled={syncing}
           title="Sync now"
+          aria-label="Sync now"
           class="flex items-center justify-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
         >
           <RefreshCw size={16} class={syncing ? 'animate-spin' : ''} />

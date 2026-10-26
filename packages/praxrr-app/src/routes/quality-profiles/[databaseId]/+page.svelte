@@ -176,7 +176,11 @@
       ariaLabel="Filter quality profiles by source"
       dropdownOnly
     />
-    <ActionButton icon={Plus} on:click={() => goto(`/quality-profiles/${data.currentDatabase.id}/new`)} />
+    <ActionButton
+      icon={Plus}
+      label="Add quality profile"
+      on:click={() => goto(`/quality-profiles/${data.currentDatabase.id}/new`)}
+    />
     <ViewToggle bind:value={$view} />
   </ActionsBar>
 

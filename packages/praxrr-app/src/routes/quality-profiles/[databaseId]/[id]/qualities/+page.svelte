@@ -518,7 +518,7 @@
 </script>
 
 <svelte:head>
-  <title>Qualities - Praxrr</title>
+  <title>{data.profileName} - Qualities - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <StickyCard position="top">
@@ -659,6 +659,7 @@
               <Button
                 icon={ChevronUp}
                 size="xs"
+                title="Move up"
                 disabled={index === 0}
                 on:click={(e) => {
                   e.stopPropagation();
@@ -668,6 +669,7 @@
               <Button
                 icon={ChevronDown}
                 size="xs"
+                title="Move down"
                 disabled={index === mainBucket.length - 1}
                 on:click={(e) => {
                   e.stopPropagation();
@@ -705,6 +707,7 @@
               </span>
             {/if}
             <IconCheckbox
+              label={`Upgrade until ${item.name}`}
               checked={item.upgradeUntil}
               icon={ArrowUp}
               color="#07CA07"
@@ -713,6 +716,7 @@
               on:click={() => toggleUpgradeUntil(index)}
             />
             <IconCheckbox
+              label={`Enable ${item.name}`}
               checked={item.enabled}
               icon={Check}
               color="blue"

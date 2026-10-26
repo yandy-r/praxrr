@@ -250,6 +250,7 @@
       {columns}
       data={sourceFiltered}
       rowHref={getRowHref}
+      rowLabel={(row) => row.name}
       emptyMessage="No custom formats match your search"
       responsive
       {initialSort}

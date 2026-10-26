@@ -100,6 +100,7 @@ message)`. See [Store Patterns](/app/components/patterns/).
 | `SectionHeader`    | Presentational uppercase section-divider label with hairline rules above and below, used to separate groups of nav entries. Single required prop: label.                                                                                 |
 | `NavScopeSelector` | Labeled select for choosing the active Arr scope; options come from the nav shell's available scopes and selection updates the navScope store. Single prop: navShell.                                                                    |
 | `Version`          | Footer card showing the praxrr logo, wordmark, and a platform-channel-version metadata line. Single optional prop: version.                                                                                                              |
+| `PageTitle`        | Sets the document title from most-specific-first parts, always suffixed with `Praxrr`; null and blank parts are dropped.                                                                                                                 |
 
 ### [Badges & Labels](/app/components/badges/)
 

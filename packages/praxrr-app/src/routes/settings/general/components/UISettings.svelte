@@ -77,7 +77,7 @@
         <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Navigation</h3>
         <div class="space-y-2">
           <div class="flex items-center gap-3">
-            <IconCheckbox icon={Check} checked={useEmojis} on:click={toggleNavIcons} />
+            <IconCheckbox label="Use Emojis" icon={Check} checked={useEmojis} on:click={toggleNavIcons} />
             <button type="button" class="flex-1 text-left" on:click={toggleNavIcons}>
               <span class="text-sm font-medium text-neutral-900 dark:text-neutral-50"> Use Emojis </span>
               <p class="text-xs text-neutral-500 dark:text-neutral-400">

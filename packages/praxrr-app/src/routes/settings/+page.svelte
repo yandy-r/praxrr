@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import { Sliders, ShieldCheck, Bell, Clock, FileText, Archive, Info, Bird, Package } from 'lucide-svelte';
 
   const settingsItems = [
@@ -67,6 +68,8 @@
     },
   ];
 </script>
+
+<PageTitle parts={['Settings']} />
 
 <div class="px-4 pt-4 pb-8 md:px-8">
   <div class="mb-8">

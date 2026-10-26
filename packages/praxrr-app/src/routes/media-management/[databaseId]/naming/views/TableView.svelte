@@ -8,7 +8,7 @@
   import { Tag, ToggleRight, Copy, Download, Database } from 'lucide-svelte';
   import type { SourcedNamingListItem } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
-  import type { ArrAppType } from '$shared/arr/capabilities.ts';
+  import { getArrAppMetadata, isArrAppType, type ArrAppType } from '$shared/arr/capabilities.ts';
   import radarrLogo from '$lib/client/assets/Radarr.svg';
   import sonarrLogo from '$lib/client/assets/Sonarr.svg';
   import lidarrLogo from '$lib/client/assets/Lidarr.png';
@@ -124,6 +124,13 @@
     return appType.charAt(0).toUpperCase();
   }
 
+  function arrLabel(arrType: string): string {
+    if (!arrType) return 'Unknown';
+    return isArrAppType(arrType)
+      ? getArrAppMetadata(arrType).label
+      : arrType.charAt(0).toUpperCase() + arrType.slice(1);
+  }
+
   const baseColumns: Column<SourcedNamingListItem>[] = [
     {
       key: 'name',
@@ -157,7 +164,14 @@
   $: columns = showSourceBadges ? [baseColumns[0], sourceColumn, ...baseColumns.slice(1)] : baseColumns;
 </script>
 
-<Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
+<Table
+  {columns}
+  data={configs}
+  rowHref={getRowHref}
+  rowLabel={(row) =>
+    `${getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)} (${arrLabel(row.arr_type)})`}
+  hoverable={true}
+>
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
       <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)}</span>
@@ -185,10 +199,10 @@
     {/if}
   </svelte:fragment>
 
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
   <svelte:fragment slot="actions" let:row>
     {#if isEditableRow(row)}
-      <div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+      <div role="presentation" class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
         <Button
           icon={Download}
           size="xs"

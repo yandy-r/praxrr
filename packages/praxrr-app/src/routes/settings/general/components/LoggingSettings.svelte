@@ -49,6 +49,7 @@
         <!-- Enable Logging -->
         <div class="flex items-center gap-3">
           <IconCheckbox
+            label="Enable Logging"
             icon={Check}
             checked={settings.enabled}
             on:click={() => (settings.enabled = !settings.enabled)}
@@ -63,6 +64,7 @@
         <!-- File Logging -->
         <div class="flex items-center gap-3">
           <IconCheckbox
+            label="File Logging"
             icon={Check}
             checked={settings.file_logging}
             on:click={() => (settings.file_logging = !settings.file_logging)}
@@ -81,6 +83,7 @@
         <!-- Console Logging -->
         <div class="flex items-center gap-3">
           <IconCheckbox
+            label="Console Logging"
             icon={Check}
             checked={settings.console_logging}
             on:click={() => (settings.console_logging = !settings.console_logging)}

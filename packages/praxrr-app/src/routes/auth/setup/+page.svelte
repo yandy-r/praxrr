@@ -22,7 +22,7 @@
 </script>
 
 <svelte:head>
-  <title>Setup - Praxrr</title>
+  <title>Create Admin Account - Praxrr</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-neutral-100 p-4 dark:bg-neutral-900">

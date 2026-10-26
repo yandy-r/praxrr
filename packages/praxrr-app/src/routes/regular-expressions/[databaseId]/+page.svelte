@@ -152,7 +152,7 @@
   <!-- Actions Bar -->
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search regular expressions..." responsive />
-    <ActionButton icon={Plus} hasDropdown={true} dropdownPosition="right" title="Add regular expression">
+    <ActionButton icon={Plus} hasDropdown={true} dropdownPosition="right" label="Add regular expression">
       <svelte:fragment slot="dropdown">
         <Dropdown position="right" role="menu" label="Add regular expression">
           <DropdownItem
@@ -172,7 +172,7 @@
     </ActionButton>
     <SearchFilterAction bind:options={searchOptions} />
     <ViewToggle bind:value={$view} />
-    <ActionButton icon={Info} title="About regular expressions" on:click={() => (infoModalOpen = true)} />
+    <ActionButton icon={Info} label="About regular expressions" on:click={() => (infoModalOpen = true)} />
   </ActionsBar>
 
   <!-- Regular Expressions Content -->

@@ -68,9 +68,29 @@
       </div>
     {/if}
   </a>
+{:else if onclick}
+  <!-- onclick on a div would trap keyboard users; a real button keeps the card keyboard-activatable. -->
+  <button type="button" class="{cardClass} block w-full text-left font-sans text-inherit" on:click={onclick}>
+    {#if hasHeader}
+      <span class="block {paddingClass}">
+        <slot name="header" />
+      </span>
+      <span class="block border-t border-neutral-200 dark:border-neutral-700/60 {dividerClass}"></span>
+    {/if}
+
+    <span class="block {paddingClass}">
+      <slot />
+    </span>
+
+    {#if hasFooter}
+      <span class="block border-t border-neutral-200 dark:border-neutral-700/60 {dividerClass}"></span>
+      <span class="block {paddingClass}">
+        <slot name="footer" />
+      </span>
+    {/if}
+  </button>
 {:else}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class={cardClass} on:click={onclick}>
+  <div class={cardClass}>
     {#if hasHeader}
       <div class={paddingClass}>
         <slot name="header" />

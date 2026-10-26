@@ -84,7 +84,7 @@
   ];
 </script>
 
-<Table {columns} data={instances} hoverable={true} rowHref={getRowHref}>
+<Table {columns} data={instances} hoverable={true} rowHref={getRowHref} rowLabel={(row) => row.name}>
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
       {@const appLabel = getAppLabel(row.type)}

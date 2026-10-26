@@ -3,6 +3,7 @@
   import LidarrNamingForm from '../components/LidarrNamingForm.svelte';
   import SonarrNamingForm from '../components/SonarrNamingForm.svelte';
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import RadarrIcon from '$lib/client/assets/Radarr.svg';
   import SonarrIcon from '$lib/client/assets/Sonarr.svg';
   import LidarrIcon from '$lib/client/assets/Lidarr.png';
@@ -37,6 +38,8 @@
 
   $: selectedLabel = arrTypeOptions.find((option) => option.value === selectedArrType)?.label ?? '';
 </script>
+
+<PageTitle parts={['New Naming Config', data.currentDatabase.name]} />
 
 {#snippet missingDefaultsWarning(label: string)}
   <div class="rounded-lg border border-amber-300 bg-amber-50 p-6 dark:border-amber-700 dark:bg-amber-950">

@@ -82,8 +82,12 @@
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search delay profiles..." responsive />
     <ViewToggle bind:value={$view} />
-    <ActionButton icon={Info} on:click={() => (showInfoModal = true)} />
-    <ActionButton icon={Plus} on:click={() => goto(`/delay-profiles/${data.currentDatabase.id}/new`)} />
+    <ActionButton icon={Info} label="About delay profiles" on:click={() => (showInfoModal = true)} />
+    <ActionButton
+      icon={Plus}
+      label="Add delay profile"
+      on:click={() => goto(`/delay-profiles/${data.currentDatabase.id}/new`)}
+    />
   </ActionsBar>
 
   <!-- Delay Profiles Content -->

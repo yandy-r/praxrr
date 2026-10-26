@@ -74,17 +74,17 @@
 
 {#if open}
   <!-- Backdrop -->
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <!-- svelte-ignore a11y-click-events-have-key-events -- scrolling container only; closing on click is delegated to the child overlay below. -->
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -- see above -->
   <div
     class="fixed inset-0 z-[100] overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-6"
     in:fade={{ duration: 140 }}
     out:fade={{ duration: 110 }}
   >
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -- backdrop click-to-close; Escape is handled on the dialog panel above. -->
     <div class="flex min-h-full w-full items-start justify-center sm:items-center" on:click|self={handleCancel}>
       <!-- Modal -->
-      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -- panel hosts the focus trap; interactions are on its interactive children. -->
       <div
         class="relative my-4 flex w-full flex-col {sizeClasses[size]} {heightClasses[
           height
@@ -104,7 +104,7 @@
         </div>
 
         <!-- Body -->
-        <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+        <!-- svelte-ignore a11y-no-noninteractive-tabindex -- focusable scroll region so keyboard users can scroll an overflowing modal body. -->
         <div
           class="flex-1 overflow-auto px-6 py-4"
           role={bodyOverflows ? 'region' : undefined}

@@ -30,7 +30,6 @@
   {#each visibleExpressions as expression (expression.id)}
     <Card href="/regular-expressions/{databaseId}/{expression.id}" hoverable>
       <svelte:fragment slot="header">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="flex items-start justify-between gap-2">
           <div class="flex min-w-0 flex-wrap items-center gap-1.5">
             <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
@@ -40,7 +39,8 @@
               <Label variant="info" size="sm" rounded="md">{tag.name}</Label>
             {/each}
           </div>
-          <div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+          <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
             {#if expression.regex101_id}
               <Button
                 icon={ExternalLink}

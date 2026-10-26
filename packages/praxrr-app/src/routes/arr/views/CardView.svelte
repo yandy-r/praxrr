@@ -75,10 +75,11 @@
     {@const appLabel = getAppLabel(instance.type)}
     {@const logoPath = getLogoPath(instance.type)}
     {@const instanceHref = resolve('/arr/[id]', { id: instance.id.toString() })}
-    <a
-      href={instanceHref}
-      class="group flex cursor-pointer items-center gap-4 rounded-lg border border-neutral-200 bg-white p-3 text-left transition-all hover:border-neutral-300 hover:shadow-md active:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 dark:active:bg-neutral-800"
+    <div
+      class="group relative flex items-center gap-4 rounded-lg border border-neutral-200 bg-white p-3 transition-all hover:border-neutral-300 hover:shadow-md active:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700 dark:active:bg-neutral-800"
     >
+      <!-- Whole-card overlay link keeps navigation as the primary action; action buttons sit above it -->
+      <a href={instanceHref} aria-label={instance.name} class="absolute inset-0 rounded-lg"></a>
       <!-- Left: Logo + Name -->
       <div class="flex min-w-0 flex-1 items-center gap-3">
         {#if logoPath}
@@ -110,6 +111,7 @@
       <div class="relative z-10 flex flex-shrink-0 items-center gap-1">
         <button
           type="button"
+          aria-label={`Open ${instance.name} in ${appLabel}`}
           on:click={(e) => handleExternalClick(e, instance)}
           class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
         >
@@ -117,12 +119,13 @@
         </button>
         <button
           type="button"
+          aria-label={`Delete ${instance.name}`}
           on:click={(e) => handleDeleteClick(e, instance)}
           class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
         >
           <Trash2 size={16} />
         </button>
       </div>
-    </a>
+    </div>
   {/each}
 </div>

@@ -207,6 +207,7 @@
         }
         return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/naming/${row.trashId}/`;
       }}
+      rowLabel={(row) => row.name}
       emptyMessage="No naming configs cached. Try syncing sources."
       responsive
       {initialSort}

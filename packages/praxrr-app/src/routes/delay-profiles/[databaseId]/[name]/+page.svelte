@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.delayProfile.name} - Delay Profiles - Praxrr</title>
+  <title>{data.delayProfile.name} - Delay Profiles - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="p-4 md:p-8">

@@ -33,6 +33,17 @@
     }
   }
 
+  // <main> is not focusable by default; make it a temporary focus target so the skip link moves
+  // keyboard focus (and the next Tab) into the content instead of only scrolling.
+  function focusMain(event: MouseEvent) {
+    const main = document.getElementById('main');
+    if (!main) return;
+    event.preventDefault();
+    main.tabIndex = -1;
+    main.addEventListener('blur', () => main.removeAttribute('tabindex'), { once: true });
+    main.focus();
+  }
+
   onMount(() => () => {
     stopToasts?.();
     stopToasts = null;
@@ -44,6 +55,13 @@
   <link rel="icon" href={logo} />
   <title>Praxrr</title>
 </svelte:head>
+<a
+  href="#main"
+  on:click={focusMain}
+  class="bg-accent-600 sr-only rounded-lg px-4 py-2 text-sm font-medium text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200]"
+>
+  Skip to main content
+</a>
 
 {#if !isAuthPage}
   <Navbar />
@@ -53,7 +71,7 @@
 <AlertContainer />
 <AlertLiveRegion />
 
-<main class={isAuthPage ? '' : 'pt-16 pb-16 md:pt-0 md:pb-0 md:pl-80'}>
+<main id="main" class={isAuthPage ? 'focus:outline-none' : 'pt-16 pb-16 focus:outline-none md:pt-0 md:pb-0 md:pl-80'}>
   {#if data.setupChecklist}
     <SetupChecklist checklist={data.setupChecklist} />
   {/if}

@@ -174,9 +174,9 @@
           </div>
         </div>
 
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+        <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
         {#if isEditableRow(config)}
-          <div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
             <Button
               icon={Download}
               size="xs"

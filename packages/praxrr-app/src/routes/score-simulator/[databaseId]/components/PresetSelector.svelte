@@ -70,6 +70,7 @@
       type="button"
       class="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
       title="Try Examples"
+      aria-label="Try Examples"
       bind:this={triggerEl}
       aria-haspopup="menu"
       aria-expanded={dropdownOpen}

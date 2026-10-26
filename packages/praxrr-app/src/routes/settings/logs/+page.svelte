@@ -9,6 +9,7 @@
   import NumberInput from '$ui/form/NumberInput.svelte';
   import type { Column, SortDirection, SortState } from '$ui/table/types';
   import LogsActionsBar from './components/LogsActionsBar.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import { getPersistentSearchStore } from '$lib/client/stores/search';
   import { invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
@@ -287,6 +288,8 @@
   }
 </script>
 
+<PageTitle parts={['Logs', 'Settings']} />
+
 <div class="p-4 md:p-8">
   <!-- Header -->
   <div class="mb-8">
@@ -342,6 +345,7 @@
           type="button"
           disabled={currentPage <= 1}
           on:click={goToPreviousPage}
+          aria-label="Previous page"
           class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"
         >
           <ChevronLeft size={20} />
@@ -353,6 +357,7 @@
           type="button"
           disabled={currentPage >= totalPages}
           on:click={goToNextPage}
+          aria-label="Next page"
           class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"
         >
           <ChevronRight size={20} />

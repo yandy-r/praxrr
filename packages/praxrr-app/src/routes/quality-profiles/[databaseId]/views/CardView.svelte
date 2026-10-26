@@ -93,11 +93,11 @@
   {#each visibleProfiles as profile}
     <Card href={getCardHref(profile)} hoverable>
       <svelte:fragment slot="header">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="flex items-start justify-between gap-2">
           <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
           {#if isEditableRow(profile)}
-            <div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+            <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+            <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
               <Button
                 icon={Download}
                 size="xs"

@@ -182,7 +182,7 @@
           class="overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700/60 dark:bg-neutral-800/50"
         >
           <!-- Card Header - clickable to expand -->
-          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -- role=button header with nested interactive actions; click and Enter/Space both toggle via handleRowClick. -->
           <div
             role="button"
             tabindex="0"
@@ -205,7 +205,7 @@
               </div>
               <div class="flex shrink-0 items-center gap-2 pt-0.5">
                 {#if $$slots.actions}
-                  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+                  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -- swallow-only wrapper: keeps row-toggle clicks from firing when clicking action buttons (which are themselves keyboard-accessible). -->
                   <div on:click|stopPropagation>
                     <slot name="actions" {row} />
                   </div>

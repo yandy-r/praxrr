@@ -48,10 +48,10 @@
   {#each visibleProfiles as profile}
     <Card href="/delay-profiles/{databaseId}/{encodeURIComponent(profile.name)}" hoverable>
       <svelte:fragment slot="header">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
-          <div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+          <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
             <Button
               icon={Download}
               size="xs"

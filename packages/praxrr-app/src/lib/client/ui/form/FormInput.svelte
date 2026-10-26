@@ -141,6 +141,8 @@
         style:display={showPrivateToggle ? 'inline-flex' : 'none'}
         type="button"
         class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+        aria-label={showPassword ? 'Hide password' : 'Show password'}
+        aria-pressed={showPassword}
         onclick={() => (showPassword = !showPassword)}
       >
         {#if showPassword}

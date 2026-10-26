@@ -151,7 +151,7 @@
       <SearchAction {searchStore} placeholder="Search runs..." />
 
       <!-- Date Filter -->
-      <ActionButton icon={Calendar} hasDropdown square title="Filter by date">
+      <ActionButton icon={Calendar} hasDropdown square label="Filter by date">
         <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by date">
           {#each [{ value: 'all', label: 'All time' }, { value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'week', label: 'Last 7 days' }, { value: 'month', label: 'Last 30 days' }] as const as option}
             <DropdownItem
@@ -165,7 +165,7 @@
       </ActionButton>
 
       <!-- Status Filter -->
-      <ActionButton icon={CircleDot} hasDropdown square title="Filter by status">
+      <ActionButton icon={CircleDot} hasDropdown square label="Filter by status">
         <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by status">
           {#each [{ value: 'all', label: 'All' }, { value: 'success', label: 'Success' }, { value: 'partial', label: 'Partial' }, { value: 'failed', label: 'Failed' }, { value: 'skipped', label: 'Skipped' }] as const as option}
             <DropdownItem

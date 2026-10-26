@@ -96,6 +96,7 @@
               <td class="px-6 py-4">
                 <div class="flex items-center justify-center gap-2">
                   <IconCheckbox
+                    label={`Enable ${format.name} for ${arrType}`}
                     checked={customFormatEnabled[format.name]?.[arrType] ?? false}
                     icon={Check}
                     color={getArrTypeColor(arrType)}

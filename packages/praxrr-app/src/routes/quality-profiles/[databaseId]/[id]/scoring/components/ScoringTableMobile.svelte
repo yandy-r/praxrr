@@ -77,6 +77,7 @@
             <div class="flex items-center justify-between gap-3 py-2.5">
               <div class="flex items-center gap-2">
                 <IconCheckbox
+                  label={`Enable ${format.name} for ${arrType}`}
                   checked={customFormatEnabled[format.name]?.[arrType] ?? false}
                   icon={Check}
                   color={getArrTypeColor(arrType)}

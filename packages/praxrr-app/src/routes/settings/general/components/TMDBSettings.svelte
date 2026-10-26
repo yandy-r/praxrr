@@ -231,6 +231,8 @@
         />
         <button
           type="button"
+          aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+          aria-pressed={showApiKey}
           on:click={() => (showApiKey = !showApiKey)}
           class="absolute top-1/2 right-2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
         >

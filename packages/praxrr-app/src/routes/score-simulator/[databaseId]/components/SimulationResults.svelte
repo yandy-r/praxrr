@@ -352,6 +352,7 @@
               <div class="flex items-center gap-1">
                 <button
                   type="button"
+                  aria-label="Previous page"
                   class="inline-flex items-center justify-center rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
                   disabled={cfPage === 0}
                   on:click={() => (cfPage = Math.max(0, cfPage - 1))}
@@ -363,6 +364,7 @@
                 </span>
                 <button
                   type="button"
+                  aria-label="Next page"
                   class="inline-flex items-center justify-center rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
                   disabled={cfPage >= totalCfPages - 1}
                   on:click={() => (cfPage = Math.min(totalCfPages - 1, cfPage + 1))}

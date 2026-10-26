@@ -842,7 +842,7 @@
                 on:click={toggleAll}
                 class="flex h-10 items-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
-                <IconCheckbox checked={allSelected} icon={Check} color="blue" shape="circle" />
+                <IconCheckbox decorative checked={allSelected} icon={Check} color="blue" shape="circle" />
                 Select all ({selectableKeys.length})
               </button>
             </div>
@@ -865,7 +865,7 @@
               <ActionButton
                 icon={previewing ? Loader2 : Upload}
                 iconClass={previewing ? 'animate-spin' : ''}
-                title={previewing ? 'Preparing preview' : 'Preview export'}
+                label={previewing ? 'Preparing preview' : 'Preview export'}
                 disabled={hasIncomingChanges || previewing || committing}
                 on:click={handlePreview}
               />
@@ -875,7 +875,7 @@
               <ActionButton
                 icon={Trash2}
                 variant="danger"
-                title="Drop selected changes"
+                label="Drop selected changes"
                 disabled={dropping}
                 on:click={requestDrop}
               />
@@ -885,7 +885,7 @@
               <ActionButton
                 icon={repairing ? Loader2 : Wrench}
                 iconClass={repairing ? 'animate-spin' : ''}
-                title="Repair legacy export batches"
+                label="Repair legacy export batches"
                 disabled={repairing || committing || previewing}
                 on:click={handleRepair}
               />
@@ -962,6 +962,7 @@
                 <span class="inline-block h-5 w-5"></span>
               {:else}
                 <IconCheckbox
+                  label={`Select ${row.name} change`}
                   checked={selected.has(row.key)}
                   icon={Check}
                   color={autoSelectedKeys.has(row.key) ? '#f59e0b' : 'blue'}

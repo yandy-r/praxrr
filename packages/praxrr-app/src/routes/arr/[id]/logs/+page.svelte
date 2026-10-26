@@ -154,7 +154,7 @@
     <SearchAction {searchStore} placeholder="Search logs..." />
 
     <!-- Level Filter -->
-    <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" title="Filter by level">
+    <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" label="Filter by level">
       <svelte:fragment slot="dropdown" let:dropdownPosition>
         <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
           {#each logLevels as level}
@@ -178,7 +178,7 @@
     </ActionButton>
 
     <!-- Page Size -->
-    <ActionButton icon={Rows3} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Rows per page">
+    <ActionButton icon={Rows3} hasDropdown={true} popupRole="dialog" dropdownPosition="right" label="Rows per page">
       <svelte:fragment slot="dropdown" let:dropdownPosition>
         <Dropdown position={dropdownPosition} minWidth="10rem" role="dialog" label="Rows per page">
           <div class="p-3">
@@ -199,7 +199,7 @@
     </ActionButton>
 
     <!-- Refresh -->
-    <ActionButton title="Refresh logs" on:click={refreshLogs}>
+    <ActionButton label="Refresh logs" on:click={refreshLogs}>
       <RefreshCw size={20} class="text-neutral-700 dark:text-neutral-300 {isRefreshing ? 'animate-spin' : ''}" />
     </ActionButton>
   </ActionsBar>
@@ -218,6 +218,7 @@
       <div class="flex items-center gap-2">
         <button
           type="button"
+          aria-label="Previous page"
           disabled={currentPage <= 1}
           on:click={() => goToPage(currentPage - 1)}
           class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"
@@ -229,6 +230,7 @@
         </span>
         <button
           type="button"
+          aria-label="Next page"
           disabled={currentPage >= totalPages}
           on:click={() => goToPage(currentPage + 1)}
           class="rounded p-1 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-700"

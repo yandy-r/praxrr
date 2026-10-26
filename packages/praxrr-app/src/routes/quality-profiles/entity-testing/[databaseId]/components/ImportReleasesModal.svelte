@@ -394,7 +394,7 @@
             hasDropdown={true}
             dropdownPosition="right"
             square={!selectedInstance}
-            title={selectedInstance ? selectedInstance.name : 'Select instance'}
+            label={selectedInstance ? `Instance: ${selectedInstance.name}` : 'Select instance'}
           >
             {#if selectedInstance}
               <span class="ml-2 text-sm text-neutral-700 dark:text-neutral-300">{selectedInstance.name}</span>
@@ -546,7 +546,7 @@
             icon={sortDirection === 'asc' ? ArrowUpAZ : ArrowDownAZ}
             hasDropdown={true}
             dropdownPosition="right"
-            title="Sort by"
+            label="Sort by"
           >
             <svelte:fragment slot="dropdown" let:dropdownPosition>
               <Dropdown position={dropdownPosition} role="menu" label="Sort by">
@@ -571,7 +571,7 @@
               </Dropdown>
             </svelte:fragment>
           </ActionButton>
-          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right" title="Select releases">
+          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right" label="Select releases">
             <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
               <Dropdown position={dropdownPosition} role="menu" label="Select releases">
                 <DropdownItem

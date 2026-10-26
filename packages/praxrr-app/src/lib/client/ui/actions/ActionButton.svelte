@@ -11,7 +11,7 @@
   export let hasDropdown: boolean = false;
   export let dropdownPosition: 'left' | 'right' | 'middle' = 'left';
   export let disabled: boolean = false;
-  export let title: string = '';
+  export let label: string;
   export let type: 'button' | 'submit' = 'button';
   export let variant: 'neutral' | 'danger' = 'neutral';
   export let popupRole: 'menu' | 'listbox' | 'dialog' = 'menu';
@@ -180,7 +180,7 @@
   <button
     bind:this={triggerEl}
     {type}
-    {title}
+    title={label}
     class="flex items-center justify-center border border-neutral-300 bg-white transition-colors dark:border-neutral-700/60 dark:bg-neutral-800/50 {square
       ? 'h-10 w-10'
       : 'h-10 px-4'} {disabled ? 'cursor-not-allowed opacity-50' : variantClasses[variant]}"
@@ -188,7 +188,7 @@
     aria-haspopup={hasDropdown ? popupRole : undefined}
     aria-expanded={hasDropdown ? open : undefined}
     aria-controls={hasDropdown ? dropdownId : undefined}
-    aria-label={title ? title : undefined}
+    aria-label={label}
     on:click
     on:click={handleClick}
     on:keydown={handleTriggerKeydown}

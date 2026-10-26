@@ -278,7 +278,7 @@
 </script>
 
 <svelte:head>
-  <title>Quality Goals - Praxrr</title>
+  <title>Quality Goals - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

@@ -114,10 +114,11 @@
   hoverable={true}
   compact={false}
   rowHref={getRowHref}
+  rowLabel={(row) => row.name}
 >
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
   <svelte:fragment slot="actions" let:row>
-    <div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+    <div role="presentation" class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
       <Button
         icon={Download}
         size="xs"

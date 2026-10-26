@@ -30,6 +30,7 @@
       <div class="space-y-2">
         <div class="flex items-center gap-3">
           <IconCheckbox
+            label="Enable Automatic Backups"
             icon={Check}
             checked={settings.enabled}
             on:click={() => (settings.enabled = !settings.enabled)}
@@ -45,6 +46,7 @@
 
         <div class="flex items-center gap-3">
           <IconCheckbox
+            label="Enable Compression"
             icon={Check}
             checked={settings.compression_enabled}
             on:click={() => (settings.compression_enabled = !settings.compression_enabled)}

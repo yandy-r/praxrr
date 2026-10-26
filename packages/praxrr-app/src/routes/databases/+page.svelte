@@ -96,8 +96,8 @@
     <!-- Actions Bar -->
     <ActionsBar>
       <SearchAction searchStore={search} placeholder="Search sources..." />
-      <ActionButton icon={Plus} title="Add Source" on:click={() => goto('/databases/new')} />
-      <ActionButton icon={Info} title="Info" on:click={() => (showInfoModal = true)} />
+      <ActionButton icon={Plus} label="Add source" on:click={() => goto('/databases/new')} />
+      <ActionButton icon={Info} label="About data sources" on:click={() => (showInfoModal = true)} />
       <ViewToggle bind:value={$view} />
     </ActionsBar>
 
