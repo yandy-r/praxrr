@@ -81,14 +81,14 @@ export function parseOidcAllowlist(env: {
       if (domain.includes('.') && !domain.includes('@') && !/\s/.test(domain)) {
         emailDomains.add(domain);
       } else {
-        invalidEntries.push(normalized);
+        invalidEntries.push(entry);
       }
     } else {
       const parts = normalized.split('@');
       if (parts.length === 2 && parts[0].length > 0 && parts[1].includes('.') && !/\s/.test(normalized)) {
         emails.add(normalized);
       } else {
-        invalidEntries.push(normalized);
+        invalidEntries.push(entry);
       }
     }
   }

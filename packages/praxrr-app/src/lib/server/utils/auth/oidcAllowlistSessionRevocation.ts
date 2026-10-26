@@ -15,16 +15,28 @@ function sorted(values: ReadonlySet<string>): string[] {
   return [...values].sort();
 }
 
-/** Hash the canonical, order-independent policy without persisting configured identities. */
+/**
+ * Hash the canonical, order-independent policy without persisting configured identities.
+ *
+ * Canonical form (v1): `{ v, configured, subjects, emails, emailDomains, groups, groupsClaim,
+ * allowAll }` where every set is sorted, `groupsClaim` is nulled unless group entries exist
+ * (a claim name can never match without entries), and `allowAll` is forced to `false` while
+ * any list is configured (lists are authoritative, so the flag is inert). The fingerprint
+ * therefore tracks the policy's *effective* sign-in semantics, not its raw env text.
+ *
+ * Bump `v` whenever `evaluateOidcAllowlist` semantics change so every deployment re-revokes
+ * once against the new definition instead of trusting fingerprints hashed under old rules.
+ */
 export function fingerprintOidcAllowlist(policy: OidcAllowlistPolicy): string {
   const canonical = JSON.stringify({
+    v: 1,
+    configured: policy.configured,
     subjects: sorted(policy.subjects),
     emails: sorted(policy.emails),
     emailDomains: sorted(policy.emailDomains),
     groups: sorted(policy.groups),
-    groupsClaim: policy.groupsClaim,
-    allowAll: policy.allowAll,
-    configured: policy.configured,
+    groupsClaim: policy.groups.size > 0 ? policy.groupsClaim : null,
+    allowAll: policy.configured ? false : policy.allowAll,
   });
   return createHash('sha256').update(canonical).digest('hex');
 }

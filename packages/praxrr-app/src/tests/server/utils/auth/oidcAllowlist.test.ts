@@ -50,10 +50,10 @@ Deno.test('parseOidcAllowlist: emails are lowercased and @domain entries become 
 });
 
 Deno.test('parseOidcAllowlist: @domain without a dot is invalid and grants nothing', () => {
-  const policy = parseOidcAllowlist({ emails: 'ok@example.com, @localhost, @, @a.b' });
+  const policy = parseOidcAllowlist({ emails: 'ok@example.com, @LocalHost, @, @a.b' });
   assertEquals([...policy.emails], ['ok@example.com']);
   assertEquals([...policy.emailDomains], ['a.b']);
-  assertEquals(policy.invalidEntries, ['@localhost', '@']);
+  assertEquals(policy.invalidEntries, ['@LocalHost', '@']);
 });
 
 Deno.test('parseOidcAllowlist: groups stay exact/case-sensitive; groupsClaim defaults to groups', () => {
@@ -257,6 +257,12 @@ Deno.test('OIDC email entries require one separator and a domain with a dot', ()
     assertEquals(policy.invalidEntries, [entry]);
     assertEquals(evaluateOidcAllowlist({ sub: 'account' }, policy), { allowed: false, reason: 'no-match' });
   }
+});
+
+Deno.test('parseOidcAllowlist: invalid entries retain their original trimmed spelling', () => {
+  const policy = parseOidcAllowlist({ emails: '  Admin  ,  @Corp , User@Local  ' });
+  assertEquals(policy.invalidEntries, ['Admin', '@Corp', 'User@Local']);
+  assertEquals(policy.usableEntryCount, 0);
 });
 
 Deno.test('OIDC token verification requires a non-empty subject and numeric expiration', () => {

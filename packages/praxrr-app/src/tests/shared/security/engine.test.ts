@@ -108,10 +108,10 @@ function instance(id: number, url: string, dns?: DnsTransportEvidence): Instance
 
 Deno.test('computeShieldReport: stamps the engine version and generatedAt from nowIso', () => {
   const report = computeShieldReport(makeInputs());
-  // '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' scoped API tokens (YAN-534).
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '5');
+  // '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534) → '6' OIDC allowlist (YAN-436).
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '6');
   assertEquals(report.engineVersion, SECURITY_POSTURE_ENGINE_VERSION);
-  assertEquals(report.engineVersion, '5');
+  assertEquals(report.engineVersion, '6');
   assertEquals(report.generatedAt, '2026-07-09T02:00:00.000Z');
 });
 
@@ -568,10 +568,10 @@ Deno.test(
   }
 );
 
-Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 5 for every transport', () => {
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '5');
+Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 6 for every transport', () => {
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '6');
   for (const session of ALL_SESSIONS) {
-    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '5');
+    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '6');
   }
 });
 

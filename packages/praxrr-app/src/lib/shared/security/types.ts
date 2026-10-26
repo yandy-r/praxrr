@@ -18,8 +18,11 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * Stamped onto every {@link ShieldReport}. Bump whenever the check set, the band thresholds, the
  * per-check score formula, OR the unscored advisory/assurance report surface changes, so a client
  * can tell a report was produced by a different engine generation. Declared here ONCE.
+ *
+ * History: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534)
+ * → '6' OIDC allowlist (YAN-436).
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '5';
+export const SECURITY_POSTURE_ENGINE_VERSION = '6';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —

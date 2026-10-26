@@ -1133,3 +1133,16 @@ CREATE TABLE arr_managed_entities (
     last_synced_at TEXT NOT NULL,
     PRIMARY KEY (instance_id, entity_type, remote_id)
 );
+
+-- ==============================================================================
+-- TABLE: oidc_allowlist_state
+-- Purpose: Store the last OIDC allowlist fingerprint used for startup session revocation (singleton pattern with id=1)
+-- Migration: 20261027_create_oidc_allowlist_state.ts
+-- ==============================================================================
+
+CREATE TABLE oidc_allowlist_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    fingerprint TEXT NOT NULL CHECK (length(fingerprint) = 64),  -- SHA-256 hex of the canonical allowlist policy
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

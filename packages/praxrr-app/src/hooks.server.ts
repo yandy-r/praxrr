@@ -257,7 +257,8 @@ if (mismatchedCount > 0) {
   );
 }
 
-// Revoke existing OIDC sessions when the effective allowlist changed between OIDC startups
+// Revoke existing OIDC sessions when the allowlist's effective sign-in semantics changed
+// between OIDC startups (see fingerprintOidcAllowlist for what "effective" means)
 await revokeOidcSessionsOnAllowlistChange();
 
 // Log server ready

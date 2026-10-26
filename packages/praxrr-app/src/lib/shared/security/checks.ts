@@ -347,14 +347,19 @@ const LABEL_AUTH = 'Control-plane authentication';
 function oidcInvalidEntriesRecommendation(inputs: PostureInputs): ShieldRecommendation | null {
   const invalidEntry = inputs.oidcAllowlistInvalidEntries[0];
   if (invalidEntry === undefined) return null;
-  return rec(
-    'OIDC allowlist entries were ignored',
-    [
-      `Some OIDC_ALLOWED_EMAILS entries (for example ${invalidEntry}) are not valid email addresses or @domain values, so they match nobody. Fix or remove them; the remaining entries still apply.`,
-    ],
-    'warning',
-    { kind: 'env-var', name: 'OIDC_ALLOWED_EMAILS', label: 'Fix the ignored allowlist entries' }
-  );
+  // "The remaining entries still apply" is only true while at least one usable entry remains; when
+  // no usable entry is left, the blocked recommendation carries the sign-in impact instead.
+  const detail = [
+    `Some OIDC_ALLOWED_EMAILS entries (for example ${invalidEntry}) are not valid email addresses or @domain values, so they match nobody. Fix or remove them${
+      inputs.oidcAllowlistUsableEntryCount > 0 ? '; the remaining entries still apply.' : '.'
+    }`,
+  ];
+  return rec('OIDC allowlist entries were ignored', detail, 'warning', {
+    kind: 'env-var',
+    name: 'OIDC_ALLOWED_EMAILS',
+    docHref: 'https://docs.praxrr.dev/guides/configuration/#restricting-which-oidc-identities-may-sign-in',
+    label: 'Fix the ignored allowlist entries',
+  });
 }
 
 const controlPlaneAuth: SecurityCheck = {
@@ -378,6 +383,8 @@ const controlPlaneAuth: SecurityCheck = {
         );
       case 'oidc': {
         const invalidRecommendation = oidcInvalidEntriesRecommendation(inputs);
+        // Ignored entries surface in EVERY OIDC branch; only the "remaining entries still apply"
+        // phrase inside the recommendation is conditional on a usable entry remaining.
         const invalidRecommendations: ShieldRecommendation[] = invalidRecommendation ? [invalidRecommendation] : [];
 
         if (!inputs.oidcConfigured) {
@@ -418,7 +425,7 @@ const controlPlaneAuth: SecurityCheck = {
             return result(
               ID_AUTH,
               LABEL_AUTH,
-              50,
+              70,
               W,
               'attention',
               false,
@@ -431,7 +438,14 @@ const controlPlaneAuth: SecurityCheck = {
                     'The allowlist has no usable subject, email, email-domain or group entries. Fix or replace the values in OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS; OIDC_ALLOW_ALL_USERS cannot override a configured allowlist.',
                   ],
                   'warning',
-                  { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Set a usable OIDC sign-in allowlist' }
+                  {
+                    kind: 'env-var',
+                    name: 'OIDC_ALLOWED_SUBJECTS',
+                    docHref:
+                      'https://docs.praxrr.dev/guides/configuration/#restricting-which-oidc-identities-may-sign-in',
+                    label:
+                      'Set a usable OIDC sign-in allowlist (OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS)',
+                  }
                 ),
                 ...invalidRecommendations,
               ]
@@ -455,7 +469,7 @@ const controlPlaneAuth: SecurityCheck = {
           return result(
             ID_AUTH,
             LABEL_AUTH,
-            70,
+            50,
             W,
             'attention',
             false,
@@ -468,7 +482,14 @@ const controlPlaneAuth: SecurityCheck = {
                   'OIDC_ALLOW_ALL_USERS is set and no allowlist is, so every account your provider accepts becomes a Praxrr administrator. Restrict sign-in with OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS — and also limit who can reach this client in the provider.',
                 ],
                 'warning',
-                { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Restrict which identities may sign in' }
+                {
+                  kind: 'env-var',
+                  name: 'OIDC_ALLOWED_SUBJECTS',
+                  docHref:
+                    'https://docs.praxrr.dev/guides/configuration/#restricting-which-oidc-identities-may-sign-in',
+                  label:
+                    'Restrict which identities may sign in (OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS)',
+                }
               ),
               ...invalidRecommendations,
             ]
@@ -478,20 +499,28 @@ const controlPlaneAuth: SecurityCheck = {
         return result(
           ID_AUTH,
           LABEL_AUTH,
-          50,
+          70,
           W,
           'attention',
           false,
           null,
-          ['OIDC is configured, but no identity allowlist is set, so new sign-ins are refused.'],
+          [
+            'OIDC is configured, but no identity allowlist is set, so new sign-ins are refused. Set one of OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS.',
+          ],
           [
             rec(
               'OIDC sign-in is blocked until an allowlist is set',
               [
-                'No OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS is set, so Praxrr refuses every new OIDC sign-in. Set one of the allowlist variables, or set OIDC_ALLOW_ALL_USERS=true to explicitly accept every identity the provider authenticates.',
+                'No OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS is set, so Praxrr refuses every new OIDC sign-in. Set one of the allowlist variables to restore sign-in.',
               ],
               'warning',
-              { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Set an OIDC sign-in allowlist' }
+              {
+                kind: 'env-var',
+                name: 'OIDC_ALLOWED_SUBJECTS',
+                docHref: 'https://docs.praxrr.dev/guides/configuration/#restricting-which-oidc-identities-may-sign-in',
+                label:
+                  'Set an OIDC sign-in allowlist (OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS)',
+              }
             ),
             ...invalidRecommendations,
           ]

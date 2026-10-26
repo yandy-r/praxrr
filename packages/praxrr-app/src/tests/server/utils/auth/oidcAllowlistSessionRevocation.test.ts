@@ -68,7 +68,7 @@ function sessionIds(): string[] {
   return db.query<{ id: string }>('SELECT id FROM sessions ORDER BY id').map((row) => row.id);
 }
 
-Deno.test('fingerprintOidcAllowlist canonicalizes entry order and hashes every effective field', () => {
+Deno.test('fingerprintOidcAllowlist hashes effective semantics and ignores inert fields', () => {
   const first = parseOidcAllowlist({
     subjects: 'subject-b,subject-a',
     emails: 'second@example.com,@example.org,first@example.com',
@@ -125,13 +125,6 @@ Deno.test('fingerprintOidcAllowlist canonicalizes entry order and hashes every e
     }),
     parseOidcAllowlist({
       subjects: 'subject-b,subject-a',
-      emails: 'second@example.com,@example.org,first@example.com',
-      groups: 'group-b,group-a',
-      groupsClaim: 'roles',
-      allowAll: 'false',
-    }),
-    parseOidcAllowlist({
-      subjects: 'subject-b,subject-a',
       emails: '@invalid',
       groups: 'group-b,group-a',
       groupsClaim: 'roles',
@@ -141,6 +134,51 @@ Deno.test('fingerprintOidcAllowlist canonicalizes entry order and hashes every e
   for (const variant of variants) {
     assert(fingerprintOidcAllowlist(variant) !== fingerprint);
   }
+
+  // allowAll is inert while any list is configured: lists are authoritative, so toggling it
+  // must not re-revoke every OIDC session.
+  const allowAllToggled = parseOidcAllowlist({
+    subjects: 'subject-b,subject-a',
+    emails: 'second@example.com,@example.org,first@example.com',
+    groups: 'group-b,group-a',
+    groupsClaim: 'roles',
+    allowAll: 'false',
+  });
+  assertEquals(fingerprintOidcAllowlist(allowAllToggled), fingerprint);
+
+  // groupsClaim names a claim to read group entries from; with no groups configured the
+  // claim can never match, so renaming it is not a semantic change.
+  const claimRenamedWithoutGroups = parseOidcAllowlist({
+    subjects: 'subject-b,subject-a',
+    emails: 'second@example.com,@example.org,first@example.com',
+    groupsClaim: 'entirely-different-claim',
+    allowAll: 'true',
+  });
+  const originalClaimWithoutGroups = parseOidcAllowlist({
+    subjects: 'subject-b,subject-a',
+    emails: 'second@example.com,@example.org,first@example.com',
+    groupsClaim: 'roles',
+    allowAll: 'true',
+  });
+  assertEquals(
+    fingerprintOidcAllowlist(claimRenamedWithoutGroups),
+    fingerprintOidcAllowlist(originalClaimWithoutGroups)
+  );
+
+  // With groups configured the claim is live, and with no lists at all allowAll alone
+  // decides sign-in — both remain effective fields that must change the fingerprint.
+  const claimRenamedWithGroups = parseOidcAllowlist({
+    groups: 'group-a',
+    groupsClaim: 'roles',
+  });
+  assert(
+    fingerprintOidcAllowlist(claimRenamedWithGroups) !==
+      fingerprintOidcAllowlist(parseOidcAllowlist({ groups: 'group-a', groupsClaim: 'other' }))
+  );
+  assert(
+    fingerprintOidcAllowlist(parseOidcAllowlist({ allowAll: 'true' })) !==
+      fingerprintOidcAllowlist(parseOidcAllowlist({}))
+  );
 });
 
 migratedTest('changed and first-run policies revoke every OIDC session and retain local sessions', async () => {
