@@ -116,10 +116,11 @@ OIDC requires `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 
 ### OIDC endpoint transport
 
-The discovery URL (`OIDC_DISCOVERY_URL`) and the token and JWKS endpoints it
-advertises must use `https`. Plain `http` is accepted only for loopback hosts
-(`localhost`, `127.x.x.x`, `::1`); any other `http` endpoint is refused and sign-in
-fails. Shield Check reports an insecure endpoint.
+The discovery URL (`OIDC_DISCOVERY_URL`) and the authorization, token, and JWKS
+endpoints its discovery document advertises must use `https`. Plain `http` is
+accepted only for loopback hosts (`localhost`, `127.x.x.x`, `::1`); any other `http`
+endpoint is refused and sign-in fails. Shield Check checks the discovery URL and
+those three advertised endpoints and reports any that are insecure.
 
 Praxrr sends a PKCE (`S256`) challenge and a per-login `nonce`, and verifies each ID
 token's signature against the provider's JWKS (`jwks_uri`) before trusting any claim.

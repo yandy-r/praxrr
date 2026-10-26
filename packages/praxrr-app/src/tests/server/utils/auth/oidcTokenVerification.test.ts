@@ -25,6 +25,7 @@ import {
   verifyIdTokenNonce,
   verifyIdTokenSignature,
   type IdTokenClaims,
+  type OidcDiscoveryEndpoints,
 } from '$auth/oidc.ts';
 import { GET as oidcLoginGet } from '../../../../routes/auth/oidc/login/+server.ts';
 import {
@@ -287,38 +288,50 @@ Deno.test('discovery: an insecure discovery URL is rejected without fetching', a
   }
 });
 
-Deno.test('discovery: insecure token_endpoint or jwks_uri in the document is rejected and not cached', async () => {
+Deno.test('discovery: insecure endpoints in the document are rejected and not cached', async () => {
   const base = {
     issuer: TEST_ISSUER,
     authorization_endpoint: `${TEST_ISSUER}/authorize`,
     token_endpoint: TEST_TOKEN_ENDPOINT,
     jwks_uri: TEST_JWKS_URI,
   };
-  const cases: Array<[string, Record<string, unknown>, string]> = [
-    ['http token_endpoint', { ...base, token_endpoint: 'http://idp.example.com/token' }, 'token endpoint'],
-    ['http jwks_uri', { ...base, jwks_uri: 'http://idp.example.com/jwks' }, 'jwks_uri'],
-    ['missing jwks_uri', { ...base, jwks_uri: undefined }, 'jwks_uri'],
-    ['empty issuer', { ...base, issuer: '' }, 'issuer'],
+  const recorded = {
+    url: TEST_DISCOVERY_URL,
+    authorizationEndpoint: base.authorization_endpoint,
+    tokenEndpoint: TEST_TOKEN_ENDPOINT,
+    jwksUri: TEST_JWKS_URI,
+  };
+  const cases: Array<[string, Record<string, unknown>, string, OidcDiscoveryEndpoints | null]> = [
+    [
+      'http token_endpoint',
+      { ...base, token_endpoint: 'http://idp.example.com/token' },
+      'token endpoint',
+      { ...recorded, tokenEndpoint: 'http://idp.example.com/token' },
+    ],
+    [
+      'http jwks_uri',
+      { ...base, jwks_uri: 'http://idp.example.com/jwks' },
+      'jwks_uri',
+      { ...recorded, jwksUri: 'http://idp.example.com/jwks' },
+    ],
+    [
+      'http authorization_endpoint',
+      { ...base, authorization_endpoint: 'http://idp.example.com/authorize' },
+      'authorization endpoint',
+      { ...recorded, authorizationEndpoint: 'http://idp.example.com/authorize' },
+    ],
+    ['non-string authorization_endpoint', { ...base, authorization_endpoint: 42 }, 'authorization_endpoint', null],
+    ['missing jwks_uri', { ...base, jwks_uri: undefined }, 'jwks_uri', null],
+    ['empty issuer', { ...base, issuer: '' }, 'issuer', null],
   ];
-  for (const [label, doc, message] of cases) {
+  for (const [label, doc, message, expectedRecord] of cases) {
     const idp = installTestIdp({ discoveryDoc: doc });
     try {
       await assertRejects(() => getDiscoveryDocument(TEST_DISCOVERY_URL), Error, message, label);
-      if (label === 'http token_endpoint') {
-        assertEquals(
-          getLastDiscoveryEndpoints(),
-          { url: TEST_DISCOVERY_URL, tokenEndpoint: 'http://idp.example.com/token', jwksUri: TEST_JWKS_URI },
-          label
-        );
-      } else if (label === 'http jwks_uri') {
-        assertEquals(
-          getLastDiscoveryEndpoints(),
-          { url: TEST_DISCOVERY_URL, tokenEndpoint: TEST_TOKEN_ENDPOINT, jwksUri: 'http://idp.example.com/jwks' },
-          label
-        );
-      } else {
-        assertEquals(getLastDiscoveryEndpoints(), null, label);
-      }
+      assertEquals(getLastDiscoveryEndpoints(), expectedRecord, label);
+      // A rejected document is never cached: the next call fetches again.
+      await assertRejects(() => getDiscoveryDocument(TEST_DISCOVERY_URL), Error, message, label);
+      assertEquals(idp.count(TEST_DISCOVERY_URL), 2, label);
     } finally {
       idp.restore();
     }
@@ -346,6 +359,7 @@ Deno.test('discovery: loopback http endpoints are allowed and the cache exposes 
     assertEquals(doc.issuer, 'http://localhost:9000');
     assertEquals(getLastDiscoveryEndpoints(), {
       url,
+      authorizationEndpoint: 'http://localhost:9000/authorize',
       tokenEndpoint: 'http://127.0.0.1:9000/token',
       jwksUri: 'http://[::1]:9000/jwks',
     });
@@ -425,6 +439,54 @@ Deno.test('JWKS: a redirect response is treated as a failure', async () => {
     );
     assertEquals(calls, 1);
   } finally {
+    globalThis.fetch = originalFetch;
+    clearDiscoveryCache();
+    clearJwksCache();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Outbound request timeouts
+// ---------------------------------------------------------------------------
+
+Deno.test('discovery, token exchange, and JWKS fetches carry a finite abort timeout', async () => {
+  const key = await generateTestKey('RS256');
+  const originalFetch = globalThis.fetch;
+  const originalTimeout = AbortSignal.timeout;
+  const requestedTimeouts: number[] = [];
+  let hangingFetches = 0;
+  // Shorten the real delay but record what production code asked for.
+  AbortSignal.timeout = (ms: number) => {
+    requestedTimeouts.push(ms);
+    return originalTimeout.call(AbortSignal, 20);
+  };
+  // A provider that accepts the connection and never answers; only the abort signal ends the request.
+  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+    hangingFetches += 1;
+    return new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return; // no signal: hangs forever, so the awaited call below would never settle
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    });
+  }) as typeof fetch;
+  clearDiscoveryCache();
+  clearJwksCache();
+  try {
+    await assertRejects(() => getDiscoveryDocument(TEST_DISCOVERY_URL));
+    await assertRejects(() =>
+      exchangeCode(TEST_TOKEN_ENDPOINT, 'code', {
+        clientId: TEST_CLIENT_ID,
+        clientSecret: 'secret',
+        redirectUri: 'http://praxrr.test/auth/oidc/callback',
+        codeVerifier: 'verifier',
+      })
+    );
+    await assertRejects(async () => verifyIdTokenSignature(await signJwt(key, validClaims()), TEST_JWKS_URI));
+    assertEquals(hangingFetches, 3);
+    assertEquals(requestedTimeouts.length, 3);
+    for (const ms of requestedTimeouts) assert(Number.isFinite(ms) && ms > 0 && ms <= 60_000);
+  } finally {
+    AbortSignal.timeout = originalTimeout;
     globalThis.fetch = originalFetch;
     clearDiscoveryCache();
     clearJwksCache();

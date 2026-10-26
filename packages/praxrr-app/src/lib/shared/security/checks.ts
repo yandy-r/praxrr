@@ -364,6 +364,7 @@ function oidcInvalidEntriesRecommendation(inputs: PostureInputs): ShieldRecommen
 
 const OIDC_ENDPOINT_LABEL = {
   discovery: 'discovery URL (OIDC_DISCOVERY_URL)',
+  authorization: 'authorization endpoint',
   token: 'token endpoint',
   jwks: 'JWKS endpoint',
 } as const;

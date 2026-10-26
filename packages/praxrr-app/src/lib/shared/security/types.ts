@@ -232,7 +232,7 @@ export interface SessionPosture {
 export type SessionRequestContext = { request?: Request; url?: URL };
 
 /** The OIDC provider endpoints Praxrr talks to; each must be `https` (loopback `http` excepted). */
-export type OidcEndpointKind = 'discovery' | 'token' | 'jwks';
+export type OidcEndpointKind = 'discovery' | 'authorization' | 'token' | 'jwks';
 
 /** Fully-materialized engine input. Nothing is read lazily — the engine performs no I/O. */
 export interface PostureInputs {

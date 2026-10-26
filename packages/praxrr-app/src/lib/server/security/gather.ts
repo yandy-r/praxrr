@@ -18,7 +18,7 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { apiTokensQueries } from '$db/queries/apiTokens.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
-import { getLastDiscoveryEndpoints } from '$auth/oidc.ts';
+import { getDiscoveryDocument, getLastDiscoveryEndpoints } from '$auth/oidc.ts';
 import { isSecureOidcEndpoint } from '$shared/security/oidcEndpoint.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
@@ -38,6 +38,7 @@ import {
 
 const SOURCE = 'SecurityPostureGather';
 const DNS_REPORT_DEADLINE_MS = 2_000;
+const OIDC_DISCOVERY_REPORT_DEADLINE_MS = 2_000;
 const MAX_DNS_CANDIDATES = 32;
 
 export interface SecurityPostureDependencies {
@@ -75,10 +76,34 @@ function gatherOidcState(): { configured: boolean; partiallyConfigured: boolean 
 }
 
 /**
- * OIDC endpoints that fail the transport policy. The discovery URL comes from config; the token and
- * JWKS endpoints come from the most recently parsed discovery document, including a document whose
- * endpoints were then refused. Only evaluated for a fully configured `oidc` deployment, and only
- * when the recorded document was fetched from the currently configured discovery URL.
+ * Make sure the discovery document for the configured URL has been parsed at least once, so the
+ * posture report can grade its endpoints without waiting for a first sign-in. `getDiscoveryDocument`
+ * records the advertised endpoints even when it then rejects them, so its failure is expected and
+ * swallowed. Bounded by {@link OIDC_DISCOVERY_REPORT_DEADLINE_MS}; the report never fails on this.
+ */
+async function ensureOidcDiscoveryObserved(oidcConfigured: boolean): Promise<void> {
+  if (config.authMode !== 'oidc' || !oidcConfigured) return;
+  const discoveryUrl = config.oidc.discoveryUrl;
+  if (discoveryUrl === null || !isSecureOidcEndpoint(discoveryUrl)) return;
+  if (getLastDiscoveryEndpoints()?.url === discoveryUrl) return;
+
+  const { promise: deadline, resolve: expire } = Promise.withResolvers<void>();
+  const timer = setTimeout(expire, OIDC_DISCOVERY_REPORT_DEADLINE_MS);
+  try {
+    await Promise.race([getDiscoveryDocument(discoveryUrl).then(() => undefined), deadline]);
+  } catch {
+    // Fetch or validation failure: any endpoints it advertised are already recorded.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * OIDC endpoints that fail the transport policy. The discovery URL comes from config; the
+ * authorization, token, and JWKS endpoints come from the most recently parsed discovery document,
+ * including a document whose endpoints were then refused (see {@link ensureOidcDiscoveryObserved}).
+ * Only evaluated for a fully configured `oidc` deployment, and only when the recorded document was
+ * fetched from the currently configured discovery URL.
  */
 function gatherOidcInsecureEndpoints(oidcConfigured: boolean): OidcEndpointKind[] {
   if (config.authMode !== 'oidc' || !oidcConfigured) return [];
@@ -86,6 +111,7 @@ function gatherOidcInsecureEndpoints(oidcConfigured: boolean): OidcEndpointKind[
   if (!isSecureOidcEndpoint(config.oidc.discoveryUrl)) insecure.push('discovery');
   const last = getLastDiscoveryEndpoints();
   if (last && last.url === config.oidc.discoveryUrl) {
+    if (!isSecureOidcEndpoint(last.authorizationEndpoint)) insecure.push('authorization');
     if (!isSecureOidcEndpoint(last.tokenEndpoint)) insecure.push('token');
     if (!isSecureOidcEndpoint(last.jwksUri)) insecure.push('jwks');
   }
@@ -222,7 +248,10 @@ export async function buildPostureInputs(
   const dependencies = resolveDependencies(dependencyOverrides);
   const startedAt = dependencies.now();
   const oidc = gatherOidcState();
-  const instances = await gatherDnsEvidence(gatherInstances(), dependencies, startedAt + DNS_REPORT_DEADLINE_MS);
+  const [instances] = await Promise.all([
+    gatherDnsEvidence(gatherInstances(), dependencies, startedAt + DNS_REPORT_DEADLINE_MS),
+    ensureOidcDiscoveryObserved(oidc.configured),
+  ]);
 
   // Parsed once at Config construction (fail-closed, non-throwing); never re-parsed here.
   const allowlist = config.oidc.allowlist;

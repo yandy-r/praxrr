@@ -47,14 +47,26 @@ let cachedDiscovery: {
   expires: number;
 } | null = null;
 
+/** Endpoints from a parsed discovery document, with the discovery URL they were fetched from. */
+export interface OidcDiscoveryEndpoints {
+  url: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  jwksUri: string;
+}
+
 /** Endpoints from the most recently parsed discovery document, recorded before transport checks run. */
-let lastDiscoveryEndpoints: { url: string; tokenEndpoint: string; jwksUri: string } | null = null;
+let lastDiscoveryEndpoints: OidcDiscoveryEndpoints | null = null;
+
+/** Upper bound for each outbound OIDC request (discovery, token exchange, JWKS). */
+const OIDC_FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * Fetch and cache OIDC discovery document.
  *
- * The discovery URL, the token endpoint, and the JWKS URI must all be `https:` (loopback `http:`
- * excepted): the client secret, authorization code, and signing keys travel over them.
+ * The discovery URL, the authorization endpoint, the token endpoint, and the JWKS URI must all be
+ * `https:` (loopback `http:` excepted): the client secret, authorization code, and signing keys
+ * travel over them.
  */
 export async function getDiscoveryDocument(url: string): Promise<DiscoveryDocument> {
   if (cachedDiscovery && cachedDiscovery.url === url && Date.now() < cachedDiscovery.expires) {
@@ -65,7 +77,7 @@ export async function getDiscoveryDocument(url: string): Promise<DiscoveryDocume
     throw new Error('OIDC discovery URL must use https (http is only allowed for loopback hosts)');
   }
 
-  const response = await fetch(url, { redirect: 'manual' });
+  const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(OIDC_FETCH_TIMEOUT_MS) });
   if (response.status >= 300 && response.status < 400) {
     throw new Error(`Failed to fetch OIDC discovery: ${response.status} (redirects are not followed)`);
   }
@@ -81,13 +93,24 @@ export async function getDiscoveryDocument(url: string): Promise<DiscoveryDocume
   if (typeof doc.issuer !== 'string' || doc.issuer.length === 0) {
     throw new Error('Invalid OIDC discovery document: missing issuer');
   }
-  if (!doc.authorization_endpoint || !doc.token_endpoint) {
+  if (typeof doc.authorization_endpoint !== 'string' || doc.authorization_endpoint.length === 0) {
+    throw new Error('Invalid OIDC discovery document: missing authorization_endpoint');
+  }
+  if (!doc.token_endpoint) {
     throw new Error('Invalid OIDC discovery document');
   }
   if (typeof doc.jwks_uri !== 'string' || doc.jwks_uri.length === 0) {
     throw new Error('Invalid OIDC discovery document: missing jwks_uri');
   }
-  lastDiscoveryEndpoints = { url, tokenEndpoint: doc.token_endpoint, jwksUri: doc.jwks_uri };
+  lastDiscoveryEndpoints = {
+    url,
+    authorizationEndpoint: doc.authorization_endpoint,
+    tokenEndpoint: doc.token_endpoint,
+    jwksUri: doc.jwks_uri,
+  };
+  if (!isSecureOidcEndpoint(doc.authorization_endpoint)) {
+    throw new Error('OIDC authorization endpoint must use https (http is only allowed for loopback hosts)');
+  }
   if (!isSecureOidcEndpoint(doc.token_endpoint)) {
     throw new Error('OIDC token endpoint must use https (http is only allowed for loopback hosts)');
   }
@@ -109,7 +132,7 @@ export async function getDiscoveryDocument(url: string): Promise<DiscoveryDocume
  * since the cache was cleared. Recorded before the transport checks run, so endpoints from a
  * document that was then refused are still available for reporting.
  */
-export function getLastDiscoveryEndpoints(): { url: string; tokenEndpoint: string; jwksUri: string } | null {
+export function getLastDiscoveryEndpoints(): OidcDiscoveryEndpoints | null {
   return lastDiscoveryEndpoints;
 }
 
@@ -216,6 +239,7 @@ export async function exchangeCode(
   }
 ): Promise<TokenResponse> {
   const response = await fetch(tokenEndpoint, {
+    signal: AbortSignal.timeout(OIDC_FETCH_TIMEOUT_MS),
     method: 'POST',
     redirect: 'manual',
     headers: {
@@ -346,7 +370,7 @@ async function fetchJwks(jwksUri: string): Promise<JwkEntry[]> {
   if (!isSecureOidcEndpoint(jwksUri)) {
     throw new Error('OIDC jwks_uri must use https (http is only allowed for loopback hosts)');
   }
-  const response = await fetch(jwksUri, { redirect: 'manual' });
+  const response = await fetch(jwksUri, { redirect: 'manual', signal: AbortSignal.timeout(OIDC_FETCH_TIMEOUT_MS) });
   if (response.status >= 300 && response.status < 400) {
     throw new Error(`Failed to fetch OIDC JWKS: ${response.status} (redirects are not followed)`);
   }

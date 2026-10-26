@@ -438,6 +438,27 @@ migratedTest('buildPostureInputs reports an insecure OIDC discovery URL only in 
   );
 });
 
+/** Replace `globalThis.fetch` for the duration of `fn`; always restores it. */
+async function withFetchStub(stub: () => Promise<Response>, fn: () => Promise<void>): Promise<void> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = stub as typeof fetch;
+  try {
+    await fn();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+function discoveryDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    issuer: 'https://idp.example.com',
+    authorization_endpoint: 'https://idp.example.com/authorize',
+    token_endpoint: 'https://idp.example.com/token',
+    jwks_uri: 'https://idp.example.com/jwks',
+    ...overrides,
+  };
+}
+
 migratedTest('buildPostureInputs accepts https and loopback http OIDC endpoints', async () => {
   for (const discoveryUrl of [
     'https://idp.example.com/.well-known/openid-configuration',
@@ -446,9 +467,67 @@ migratedTest('buildPostureInputs accepts https and loopback http OIDC endpoints'
     'http://[::1]:8080/.well-known/openid-configuration',
   ]) {
     await withOidcConfig({ discoveryUrl }, async () => {
-      assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, [], discoveryUrl);
+      await withFetchStub(
+        () => Promise.resolve(Response.json(discoveryDoc())),
+        async () => {
+          assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, [], discoveryUrl);
+        }
+      );
     });
   }
+});
+
+migratedTest('buildPostureInputs discovers insecure endpoints without a prior sign-in', async () => {
+  const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+  const cases: Array<[string, Record<string, unknown>, string[]]> = [
+    ['token', { token_endpoint: 'http://idp.example.com/token' }, ['token']],
+    ['jwks', { jwks_uri: 'http://idp.example.com/jwks' }, ['jwks']],
+    ['authorization', { authorization_endpoint: 'http://idp.example.com/authorize' }, ['authorization']],
+  ];
+  for (const [label, overrides, expected] of cases) {
+    await withOidcConfig({ discoveryUrl }, async () => {
+      await withFetchStub(
+        () => Promise.resolve(Response.json(discoveryDoc(overrides))),
+        async () => {
+          assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, expected, label);
+        }
+      );
+    });
+  }
+});
+
+migratedTest('buildPostureInputs still builds the report when discovery cannot be fetched', async () => {
+  const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+  await withOidcConfig({ discoveryUrl }, async () => {
+    await withFetchStub(
+      () => Promise.reject(new Error('network unreachable')),
+      async () => {
+        assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, []);
+        const { body } = await getSummary();
+        assert(body.checks.some((c) => c.id === 'control_plane_auth'));
+      }
+    );
+  });
+});
+
+migratedTest('buildPostureInputs does not fetch discovery outside oidc mode or for an insecure URL', async () => {
+  let fetches = 0;
+  const countingStub = () => {
+    fetches++;
+    return Promise.reject(new Error('unexpected fetch'));
+  };
+  await withFetchStub(countingStub, async () => {
+    await withOidcConfig(
+      { authMode: 'on', discoveryUrl: 'https://idp.example.com/.well-known/openid-configuration' },
+      async () => {
+        await buildPostureInputs({});
+      }
+    );
+    await withOidcConfig({ discoveryUrl: 'http://idp.example.com/.well-known/openid-configuration' }, async () => {
+      await buildPostureInputs({});
+    });
+  });
+  assertEquals(fetches, 0);
 });
 
 migratedTest('buildPostureInputs reads token and JWKS endpoints from the cached discovery document', async () => {

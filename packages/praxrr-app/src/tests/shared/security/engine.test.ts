@@ -569,7 +569,7 @@ Deno.test(
   }
 );
 
-Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 6 for every transport', () => {
+Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 7 for every transport', () => {
   assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '7');
   for (const session of ALL_SESSIONS) {
     assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '7');
