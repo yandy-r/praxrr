@@ -25,6 +25,10 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     port: 6868,
     oidcConfigured: false,
     oidcPartiallyConfigured: false,
+    oidcAllowlistConfigured: false,
+    oidcAllowAllUsers: false,
+    oidcAllowlistInvalidEntries: [],
+    oidcAllowlistUsableEntryCount: 0,
     apiTokens: { activeCount: 1, legacyActive: true },
     instances: [],
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
@@ -259,8 +263,57 @@ Deno.test('shieldStatus: every transport tier has a non-colour label and mixed i
 
 Deno.test('control_plane_auth: scores every mode and never returns null', () => {
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'on' })).score, 100);
-  assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: true })).score, 100);
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: false })).score, 50);
+
+  // OIDC allowlist branches (YAN-436).
+
+  const oidcAllowlistedInvalid = runCheck(
+    'control_plane_auth',
+    makeInputs({
+      authMode: 'oidc',
+      oidcConfigured: true,
+      oidcAllowlistConfigured: true,
+      oidcAllowlistInvalidEntries: ['@no-dot'],
+      oidcAllowlistUsableEntryCount: 1,
+    })
+  );
+  assertEquals(oidcAllowlistedInvalid.score, 100);
+  assertEquals(oidcAllowlistedInvalid.status, 'pass');
+  assertEquals(oidcAllowlistedInvalid.recommendations.length, 1);
+  assertEquals(oidcAllowlistedInvalid.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcAllowlistedInvalid.recommendations[0].fix.kind, 'env-var');
+
+  const oidcAllowAll = runCheck(
+    'control_plane_auth',
+    makeInputs({ authMode: 'oidc', oidcConfigured: true, oidcAllowAllUsers: true })
+  );
+  assertEquals(oidcAllowAll.score, 50);
+  assertEquals(oidcAllowAll.status, 'attention');
+  assertEquals(oidcAllowAll.recommendations.length, 1);
+  assertEquals(oidcAllowAll.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcAllowAll.recommendations[0].fix.kind, 'env-var');
+
+  const oidcFailClosed = runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: true }));
+  assertEquals(oidcFailClosed.score, 70);
+  assertEquals(oidcFailClosed.status, 'attention');
+  assertEquals(oidcFailClosed.recommendations.length, 1);
+  assertEquals(oidcFailClosed.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcFailClosed.recommendations[0].fix.kind, 'env-var');
+
+  // Lists stay authoritative over the opt-out: a configured allowlist still scores 100.
+  assertEquals(
+    runCheck(
+      'control_plane_auth',
+      makeInputs({
+        authMode: 'oidc',
+        oidcConfigured: true,
+        oidcAllowlistConfigured: true,
+        oidcAllowlistUsableEntryCount: 1,
+        oidcAllowAllUsers: true,
+      })
+    ).score,
+    100
+  );
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'local' })).score, 60);
 
   const offPublic = runCheck('control_plane_auth', makeInputs({ authMode: 'off', bindHost: '0.0.0.0' }));
@@ -284,6 +337,76 @@ Deno.test('control_plane_auth: scores every mode and never returns null', () => 
 
   for (const authMode of ['on', 'local', 'off', 'oidc'] as const) {
     assert(runCheck('control_plane_auth', makeInputs({ authMode })).score !== null, `${authMode} must score`);
+  }
+});
+
+Deno.test('control_plane_auth: a configured allowlist with zero usable entries is blocked', () => {
+  const result = runCheck(
+    'control_plane_auth',
+    makeInputs({
+      authMode: 'oidc',
+      oidcConfigured: true,
+      oidcAllowlistConfigured: true,
+      oidcAllowlistUsableEntryCount: 0,
+      oidcAllowlistInvalidEntries: ['@no-dot'],
+      oidcAllowAllUsers: true,
+    })
+  );
+
+  assertEquals(result.score, 70);
+  assertEquals(result.status, 'attention');
+  assert(result.detail[0].includes('none of its entries can match'));
+  assertEquals(result.recommendations.length, 2);
+  assert(result.recommendations.some((recommendation) => recommendation.line.headline.includes('usable allowlist')));
+  // The ignored-entries warning is still present, but without the "remaining entries still apply"
+  // phrase — nothing remains to apply while sign-in is blocked.
+  const ignored = result.recommendations.find(
+    (recommendation) => recommendation.line.headline === 'OIDC allowlist entries were ignored'
+  );
+  assert(ignored, 'blocked state still surfaces the ignored-entries warning');
+  assert(ignored.line.detail.join(' ').includes('Fix or remove them.'));
+  assert(!ignored.line.detail.join(' ').includes('remaining entries still apply'));
+});
+
+Deno.test('control_plane_auth: ignored allowlist entries surface in every OIDC branch', () => {
+  const cases: readonly { label: string; overrides: Partial<PostureInputs>; remainingPhrase: boolean }[] = [
+    {
+      label: 'incomplete provider',
+      overrides: { oidcConfigured: false, oidcPartiallyConfigured: true },
+      remainingPhrase: false,
+    },
+    {
+      label: 'usable allowlist',
+      overrides: { oidcConfigured: true, oidcAllowlistConfigured: true, oidcAllowlistUsableEntryCount: 1 },
+      remainingPhrase: true,
+    },
+    {
+      label: 'configured allowlist without usable entries',
+      overrides: { oidcConfigured: true, oidcAllowlistConfigured: true, oidcAllowlistUsableEntryCount: 0 },
+      remainingPhrase: false,
+    },
+    { label: 'allow all', overrides: { oidcConfigured: true, oidcAllowAllUsers: true }, remainingPhrase: false },
+    { label: 'blocked without an allowlist', overrides: { oidcConfigured: true }, remainingPhrase: false },
+  ];
+
+  for (const { label, overrides, remainingPhrase } of cases) {
+    const result = runCheck(
+      'control_plane_auth',
+      makeInputs({
+        ...overrides,
+        authMode: 'oidc',
+        oidcAllowlistInvalidEntries: ['@no-dot'],
+      })
+    );
+    const ignored = result.recommendations.find(
+      (recommendation) => recommendation.line.headline === 'OIDC allowlist entries were ignored'
+    );
+    assert(ignored, `${label} must surface ignored allowlist entries`);
+    const detail = ignored.line.detail.join(' ');
+    assert(
+      remainingPhrase ? detail.includes('remaining entries still apply') : detail.includes('Fix or remove them.'),
+      `${label} phrases the ignored-entry detail for its usable-entry state`
+    );
   }
 });
 

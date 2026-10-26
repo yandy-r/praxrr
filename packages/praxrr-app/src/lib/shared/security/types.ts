@@ -18,8 +18,11 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * Stamped onto every {@link ShieldReport}. Bump whenever the check set, the band thresholds, the
  * per-check score formula, OR the unscored advisory/assurance report surface changes, so a client
  * can tell a report was produced by a different engine generation. Declared here ONCE.
+ *
+ * History: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534)
+ * → '6' OIDC allowlist (YAN-436).
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '5';
+export const SECURITY_POSTURE_ENGINE_VERSION = '6';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -237,6 +240,14 @@ export interface PostureInputs {
   readonly oidcConfigured: boolean;
   /** Some but not all OIDC settings present (a misconfiguration that weakens `oidc`). */
   readonly oidcPartiallyConfigured: boolean;
+  /** Any nonempty subject/email/group token is configured, including an email token rejected as malformed. */
+  readonly oidcAllowlistConfigured: boolean;
+  /** Number of usable subject, email, email-domain and group entries across the sign-in allowlists. */
+  readonly oidcAllowlistUsableEntryCount: number;
+  /** `OIDC_ALLOW_ALL_USERS` opt-out — every provider-authenticated identity may sign in. */
+  readonly oidcAllowAllUsers: boolean;
+  /** Raw `OIDC_ALLOWED_EMAILS` entries ignored as malformed (safe to echo — not secrets). */
+  readonly oidcAllowlistInvalidEntries: readonly string[];
   /** `null` when the token table could not be read (the check is then not measurable). */
   readonly apiTokens: ApiTokenFacts | null;
   readonly instances: readonly InstanceFact[];

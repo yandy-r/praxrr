@@ -203,6 +203,9 @@ export async function buildPostureInputs(
   const oidc = gatherOidcState();
   const instances = await gatherDnsEvidence(gatherInstances(), dependencies, startedAt + DNS_REPORT_DEADLINE_MS);
 
+  // Parsed once at Config construction (fail-closed, non-throwing); never re-parsed here.
+  const allowlist = config.oidc.allowlist;
+
   const transport = resolveSessionTransport(event);
   const cookieSecureMode = config.cookieSecureMode;
   const cookieSecure = resolveCookieSecure(cookieSecureMode, transport);
@@ -215,6 +218,10 @@ export async function buildPostureInputs(
     port: config.port,
     oidcConfigured: oidc.configured,
     oidcPartiallyConfigured: oidc.partiallyConfigured,
+    oidcAllowlistConfigured: allowlist.configured,
+    oidcAllowlistUsableEntryCount: allowlist.usableEntryCount,
+    oidcAllowAllUsers: allowlist.allowAll,
+    oidcAllowlistInvalidEntries: allowlist.invalidEntries,
     apiTokens: gatherApiTokenFacts(),
     instances,
     rotation: gatherRotation(instances),

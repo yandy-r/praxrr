@@ -2,7 +2,8 @@ import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { config } from '$config';
 import { getDiscoveryDocument, exchangeCode, decodeIdToken, verifyIdToken } from '$auth/oidc.ts';
-import { usersQueries, OidcIdentityConflictError } from '$db/queries/users.ts';
+import { evaluateOidcAllowlist } from '$auth/oidcAllowlist.ts';
+import { usersQueries, isOidcUser, OidcIdentityConflictError } from '$db/queries/users.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { authSettingsQueries } from '$db/queries/authSettings.ts';
 import { getClientIp } from '$auth/network.ts';
@@ -93,6 +94,21 @@ export const GET: RequestHandler = async (event) => {
     throw error(500, 'Failed to verify ID token');
   }
 
+  // Only operator-approved identities may obtain an account or session.
+  // Evaluated before provisioning; denied identities lose prior sessions.
+  const decision = evaluateOidcAllowlist(claims, config.oidc.allowlist);
+  if (!decision.allowed) {
+    const existing = usersQueries.getByUsername(`oidc:${claims.sub}`);
+    if (existing && isOidcUser(existing)) {
+      sessionsQueries.deleteByUserId(existing.id);
+    }
+    await logger.warn('OIDC sign-in refused: identity is not on the allowlist', {
+      source: 'Auth:OIDC',
+      meta: { sub: claims.sub, ip, reason: decision.reason },
+    });
+    throw error(403, 'This account is not permitted to sign in');
+  }
+
   let userId: number;
   try {
     userId = usersQueries.getOrCreateOidcUser(claims.sub);
@@ -126,7 +142,13 @@ export const GET: RequestHandler = async (event) => {
 
   await logger.info(`OIDC login successful for '${claims.sub}'`, {
     source: 'Auth:OIDC',
-    meta: { sub: claims.sub, ip: ipAddress, browser: parsed.browser, device: parsed.deviceType },
+    meta: {
+      sub: claims.sub,
+      ip: ipAddress,
+      browser: parsed.browser,
+      device: parsed.deviceType,
+      matchedBy: decision.matchedBy,
+    },
   });
 
   // Set session cookie
