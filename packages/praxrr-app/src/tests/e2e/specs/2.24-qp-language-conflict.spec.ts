@@ -28,7 +28,7 @@ const DEV_LANGUAGE = 'German';
 async function setQpLanguage(page: import('@playwright/test').Page, language: string): Promise<void> {
   const input = page.locator('input[name="language-search"]');
   await input.fill(language);
-  await page.locator('button', { hasText: language }).first().click();
+  await page.getByRole('option', { name: language, exact: true }).first().click();
   await page.getByRole('button', { name: 'Save' }).click();
   await page.waitForLoadState('networkidle');
 }

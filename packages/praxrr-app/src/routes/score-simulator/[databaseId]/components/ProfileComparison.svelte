@@ -60,6 +60,7 @@
   function clearComparison() {
     comparisonProfileName = null;
     dispatch('comparisonProfileChange', { profileName: null });
+    triggerEl?.focus();
   }
 </script>
 

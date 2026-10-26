@@ -21,6 +21,8 @@
   let dropdownOpen = false;
   let selectedCategory: PresetCategory = sampleCategory;
   const dropdownId = uniqueId('preset-selector-dropdown');
+  const mediaTypeHeaderId = uniqueId('preset-media-type');
+  const groupHeaderPrefix = uniqueId('preset-group');
   let triggerEl: HTMLButtonElement | undefined;
 
   $: if (!dropdownOpen) {
@@ -98,11 +100,15 @@
     <Dropdown id={dropdownId} role="menu" label="Try examples" onClose={closeDropdown} position="left" minWidth="16rem">
       <div class="max-h-80 overflow-y-auto py-1">
         <div class="px-3 pt-2 pb-1">
-          <p class="text-[10px] font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400">
+          <p
+            id={mediaTypeHeaderId}
+            class="text-[10px] font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400"
+          >
             Media Type
           </p>
-          <div class="mt-1 grid grid-cols-2 gap-1" role="group" aria-label="Media Type">
+          <div class="mt-1 grid grid-cols-2 gap-1" role="group" aria-labelledby={mediaTypeHeaderId}>
             <button
+              tabindex="-1"
               type="button"
               role="menuitemradio"
               aria-checked={selectedCategory === 'movie'}
@@ -114,6 +120,7 @@
               Movie
             </button>
             <button
+              tabindex="-1"
               type="button"
               role="menuitemradio"
               aria-checked={selectedCategory === 'series'}
@@ -126,6 +133,7 @@
               Series
             </button>
             <button
+              tabindex="-1"
               type="button"
               role="menuitemradio"
               aria-checked={selectedCategory === 'anime'}
@@ -141,23 +149,28 @@
         </div>
         <div class="mt-1 border-t border-neutral-200 dark:border-neutral-700" role="separator"></div>
 
-        {#each presetGroups as group (group.label)}
-          <div class="px-3 pt-2.5 pb-0.5">
-            <p class="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-              {group.label}
-            </p>
-            {#if group.description}
-              <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
-                {group.description}
+        {#each presetGroups as group, groupIndex (group.label)}
+          <div role="group" aria-labelledby={`${groupHeaderPrefix}-${groupIndex}`}>
+            <div class="px-3 pt-2.5 pb-0.5">
+              <p
+                id={`${groupHeaderPrefix}-${groupIndex}`}
+                class="text-xs font-semibold text-neutral-900 dark:text-neutral-100"
+              >
+                {group.label}
               </p>
-            {/if}
+              {#if group.description}
+                <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
+                  {group.description}
+                </p>
+              {/if}
+            </div>
+            <DropdownItem
+              label={`${group.titles.length} titles - Load all`}
+              role="menuitem"
+              compact
+              onSelect={() => selectPreset(group)}
+            />
           </div>
-          <DropdownItem
-            label={`${group.titles.length} titles - Load all`}
-            role="menuitem"
-            compact
-            onSelect={() => selectPreset(group)}
-          />
         {/each}
 
         {#if presetGroups.length === 0}

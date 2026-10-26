@@ -59,9 +59,23 @@
     clearLeaveTimer();
     // Small delay before closing to allow mouse to move to dropdown
     leaveTimer = setTimeout(() => {
-      hoverOpen = false;
       leaveTimer = null;
+      if (wrapperEl && document.activeElement instanceof Node && wrapperEl.contains(document.activeElement)) {
+        return;
+      }
+      hoverOpen = false;
     }, 100);
+  }
+
+  function handleFocusIn(event: FocusEvent) {
+    if (!hasDropdown || !wrapperEl) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    const dropdown = document.getElementById(dropdownId);
+    if (dropdown && target !== triggerEl && dropdown.contains(target)) {
+      clearLeaveTimer();
+      pinned = true;
+    }
   }
 
   function enabledMenuItems(root: ParentNode): HTMLElement[] {
@@ -120,7 +134,7 @@
   }
 
   function handleWrapperKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Escape' || (!hoverOpen && !pinned)) return;
+    if (event.key !== 'Escape' || !open) return;
     event.preventDefault();
     event.stopPropagation();
     close();
@@ -157,6 +171,7 @@
   class="group relative flex"
   on:mouseenter={handleMouseEnter}
   on:mouseleave={handleMouseLeave}
+  on:focusin={handleFocusIn}
   on:focusout={handleFocusOut}
   on:click={handleWrapperClick}
   on:keydown|capture={handleWrapperKeydown}

@@ -159,16 +159,20 @@
     }
   }
 
-  function selectLanguage(language: LanguageOption) {
+  async function selectLanguage(language: LanguageOption) {
     update('language', language.name);
     languageSearchQuery = language.name;
     showLanguageDropdown = false;
+    await tick();
+    languageInputElement?.focus();
   }
 
-  function clearLanguage() {
+  async function clearLanguage() {
     update('language', null);
     languageSearchQuery = '';
     showLanguageDropdown = false;
+    await tick();
+    languageInputElement?.focus();
   }
 
   function handleLanguageInput(value: string) {
@@ -319,27 +323,27 @@
             <div class="space-y-2">
               <!-- svelte-ignore a11y-no-static-element-interactions -->
               <div class="relative" onkeydown={handleLanguageKeydown}>
-                {#if selectedLanguageName}
-                  <FormInput
-                    label="Language"
-                    name="language-search"
-                    value={languageSearchQuery}
-                    role="combobox"
-                    aria-haspopup="listbox"
-                    aria-expanded={showLanguageDropdown && filteredLanguages.length > 0}
-                    aria-controls={languageListboxId}
-                    aria-autocomplete="list"
-                    aria-activedescendant={showLanguageDropdown && languageHighlightedIndex >= 0
-                      ? `${languageListboxId}-${languageHighlightedIndex}`
-                      : undefined}
-                    bind:inputElement={languageInputElement}
-                    description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
-                    placeholder="Search for a language..."
-                    on:input={(e) => handleLanguageInput(e.detail)}
-                    on:focus={handleLanguageFocus}
-                    on:blur={handleLanguageBlur}
-                  >
-                    <svelte:fragment slot="suffix">
+                <FormInput
+                  label="Language"
+                  name="language-search"
+                  value={languageSearchQuery}
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded={showLanguageDropdown && filteredLanguages.length > 0}
+                  aria-controls={languageListboxId}
+                  aria-autocomplete="list"
+                  aria-activedescendant={showLanguageDropdown && languageHighlightedIndex >= 0
+                    ? `${languageListboxId}-${languageHighlightedIndex}`
+                    : undefined}
+                  bind:inputElement={languageInputElement}
+                  description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
+                  placeholder="Search for a language..."
+                  on:input={(e) => handleLanguageInput(e.detail)}
+                  on:focus={handleLanguageFocus}
+                  on:blur={handleLanguageBlur}
+                >
+                  <svelte:fragment slot="suffix">
+                    {#if selectedLanguageName}
                       <button
                         type="button"
                         onclick={clearLanguage}
@@ -355,29 +359,9 @@
                           />
                         </svg>
                       </button>
-                    </svelte:fragment>
-                  </FormInput>
-                {:else}
-                  <FormInput
-                    label="Language"
-                    name="language-search"
-                    value={languageSearchQuery}
-                    role="combobox"
-                    aria-haspopup="listbox"
-                    aria-expanded={showLanguageDropdown && filteredLanguages.length > 0}
-                    aria-controls={languageListboxId}
-                    aria-autocomplete="list"
-                    aria-activedescendant={showLanguageDropdown && languageHighlightedIndex >= 0
-                      ? `${languageListboxId}-${languageHighlightedIndex}`
-                      : undefined}
-                    bind:inputElement={languageInputElement}
-                    description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
-                    placeholder="Search for a language..."
-                    on:input={(e) => handleLanguageInput(e.detail)}
-                    on:focus={handleLanguageFocus}
-                    on:blur={handleLanguageBlur}
-                  />
-                {/if}
+                    {/if}
+                  </svelte:fragment>
+                </FormInput>
 
                 {#if showLanguageDropdown && filteredLanguages.length > 0}
                   <div

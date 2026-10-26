@@ -20,6 +20,10 @@ function isTabbable(el: HTMLElement, root: HTMLElement): boolean {
   if (el.tabIndex < 0) return false;
   if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return false;
 
+  if (typeof el.checkVisibility === 'function') {
+    return el.checkVisibility();
+  }
+
   let current: HTMLElement | null = el;
   while (current) {
     if (current.hasAttribute('hidden')) return false;
@@ -39,6 +43,48 @@ function isTabbable(el: HTMLElement, root: HTMLElement): boolean {
   }
 
   return true;
+}
+
+function radioRepresentative(el: HTMLElement, candidates: HTMLElement[]): HTMLElement | null {
+  if (!(el instanceof HTMLInputElement)) return el;
+  const key = radioGroupKey(el);
+  if (key === null) return el;
+  const group = candidates.filter(
+    (candidate) => candidate instanceof HTMLInputElement && radioGroupKey(candidate) === key
+  ) as HTMLInputElement[];
+  return group.find((candidate) => candidate.checked) ?? group[0] ?? el;
+}
+
+function getFirstLastTabbable(node: HTMLElement): { first: HTMLElement; last: HTMLElement } | null {
+  const candidates = Array.from(node.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR));
+
+  let first: HTMLElement | null = null;
+  for (const el of candidates) {
+    if (!isTabbable(el, node)) continue;
+    if (radioRepresentative(el, candidates) !== el) continue;
+    first = el;
+    break;
+  }
+  if (!first) return null;
+
+  let last: HTMLElement | null = null;
+  for (let i = candidates.length - 1; i >= 0; i -= 1) {
+    const el = candidates[i];
+    if (!el || !isTabbable(el, node)) continue;
+    if (radioRepresentative(el, candidates) !== el) continue;
+    last = el;
+    break;
+  }
+  if (!last) return null;
+  return { first, last };
+}
+
+function isTabbableRepresentative(el: HTMLElement, node: HTMLElement): boolean {
+  if (!node.contains(el) || !isTabbable(el, node)) return false;
+  if (!(el instanceof HTMLInputElement)) return true;
+  if (radioGroupKey(el) === null) return true;
+  const candidates = Array.from(node.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR));
+  return radioRepresentative(el, candidates) === el;
 }
 
 export function getTabbable(node: HTMLElement): HTMLElement[] {
@@ -120,27 +166,32 @@ export function focusTrap(node: HTMLElement, params: FocusTrapParams = {}) {
   function onKeydown(event: KeyboardEvent) {
     if (!enabled || event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
 
-    const tabbable = getTabbable(node);
-    if (tabbable.length === 0) {
+    const firstLast = getFirstLastTabbable(node);
+    if (!firstLast) {
       event.preventDefault();
       node.focus();
       return;
     }
 
+    const { first, last } = firstLast;
     const currentElement = document.activeElement;
-    const current = currentElement instanceof HTMLElement ? tabbable.indexOf(currentElement) : -1;
 
-    if (current === -1) {
+    if (!(currentElement instanceof HTMLElement) || !isTabbableRepresentative(currentElement, node)) {
       event.preventDefault();
-      tabbable[event.shiftKey ? tabbable.length - 1 : 0].focus();
+      (event.shiftKey ? last : first).focus();
       return;
     }
 
-    const leaving = event.shiftKey ? current === 0 : current === tabbable.length - 1;
-    if (!leaving) return;
+    if (event.shiftKey && currentElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
 
-    event.preventDefault();
-    tabbable[wrapIndex(current, event.shiftKey ? -1 : 1, tabbable.length)].focus();
+    if (!event.shiftKey && currentElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function activate() {

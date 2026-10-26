@@ -159,7 +159,7 @@ async function findQualityProfileContext(page: Page): Promise<ProfileContext | n
   }
   await profileTrigger.click();
 
-  const firstProfile = profileTrigger.locator('..').locator('div.z-50 button').nth(1);
+  const firstProfile = profileTrigger.locator('..').getByRole('listbox').getByRole('option').nth(1);
   const profileName = (await firstProfile.innerText()).trim();
   if (!profileName) {
     return null;
@@ -212,7 +212,7 @@ test.describe('4.4 Score Simulator UX basics', () => {
         name: 'Select quality profile...',
       })
       .click();
-    await page.getByRole('button', { name: context!.profileName, exact: true }).click();
+    await page.getByRole('option', { name: context!.profileName, exact: true }).click();
     await releaseInputCard.getByRole('button', { name: 'Simulate' }).click();
 
     await expect(page.getByText('Total Score').first()).toBeVisible();
@@ -311,7 +311,7 @@ test.describe('4.4 Score Simulator UX basics', () => {
         name: 'Select quality profile...',
       })
       .click();
-    await page.getByRole('button', { name: context!.profileName, exact: true }).click();
+    await page.getByRole('option', { name: context!.profileName, exact: true }).click();
 
     const request = await simulateRequest;
     const response = await request.response();

@@ -139,7 +139,7 @@
     {placeholder}
     mono
     wrap
-    aria-controls={listboxId}
+    aria-controls={open && filteredTokens.length > 0 ? listboxId : undefined}
     aria-autocomplete="list"
     aria-activedescendant={open && highlightedIndex >= 0 ? `${listboxId}-${highlightedIndex}` : undefined}
     bind:inputElement

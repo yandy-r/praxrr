@@ -176,7 +176,7 @@ async function createArrInstance(
   await page.waitForLoadState('networkidle');
 
   await page.getByRole('button', { name: 'Select type...' }).first().click();
-  await page.getByRole('button', { name: options.typeLabel, exact: true }).click();
+  await page.getByRole('option', { name: options.typeLabel, exact: true }).click();
 
   const unsupportedWorkflowStatus = page.getByRole('status').filter({
     hasText: LIDARR_UNSUPPORTED_WORKFLOW_MESSAGE,

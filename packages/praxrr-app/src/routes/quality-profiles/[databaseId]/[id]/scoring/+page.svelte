@@ -691,6 +691,7 @@
           <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem" role="menu" label="Sort by">
             <div role="presentation" class="py-1">
               <button
+                tabindex="-1"
                 type="button"
                 role="menuitemradio"
                 aria-checked={sortState?.key === 'name'}
@@ -711,6 +712,7 @@
               </button>
               {#each getArrSortKeys(scoring.arrTypes) as arrType}
                 <button
+                  tabindex="-1"
                   type="button"
                   role="menuitemradio"
                   aria-checked={sortState?.key === arrType}
@@ -796,6 +798,7 @@
             <div role="presentation" class="py-1">
               {#each [1, 2, 3] as columns}
                 <button
+                  tabindex="-1"
                   type="button"
                   role="menuitemradio"
                   aria-checked={tileColumns === columns}
@@ -824,6 +827,7 @@
           >
             <div role="presentation" class="py-1">
               <button
+                tabindex="-1"
                 type="button"
                 role="menuitemcheckbox"
                 aria-checked={hideUnscoredFormats}

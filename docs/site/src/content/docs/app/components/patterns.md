@@ -274,10 +274,11 @@ The stores above integrate with Tailwind CSS v4 through CSS custom properties ra
 
 Svelte actions and helpers under `$lib/client/utils/` (source: `packages/praxrr-app/src/lib/client/utils/`) that the shared dialogs, dropdowns, and tooltips use for keyboard and screen-reader support.
 
-```svelte
-import {(focusTrap, getTabbable)} from '$lib/client/utils/focusTrap'; import {focusOutside}
-from '$lib/client/utils/focusOutside'; import {clickOutside} from '$lib/client/utils/clickOutside';
-import {uniqueId} from '$lib/client/utils/uniqueId';
+```ts
+import { focusTrap, getTabbable } from '$lib/client/utils/focusTrap';
+import { focusOutside } from '$lib/client/utils/focusOutside';
+import { clickOutside } from '$lib/client/utils/clickOutside';
+import { uniqueId } from '$lib/client/utils/uniqueId';
 ```
 
 | Helper         | Signature                                                                                                     | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |

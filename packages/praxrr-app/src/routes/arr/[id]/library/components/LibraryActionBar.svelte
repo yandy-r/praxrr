@@ -17,6 +17,7 @@
   import IconCheckbox from '$ui/form/IconCheckbox.svelte';
   import NumberInput from '$ui/form/NumberInput.svelte';
   import { type SearchStore } from '$stores/search';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
 
   type FilterOperator = 'eq' | 'neq';
   type FilterField = 'qualityName' | 'qualityProfileName';
@@ -90,21 +91,26 @@
     onOpen();
   }
 
-  function closeActionMenu(close: () => void, event: MouseEvent) {
-    const menu = (event.currentTarget as HTMLElement).closest('[id^="action-menu-"]');
-    const trigger = menu?.id ? document.querySelector<HTMLButtonElement>(`[aria-controls="${menu.id}"]`) : null;
-    close();
-    trigger?.focus();
-  }
+  const filterDescId = uniqueId('library-filter-desc');
+  const qualityHeaderId = uniqueId('library-filter-quality');
+  const profileHeaderId = uniqueId('library-filter-profile');
+  const columnsHeaderId = uniqueId('library-columns-header');
 </script>
 
 <ActionsBar>
   <SearchAction {searchStore} placeholder={searchPlaceholder} responsive />
   <ActionButton icon={SlidersHorizontal} hasDropdown={true} dropdownPosition="right" title="Filter library">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="16rem" role="menu" label="Filter library">
+      <Dropdown
+        position={dropdownPosition}
+        mobilePosition="middle"
+        minWidth="16rem"
+        role="menu"
+        label="Filter library"
+        describedby={filterDescId}
+      >
         <div role="presentation" class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+          <p id={filterDescId} class="text-xs text-neutral-500 dark:text-neutral-400">
             {filterDescription}
           </p>
         </div>
@@ -114,14 +120,21 @@
           {/if}
           <!-- Quality Filter (Radarr only) -->
           {#if isRadarr && uniqueQualities.length > 0}
-            <div class="border-b border-neutral-100 dark:border-neutral-700">
+            <div
+              class="border-b border-neutral-100 dark:border-neutral-700"
+              role="group"
+              aria-labelledby={qualityHeaderId}
+            >
               <div role="presentation" class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
-                <span class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+                <span
+                  id={qualityHeaderId}
+                  class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
                   >Quality</span
                 >
               </div>
               {#each uniqueQualities as quality}
                 <button
+                  tabindex="-1"
                   type="button"
                   role="menuitemcheckbox"
                   aria-checked={!!activeFilters.find((f) => f.field === 'qualityName' && f.value === quality)}
@@ -146,14 +159,17 @@
           {/if}
 
           <!-- Profile Filter -->
-          <div>
+          <div role="group" aria-labelledby={profileHeaderId}>
             <div role="presentation" class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
-              <span class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+              <span
+                id={profileHeaderId}
+                class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
                 >Profile</span
               >
             </div>
             {#each uniqueProfiles as profile}
               <button
+                tabindex="-1"
                 type="button"
                 role="menuitemcheckbox"
                 aria-checked={!!activeFilters.find((f) => f.field === 'qualityProfileName' && f.value === profile)}
@@ -181,13 +197,23 @@
   </ActionButton>
   <ActionButton icon={TableProperties} hasDropdown={true} dropdownPosition="right" title="Toggle columns">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem" role="menu" label="Toggle columns">
+      <Dropdown
+        position={dropdownPosition}
+        mobilePosition="middle"
+        minWidth="14rem"
+        role="menu"
+        label="Toggle columns"
+        describedby={columnsHeaderId}
+      >
         <div role="presentation" class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">Toggle visible table columns</p>
+          <p id={columnsHeaderId} class="text-xs text-neutral-500 dark:text-neutral-400">
+            Toggle visible table columns
+          </p>
         </div>
-        <div role="presentation" class="py-1">
+        <div role="group" aria-labelledby={columnsHeaderId} class="py-1">
           {#each toggleableColumns as colKey}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemcheckbox"
               aria-checked={visibleColumns.has(colKey)}
@@ -212,12 +238,10 @@
     <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
       <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label="Refresh library">
         <button
+          tabindex="-1"
           type="button"
           role="menuitem"
-          on:click={(event) => {
-            closeActionMenu(close, event);
-            onRefresh();
-          }}
+          on:click={() => onRefresh()}
           class="w-full rounded-lg px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
         >
           Refresh library
@@ -229,12 +253,10 @@
     <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
       <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label={openLabel}>
         <button
+          tabindex="-1"
           type="button"
           role="menuitem"
-          on:click={(event) => {
-            closeActionMenu(close, event);
-            handleOpen();
-          }}
+          on:click={() => handleOpen()}
           class="w-full rounded-lg px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
         >
           {openLabel}

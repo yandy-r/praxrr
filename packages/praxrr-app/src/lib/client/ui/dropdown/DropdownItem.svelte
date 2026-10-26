@@ -40,6 +40,7 @@
 
 <button
   type="button"
+  tabindex="-1"
   class="flex w-full items-center border-b border-neutral-200 text-left transition-colors last:border-b-0 dark:border-neutral-700/60 {baseSurfaceClass} {sizeClasses} {stateClasses}"
   {disabled}
   {role}

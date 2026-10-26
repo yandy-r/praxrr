@@ -74,6 +74,7 @@
       <div class="flex flex-col gap-2 p-2">
         {#each accentColors as accent}
           <button
+            tabindex="-1"
             type="button"
             role="menuitemradio"
             aria-checked={$accentStore === accent.value}

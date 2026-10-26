@@ -4,8 +4,24 @@ import { expect, type Page, test } from '@playwright/test';
 const E2E_USERNAME = process.env.E2E_USERNAME;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
 
+// The SSR markup is visible before client handlers attach, and keys pressed before hydration are
+// lost. Probe for hydration by hovering the showcase menu trigger until its hover preview opens
+// (aria-expanded flips), then move the pointer away so each test starts from a closed menu.
+async function waitForShowcase(page: Page): Promise<void> {
+  const trigger = page.locator('[data-component="Dropdown"]').getByRole('button', { name: 'Dropdown examples' });
+  await trigger.waitFor({ state: 'visible' });
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await trigger.hover();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
+  }).toPass({ timeout: 15_000 });
+  await page.mouse.move(0, 0);
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+}
+
 async function openShowcase(page: Page): Promise<void> {
-  await page.goto('/dev/components', { waitUntil: 'networkidle' });
+  await page.goto('/dev/components');
+  if (!page.url().includes('/auth/login')) await waitForShowcase(page);
 
   if (page.url().includes('/auth/login')) {
     if (!E2E_USERNAME || !E2E_PASSWORD) {
@@ -15,7 +31,8 @@ async function openShowcase(page: Page): Promise<void> {
     await page.getByLabel('Password').fill(E2E_PASSWORD!);
     await page.getByRole('button', { name: 'Sign In' }).click();
     await page.waitForURL((url) => !url.pathname.startsWith('/auth/'));
-    await page.goto('/dev/components', { waitUntil: 'networkidle' });
+    await page.goto('/dev/components');
+    if (page.url().includes('/dev/components')) await waitForShowcase(page);
   }
 
   if (!page.url().includes('/dev/components')) {
@@ -158,5 +175,36 @@ test.describe('keyboard-accessible overlays', () => {
     await page.keyboard.press('Escape');
     await expect(trigger).toBeFocused();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('Tab from inside a menu closes the menu', async ({ page }) => {
+    await openShowcase(page);
+    const card = page.locator('[data-component="Dropdown"]');
+    const trigger = card.getByRole('button', { name: 'Dropdown examples' });
+
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const menu = card.getByRole('menu', { name: 'Dropdown examples' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Normal item' })).toBeFocused();
+
+    await page.keyboard.press('Tab');
+    await expect(menu).toBeHidden();
+  });
+
+  test('ReorderableList Alt+ArrowDown moves the first item down and keeps focus', async ({ page }) => {
+    await openShowcase(page);
+    const card = page.locator('[data-component="Table"]');
+    const section = card.locator('section[aria-label="Reorderable list demo"]');
+    const firstRow = section.locator('[data-index="0"]');
+    await expect(firstRow).toContainText('First item');
+
+    await firstRow.focus();
+    await page.keyboard.press('Alt+ArrowDown');
+
+    const movedRow = section.locator('[data-index="1"]');
+    await expect(movedRow).toContainText('First item');
+    await expect(movedRow).toBeFocused();
+    await expect(section.locator('[data-index="0"]')).toContainText('Second item');
   });
 });

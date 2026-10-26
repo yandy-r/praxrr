@@ -58,7 +58,7 @@ function escapeRegex(value: string): string {
 async function setQpLanguage(page: Page, language: string): Promise<void> {
   const input = page.locator('input[name="language-search"]');
   await input.fill(language);
-  await page.locator('button', { hasText: language }).first().click();
+  await page.getByRole('option', { name: language, exact: true }).first().click();
 }
 
 /** Read the ordered quality/group names from the qualities page. */
@@ -129,9 +129,7 @@ async function createGroup(page: Page, name: string, memberNames: string[]): Pro
 
   await modal.getByRole('textbox', { name: 'Group Name' }).fill(name);
 
-  const qualityButtons = modal.locator('button').filter({
-    has: page.locator('[role="checkbox"]'),
-  });
+  const qualityButtons = modal.locator('button[aria-pressed]');
   const count = await qualityButtons.count();
   for (let i = 0; i < count; i++) {
     const btn = qualityButtons.nth(i);
@@ -159,15 +157,12 @@ async function editGroupMembers(page: Page, groupName: string, keepMembers: stri
   const modal = page.getByRole('dialog');
   await modal.waitFor({ state: 'visible' });
 
-  const qualityButtons = modal.locator('button').filter({
-    has: page.locator('[role="checkbox"]'),
-  });
+  const qualityButtons = modal.locator('button[aria-pressed]');
   const count = await qualityButtons.count();
   for (let i = 0; i < count; i++) {
     const btn = qualityButtons.nth(i);
     const text = (await btn.innerText()).trim();
-    const checkbox = btn.locator('[role="checkbox"]');
-    const isChecked = (await checkbox.getAttribute('aria-checked')) === 'true';
+    const isChecked = (await btn.getAttribute('aria-pressed')) === 'true';
 
     if (keepMembers.includes(text)) {
       if (!isChecked) await btn.click();

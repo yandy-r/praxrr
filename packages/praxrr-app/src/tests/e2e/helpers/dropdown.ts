@@ -18,7 +18,7 @@ export async function selectDropdownOption(scope: Locator, optionLabel: string):
   await trigger.waitFor({ state: 'visible', timeout: 10_000 });
   await trigger.click();
 
-  const exactOption = scope.getByRole('button', { name: optionLabel, exact: true });
+  const exactOption = scope.getByRole('option', { name: optionLabel, exact: true });
   if ((await exactOption.count()) > 0) {
     await exactOption.first().waitFor({ state: 'visible', timeout: 10_000 });
     await exactOption.first().click();
@@ -26,7 +26,7 @@ export async function selectDropdownOption(scope: Locator, optionLabel: string):
   }
 
   const escaped = escapeRegExp(optionLabel);
-  const fuzzyOption = scope.getByRole('button', { name: new RegExp(`^\\s*${escaped}\\s*$`) });
+  const fuzzyOption = scope.getByRole('option', { name: new RegExp(`^\\s*${escaped}\\s*$`) });
   await fuzzyOption.first().waitFor({ state: 'visible', timeout: 10_000 });
   await fuzzyOption.first().click();
 }
@@ -56,7 +56,7 @@ export async function selectSearchDropdownOption(
   await input.fill('');
   await input.fill(optionLabel);
 
-  const optionButtons = scope.locator('div.absolute').getByRole('button');
+  const optionButtons = scope.getByRole('listbox').getByRole('option');
   await optionButtons.first().waitFor({ state: 'visible', timeout: 10_000 });
 
   const escaped = escapeRegExp(optionLabel);

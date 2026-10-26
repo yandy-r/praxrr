@@ -208,7 +208,7 @@ test.describe('4.2 Score Simulator what-if overrides', () => {
     await page.locator('#batch-input-textarea').fill(`${BATCH_ALPHA_TITLE}\n${BATCH_BETA_TITLE}`);
 
     await page.getByRole('button', { name: 'Select quality profile...' }).last().click();
-    await page.getByRole('button', { name: context!.profileName, exact: true }).click();
+    await page.getByRole('option', { name: context!.profileName, exact: true }).click();
     await page.getByRole('button', { name: 'Simulate All' }).click();
 
     const batchResults = page

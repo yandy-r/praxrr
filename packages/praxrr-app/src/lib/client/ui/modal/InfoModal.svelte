@@ -12,6 +12,22 @@
 
   const titleId = uniqueId('info-modal-title');
 
+  let bodyOverflows = false;
+
+  function observeBody(node: HTMLDivElement) {
+    const update = () => {
+      bodyOverflows = node.scrollHeight > node.clientHeight;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return {
+      destroy() {
+        observer.disconnect();
+      },
+    };
+  }
+
   function handleClose() {
     open = false;
   }
@@ -70,10 +86,11 @@
         <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
         <div
           class="flex-1 overflow-auto px-6 py-4"
-          role="region"
-          tabindex="0"
-          aria-labelledby={titleId}
+          role={bodyOverflows ? 'region' : undefined}
+          tabindex={bodyOverflows ? 0 : undefined}
+          aria-labelledby={bodyOverflows ? titleId : undefined}
           data-focus-trap-region
+          use:observeBody
         >
           <slot />
         </div>

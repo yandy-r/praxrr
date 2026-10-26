@@ -230,6 +230,7 @@
       <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter entity">
         <div class="max-h-64 overflow-y-auto">
           <button
+            tabindex="-1"
             type="button"
             role="menuitemcheckbox"
             aria-checked={activeEntities.size === 0}
@@ -244,6 +245,7 @@
           </button>
           {#each entityKeys as entity}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemcheckbox"
               aria-checked={activeEntities.has(entity)}
@@ -268,6 +270,7 @@
       <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter reason">
         <div class="max-h-64 overflow-y-auto">
           <button
+            tabindex="-1"
             type="button"
             role="menuitemcheckbox"
             aria-checked={activeReasons.size === 0}
@@ -283,6 +286,7 @@
           {#each reasonKeys as reason}
             {@const label = (reasonLabels[reason] ?? reason) || 'Unknown'}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemcheckbox"
               aria-checked={activeReasons.has(reason)}

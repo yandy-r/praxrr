@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
 
   export let position: 'left' | 'right' | 'middle' = 'left';
   export let mobilePosition: 'left' | 'right' | 'middle' | null = null;
@@ -12,6 +12,7 @@
   export let label: string | undefined = undefined;
   export let id: string | undefined = undefined;
   export let onClose: (() => void) | null = null;
+  export let describedby: string | undefined = undefined;
 
   let dropdownEl: HTMLElement;
   let fixedStyle = '';
@@ -70,6 +71,13 @@
     });
   }
 
+  function applyRovingTabIndex() {
+    if (role !== 'menu' && role !== 'listbox') return;
+    for (const item of enabledMenuItems()) {
+      item.tabIndex = -1;
+    }
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (!onClose) return;
@@ -80,6 +88,12 @@
     }
 
     if (role !== 'menu' && role !== 'listbox') return;
+
+    if (event.key === 'Tab') {
+      if (onClose) onClose();
+      return;
+    }
+
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') {
       return;
     }
@@ -102,9 +116,11 @@
     event.preventDefault();
     event.stopPropagation();
     items[next]?.focus();
+    applyRovingTabIndex();
   }
 
   onMount(() => {
+    applyRovingTabIndex();
     if (fixed && triggerEl) {
       updateFixedPosition();
       // Update position on scroll/resize
@@ -115,6 +131,10 @@
         window.removeEventListener('resize', updateFixedPosition);
       };
     }
+  });
+
+  afterUpdate(() => {
+    applyRovingTabIndex();
   });
 
   $: if (fixed && triggerEl && dropdownEl) {
@@ -132,6 +152,7 @@
   {id}
   {role}
   aria-label={label}
+  aria-describedby={describedby}
   class="z-50 border border-neutral-300 bg-white shadow-lg dark:border-neutral-700/60 dark:bg-neutral-800 {roundedClass} {fixed
     ? 'fixed'
     : 'absolute top-full ' + marginClass} {positionClass}"

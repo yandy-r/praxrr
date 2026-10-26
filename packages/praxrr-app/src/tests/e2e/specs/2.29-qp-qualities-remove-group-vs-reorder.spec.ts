@@ -75,9 +75,7 @@ async function createGroupFromFirstTwo(page: import('@playwright/test').Page): P
 
   await modal.getByRole('textbox', { name: 'Group Name' }).fill(GROUP_NAME);
 
-  const qualityButtons = modal.locator('button').filter({
-    has: page.locator('[role="checkbox"]'),
-  });
+  const qualityButtons = modal.locator('button[aria-pressed]');
   const first = (await qualityButtons.nth(0).innerText()).trim();
   const second = (await qualityButtons.nth(1).innerText()).trim();
 

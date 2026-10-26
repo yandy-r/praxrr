@@ -67,6 +67,7 @@
         <div role="presentation" class="max-h-64 overflow-y-auto">
           {#each logFiles as file}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemradio"
               aria-checked={selectedFile === file.filename}
@@ -102,6 +103,7 @@
       <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
         {#each logLevels as level}
           <button
+            tabindex="-1"
             type="button"
             role="menuitemradio"
             aria-checked={selectedLevel === level}
@@ -123,6 +125,7 @@
         <div role="presentation" class="max-h-64 overflow-y-auto">
           {#each uniqueSources as source}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemcheckbox"
               aria-checked={selectedSources.has(source)}

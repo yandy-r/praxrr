@@ -23,13 +23,6 @@
   let saving = false;
   let formRef: HTMLFormElement;
 
-  function closeActionMenu(close: () => void, event: MouseEvent) {
-    const menu = (event.currentTarget as HTMLElement).closest('[id^="action-menu-"]');
-    const trigger = menu?.id ? document.querySelector<HTMLButtonElement>(`[aria-controls="${menu.id}"]`) : null;
-    close();
-    trigger?.focus();
-  }
-
   // Layer selection
   let selectedLayer: 'user' | 'base' = canWriteToBase ? 'base' : 'user';
 
@@ -442,6 +435,7 @@
                       <button
                         type="button"
                         class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        aria-pressed={selectedItem?.id === item.id}
                         on:click={() => (selectedItem = selectedItem?.id === item.id ? null : item)}
                       >
                         <div class="min-w-0 flex-1">
@@ -454,7 +448,7 @@
                             </p>
                           {/if}
                         </div>
-                        <IconCheckbox checked={selectedItem?.id === item.id} icon={Check} />
+                        <IconCheckbox decorative checked={selectedItem?.id === item.id} icon={Check} />
                       </button>
                     {/each}
                   </div>
@@ -477,6 +471,7 @@
                     <button
                       type="button"
                       class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                      aria-pressed={selectedItem?.id === item.id}
                       on:click={() => (selectedItem = selectedItem?.id === item.id ? null : item)}
                     >
                       <div class="min-w-0 flex-1">
@@ -489,7 +484,7 @@
                           </p>
                         {/if}
                       </div>
-                      <IconCheckbox checked={selectedItem?.id === item.id} icon={Check} />
+                      <IconCheckbox decorative checked={selectedItem?.id === item.id} icon={Check} />
                     </button>
                   {/each}
                 </div>
@@ -582,8 +577,8 @@
                 <DropdownItem
                   label={allFilteredSelected ? 'Deselect All' : 'Select All'}
                   role="menuitem"
-                  on:click={(event) => {
-                    closeActionMenu(close, event.detail);
+                  on:click={() => {
+                    close();
                     selectAllReleases();
                   }}
                 />
@@ -605,6 +600,7 @@
                 <button
                   type="button"
                   class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  aria-pressed={selectedReleases.has(release.title)}
                   on:click={() => toggleRelease(release.title)}
                 >
                   <div class="min-w-0 flex-1">
@@ -629,7 +625,7 @@
                       {/each}
                     </div>
                   </div>
-                  <IconCheckbox checked={selectedReleases.has(release.title)} icon={Check} />
+                  <IconCheckbox decorative checked={selectedReleases.has(release.title)} icon={Check} />
                 </button>
               {/each}
             </div>

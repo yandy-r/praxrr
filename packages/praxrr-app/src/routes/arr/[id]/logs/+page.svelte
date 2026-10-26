@@ -159,6 +159,7 @@
         <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
           {#each logLevels as level}
             <button
+              tabindex="-1"
               type="button"
               role="menuitemradio"
               aria-checked={selectedLevel === level}
