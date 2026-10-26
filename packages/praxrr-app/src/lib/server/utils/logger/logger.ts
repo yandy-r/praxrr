@@ -95,12 +95,12 @@ class Logger {
   }
 
   private log(level: LogLevel, color: string, message: string, options?: LogOptions): void {
-    const sanitizedMeta = options?.meta ? sanitizeLogMeta(options.meta) : undefined;
-
     // Check if this log level should be logged
     if (!this.shouldLog(level)) {
       return;
     }
+
+    const sanitizedMeta = options?.meta ? sanitizeLogMeta(options.meta) : undefined;
 
     const timestamp = new Date().toISOString();
 
@@ -168,7 +168,8 @@ class Logger {
 
     // Print stack trace to console
     if (error?.stack && this.isConsoleLoggingEnabled()) {
-      console.log(`${colors.grey}${error.stack}${colors.reset}`);
+      const sanitizedTraceMeta = sanitizeLogMeta({ stack: error.stack }) as { stack?: unknown };
+      console.log(`${colors.grey}${String(sanitizedTraceMeta.stack)}${colors.reset}`);
     }
 
     // Write stack trace to file

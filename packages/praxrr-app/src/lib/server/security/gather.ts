@@ -234,7 +234,14 @@ function verifyLogRedaction(): boolean {
   const hexSecret = 'deadbeefdeadbeefdeadbeefdeadbeef'; // 32 hex — the shape of an Arr API key
   const skSecret = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX'; // sk- token shape
   try {
-    const sanitized = sanitizeLogMeta({ apiKey: hexSecret, headers: { authorization: skSecret } });
+    // Secrets are planted both under sensitive keys (key-based redaction) and under neutral keys,
+    // so the value patterns are exercised independently of the key rules.
+    const sanitized = sanitizeLogMeta({
+      apiKey: hexSecret,
+      note: `key ${hexSecret}`,
+      detail: skSecret,
+      headers: { authorization: skSecret },
+    });
     const serialized = JSON.stringify(sanitized);
     return !serialized.includes(hexSecret) && !serialized.includes(skSecret);
   } catch {
