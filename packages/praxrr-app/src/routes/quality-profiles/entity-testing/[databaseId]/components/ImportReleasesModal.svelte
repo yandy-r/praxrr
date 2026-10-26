@@ -389,15 +389,22 @@
       {:else}
         <ActionsBar>
           <SearchAction {searchStore} placeholder="Search library..." />
-          <ActionButton icon={Server} hasDropdown={true} dropdownPosition="right" square={!selectedInstance}>
+          <ActionButton
+            icon={Server}
+            hasDropdown={true}
+            dropdownPosition="right"
+            square={!selectedInstance}
+            title={selectedInstance ? selectedInstance.name : 'Select instance'}
+          >
             {#if selectedInstance}
               <span class="ml-2 text-sm text-neutral-700 dark:text-neutral-300">{selectedInstance.name}</span>
             {/if}
             <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
+              <Dropdown position={dropdownPosition} role="menu" label="Select instance">
                 {#each filteredInstances as instance}
                   <DropdownItem
                     label={instance.name}
+                    role="menuitemradio"
                     selected={selectedInstanceId === instance.id}
                     on:click={() => selectInstance(instance.id)}
                   />
@@ -428,6 +435,7 @@
                       <button
                         type="button"
                         class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                        aria-pressed={selectedItem?.id === item.id}
                         on:click={() => (selectedItem = selectedItem?.id === item.id ? null : item)}
                       >
                         <div class="min-w-0 flex-1">
@@ -440,7 +448,7 @@
                             </p>
                           {/if}
                         </div>
-                        <IconCheckbox checked={selectedItem?.id === item.id} icon={Check} />
+                        <IconCheckbox decorative checked={selectedItem?.id === item.id} icon={Check} />
                       </button>
                     {/each}
                   </div>
@@ -463,6 +471,7 @@
                     <button
                       type="button"
                       class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                      aria-pressed={selectedItem?.id === item.id}
                       on:click={() => (selectedItem = selectedItem?.id === item.id ? null : item)}
                     >
                       <div class="min-w-0 flex-1">
@@ -475,7 +484,7 @@
                           </p>
                         {/if}
                       </div>
-                      <IconCheckbox checked={selectedItem?.id === item.id} icon={Check} />
+                      <IconCheckbox decorative checked={selectedItem?.id === item.id} icon={Check} />
                     </button>
                   {/each}
                 </div>
@@ -537,25 +546,41 @@
             icon={sortDirection === 'asc' ? ArrowUpAZ : ArrowDownAZ}
             hasDropdown={true}
             dropdownPosition="right"
+            title="Sort by"
           >
             <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
-                <DropdownItem label="Title" selected={sortField === 'title'} on:click={() => setSortField('title')} />
-                <DropdownItem label="Size" selected={sortField === 'size'} on:click={() => setSortField('size')} />
+              <Dropdown position={dropdownPosition} role="menu" label="Sort by">
+                <DropdownItem
+                  label="Title"
+                  role="menuitemradio"
+                  selected={sortField === 'title'}
+                  on:click={() => setSortField('title')}
+                />
+                <DropdownItem
+                  label="Size"
+                  role="menuitemradio"
+                  selected={sortField === 'size'}
+                  on:click={() => setSortField('size')}
+                />
                 <DropdownItem
                   label="Indexers"
+                  role="menuitemradio"
                   selected={sortField === 'indexers'}
                   on:click={() => setSortField('indexers')}
                 />
               </Dropdown>
             </svelte:fragment>
           </ActionButton>
-          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right">
-            <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
+          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right" title="Select releases">
+            <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
+              <Dropdown position={dropdownPosition} role="menu" label="Select releases">
                 <DropdownItem
                   label={allFilteredSelected ? 'Deselect All' : 'Select All'}
-                  on:click={selectAllReleases}
+                  role="menuitem"
+                  on:click={() => {
+                    close();
+                    selectAllReleases();
+                  }}
                 />
               </Dropdown>
             </svelte:fragment>
@@ -575,6 +600,7 @@
                 <button
                   type="button"
                   class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  aria-pressed={selectedReleases.has(release.title)}
                   on:click={() => toggleRelease(release.title)}
                 >
                   <div class="min-w-0 flex-1">
@@ -599,7 +625,7 @@
                       {/each}
                     </div>
                   </div>
-                  <IconCheckbox checked={selectedReleases.has(release.title)} icon={Check} />
+                  <IconCheckbox decorative checked={selectedReleases.has(release.title)} icon={Check} />
                 </button>
               {/each}
             </div>

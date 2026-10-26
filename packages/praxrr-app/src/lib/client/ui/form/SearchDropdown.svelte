@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import FormInput from '$ui/form/FormInput.svelte';
 
   type Option = {
@@ -27,6 +28,8 @@
   let searchQuery = '';
   let inputElement: HTMLInputElement | HTMLTextAreaElement | null = null;
   let highlightedIndex = -1;
+  const dropdownId = uniqueId('search-options');
+  const inputId = uniqueId('search-input');
 
   $: selectedOption = options.find((opt) => opt.value === value);
   $: if (!open) {
@@ -61,6 +64,7 @@
 
   function handleKeyDown(event: KeyboardEvent) {
     if (disabled) return;
+    if (event.target !== inputElement && event.key !== 'Escape') return;
 
     switch (event.key) {
       case 'ArrowDown':
@@ -83,6 +87,8 @@
       case 'Escape':
         if (open) {
           event.preventDefault();
+          event.stopPropagation();
+          inputElement?.focus();
           close();
         }
         break;
@@ -133,6 +139,13 @@
     {label}
     {description}
     {name}
+    id={name || inputId}
+    role="combobox"
+    aria-haspopup="listbox"
+    aria-expanded={open && filteredOptions.length > 0}
+    aria-controls={dropdownId}
+    aria-autocomplete="list"
+    aria-activedescendant={open && highlightedIndex >= 0 ? `${dropdownId}-${highlightedIndex}` : undefined}
     {placeholder}
     {disabled}
     {size}
@@ -162,6 +175,8 @@
 
   {#if open && filteredOptions.length > 0}
     <div
+      id={dropdownId}
+      aria-label={label}
       role="listbox"
       class="absolute top-full z-50 mt-1 w-full overflow-y-auto rounded-xl border border-neutral-300 bg-white p-1 shadow-sm dark:border-neutral-700/60 dark:bg-neutral-800 {constrainMenuHeight
         ? 'max-h-60'
@@ -172,10 +187,13 @@
         {@const isSelected = option.value === value}
         <button
           type="button"
+          id={`${dropdownId}-${index}`}
+          tabindex="-1"
           role="option"
           aria-selected={isSelected}
           on:mouseenter={() => (highlightedIndex = index)}
-          on:mousedown={() => selectOption(option)}
+          on:mousedown|preventDefault
+          on:click={() => selectOption(option)}
           class="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors {isHighlighted
             ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-700/40 dark:text-neutral-100'
             : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800'} {isSelected

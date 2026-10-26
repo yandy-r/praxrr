@@ -152,17 +152,19 @@
   <!-- Actions Bar -->
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search regular expressions..." responsive />
-    <ActionButton icon={Plus} hasDropdown={true} dropdownPosition="right">
+    <ActionButton icon={Plus} hasDropdown={true} dropdownPosition="right" title="Add regular expression">
       <svelte:fragment slot="dropdown">
-        <Dropdown position="right">
+        <Dropdown position="right" role="menu" label="Add regular expression">
           <DropdownItem
             icon={FileText}
             label="Blank"
+            role="menuitem"
             on:click={() => goto(`/regular-expressions/${data.currentDatabase.id}/new`)}
           />
           <DropdownItem
             icon={Users}
             label="Release Group"
+            role="menuitem"
             on:click={() => goto(`/regular-expressions/${data.currentDatabase.id}/new?preset=release-group`)}
           />
         </Dropdown>
@@ -170,7 +172,7 @@
     </ActionButton>
     <SearchFilterAction bind:options={searchOptions} />
     <ViewToggle bind:value={$view} />
-    <ActionButton icon={Info} on:click={() => (infoModalOpen = true)} />
+    <ActionButton icon={Info} title="About regular expressions" on:click={() => (infoModalOpen = true)} />
   </ActionsBar>
 
   <!-- Regular Expressions Content -->

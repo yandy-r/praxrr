@@ -4,7 +4,7 @@
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
-  import Tooltip from '$ui/tooltip/Tooltip.svelte';
+  import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import { type SearchStore } from '$stores/search';
 
   interface LogFile {
@@ -61,13 +61,16 @@
   <SearchAction {searchStore} placeholder="Search logs..." responsive />
 
   <!-- Log File Selector -->
-  <ActionButton icon={FileText} hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={FileText} hasDropdown={true} dropdownPosition="right" title="Select log file">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} minWidth="20rem">
-        <div class="max-h-64 overflow-y-auto">
+      <Dropdown position={dropdownPosition} minWidth="20rem" role="menu" label="Select log file">
+        <div role="presentation" class="max-h-64 overflow-y-auto">
           {#each logFiles as file}
             <button
+              tabindex="-1"
               type="button"
+              role="menuitemradio"
+              aria-checked={selectedFile === file.filename}
               on:click={() => onChangeFile(file.filename)}
               class="flex w-full items-center justify-between gap-4 border-b border-neutral-200 px-4 py-2.5 text-left transition-colors first:rounded-t-lg last:rounded-b-lg last:border-b-0 dark:border-neutral-700
 								{selectedFile === file.filename
@@ -86,6 +89,8 @@
                 {formatFileSize(file.size)}
               </span>
             </button>
+          {:else}
+            <DropdownItem disabled label="No log files" />
           {/each}
         </div>
       </Dropdown>
@@ -93,12 +98,15 @@
   </ActionButton>
 
   <!-- Level Filter -->
-  <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" title="Filter by level">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} minWidth="8rem">
+      <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
         {#each logLevels as level}
           <button
+            tabindex="-1"
             type="button"
+            role="menuitemradio"
+            aria-checked={selectedLevel === level}
             on:click={() => onChangeLevel(level)}
             class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left transition-colors first:rounded-t-lg last:rounded-b-lg last:border-b-0 dark:border-neutral-700
 							{selectedLevel === level ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
@@ -111,13 +119,16 @@
   </ActionButton>
 
   <!-- Source Filter -->
-  <ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right" title="Filter by source">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} minWidth="12rem">
-        <div class="max-h-64 overflow-y-auto">
+      <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter by source">
+        <div role="presentation" class="max-h-64 overflow-y-auto">
           {#each uniqueSources as source}
             <button
+              tabindex="-1"
               type="button"
+              role="menuitemcheckbox"
+              aria-checked={selectedSources.has(source)}
               on:click={() => onToggleSource(source)}
               class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left text-sm transition-colors first:rounded-t-lg last:rounded-b-lg last:border-b-0 dark:border-neutral-700
 								{selectedSources.has(source) ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
@@ -127,28 +138,23 @@
                 <Check size={16} class="text-accent-600 dark:text-accent-400" />
               {/if}
             </button>
+          {:else}
+            <DropdownItem disabled label="No sources" />
           {/each}
         </div>
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
 
-  <!-- Refresh -->
-  <Tooltip text="Refresh logs">
-    <ActionButton on:click={onRefresh}>
-      <RefreshCw size={20} class="text-neutral-700 dark:text-neutral-300 {isRefreshing ? 'animate-spin' : ''}" />
-    </ActionButton>
-  </Tooltip>
+  <ActionButton title="Refresh logs" on:click={onRefresh}>
+    <RefreshCw size={20} class="text-neutral-700 dark:text-neutral-300 {isRefreshing ? 'animate-spin' : ''}" />
+  </ActionButton>
 
   <!-- Cleanup -->
   {#if onCleanup}
-    <Tooltip text="Run log cleanup">
-      <ActionButton icon={BrushCleaning} on:click={onCleanup} />
-    </Tooltip>
+    <ActionButton icon={BrushCleaning} title="Run log cleanup" on:click={onCleanup} />
   {/if}
 
   <!-- Download -->
-  <Tooltip text="Download logs as JSON">
-    <ActionButton icon={Download} on:click={onDownload} />
-  </Tooltip>
+  <ActionButton icon={Download} title="Download logs as JSON" on:click={onDownload} />
 </ActionsBar>

@@ -227,10 +227,13 @@
   <SearchAction {searchStore} placeholder="Search conflicts..." />
   <ActionButton icon={Fingerprint} title="Filter entity" hasDropdown={true} dropdownPosition="right">
     <svelte:fragment slot="dropdown" let:dropdownPosition>
-      <Dropdown position={dropdownPosition} minWidth="12rem">
+      <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter entity">
         <div class="max-h-64 overflow-y-auto">
           <button
+            tabindex="-1"
             type="button"
+            role="menuitemcheckbox"
+            aria-checked={activeEntities.size === 0}
             on:click={() => toggleEntity('__all__')}
             class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left text-sm transition-colors first:rounded-t-lg dark:border-neutral-700
 							{activeEntities.size === 0 ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
@@ -242,10 +245,13 @@
           </button>
           {#each entityKeys as entity}
             <button
+              tabindex="-1"
               type="button"
+              role="menuitemcheckbox"
+              aria-checked={activeEntities.has(entity)}
               on:click={() => toggleEntity(entity)}
               class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left text-sm transition-colors last:rounded-b-lg last:border-b-0 dark:border-neutral-700
-								{activeEntities.has(entity) ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
+							{activeEntities.has(entity) ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
             >
               <span class="text-neutral-700 dark:text-neutral-300">
                 {entityLabels[entity] ?? formatEntity(entity)}
@@ -261,10 +267,13 @@
   </ActionButton>
   <ActionButton icon={AlertTriangle} title="Filter reason" hasDropdown={true} dropdownPosition="right">
     <svelte:fragment slot="dropdown" let:dropdownPosition>
-      <Dropdown position={dropdownPosition} minWidth="12rem">
+      <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter reason">
         <div class="max-h-64 overflow-y-auto">
           <button
+            tabindex="-1"
             type="button"
+            role="menuitemcheckbox"
+            aria-checked={activeReasons.size === 0}
             on:click={() => toggleReason('__all__')}
             class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left text-sm transition-colors first:rounded-t-lg dark:border-neutral-700
 							{activeReasons.size === 0 ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
@@ -277,10 +286,13 @@
           {#each reasonKeys as reason}
             {@const label = (reasonLabels[reason] ?? reason) || 'Unknown'}
             <button
+              tabindex="-1"
               type="button"
+              role="menuitemcheckbox"
+              aria-checked={activeReasons.has(reason)}
               on:click={() => toggleReason(reason)}
               class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left text-sm transition-colors last:rounded-b-lg last:border-b-0 dark:border-neutral-700
-								{activeReasons.has(reason) ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
+							{activeReasons.has(reason) ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
             >
               <span class="text-neutral-700 dark:text-neutral-300">{label}</span>
               {#if activeReasons.has(reason)}

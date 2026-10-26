@@ -95,6 +95,7 @@
       class={classes}
       {...$$restProps}
       on:click
+      on:keydown
     >
       {#if icon && iconPosition === 'left'}
         <svelte:component this={icon} size={iconSize} class={baseIconColor} />
@@ -116,6 +117,7 @@
       class={classes}
       {...$$restProps}
       on:click
+      on:keydown
     >
       {#if icon && iconPosition === 'left'}
         <svelte:component this={icon} size={iconSize} class={baseIconColor} />

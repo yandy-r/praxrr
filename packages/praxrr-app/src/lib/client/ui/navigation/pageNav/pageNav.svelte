@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { focusTrap } from '$lib/client/utils/focusTrap';
   import Group from './group.svelte';
   import GroupItem from './groupItem.svelte';
   import Version from './version.svelte';
@@ -114,6 +116,18 @@
     mobileNavOpen.close();
   }
 
+  let narrowViewport = false;
+
+  onMount(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const syncViewport = () => {
+      narrowViewport = media.matches;
+    };
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  });
+
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape' && $mobileNavOpen) mobileNavOpen.close();
   }
@@ -132,6 +146,9 @@
 {/if}
 
 <nav
+  id="page-nav"
+  use:focusTrap={{ enabled: $mobileNavOpen && narrowViewport }}
+  inert={narrowViewport && !$mobileNavOpen}
   class="fixed top-0 left-0 z-[70] flex h-full w-[90vw] flex-col border-r border-neutral-200 bg-neutral-50 transition-transform duration-200 dark:border-neutral-800 dark:bg-neutral-900
 		{$mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}
 		md:top-16 md:h-[calc(100vh-4rem)] md:w-80 md:translate-x-0 md:border-t"

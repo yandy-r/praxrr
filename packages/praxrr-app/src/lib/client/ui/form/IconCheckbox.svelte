@@ -11,6 +11,7 @@
   export let iconColor: string = '';
   export let stopPropagation: boolean = false;
   export let title: string | undefined = undefined;
+  export let decorative: boolean = false;
 
   const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
@@ -91,17 +92,29 @@
   }
 </script>
 
-<button
-  type="button"
-  role="checkbox"
-  aria-checked={checked}
-  {disabled}
-  {title}
-  on:click={handleClick}
-  style="{buttonStyle}{shape === 'circle' ? ' border-radius: 9999px !important;' : ''}"
-  class="{baseClass} {shapeClass} {stateClass} {disabled ? disabledClass : enabledClass}"
->
-  {#if checked}
-    <svelte:component this={icon} size={14} class={resolvedIconClass} />
-  {/if}
-</button>
+{#if decorative}
+  <span
+    aria-hidden="true"
+    style="{buttonStyle}{shape === 'circle' ? ' border-radius: 9999px !important;' : ''}"
+    class="{baseClass} {shapeClass} {stateClass} {disabled ? disabledClass : ''}"
+  >
+    {#if checked}
+      <svelte:component this={icon} size={14} class={resolvedIconClass} />
+    {/if}
+  </span>
+{:else}
+  <button
+    type="button"
+    role="checkbox"
+    aria-checked={checked}
+    {disabled}
+    {title}
+    on:click={handleClick}
+    style="{buttonStyle}{shape === 'circle' ? ' border-radius: 9999px !important;' : ''}"
+    class="{baseClass} {shapeClass} {stateClass} {disabled ? disabledClass : enabledClass}"
+  >
+    {#if checked}
+      <svelte:component this={icon} size={14} class={resolvedIconClass} />
+    {/if}
+  </button>
+{/if}

@@ -13,9 +13,11 @@
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
+  import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import IconCheckbox from '$ui/form/IconCheckbox.svelte';
   import NumberInput from '$ui/form/NumberInput.svelte';
   import { type SearchStore } from '$stores/search';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
 
   type FilterOperator = 'eq' | 'neq';
   type FilterField = 'qualityName' | 'qualityProfileName';
@@ -88,30 +90,54 @@
 
     onOpen();
   }
+
+  const filterDescId = uniqueId('library-filter-desc');
+  const qualityHeaderId = uniqueId('library-filter-quality');
+  const profileHeaderId = uniqueId('library-filter-profile');
+  const columnsHeaderId = uniqueId('library-columns-header');
 </script>
 
 <ActionsBar>
   <SearchAction {searchStore} placeholder={searchPlaceholder} responsive />
-  <ActionButton icon={SlidersHorizontal} hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={SlidersHorizontal} hasDropdown={true} dropdownPosition="right" title="Filter library">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="16rem">
-        <div class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+      <Dropdown
+        position={dropdownPosition}
+        mobilePosition="middle"
+        minWidth="16rem"
+        role="menu"
+        label="Filter library"
+        describedby={filterDescId}
+      >
+        <div role="presentation" class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
+          <p id={filterDescId} class="text-xs text-neutral-500 dark:text-neutral-400">
             {filterDescription}
           </p>
         </div>
-        <div class="max-h-96 overflow-y-auto">
+        <div role="presentation" class="max-h-96 overflow-y-auto">
+          {#if uniqueProfiles.length === 0 && (!isRadarr || uniqueQualities.length === 0)}
+            <DropdownItem disabled label="No options" />
+          {/if}
           <!-- Quality Filter (Radarr only) -->
           {#if isRadarr && uniqueQualities.length > 0}
-            <div class="border-b border-neutral-100 dark:border-neutral-700">
-              <div class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
-                <span class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+            <div
+              class="border-b border-neutral-100 dark:border-neutral-700"
+              role="group"
+              aria-labelledby={qualityHeaderId}
+            >
+              <div role="presentation" class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
+                <span
+                  id={qualityHeaderId}
+                  class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
                   >Quality</span
                 >
               </div>
               {#each uniqueQualities as quality}
                 <button
+                  tabindex="-1"
                   type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={!!activeFilters.find((f) => f.field === 'qualityName' && f.value === quality)}
                   on:click={() => onToggleFilter('qualityName', 'eq', quality, quality)}
                   class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {activeFilters.find(
                     (f) => f.field === 'qualityName' && f.value === quality
@@ -121,6 +147,7 @@
                 >
                   <span class="text-neutral-700 dark:text-neutral-300">{quality}</span>
                   <IconCheckbox
+                    decorative
                     checked={!!activeFilters.find((f) => f.field === 'qualityName' && f.value === quality)}
                     icon={Check}
                     color="blue"
@@ -132,15 +159,20 @@
           {/if}
 
           <!-- Profile Filter -->
-          <div>
-            <div class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
-              <span class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
+          <div role="group" aria-labelledby={profileHeaderId}>
+            <div role="presentation" class="bg-neutral-50 px-3 py-2 dark:bg-neutral-800">
+              <span
+                id={profileHeaderId}
+                class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
                 >Profile</span
               >
             </div>
             {#each uniqueProfiles as profile}
               <button
+                tabindex="-1"
                 type="button"
+                role="menuitemcheckbox"
+                aria-checked={!!activeFilters.find((f) => f.field === 'qualityProfileName' && f.value === profile)}
                 on:click={() => onToggleFilter('qualityProfileName', 'eq', profile, profile)}
                 class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {activeFilters.find(
                   (f) => f.field === 'qualityProfileName' && f.value === profile
@@ -150,6 +182,7 @@
               >
                 <span class="text-neutral-700 dark:text-neutral-300">{profile}</span>
                 <IconCheckbox
+                  decorative
                   checked={!!activeFilters.find((f) => f.field === 'qualityProfileName' && f.value === profile)}
                   icon={Check}
                   color="blue"
@@ -162,16 +195,28 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={TableProperties} hasDropdown={true} dropdownPosition="right">
+  <ActionButton icon={TableProperties} hasDropdown={true} dropdownPosition="right" title="Toggle columns">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem">
-        <div class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">Toggle visible table columns</p>
+      <Dropdown
+        position={dropdownPosition}
+        mobilePosition="middle"
+        minWidth="14rem"
+        role="menu"
+        label="Toggle columns"
+        describedby={columnsHeaderId}
+      >
+        <div role="presentation" class="border-b border-neutral-100 px-4 py-3 dark:border-neutral-700">
+          <p id={columnsHeaderId} class="text-xs text-neutral-500 dark:text-neutral-400">
+            Toggle visible table columns
+          </p>
         </div>
-        <div class="py-1">
+        <div role="group" aria-labelledby={columnsHeaderId} class="py-1">
           {#each toggleableColumns as colKey}
             <button
+              tabindex="-1"
               type="button"
+              role="menuitemcheckbox"
+              aria-checked={visibleColumns.has(colKey)}
               on:click={() => onToggleColumn(colKey)}
               class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {visibleColumns.has(
                 colKey
@@ -180,19 +225,23 @@
                 : ''}"
             >
               <span class="text-neutral-700 dark:text-neutral-300">{columnLabels[colKey]}</span>
-              <IconCheckbox checked={visibleColumns.has(colKey)} icon={Check} color="blue" shape="circle" />
+              <IconCheckbox decorative checked={visibleColumns.has(colKey)} icon={Check} color="blue" shape="circle" />
             </button>
+          {:else}
+            <DropdownItem disabled label="No options" />
           {/each}
         </div>
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={RefreshCw} hasDropdown={true} dropdownPosition="right">
-    <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} minWidth="10rem">
+  <ActionButton icon={RefreshCw} hasDropdown={true} dropdownPosition="right" title="Refresh library">
+    <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
+      <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label="Refresh library">
         <button
+          tabindex="-1"
           type="button"
-          on:click={onRefresh}
+          role="menuitem"
+          on:click={() => onRefresh()}
           class="w-full rounded-lg px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
         >
           Refresh library
@@ -200,12 +249,14 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={ExternalLink} hasDropdown={true} dropdownPosition="right">
-    <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-      <Dropdown position={dropdownPosition} minWidth="10rem">
+  <ActionButton icon={ExternalLink} hasDropdown={true} dropdownPosition="right" title={openLabel}>
+    <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
+      <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label={openLabel}>
         <button
+          tabindex="-1"
           type="button"
-          on:click={handleOpen}
+          role="menuitem"
+          on:click={() => handleOpen()}
           class="w-full rounded-lg px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
         >
           {openLabel}
@@ -216,11 +267,13 @@
   <ActionButton
     icon={Rows3}
     hasDropdown={true}
+    popupRole="dialog"
     dropdownPosition="right"
     disabled={disablePaginationControls || isPaginationLoading}
+    title="Rows per page"
   >
     <svelte:fragment slot="dropdown" let:dropdownPosition>
-      <Dropdown position={dropdownPosition} minWidth="10rem">
+      <Dropdown position={dropdownPosition} minWidth="10rem" role="dialog" label="Rows per page">
         <div class="p-3">
           <label for="libraryPageSize" class="mb-2 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
             Rows per page

@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { goto } from '$app/navigation';
   import type { ComponentType } from 'svelte';
   import { ArrowLeft, ChevronRight, ChevronDown } from 'lucide-svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
 
@@ -38,6 +40,20 @@
   let mediaQuery: MediaQueryList | null = null;
   let dropdownOpen = false;
   let triggerEl: HTMLElement;
+  const dropdownId = uniqueId('tabs-menu');
+
+  function closeDropdown() {
+    dropdownOpen = false;
+    triggerEl?.querySelector<HTMLButtonElement>('button')?.focus();
+  }
+
+  async function toggleDropdown(event: MouseEvent) {
+    dropdownOpen = !dropdownOpen;
+    if (dropdownOpen && event.detail === 0) {
+      await tick();
+      document.getElementById(dropdownId)?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    }
+  }
 
   onMount(() => {
     if (responsive && typeof window !== 'undefined') {
@@ -63,7 +79,7 @@
   $: activeTab = tabs.find((t) => t.active) ?? tabs[0];
 
   function handleTabSelect(href: string) {
-    dropdownOpen = false;
+    closeDropdown();
     goto(href);
   }
 </script>
@@ -73,10 +89,25 @@
 {:else if useMobileMode}
   <!-- Mobile: Custom dropdown with icons -->
   <div class="border-b border-neutral-200 py-3 dark:border-neutral-800">
-    <div class="relative" bind:this={triggerEl} use:clickOutside={() => (dropdownOpen = false)}>
+    <div
+      class="relative"
+      bind:this={triggerEl}
+      use:clickOutside={() => (dropdownOpen = false)}
+      use:focusOutside={() => (dropdownOpen = false)}
+    >
       <button
         type="button"
-        on:click={() => (dropdownOpen = !dropdownOpen)}
+        aria-haspopup="menu"
+        aria-expanded={dropdownOpen}
+        aria-controls={dropdownId}
+        on:click={toggleDropdown}
+        on:keydown={(event) => {
+          if (dropdownOpen && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeDropdown();
+          }
+        }}
         class="flex w-full items-center justify-between gap-2 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-100 dark:hover:bg-neutral-700"
       >
         <span class="flex items-center gap-2">
@@ -89,7 +120,7 @@
       </button>
 
       {#if dropdownOpen}
-        <Dropdown position="left" minWidth="100%" {triggerEl}>
+        <Dropdown id={dropdownId} label="Tabs" onClose={closeDropdown} position="left" minWidth="100%" {triggerEl}>
           {#each tabs as tab}
             <DropdownItem
               icon={tab.icon}

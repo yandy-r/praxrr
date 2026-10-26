@@ -181,10 +181,11 @@
 
       <!-- Date Filter -->
       <ActionButton icon={Calendar} hasDropdown square title="Filter by date">
-        <Dropdown slot="dropdown" position="right" mobilePosition="middle">
+        <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by date">
           {#each [{ value: 'all', label: 'All time' }, { value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'week', label: 'Last 7 days' }, { value: 'month', label: 'Last 30 days' }] as const as option}
             <DropdownItem
               label={option.label}
+              role="menuitemradio"
               selected={dateFilter === option.value}
               on:click={() => (dateFilter = option.value)}
             />
@@ -194,20 +195,31 @@
 
       <!-- Filter Name Filter -->
       <ActionButton icon={Filter} hasDropdown square title="Filter by filter name">
-        <Dropdown slot="dropdown" position="right" mobilePosition="middle">
-          <DropdownItem label="All filters" selected={filterFilter === 'all'} on:click={() => (filterFilter = 'all')} />
+        <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by filter name">
+          <DropdownItem
+            label="All filters"
+            role="menuitemradio"
+            selected={filterFilter === 'all'}
+            on:click={() => (filterFilter = 'all')}
+          />
           {#each uniqueFilters as filter}
-            <DropdownItem label={filter} selected={filterFilter === filter} on:click={() => (filterFilter = filter)} />
+            <DropdownItem
+              label={filter}
+              role="menuitemradio"
+              selected={filterFilter === filter}
+              on:click={() => (filterFilter = filter)}
+            />
           {/each}
         </Dropdown>
       </ActionButton>
 
       <!-- Status Filter -->
       <ActionButton icon={CircleDot} hasDropdown square title="Filter by status">
-        <Dropdown slot="dropdown" position="right" mobilePosition="middle">
+        <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by status">
           {#each [{ value: 'all', label: 'All' }, { value: 'success', label: 'Success' }, { value: 'partial', label: 'Partial' }, { value: 'failed', label: 'Failed' }, { value: 'skipped', label: 'Skipped' }] as const as option}
             <DropdownItem
               label={option.label}
+              role="menuitemradio"
               selected={statusFilter === option.value}
               on:click={() => (statusFilter = option.value)}
             />

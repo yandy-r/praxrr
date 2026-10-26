@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import { ChevronDown, Film, Link, RotateCcw, Shield, Tv } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
@@ -65,6 +67,8 @@
   let batchSampleCategory: PresetCategory = 'movie';
   let batchSelectedProfileName: string | null = null;
   let batchPrimaryProfileDropdownOpen = false;
+  const batchPrimaryDropdownId = uniqueId('batch-profile-dropdown');
+  let batchPrimaryTriggerEl: HTMLButtonElement | undefined;
   let comparisonProfileName: string | null = null;
   let selectedReleaseId: string | null = null;
   let scoreOverrides: ScoreOverrideMap = {};
@@ -517,9 +521,29 @@
     }
   }
 
+  function closeBatchPrimaryDropdown() {
+    batchPrimaryProfileDropdownOpen = false;
+    batchPrimaryTriggerEl?.focus();
+  }
+
+  async function toggleBatchPrimaryDropdown(event: MouseEvent) {
+    batchPrimaryProfileDropdownOpen = !batchPrimaryProfileDropdownOpen;
+    if (batchPrimaryProfileDropdownOpen && event.detail === 0) {
+      await tick();
+      document.getElementById(batchPrimaryDropdownId)?.querySelector<HTMLElement>('[role="option"]')?.focus();
+    }
+  }
+
+  function handleBatchPrimaryTriggerKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && batchPrimaryProfileDropdownOpen) {
+      event.preventDefault();
+      closeBatchPrimaryDropdown();
+    }
+  }
+
   function selectBatchPrimaryProfile(profileName: string | null) {
     batchSelectedProfileName = profileName;
-    batchPrimaryProfileDropdownOpen = false;
+    closeBatchPrimaryDropdown();
     selectedReleaseId = null;
     if (batchSimulationResult) {
       void simulateBatch();
@@ -771,11 +795,20 @@
 
             <div class="space-y-1.5">
               <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Batch Primary Profile</p>
-              <div class="relative" use:clickOutside={() => (batchPrimaryProfileDropdownOpen = false)}>
+              <div
+                class="relative"
+                use:clickOutside={() => (batchPrimaryProfileDropdownOpen = false)}
+                use:focusOutside={() => (batchPrimaryProfileDropdownOpen = false)}
+              >
                 <button
                   type="button"
                   class="inline-flex w-full items-center justify-between rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                  on:click={() => (batchPrimaryProfileDropdownOpen = !batchPrimaryProfileDropdownOpen)}
+                  bind:this={batchPrimaryTriggerEl}
+                  aria-haspopup="listbox"
+                  aria-expanded={batchPrimaryProfileDropdownOpen}
+                  aria-controls={batchPrimaryDropdownId}
+                  on:click={toggleBatchPrimaryDropdown}
+                  on:keydown={handleBatchPrimaryTriggerKeydown}
                 >
                   <span class={batchSelectedProfileName ? '' : 'text-neutral-400 dark:text-neutral-500'}>
                     {batchSelectedProfileLabel ?? 'Select quality profile...'}
@@ -784,16 +817,25 @@
                 </button>
 
                 {#if batchPrimaryProfileDropdownOpen}
-                  <Dropdown position="left" minWidth="100%">
+                  <Dropdown
+                    id={batchPrimaryDropdownId}
+                    role="listbox"
+                    label="Batch primary profile"
+                    onClose={closeBatchPrimaryDropdown}
+                    position="left"
+                    minWidth="100%"
+                  >
                     <div class="max-h-80 overflow-y-auto py-1">
                       <DropdownItem
                         label="No Profile"
+                        role="option"
                         selected={batchSelectedProfileName === null}
                         onSelect={() => selectBatchPrimaryProfile(null)}
                       />
                       {#each qualityProfileOptions as profile (profile.id)}
                         <DropdownItem
                           label={profile.displayName ?? profile.name}
+                          role="option"
                           selected={batchSelectedProfileName === profile.value}
                           onSelect={() => selectBatchPrimaryProfile(profile.value)}
                         />

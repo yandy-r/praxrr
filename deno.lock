@@ -13,6 +13,7 @@
     "jsr:@std/path@1": "1.1.6",
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/yaml@^1.0.10": "1.1.2",
+    "npm:@axe-core/playwright@^4.14.0": "4.14.0_playwright-core@1.63.0",
     "npm:@deno/vite-plugin@^1.0.5": "1.0.6_vite@7.3.7",
     "npm:@eslint/compat@^1.4.0": "1.4.1_eslint@9.39.5",
     "npm:@eslint/js@^9.36.0": "9.39.5",
@@ -51,7 +52,7 @@
     "npm:simple-icons@^16.34.0": "16.34.0",
     "npm:svelte-check@^4.7.6": "4.7.6_svelte@5.56.4_typescript@5.9.3",
     "npm:svelte@^5.39.5": "5.56.4_acorn@8.17.0",
-    "npm:sveltekit-adapter-deno@~0.16.1": "0.16.1_@sveltejs+kit@2.69.2__@sveltejs+vite-plugin-svelte@6.2.4___svelte@5.56.4___vite@7.3.7___@types+node@26.6.4___yaml@2.9.1__svelte@5.56.4__typescript@5.9.3__vite@7.3.7_vite@7.3.7",
+    "npm:sveltekit-adapter-deno@~0.16.1": "0.16.1_@sveltejs+kit@2.69.2_vite@7.3.7",
     "npm:tailwindcss@^4.1.13": "4.3.3",
     "npm:typescript-eslint@^8.71.0": "8.71.1_eslint@9.39.5_typescript@5.9.3",
     "npm:typescript@^5.9.3": "5.9.3",
@@ -114,6 +115,13 @@
     }
   },
   "npm": {
+    "@axe-core/playwright@4.14.0_playwright-core@1.63.0": {
+      "integrity": "sha512-SGUhG5PIHd2eMdpgBF2PyQLOhX+qyDR2PT4cmoS4Qk2ak+jX/rrSvst9l0PGv5WTHolKpUMvVmoHpr4cZgf1RQ==",
+      "dependencies": [
+        "axe-core",
+        "playwright-core"
+      ]
+    },
     "@babel/code-frame@7.29.7": {
       "integrity": "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==",
       "dependencies": [
@@ -1302,6 +1310,9 @@
         "pvutils",
         "tslib@2.8.1"
       ]
+    },
+    "axe-core@4.14.0": {
+      "integrity": "sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ=="
     },
     "axobject-query@4.1.0": {
       "integrity": "sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ=="
@@ -2620,7 +2631,7 @@
         "zimmerframe"
       ]
     },
-    "sveltekit-adapter-deno@0.16.1_@sveltejs+kit@2.69.2__@sveltejs+vite-plugin-svelte@6.2.4___svelte@5.56.4___vite@7.3.7___@types+node@26.6.4___yaml@2.9.1__svelte@5.56.4__typescript@5.9.3__vite@7.3.7_vite@7.3.7": {
+    "sveltekit-adapter-deno@0.16.1_@sveltejs+kit@2.69.2_vite@7.3.7": {
       "integrity": "sha512-AwJj5Y9yoJ5BQVhfFURrVex5GrQmU/v06pW8vs6tyWaJxEYrnF6o3gbELVtCOI/YRl4G02I7n8fBDMY+/cgBdg==",
       "dependencies": [
         "@sveltejs/kit",
@@ -2789,6 +2800,7 @@
     ],
     "packageJson": {
       "dependencies": [
+        "npm:@axe-core/playwright@^4.14.0",
         "npm:@deno/vite-plugin@^1.0.5",
         "npm:@eslint/compat@^1.4.0",
         "npm:@eslint/js@^9.36.0",

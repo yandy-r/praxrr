@@ -152,10 +152,11 @@
 
       <!-- Date Filter -->
       <ActionButton icon={Calendar} hasDropdown square title="Filter by date">
-        <Dropdown slot="dropdown" position="right" mobilePosition="middle">
+        <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by date">
           {#each [{ value: 'all', label: 'All time' }, { value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'week', label: 'Last 7 days' }, { value: 'month', label: 'Last 30 days' }] as const as option}
             <DropdownItem
               label={option.label}
+              role="menuitemradio"
               selected={dateFilter === option.value}
               on:click={() => (dateFilter = option.value)}
             />
@@ -165,10 +166,11 @@
 
       <!-- Status Filter -->
       <ActionButton icon={CircleDot} hasDropdown square title="Filter by status">
-        <Dropdown slot="dropdown" position="right" mobilePosition="middle">
+        <Dropdown slot="dropdown" position="right" mobilePosition="middle" role="menu" label="Filter by status">
           {#each [{ value: 'all', label: 'All' }, { value: 'success', label: 'Success' }, { value: 'partial', label: 'Partial' }, { value: 'failed', label: 'Failed' }, { value: 'skipped', label: 'Skipped' }] as const as option}
             <DropdownItem
               label={option.label}
+              role="menuitemradio"
               selected={statusFilter === option.value}
               on:click={() => (statusFilter = option.value)}
             />

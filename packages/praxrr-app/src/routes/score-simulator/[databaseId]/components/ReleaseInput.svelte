@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { createEventDispatcher, onDestroy } from 'svelte';
+  import { createEventDispatcher, onDestroy, tick } from 'svelte';
   import { AlertTriangle, BookOpen, ChevronDown, Clapperboard, Loader2, Film, Tv } from 'lucide-svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import type { PresetCategory, SimulatorProfileOption } from '../helpers.ts';
@@ -26,6 +28,8 @@
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let profileDropdownOpen = false;
+  const profileDropdownId = uniqueId('release-profile-dropdown');
+  let profileTriggerEl: HTMLButtonElement | undefined;
 
   $: canSimulate = Boolean(selectedProfileName);
 
@@ -49,9 +53,29 @@
     dispatch('input', { title });
   }
 
+  function closeProfileDropdown() {
+    profileDropdownOpen = false;
+    profileTriggerEl?.focus();
+  }
+
+  async function toggleProfileDropdown(event: MouseEvent) {
+    profileDropdownOpen = !profileDropdownOpen;
+    if (profileDropdownOpen && event.detail === 0) {
+      await tick();
+      document.getElementById(profileDropdownId)?.querySelector<HTMLElement>('[role="option"]')?.focus();
+    }
+  }
+
+  function handleTriggerKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && profileDropdownOpen) {
+      event.preventDefault();
+      closeProfileDropdown();
+    }
+  }
+
   function selectProfile(profileName: string | null) {
     selectedProfileName = profileName;
-    profileDropdownOpen = false;
+    closeProfileDropdown();
     dispatch('profileChange', { profileName });
   }
 
@@ -140,6 +164,7 @@
           'movie'
             ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
             : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+          aria-pressed={sampleCategory === 'movie'}
           on:click={() => selectAppType('movie')}
         >
           <Film size={14} />
@@ -151,6 +176,7 @@
           'series'
             ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
             : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+          aria-pressed={sampleCategory === 'series'}
           on:click={() => selectAppType('series')}
         >
           <Tv size={14} />
@@ -162,6 +188,7 @@
           'anime'
             ? 'border-accent-500 bg-accent-50 text-accent-700 dark:border-accent-400 dark:bg-accent-900/30 dark:text-accent-200'
             : 'border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800'}"
+          aria-pressed={sampleCategory === 'anime'}
           on:click={() => selectAppType('anime')}
         >
           <Tv size={14} />
@@ -173,11 +200,20 @@
 
   <div class="space-y-1.5">
     <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Quality Profile</p>
-    <div class="relative" use:clickOutside={() => (profileDropdownOpen = false)}>
+    <div
+      class="relative"
+      use:clickOutside={() => (profileDropdownOpen = false)}
+      use:focusOutside={() => (profileDropdownOpen = false)}
+    >
       <button
         type="button"
         class="inline-flex w-full items-center justify-between rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-        on:click={() => (profileDropdownOpen = !profileDropdownOpen)}
+        bind:this={profileTriggerEl}
+        aria-haspopup="listbox"
+        aria-expanded={profileDropdownOpen}
+        aria-controls={profileDropdownId}
+        on:click={toggleProfileDropdown}
+        on:keydown={handleTriggerKeydown}
       >
         <span class={selectedProfileName ? '' : 'text-neutral-400 dark:text-neutral-500'}>
           {qualityProfiles.find((profile) => profile.value === selectedProfileName)?.displayName ??
@@ -187,16 +223,25 @@
       </button>
 
       {#if profileDropdownOpen}
-        <Dropdown position="left" minWidth="100%">
+        <Dropdown
+          id={profileDropdownId}
+          role="listbox"
+          label="Quality profile"
+          onClose={closeProfileDropdown}
+          position="left"
+          minWidth="100%"
+        >
           <div class="max-h-80 overflow-y-auto py-1">
             <DropdownItem
               label="No Profile"
+              role="option"
               selected={selectedProfileName === null}
               onSelect={() => selectProfile(null)}
             />
             {#each qualityProfiles as profile (profile.id)}
               <DropdownItem
                 label={profile.displayName ?? profile.name}
+                role="option"
                 selected={selectedProfileName === profile.value}
                 onSelect={() => selectProfile(profile.value)}
               />

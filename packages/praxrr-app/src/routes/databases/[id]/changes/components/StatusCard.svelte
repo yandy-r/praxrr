@@ -8,14 +8,18 @@
     GitFork,
     CircleDot,
     ChevronDown,
-    Check,
     Database,
     RefreshCw,
   } from 'lucide-svelte';
+  import { tick } from 'svelte';
   import { invalidateAll } from '$app/navigation';
+  import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
+  import Dropdown from '$ui/dropdown/Dropdown.svelte';
+  import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import type { GitStatus, RepoInfo } from '$utils/git/types';
   import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
-
   export let status: GitStatus;
   export let repoInfo: RepoInfo | null;
   export let branches: string[];
@@ -25,12 +29,58 @@
   let branchDropdownOpen = false;
   let switching = false;
   let syncing = false;
+  const branchDropdownId = uniqueId('status-branch-dropdown');
+  let branchTriggerEl: HTMLButtonElement | undefined;
+
+  function closeBranchDropdown() {
+    branchDropdownOpen = false;
+    branchTriggerEl?.focus();
+  }
+
+  async function openBranchDropdown(focusLast = false) {
+    branchDropdownOpen = true;
+    await tick();
+
+    const items = Array.from(
+      document.getElementById(branchDropdownId)?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []
+    );
+    const selectedItem = items.find((item) => item.getAttribute('aria-checked') === 'true');
+    const item = focusLast ? items[items.length - 1] : (selectedItem ?? items[0]);
+    item?.focus();
+  }
+
+  async function toggleBranchDropdown(event: MouseEvent) {
+    if (branchDropdownOpen) {
+      branchDropdownOpen = false;
+      return;
+    }
+
+    if (event.detail === 0) {
+      await openBranchDropdown();
+    } else {
+      branchDropdownOpen = true;
+    }
+  }
+
+  async function handleBranchTriggerKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && branchDropdownOpen) {
+      event.preventDefault();
+      closeBranchDropdown();
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    await openBranchDropdown(event.key === 'ArrowUp');
+  }
 
   async function handleBranchSwitch(branch: string) {
-    if (branch === status.branch || switching) return;
+    if (switching) return;
+
+    closeBranchDropdown();
+    if (branch === status.branch) return;
 
     switching = true;
-    branchDropdownOpen = false;
 
     const formData = new FormData();
     formData.append('branch', branch);
@@ -46,13 +96,8 @@
       }
     } finally {
       switching = false;
-    }
-  }
-
-  function handleClickOutside(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    if (!target.closest('.branch-dropdown')) {
-      branchDropdownOpen = false;
+      await tick();
+      branchTriggerEl?.focus();
     }
   }
 
@@ -68,8 +113,6 @@
     }
   }
 </script>
-
-<svelte:window on:click={handleClickOutside} />
 
 <div class="mt-6 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-800">
   <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -130,11 +173,22 @@
         {/if}
 
         <!-- Branch dropdown -->
-        <div class="branch-dropdown relative">
+        <div
+          class="branch-dropdown relative"
+          use:clickOutside={() => (branchDropdownOpen = false)}
+          use:focusOutside={() => (branchDropdownOpen = false)}
+        >
           <button
+            bind:this={branchTriggerEl}
             type="button"
-            on:click|stopPropagation={() => (branchDropdownOpen = !branchDropdownOpen)}
+            on:click|stopPropagation={toggleBranchDropdown}
+            on:keydown={handleBranchTriggerKeydown}
             disabled={switching}
+            title="Switch branch"
+            aria-label={`Switch branch, current branch ${status.branch}`}
+            aria-haspopup="menu"
+            aria-expanded={branchDropdownOpen}
+            aria-controls={branchDropdownId}
             class="flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
           >
             <GitBranch size={14} class="text-neutral-500 dark:text-neutral-400" />
@@ -146,26 +200,26 @@
           </button>
 
           {#if branchDropdownOpen}
-            <div
-              class="absolute top-full left-0 z-50 mt-1 max-h-60 w-48 overflow-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
+            <Dropdown
+              id={branchDropdownId}
+              position="left"
+              minWidth="12rem"
+              compact
+              role="menu"
+              label="Switch branch"
+              onClose={closeBranchDropdown}
             >
-              {#each branches as branch}
-                <button
-                  type="button"
-                  on:click={() => handleBranchSwitch(branch)}
-                  class="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                >
-                  <code
-                    class="font-mono {branch === status.branch
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-neutral-700 dark:text-neutral-300'}">{branch}</code
-                  >
-                  {#if branch === status.branch}
-                    <Check size={14} class="text-blue-600 dark:text-blue-400" />
-                  {/if}
-                </button>
-              {/each}
-            </div>
+              <div class="max-h-60 overflow-y-auto rounded-lg font-mono text-sm" role="presentation">
+                {#each branches as branch (branch)}
+                  <DropdownItem
+                    label={branch}
+                    role="menuitemradio"
+                    selected={branch === status.branch}
+                    on:click={() => handleBranchSwitch(branch)}
+                  />
+                {/each}
+              </div>
+            </Dropdown>
           {/if}
         </div>
       </div>

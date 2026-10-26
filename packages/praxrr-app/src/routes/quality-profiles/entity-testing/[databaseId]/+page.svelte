@@ -354,33 +354,57 @@
   <!-- Actions Bar -->
   <ActionsBar className="w-full justify-center md:w-full md:mx-auto">
     <SearchAction searchStore={search} placeholder={searchPlaceholder} responsive />
-    <ActionButton icon={Plus} on:click={() => (data.canWriteToBase ? (showAddModal = true) : notifyReadOnly())} />
-    <ActionButton icon={Sliders} hasDropdown={true} dropdownPosition="middle" square={!selectedProfile}>
+    <ActionButton
+      icon={Plus}
+      title="Add test entity"
+      on:click={() => (data.canWriteToBase ? (showAddModal = true) : notifyReadOnly())}
+    />
+    <ActionButton
+      icon={Sliders}
+      hasDropdown={true}
+      dropdownPosition="middle"
+      square={!selectedProfile}
+      title={selectedProfile ? `Quality profile: ${selectedProfile.name}` : 'Select quality profile'}
+    >
       {#if selectedProfile}
         <span class="ml-2 text-sm text-neutral-700 dark:text-neutral-300">{selectedProfile.name}</span>
       {/if}
-      <Dropdown slot="dropdown" position="middle">
+      <Dropdown slot="dropdown" position="middle" role="menu" label="Quality profile">
         <DropdownItem
           label="No Profile"
+          role="menuitemradio"
           selected={selectedProfileId === null}
           on:click={() => setSelectedProfile(null)}
         />
         {#each data.qualityProfiles as profile}
           <DropdownItem
             label={profile.name}
+            role="menuitemradio"
             selected={selectedProfileId === profile.id}
             on:click={() => setSelectedProfile(profile.id)}
           />
         {/each}
       </Dropdown>
     </ActionButton>
-    <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="middle">
-      <Dropdown slot="dropdown" position="middle">
-        <DropdownItem icon={Film} label="Movies" selected={moviesSelected} on:click={toggleMovies} />
-        <DropdownItem icon={Tv} label="TV Series" selected={seriesSelected} on:click={toggleSeries} />
+    <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="middle" title="Filter by type">
+      <Dropdown slot="dropdown" position="middle" role="menu" label="Filter by type">
+        <DropdownItem
+          icon={Film}
+          label="Movies"
+          role="menuitemcheckbox"
+          selected={moviesSelected}
+          on:click={toggleMovies}
+        />
+        <DropdownItem
+          icon={Tv}
+          label="TV Series"
+          role="menuitemcheckbox"
+          selected={seriesSelected}
+          on:click={toggleSeries}
+        />
       </Dropdown>
     </ActionButton>
-    <ActionButton icon={Info} on:click={() => (showInfoModal = true)} />
+    <ActionButton icon={Info} title="How entity testing works" on:click={() => (showInfoModal = true)} />
   </ActionsBar>
 
   <!-- Entity Testing Content -->

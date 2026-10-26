@@ -238,11 +238,23 @@
           on:submit={handleSubmit}
           on:clearQuery={clearSearch}
         />
-        <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="right">
+        <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="right" title="Filter by type">
           <svelte:fragment slot="dropdown" let:dropdownPosition>
-            <Dropdown position={dropdownPosition}>
-              <DropdownItem icon={Film} label="Movies" selected={moviesSelected} on:click={toggleMovies} />
-              <DropdownItem icon={Tv} label="TV Series" selected={seriesSelected} on:click={toggleSeries} />
+            <Dropdown position={dropdownPosition} role="menu" label="Filter by type">
+              <DropdownItem
+                icon={Film}
+                label="Movies"
+                role="menuitemcheckbox"
+                selected={moviesSelected}
+                on:click={toggleMovies}
+              />
+              <DropdownItem
+                icon={Tv}
+                label="TV Series"
+                role="menuitemcheckbox"
+                selected={seriesSelected}
+                on:click={toggleSeries}
+              />
             </Dropdown>
           </svelte:fragment>
         </ActionButton>
@@ -250,17 +262,34 @@
           icon={sortDirection === 'asc' ? ArrowUpAZ : ArrowDownAZ}
           hasDropdown={true}
           dropdownPosition="right"
+          title="Sort by"
         >
           <svelte:fragment slot="dropdown" let:dropdownPosition>
-            <Dropdown position={dropdownPosition}>
+            <Dropdown position={dropdownPosition} role="menu" label="Sort by">
               <DropdownItem
                 label="Popularity"
+                role="menuitemradio"
                 selected={sortField === 'popularity'}
                 on:click={() => setSortField('popularity')}
               />
-              <DropdownItem label="Rating" selected={sortField === 'rating'} on:click={() => setSortField('rating')} />
-              <DropdownItem label="Title" selected={sortField === 'title'} on:click={() => setSortField('title')} />
-              <DropdownItem label="Year" selected={sortField === 'year'} on:click={() => setSortField('year')} />
+              <DropdownItem
+                label="Rating"
+                role="menuitemradio"
+                selected={sortField === 'rating'}
+                on:click={() => setSortField('rating')}
+              />
+              <DropdownItem
+                label="Title"
+                role="menuitemradio"
+                selected={sortField === 'title'}
+                on:click={() => setSortField('title')}
+              />
+              <DropdownItem
+                label="Year"
+                role="menuitemradio"
+                selected={sortField === 'year'}
+                on:click={() => setSortField('year')}
+              />
             </Dropdown>
           </svelte:fragment>
         </ActionButton>
@@ -284,6 +313,7 @@
                   class="flex w-full gap-3 p-3 text-left transition-colors {alreadyAdded
                     ? 'cursor-not-allowed opacity-50'
                     : 'cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800'}"
+                  aria-pressed={selectedKeys.has(getItemKey(item))}
                   on:click={() => !alreadyAdded && toggleItem(item)}
                   disabled={alreadyAdded}
                 >
@@ -334,7 +364,7 @@
                         {#if alreadyAdded}
                           <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400"> Added </span>
                         {:else}
-                          <IconCheckbox checked={selectedKeys.has(getItemKey(item))} icon={Check} />
+                          <IconCheckbox decorative checked={selectedKeys.has(getItemKey(item))} icon={Check} />
                         {/if}
                       </div>
                     </div>

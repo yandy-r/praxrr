@@ -7,7 +7,7 @@ This is the reference for the reusable UI components that make up the Praxrr
 application client. Every component lives under
 `packages/praxrr-app/src/lib/client/ui/` (imported via the `$ui/` alias), with
 client stores under `$stores/` and the alert system under
-`$lib/client/alerts/`. The catalog below covers **75 components, stores, and
+`$lib/client/alerts/`. The catalog below covers **76 components, stores, and
 helper modules** across 12 category pages.
 
 ## Conventions
@@ -27,14 +27,14 @@ message)`. See [Store Patterns](/app/components/patterns/).
 
 ### [Buttons & Actions](/app/components/buttons/)
 
-| Component            | Description                                                                                                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`             | Multi-variant button (primary/secondary/danger/ghost) with optional icon, responsive sizing, tooltip, and anchor mode; renders a button or an anchor when href is set, wrapped in a Tooltip.    |
-| `ActionButton`       | Bordered 40px icon button sized for action bars, with an optional hover-activated dropdown region and neutral/danger hover variants.                                                            |
-| `ActionsBar`         | Layout wrapper that groups action items into a single connected control strip with collapsed inner borders and auto-rounded outer edges, centered/full-width on mobile.                         |
-| `ViewToggle`         | Action-bar control that toggles a data page between cards and table view via an ActionButton with a hover dropdown of the two options; bind:value to observe changes.                           |
-| `SearchAction`       | Action-bar search input backed by a SearchStore: inline bordered field on desktop, collapsing to a trigger button plus full-screen modal in responsive mobile mode, with an active-query badge. |
-| `SourceFilterAction` | Action-bar PCD source filter rendering inline segmented pills for small counts or a labeled dropdown with active-count badge otherwise, supporting single- and multi-select modes.              |
+| Component            | Description                                                                                                                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`             | Multi-variant button (primary/secondary/danger/ghost) with optional icon, responsive sizing, tooltip, and anchor mode; renders a button or an anchor when href is set, wrapped in a Tooltip.                                                      |
+| `ActionButton`       | Bordered 40px icon button sized for action bars, with an optional dropdown region and neutral/danger hover variants; click/Enter/Space pins the dropdown open, hover only previews it, ArrowDown opens and focuses the first item, Escape closes. |
+| `ActionsBar`         | Layout wrapper that groups action items into a single connected control strip with collapsed inner borders and auto-rounded outer edges, centered/full-width on mobile.                                                                           |
+| `ViewToggle`         | Action-bar control that toggles a data page between cards and table view via an ActionButton dropdown of two `menuitemradio` options (opened by click, Enter/Space, or hover preview); bind:value to observe changes.                             |
+| `SearchAction`       | Action-bar search input backed by a SearchStore: inline bordered field on desktop, collapsing to a trigger button plus full-screen modal in responsive mobile mode, with an active-query badge.                                                   |
+| `SourceFilterAction` | Action-bar PCD source filter rendering inline segmented pills for small counts or a labeled dropdown with active-count badge otherwise, supporting single- and multi-select modes.                                                                |
 
 ### [Form Inputs](/app/components/forms/)
 
@@ -58,48 +58,48 @@ message)`. See [Store Patterns](/app/components/patterns/).
 
 ### [Tables & Lists](/app/components/tables/)
 
-| Component                                   | Description                                                                                                                                                                                                                         |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Column, SortState & SortDirection (types)` | Shared TypeScript type module defining the column contract and sort state consumed by Table and ExpandableTable, including key-path/accessor/comparator sorting and cell rendering fields.                                          |
-| `Table`                                     | Generic Svelte 5 sortable data table with per-column custom cell rendering, click-to-sort headers, row click/href navigation, progressive lazy loading, an actions slot, and an optional responsive mobile card layout.             |
-| `ExpandableTable`                           | Sortable data table with expandable detail rows toggled by chevron or row click, per-row expand disabling, configurable chevron position, slot-based cell rendering, and a responsive mobile card layout; requires a stable row id. |
-| `ReorderableList`                           | Drag-and-drop reorderable vertical list that renders items via a default slot and emits the reordered array live during dragging, with a sensitivity dead-zone to reduce flicker.                                                   |
-| `TableActionButton`                         | Compact square icon-only button for table row actions with neutral/danger/accent hover styling, two sizes, disabled state, and optional click-propagation stopping; dispatches a click event.                                       |
+| Component                                   | Description                                                                                                                                                                                                                                                            |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Column, SortState & SortDirection (types)` | Shared TypeScript type module defining the column contract and sort state consumed by Table and ExpandableTable, including key-path/accessor/comparator sorting and cell rendering fields.                                                                             |
+| `Table`                                     | Generic Svelte 5 sortable data table with per-column custom cell rendering, click-to-sort headers, row click/href navigation, progressive lazy loading, an actions slot, and an optional responsive mobile card layout.                                                |
+| `ExpandableTable`                           | Sortable data table with expandable detail rows toggled by chevron or row click, per-row expand disabling, configurable chevron position, slot-based cell rendering, and a responsive mobile card layout; requires a stable row id.                                    |
+| `ReorderableList`                           | Drag-and-drop reorderable vertical list that renders items via a default slot and emits the reordered array live during dragging, with a sensitivity dead-zone to reduce flicker; focused rows also move with Alt+ArrowUp/Alt+ArrowDown and announce the new position. |
+| `TableActionButton`                         | Compact square icon-only button for table row actions with neutral/danger/accent hover styling, two sizes, disabled state, and optional click-propagation stopping; dispatches a click event.                                                                          |
 
 ### [Modals & Dialogs](/app/components/modals/)
 
-| Component    | Description                                                                                                                                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Modal`      | Base confirm/cancel dialog with header, body slot (falling back to a message), and a two-button footer; handles backdrop, transitions, Escape-to-cancel, size/height presets, and loading/danger states. |
-| `InfoModal`  | Read-only informational dialog with an X close button and a default-slot body; self-manages closing and is sized via maxWidth/maxHeight CSS strings.                                                     |
-| `CloneModal` | Self-contained dialog for cloning a PCD entity; wraps Modal to prompt for a new name, optionally pick the base/user layer, then export and re-import via the PCD API.                                    |
-| `DirtyModal` | Global unsaved-changes guard that renders a store-wired Modal and intercepts SvelteKit navigation via beforeNavigate to prompt before leaving a dirty page.                                              |
+| Component    | Description                                                                                                                                                                                                                                                             |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Modal`      | Base confirm/cancel dialog with header, body slot (falling back to a message), and a two-button footer; handles backdrop, transitions, focus trap with focus restore on close, Escape-to-cancel (innermost modal only), size/height presets, and loading/danger states. |
+| `InfoModal`  | Read-only informational dialog with an X close button and a default-slot body; self-manages closing (X, backdrop, Escape), traps focus and restores it on close, and is sized via maxWidth/maxHeight CSS strings.                                                       |
+| `CloneModal` | Self-contained dialog for cloning a PCD entity; wraps Modal to prompt for a new name, optionally pick the base/user layer, then export and re-import via the PCD API.                                                                                                   |
+| `DirtyModal` | Global unsaved-changes guard that renders a store-wired Modal and intercepts SvelteKit navigation via beforeNavigate to prompt before leaving a dirty page.                                                                                                             |
 
 ### [Dropdowns & Tabs](/app/components/navigation/)
 
-| Component            | Description                                                                                                                                                          |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Dropdown`           | Positioned floating menu container rendered below a trigger, with absolute or fixed positioning, responsive position switching, and compact spacing.                 |
-| `DropdownItem`       | Selectable full-width menu row with optional leading icon, trailing selected check, and danger/disabled/compact states; fires on:click and an onSelect callback.     |
-| `DropdownSelect`     | Labeled value picker composing Button + Dropdown + DropdownItem, emitting change with the chosen value and supporting compaction, full-width, and fixed positioning. |
-| `CustomGroupManager` | Form section for managing user-defined tag groups (add form plus toggle/delete list) that delegates all mutation to onAdd/onDelete/onToggle callbacks.               |
-| `Tabs`               | Responsive tab bar with active underline, optional icons, breadcrumb/back-button trailing region, and mobile collapse to a Dropdown select.                          |
+| Component            | Description                                                                                                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Dropdown`           | Positioned floating menu container rendered below a trigger with a configurable ARIA `role` (menu/listbox/dialog/group), absolute or fixed positioning, responsive position switching, compact spacing, ArrowUp/ArrowDown/Home/End item navigation, and an `onClose` Escape hook.                |
+| `DropdownItem`       | Selectable full-width menu row with a `role` prop (menuitem/menuitemcheckbox/menuitemradio/option) that maps `selected` to aria-checked/aria-selected/aria-current, optional leading icon, trailing selected check, and danger/disabled/compact states; fires on:click and an onSelect callback. |
+| `DropdownSelect`     | Labeled value picker composing Button + Dropdown (`listbox`) + DropdownItem (`option`), emitting change with the chosen value and supporting compaction, full-width, and fixed positioning; keyboard opening focuses the first option, Escape or selection returns focus to the trigger.         |
+| `CustomGroupManager` | Form section for managing user-defined tag groups (add form plus toggle/delete list) that delegates all mutation to onAdd/onDelete/onToggle callbacks.                                                                                                                                           |
+| `Tabs`               | Responsive tab bar with active underline, optional icons, breadcrumb/back-button trailing region, and mobile collapse to a keyboard-navigable Dropdown menu with aria-haspopup/aria-expanded on the trigger.                                                                                     |
 
 ### [Navigation Shell](/app/components/shell/)
 
-| Component          | Description                                                                                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Navbar`           | Fixed top navigation bar: mobile hamburger plus centered latest-alert toast, desktop logo/wordmark, always-present AccentPicker and ThemeToggle. Takes no props.                            |
-| `ThemeToggle`      | Icon button that toggles light/dark theme via themeStore.toggle() with an animated transition; renders Lucide icons or emoji per the nav icon preference. Takes no props.                   |
-| `AccentPicker`     | Swatch button that opens a Dropdown of accent colors and sets the global accentStore, marking the current selection with a Check icon. Takes no props.                                      |
-| `BottomNav`        | Mobile-only fixed bottom tab bar that flattens the nav shell's groups, filters by Arr scope, sorts by mobilePriority, and renders icon-plus-short-label links. Single prop: navShell.       |
-| `PageNav`          | Primary sidebar shell: scope selector, collapsible groups, scope-disabled annotations, and version footer; mobile overlay drawer, desktop fixed w-80 sidebar. Props: version, navShell.     |
-| `Group`            | Collapsible navigation group rendering an optional SectionHeader, a GroupHeader, and a slide-animated list of child items. Props: label, href, icon, initialOpen, hasItems, sectionLabel.   |
-| `GroupHeader`      | Header row for a Group: main navigation link with optional icon plus a chevron toggle button when the group has items. Props: label, href, icon, isOpen, hasItems, onToggle, activePattern. |
-| `GroupItem`        | Leaf navigation link with active-state highlighting that special-cases the logout route to clear UI preferences before navigating. Props: label, href, activePattern.                       |
-| `SectionHeader`    | Presentational uppercase section-divider label with hairline rules above and below, used to separate groups of nav entries. Single required prop: label.                                    |
-| `NavScopeSelector` | Labeled select for choosing the active Arr scope; options come from the nav shell's available scopes and selection updates the navScope store. Single prop: navShell.                       |
-| `Version`          | Footer card showing the praxrr logo, wordmark, and a platform-channel-version metadata line. Single optional prop: version.                                                                 |
+| Component          | Description                                                                                                                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Navbar`           | Fixed top navigation bar: mobile hamburger plus centered latest-alert toast, desktop logo/wordmark, always-present AccentPicker and ThemeToggle. Takes no props.                                                                         |
+| `ThemeToggle`      | Icon button that toggles light/dark theme via themeStore.toggle() with an animated transition; renders Lucide icons or emoji per the nav icon preference. Takes no props.                                                                |
+| `AccentPicker`     | Swatch button that opens a Dropdown of `menuitemradio` accent colors and sets the global accentStore, marking the current selection with a Check icon and aria-checked; Escape or selection returns focus to the swatch. Takes no props. |
+| `BottomNav`        | Mobile-only fixed bottom tab bar that flattens the nav shell's groups, filters by Arr scope, sorts by mobilePriority, and renders icon-plus-short-label links. Single prop: navShell.                                                    |
+| `PageNav`          | Primary sidebar shell: scope selector, collapsible groups, scope-disabled annotations, and version footer; mobile overlay drawer, desktop fixed w-80 sidebar. Props: version, navShell.                                                  |
+| `Group`            | Collapsible navigation group rendering an optional SectionHeader, a GroupHeader, and a slide-animated list of child items. Props: label, href, icon, initialOpen, hasItems, sectionLabel.                                                |
+| `GroupHeader`      | Header row for a Group: main navigation link with optional icon plus a chevron toggle button when the group has items. Props: label, href, icon, isOpen, hasItems, onToggle, activePattern.                                              |
+| `GroupItem`        | Leaf navigation link with active-state highlighting that special-cases the logout route to clear UI preferences before navigating. Props: label, href, activePattern.                                                                    |
+| `SectionHeader`    | Presentational uppercase section-divider label with hairline rules above and below, used to separate groups of nav entries. Single required prop: label.                                                                                 |
+| `NavScopeSelector` | Labeled select for choosing the active Arr scope; options come from the nav shell's available scopes and selection updates the navScope store. Single prop: navShell.                                                                    |
+| `Version`          | Footer card showing the praxrr logo, wordmark, and a platform-channel-version metadata line. Single optional prop: version.                                                                                                              |
 
 ### [Badges & Labels](/app/components/badges/)
 
@@ -122,14 +122,14 @@ message)`. See [Store Patterns](/app/components/patterns/).
 
 ### [Feedback & States](/app/components/feedback/)
 
-| Component                   | Description                                                                                                                                                                                                |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Alert`                     | Type-colored toast card (success/error/warning/info) rendered inside AlertContainer; dismisses on click or Enter/Space with fly-in/fade-out animation.                                                     |
-| `AlertContainer`            | Fixed overlay that subscribes to alertStore and renders one Alert per active toast, resolving placement from alertSettingsStore and adapting for auth vs app-shell layouts. Mount once in the root layout. |
-| `MobileNavAlert`            | Compact single-line alert variant sized for the mobile navigation bar with truncated text, lighter styling, and fade-only transitions; same dismiss behavior as Alert.                                     |
-| `EmptyState`                | Centered full-height placeholder with a circular icon, title, description, and a single anchor-based call-to-action, used when a collection has no items yet.                                              |
-| `Tooltip`                   | Hover tooltip wrapping trigger slot content; renders a fixed, viewport-clamped label above or below the trigger and flips on overflow.                                                                     |
-| `ComplexityProgressionHint` | Contextual amber banner nudging the user to advance the area's complexity tier after enough advanced-option toggles, offering Switch / Not now actions; driven entirely by the complexity-tier context.    |
+| Component                   | Description                                                                                                                                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Alert`                     | Type-colored toast card (success/error/warning/info) rendered inside AlertContainer; dismisses on click or Enter/Space with fly-in/fade-out animation.                                                                                       |
+| `AlertContainer`            | Fixed overlay that subscribes to alertStore and renders one Alert per active toast, resolving placement from alertSettingsStore and adapting for auth vs app-shell layouts. Mount once in the root layout.                                   |
+| `MobileNavAlert`            | Compact single-line alert variant sized for the mobile navigation bar with truncated text, lighter styling, and fade-only transitions; same dismiss behavior as Alert.                                                                       |
+| `EmptyState`                | Centered full-height placeholder with a circular icon, title, description, and a single anchor-based call-to-action, used when a collection has no items yet.                                                                                |
+| `Tooltip`                   | Tooltip wrapping trigger slot content, shown on hover or keyboard focus and hidden on Escape; renders a fixed, viewport-clamped label above or below the trigger, flips on overflow, and links its text to the trigger via aria-describedby. |
+| `ComplexityProgressionHint` | Contextual amber banner nudging the user to advance the area's complexity tier after enough advanced-option toggles, offering Switch / Not now actions; driven entirely by the complexity-tier context.                                      |
 
 ### [Display & Formatting](/app/components/display/)
 
@@ -150,12 +150,13 @@ message)`. See [Store Patterns](/app/components/patterns/).
 
 ### [Store Patterns & Conventions](/app/components/patterns/)
 
-| Component                                                      | Description                                                                                                                                                                            |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dirty (form dirty-state store)`                               | Singleton snapshot-based form dirty-tracking store with initEdit/initCreate/update/resetFromServer/clear plus a confirmNavigation guard driving an unsaved-changes modal.              |
-| `alertStore`                                                   | Global toast/alert queue; add() enqueues a typed message that auto-dismisses after a resolved duration and returns its id, with remove/clear helpers.                                  |
-| `alertSettingsStore`                                           | Persisted preferences for alert position and default auto-dismiss duration, hydrated from validated localStorage with exported ALERT_POSITIONS and DEFAULT_ALERT_SETTINGS.             |
-| `themeStore`                                                   | Singleton light/dark theme store initialized from localStorage or prefers-color-scheme, applying the theme class to <html> via View Transitions and persisting on toggle.              |
-| `accentStore`                                                  | Singleton accent-color store persisting a chosen accent and writing an 11-shade palette to --accent-50..--accent-950 CSS variables; ships accentColors and the AccentColor union.      |
-| `createSearchStore / getPersistentSearchStore`                 | Factory for a per-instance debounced search + filter store with filterItems helper; getPersistentSearchStore returns a localStorage-keyed singleton.                                   |
-| `userComplexityTiersStore / getUserComplexityTierSectionStore` | Server-synced per-section UI complexity tier store wrapping a debounced sync engine against /api/v1/complexity-tiers with ref-counted section stores and activity/suggestion tracking. |
+| Component                                                                    | Description                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dirty (form dirty-state store)`                                             | Singleton snapshot-based form dirty-tracking store with initEdit/initCreate/update/resetFromServer/clear plus a confirmNavigation guard driving an unsaved-changes modal.                                  |
+| `alertStore`                                                                 | Global toast/alert queue; add() enqueues a typed message that auto-dismisses after a resolved duration and returns its id, with remove/clear helpers.                                                      |
+| `alertSettingsStore`                                                         | Persisted preferences for alert position and default auto-dismiss duration, hydrated from validated localStorage with exported ALERT_POSITIONS and DEFAULT_ALERT_SETTINGS.                                 |
+| `themeStore`                                                                 | Singleton light/dark theme store initialized from localStorage or prefers-color-scheme, applying the theme class to <html> via View Transitions and persisting on toggle.                                  |
+| `accentStore`                                                                | Singleton accent-color store persisting a chosen accent and writing an 11-shade palette to --accent-50..--accent-950 CSS variables; ships accentColors and the AccentColor union.                          |
+| `createSearchStore / getPersistentSearchStore`                               | Factory for a per-instance debounced search + filter store with filterItems helper; getPersistentSearchStore returns a localStorage-keyed singleton.                                                       |
+| `userComplexityTiersStore / getUserComplexityTierSectionStore`               | Server-synced per-section UI complexity tier store wrapping a debounced sync engine against /api/v1/complexity-tiers with ref-counted section stores and activity/suggestion tracking.                     |
+| `Accessibility helpers (focusTrap / focusOutside / clickOutside / uniqueId)` | Svelte actions and an id helper in $lib/client/utils for focus trapping with restore, closing popups on focus-out or outside click, and generating ids for aria-controls/aria-labelledby/aria-describedby. |

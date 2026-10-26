@@ -686,12 +686,15 @@
 
     <ActionsBar className="md:w-full">
       <SearchAction {searchStore} placeholder="Search custom formats..." responsive />
-      <ActionButton icon={ArrowUpDown} hasDropdown={true} dropdownPosition="right">
+      <ActionButton icon={ArrowUpDown} hasDropdown={true} dropdownPosition="right" title="Sort by">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem">
-            <div class="py-1">
+          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem" role="menu" label="Sort by">
+            <div role="presentation" class="py-1">
               <button
+                tabindex="-1"
                 type="button"
+                role="menuitemradio"
+                aria-checked={sortState?.key === 'name'}
                 on:click={() => toggleSort('name', 'asc')}
                 class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
                 'name'
@@ -700,6 +703,7 @@
               >
                 <span class="text-neutral-700 dark:text-neutral-300">Name</span>
                 <IconCheckbox
+                  decorative
                   checked={sortState?.key === 'name'}
                   icon={sortState?.key === 'name' && sortState.direction === 'desc' ? ArrowDown : ArrowUp}
                   color="blue"
@@ -708,7 +712,10 @@
               </button>
               {#each getArrSortKeys(scoring.arrTypes) as arrType}
                 <button
+                  tabindex="-1"
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={sortState?.key === arrType}
                   on:click={() => toggleSort(arrType, 'desc')}
                   class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {sortState?.key ===
                   arrType
@@ -719,6 +726,7 @@
                     {getArrTypeLabel(arrType)}
                   </span>
                   <IconCheckbox
+                    decorative
                     checked={sortState?.key === arrType}
                     icon={sortState?.key === arrType && sortState.direction === 'asc' ? ArrowUp : ArrowDown}
                     color={getArrTypeColor(arrType)}
@@ -730,12 +738,13 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right">
+      <ActionButton icon={Layers} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Group by">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem">
-            <div class="py-1">
+          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem" role="dialog" label="Group by">
+            <div role="presentation" class="py-1">
               <button
                 type="button"
+                aria-pressed={selectedGroups.size === 0}
                 on:click={clearGrouping}
                 class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {selectedGroups.size ===
                 0
@@ -743,11 +752,12 @@
                   : ''}"
               >
                 <span class="text-neutral-700 dark:text-neutral-300">No Grouping</span>
-                <IconCheckbox checked={selectedGroups.size === 0} icon={Check} color="blue" shape="circle" />
+                <IconCheckbox decorative checked={selectedGroups.size === 0} icon={Check} color="blue" shape="circle" />
               </button>
               {#each builtInGroups as group}
                 <button
                   type="button"
+                  aria-pressed={selectedGroups.has(group.key)}
                   on:click={() => toggleGroup(group.key)}
                   class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {selectedGroups.has(
                     group.key
@@ -756,7 +766,13 @@
                     : ''}"
                 >
                   <span class="text-neutral-700 dark:text-neutral-300">{group.name}</span>
-                  <IconCheckbox checked={selectedGroups.has(group.key)} icon={Check} color="blue" shape="circle" />
+                  <IconCheckbox
+                    decorative
+                    checked={selectedGroups.has(group.key)}
+                    icon={Check}
+                    color="blue"
+                    shape="circle"
+                  />
                 </button>
               {/each}
             </div>
@@ -770,13 +786,22 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={LayoutGrid} hasDropdown={true} dropdownPosition="right">
+      <ActionButton icon={LayoutGrid} hasDropdown={true} dropdownPosition="right" title="Tile columns">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem">
-            <div class="py-1">
+          <Dropdown
+            position={dropdownPosition}
+            mobilePosition="middle"
+            minWidth="10rem"
+            role="menu"
+            label="Tile columns"
+          >
+            <div role="presentation" class="py-1">
               {#each [1, 2, 3] as columns}
                 <button
+                  tabindex="-1"
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={tileColumns === columns}
                   on:click={() => setTileColumns(columns)}
                   class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {tileColumns ===
                   columns
@@ -784,34 +809,43 @@
                     : ''}"
                 >
                   <span class="text-neutral-700 dark:text-neutral-300">{columns} Column{columns > 1 ? 's' : ''}</span>
-                  <IconCheckbox checked={tileColumns === columns} icon={Check} color="blue" shape="circle" />
+                  <IconCheckbox decorative checked={tileColumns === columns} icon={Check} color="blue" shape="circle" />
                 </button>
               {/each}
             </div>
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={Settings} hasDropdown={true} dropdownPosition="right">
+      <ActionButton icon={Settings} hasDropdown={true} dropdownPosition="right" title="Display options">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-          <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem">
-            <div class="py-1">
+          <Dropdown
+            position={dropdownPosition}
+            mobilePosition="middle"
+            minWidth="14rem"
+            role="menu"
+            label="Display options"
+          >
+            <div role="presentation" class="py-1">
               <button
+                tabindex="-1"
                 type="button"
+                role="menuitemcheckbox"
+                aria-checked={hideUnscoredFormats}
                 on:click={toggleHideUnscored}
                 class="flex w-full items-center justify-between gap-3 px-4 py-2 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700 {hideUnscoredFormats
                   ? 'bg-neutral-50 dark:bg-neutral-700'
                   : ''}"
               >
                 <span class="text-neutral-700 dark:text-neutral-300">Hide Unscored Formats</span>
-                <IconCheckbox checked={hideUnscoredFormats} icon={Check} color="blue" shape="circle" />
+                <IconCheckbox decorative checked={hideUnscoredFormats} icon={Check} color="blue" shape="circle" />
               </button>
             </div>
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={User} hasDropdown={true} dropdownPosition="right">
+      <ActionButton icon={User} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Profiles">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
-          <Dropdown position={dropdownPosition} minWidth="16rem">
+          <Dropdown position={dropdownPosition} minWidth="16rem" role="dialog" label="Profiles">
             <!-- Save current config form -->
             <div class="border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
               <div class="mb-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">Save Current Settings</div>
@@ -844,24 +878,32 @@
               >
                 <button
                   type="button"
+                  aria-pressed={currentProfileId === null}
                   on:click={loadDefaultProfile}
                   class="flex flex-1 items-center justify-between gap-3"
                 >
                   <div class="flex-1 text-left">
                     <div class="text-xs font-medium text-neutral-700 dark:text-neutral-300">Default</div>
                   </div>
-                  <IconCheckbox checked={currentProfileId === null} icon={Check} color="blue" shape="circle" />
+                  <IconCheckbox
+                    decorative
+                    checked={currentProfileId === null}
+                    icon={Check}
+                    color="blue"
+                    shape="circle"
+                  />
                 </button>
               </div>
 
               {#if profiles.length > 0}
-                <div class="border-t border-neutral-200 dark:border-neutral-700"></div>
+                <div role="separator" class="border-t border-neutral-200 dark:border-neutral-700"></div>
                 {#each profiles as profile}
                   <div
                     class="group flex items-center justify-between gap-2 px-4 py-2 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700"
                   >
                     <button
                       type="button"
+                      aria-pressed={currentProfileId === profile.id}
                       on:click={() => loadProfile(profile.id)}
                       class="flex flex-1 items-center justify-between gap-3"
                     >
@@ -871,6 +913,7 @@
                         </div>
                       </div>
                       <IconCheckbox
+                        decorative
                         checked={currentProfileId === profile.id}
                         icon={Check}
                         color="blue"
@@ -879,6 +922,7 @@
                     </button>
                     <button
                       type="button"
+                      aria-label="Delete profile {profile.name}"
                       on:click|stopPropagation={() => deleteProfile(profile.id)}
                       class="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                     >

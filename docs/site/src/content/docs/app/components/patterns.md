@@ -1,6 +1,6 @@
 ---
 title: Store Patterns & Conventions
-description: 'Client store patterns and conventions: dirty tracking, the alert system, theme/accent, search stores, and Tailwind CSS v4 utility conventions.'
+description: 'Client store patterns and conventions: dirty tracking, the alert system, theme/accent, search stores, Tailwind CSS v4 utility conventions, and accessibility helpers.'
 ---
 
 This page documents the client-side store patterns and conventions used across the app. These are modules under `$stores/` (source: `packages/praxrr-app/src/lib/client/stores/`) and the alert system under `$lib/client/alerts/`. Most are module-level singletons; the search store is a factory. Usage examples follow the repo's Svelte 5 convention of plain props and `onclick`/`on:click` handlers rather than runes.
@@ -269,3 +269,63 @@ The stores above integrate with Tailwind CSS v4 through CSS custom properties ra
 - `accentStore` writes an 11-shade palette to `--accent-50` … `--accent-950` on `<html>`, so utilities and components can reference the live accent via those custom properties.
 - `themeStore` toggles the theme class on `document.documentElement`, which is the anchor for Tailwind's dark-mode variants.
 - Prefer referencing these CSS variables in component styles over duplicating shade values, so theme and accent changes propagate without rebuilds.
+
+## Accessibility helpers
+
+Svelte actions and helpers under `$lib/client/utils/` (source: `packages/praxrr-app/src/lib/client/utils/`) that the shared dialogs, dropdowns, and tooltips use for keyboard and screen-reader support.
+
+```ts
+import { focusTrap, getTabbable } from '$lib/client/utils/focusTrap';
+import { focusOutside } from '$lib/client/utils/focusOutside';
+import { clickOutside } from '$lib/client/utils/clickOutside';
+import { uniqueId } from '$lib/client/utils/uniqueId';
+```
+
+| Helper         | Signature                                                                                                     | Description                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `focusTrap`    | `use:focusTrap={{ enabled?: boolean; initialFocus?: HTMLElement \| string \| null; restoreFocus?: boolean }}` | Action that keeps Tab/Shift+Tab inside the node while `enabled` (default `true`). On activation it records the focused element and focuses `initialFocus` (an element inside the node or a selector), else the first tabbable element not marked `data-focus-trap-region`, else the node. On deactivation or destroy it restores focus to the recorded element when `restoreFocus` (default `true`) and the element is still connected. |
+| `getTabbable`  | `(node: HTMLElement) => HTMLElement[]`                                                                        | Tabbable descendants in DOM order. Skips disabled, `aria-disabled="true"`, `tabindex="-1"`, hidden (`hidden`, `display: none`, `visibility: hidden`), and closed `<details>` content; collapses each radio group to its checked (or first) radio. Used by `focusTrap` and `ActionButton`.                                                                                                                                               |
+| `focusOutside` | `use:focusOutside={() => void}`                                                                               | Calls the callback when focus moves from inside the node to an element outside it. Does not move focus. A `focusout` with no `relatedTarget` (for example a click on a non-focusable area) is ignored.                                                                                                                                                                                                                                  |
+| `clickOutside` | `use:clickOutside={() => void}`                                                                               | Calls the callback for any `click` (document, capture phase) whose target is outside the node.                                                                                                                                                                                                                                                                                                                                          |
+| `uniqueId`     | `(prefix: string) => string`                                                                                  | Returns `` `${prefix}-${n}` `` from a module-level counter. Call it once per component instance in the `<script>` block to pair `id` with `aria-controls`, `aria-labelledby`, or `aria-describedby`.                                                                                                                                                                                                                                    |
+
+Usage — a custom dialog panel:
+
+```svelte
+<script>
+  import { focusTrap } from '$lib/client/utils/focusTrap';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
+
+  export let open = false;
+  const titleId = uniqueId('settings-dialog-title');
+
+  function handleKeydown(e) {
+    if (e.key !== 'Escape' || !open) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open = false;
+  }
+</script>
+
+{#if open}
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby={titleId}
+    tabindex="-1"
+    on:keydown={handleKeydown}
+    use:focusTrap={{ enabled: open }}
+  >
+    <h2 id={titleId}>Settings</h2>
+    <!-- controls -->
+  </div>
+{/if}
+```
+
+Notes:
+
+- **Use `focusTrap` for any new dialog.** Prefer `Modal` or `InfoModal`, which already apply it. For a custom dialog, also set `role="dialog"`, `aria-modal="true"`, and `aria-labelledby`, and handle Escape on the panel with `stopPropagation()` so nested dialogs close one at a time. `focusTrap` does not handle Escape and does not make the page behind the dialog inert.
+- **Give dropdown triggers `aria-haspopup` and `aria-expanded`.** Also set `aria-controls` to the `Dropdown` `id` (from `uniqueId`). Match `aria-haspopup` to the panel `role` (`menu`, `listbox`, or `dialog`). Pass `onClose` to `Dropdown` so Escape closes the panel and returns focus to the trigger. When the trigger is activated from the keyboard (`event.detail === 0`), move focus to the first item after `tick()`. `ActionButton` with `hasDropdown` and `DropdownSelect` do all of this already.
+- Close popups with both `clickOutside` (pointer) and `focusOutside` (Tab away). Neither one covers the other's case.
+- Make scrollable regions inside dialogs keyboard-reachable with `tabindex="0"`, `role="region"`, and `aria-labelledby`. Add `data-focus-trap-region` so `focusTrap` gives initial focus to a real control instead of the region.
+- The `focusTrap` keydown listener ignores Tab combined with Alt, Ctrl, or Meta. If the node has no tabbable elements, Tab keeps focus on the node.
