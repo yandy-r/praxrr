@@ -47,7 +47,9 @@ async function signInIfNeeded(page: Page, path: string): Promise<void> {
 }
 
 async function nameAndBypassViolations(page: Page): Promise<string[]> {
-  await page.waitForLoadState('networkidle');
+  // Not `networkidle`: the live-events SSE stream keeps a request open on every app page.
+  await page.waitForLoadState('load');
+  await page.locator('main#main').waitFor();
   const results = await new AxeBuilder({ page }).withRules(NAME_AND_BYPASS_RULES).analyze();
   return results.violations.map(
     (violation) => `${page.url()} ${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`
@@ -86,6 +88,8 @@ test.describe('accessible names and landmarks', () => {
   });
 
   test('main list pages have named controls and a bypass mechanism', async ({ page }) => {
+    // Eight pages with an axe scan each.
+    test.setTimeout(180_000);
     await signInIfNeeded(page, STATIC_PAGES[0]);
     const violations: string[] = [];
     for (const path of STATIC_PAGES) {
@@ -116,9 +120,10 @@ test.describe('accessible names and landmarks', () => {
       // Open the first entity's editor through its row link; a list with rows must expose one.
       const rowCount = await page.locator('tbody tr:has(td a.cell-link)').count();
       if (rowCount === 0) continue;
-      const rowLink = page.locator('tbody a.cell-link:not([aria-hidden="true"])').first();
-      const editPath = await rowLink.getAttribute('href');
-      expect(editPath, `${listPath} has linked rows but no focusable row link`).toBeTruthy();
+      const rowLinks = page.locator('tbody a.cell-link:not([aria-hidden="true"])');
+      expect(await rowLinks.count(), `${listPath} has linked rows but no focusable row link`).toBeGreaterThan(0);
+      const editPath = await rowLinks.first().getAttribute('href');
+      expect(editPath, `${listPath} row link has no href`).toBeTruthy();
       await page.goto(editPath!);
       violations.push(...(await nameAndBypassViolations(page)));
       titles.set(editPath!, await page.title());
@@ -128,7 +133,7 @@ test.describe('accessible names and landmarks', () => {
 
     const seen = new Map<string, string>();
     for (const [path, title] of titles) {
-      expect(title, `${path} has no specific title`).not.toBe('Praxrr');
+      expect(title, `${path} has no specific title`).toMatch(/^.+ - Praxrr$/);
       expect(seen.get(title), `${path} shares its title "${title}"`).toBeUndefined();
       seen.set(title, path);
     }

@@ -469,7 +469,7 @@ The interactive island below reproduces the switch card interaction (self-toggli
 
 - `color` accent/amber/green/red/neutral (legacy) or `checkboxColor` override; `shape`/`variant` pass through to `IconCheckbox`.
 - Unlike the bare `IconCheckbox`, `Toggle` self-mutates `checked` in `handleToggle`. `color` `'amber'` has no `IconCheckbox` equivalent, so it is remapped to hex `#F59E0B`.
-- `resolvedLabel = label || ariaLabel`. The whole card is the switch; the inner `IconCheckbox` stops propagation and re-triggers the same toggle.
+- `resolvedLabel = label || ariaLabel`. The whole card is the switch; the inner `IconCheckbox` is `decorative` (an `aria-hidden` indicator), so the switch is the only control.
 
 ## RangeScale
 

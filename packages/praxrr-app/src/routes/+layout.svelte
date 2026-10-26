@@ -53,7 +53,7 @@
 
 <svelte:head>
   <link rel="icon" href={logo} />
-  <title>Praxrr</title>
+  <!-- No fallback <title>: during SSR a layout title outranks page <svelte:head> titles, so every page sets its own. -->
 </svelte:head>
 <a
   href="#main"

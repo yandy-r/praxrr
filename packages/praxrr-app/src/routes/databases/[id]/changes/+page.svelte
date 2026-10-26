@@ -840,6 +840,7 @@
               <button
                 type="button"
                 on:click={toggleAll}
+                aria-pressed={allSelected}
                 class="flex h-10 items-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 <IconCheckbox decorative checked={allSelected} icon={Check} color="blue" shape="circle" />

@@ -64,7 +64,7 @@
     <div
       class="group relative cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
     >
-      <a href={getItemHref(item)} aria-label={item.name} class="absolute inset-0 rounded-lg"></a>
+      <a href={getItemHref(item)} aria-label={item.name} class="absolute inset-0 z-[1] rounded-lg"></a>
       <!-- Top row: Avatar, Name, Action buttons -->
       <div class="flex items-center gap-3">
         <DatabaseAvatar name={item.name} repoUrl={item.repositoryUrl} size="md" />
