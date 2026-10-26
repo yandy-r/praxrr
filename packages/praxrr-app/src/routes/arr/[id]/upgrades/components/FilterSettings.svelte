@@ -205,7 +205,7 @@
   <div class="mb-4">
     <ActionsBar>
       <SearchAction {searchStore} placeholder="Search filters..." />
-      <ActionButton icon={Plus} title="Add filter" on:click={addFilter} />
+      <ActionButton icon={Plus} label="Add filter" on:click={addFilter} />
     </ActionsBar>
   </div>
 
@@ -224,7 +224,7 @@
         <div class="flex flex-col gap-2">
           <div class="flex items-center">
             {#if editingId === row.id}
-              <!-- svelte-ignore a11y_autofocus -->
+              <!-- svelte-ignore a11y_autofocus -- intentional: focuses the inline rename input the moment the user enters edit mode for that row -->
               <input
                 type="text"
                 bind:value={editingName}

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { RotateCcw } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
   import Modal from '$ui/modal/Modal.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import SnapshotDiff from '$ui/snapshots/SnapshotDiff.svelte';
   import { alertStore } from '$alerts/store';
   import type { PcdSnapshotFullDetail, SnapshotTrigger, SnapshotType } from '$pcd/snapshots/types.ts';
@@ -143,9 +145,7 @@
   });
 </script>
 
-<svelte:head>
-  <title>Snapshot detail - Praxrr</title>
-</svelte:head>
+<PageTitle parts={[`Snapshot #${data.snapshotId}`, $page.data.database?.name]} />
 
 <div class="space-y-6 pt-4">
   <div>

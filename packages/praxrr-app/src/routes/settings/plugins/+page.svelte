@@ -400,6 +400,7 @@
       <div class="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
         <div class="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <IconCheckbox
+            label="Enable plugins"
             icon={Check}
             checked={true}
             disabled={settingsPending || loading || reloadPending || pendingIdentities.size > 0}
@@ -547,6 +548,7 @@
       </p>
       <div class="mt-5 flex items-start gap-3">
         <IconCheckbox
+          label="Enable plugins"
           icon={Check}
           checked={false}
           disabled={settingsPending || loading}

@@ -311,7 +311,7 @@
 </script>
 
 <svelte:head>
-  <title>Config Health Detail - Praxrr</title>
+  <title>{detail?.instanceName ?? `Instance ${data.instanceId}`} - Config Health Detail - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

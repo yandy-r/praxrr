@@ -7,7 +7,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.database.name} - Settings - Praxrr</title>
+  <title>Settings - {data.database.name} - Praxrr</title>
 </svelte:head>
 
 <InstanceForm

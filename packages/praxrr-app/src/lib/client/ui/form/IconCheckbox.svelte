@@ -2,6 +2,22 @@
   import type { ComponentType } from 'svelte';
   import { createEventDispatcher } from 'svelte';
 
+  type BaseProps = {
+    checked?: boolean;
+    icon: ComponentType;
+    color?: 'accent' | 'blue' | 'green' | 'red' | 'neutral' | `#${string}` | `var(--${string})`;
+    shape?: 'square' | 'circle' | 'rounded';
+    disabled?: boolean;
+    variant?: 'filled' | 'outline';
+    iconColor?: string;
+    stopPropagation?: boolean;
+    title?: string;
+  };
+
+  // Interactive checkboxes need their own name; decorative icons belong to a named parent control.
+  type $$Props =
+    (BaseProps & { decorative: true; label?: undefined }) | (BaseProps & { decorative?: false; label: string });
+
   export let checked: boolean = false;
   export let icon: ComponentType;
   export let color: 'accent' | 'blue' | 'green' | 'red' | 'neutral' | `#${string}` | `var(--${string})` = 'accent'; // accent, semantic colors, hex (#FFC230), or CSS var (var(--arr-radarr-color))
@@ -12,6 +28,7 @@
   export let stopPropagation: boolean = false;
   export let title: string | undefined = undefined;
   export let decorative: boolean = false;
+  export let label: string | undefined = undefined;
 
   const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
@@ -107,6 +124,7 @@
     type="button"
     role="checkbox"
     aria-checked={checked}
+    aria-label={label}
     {disabled}
     {title}
     on:click={handleClick}

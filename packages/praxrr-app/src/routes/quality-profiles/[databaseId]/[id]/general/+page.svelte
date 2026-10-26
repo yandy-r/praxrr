@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.profile.name} - General - Praxrr</title>
+  <title>{data.profile.name} - General - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="mt-6">

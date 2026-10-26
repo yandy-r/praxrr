@@ -35,10 +35,6 @@
   $: backButton = isNestedPage ? { label: 'Back' } : undefined;
 </script>
 
-<svelte:head>
-  <title>Media Management - {data.currentDatabase.name} - Praxrr</title>
-</svelte:head>
-
 <div class="space-y-6 px-4 pt-4 pb-8 md:px-8">
   <!-- Database Tabs -->
   <Tabs tabs={databaseTabs} {backButton} />

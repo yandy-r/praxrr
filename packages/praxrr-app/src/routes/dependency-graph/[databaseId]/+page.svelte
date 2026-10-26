@@ -92,7 +92,9 @@
 </script>
 
 <svelte:head>
-  <title>Dependency Graph - Praxrr</title>
+  <title
+    >Dependency Graph - {data.databases.find((db) => db.id === data.selectedDatabaseId)?.name ?? 'Database'} - Praxrr</title
+  >
 </svelte:head>
 
 <div class="space-y-8">

@@ -149,7 +149,12 @@
   <div class="space-y-6">
     <!-- Enable Toggle -->
     <div class="flex items-center gap-3">
-      <IconCheckbox icon={Check} checked={settings.enabled} on:click={() => (settings.enabled = !settings.enabled)} />
+      <IconCheckbox
+        label="Enable AI Features"
+        icon={Check}
+        checked={settings.enabled}
+        on:click={() => (settings.enabled = !settings.enabled)}
+      />
       <input type="hidden" name="enabled" value={settings.enabled ? 'on' : ''} />
       <button type="button" class="flex-1 text-left" on:click={() => (settings.enabled = !settings.enabled)}>
         <span class="text-sm font-medium text-neutral-900 dark:text-neutral-50">Enable AI Features</span>
@@ -233,6 +238,8 @@
           />
           <button
             type="button"
+            aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+            aria-pressed={showApiKey}
             on:click={() => (showApiKey = !showApiKey)}
             class="absolute top-1/2 right-2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
           >

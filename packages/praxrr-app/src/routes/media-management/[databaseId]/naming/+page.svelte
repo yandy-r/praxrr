@@ -1,6 +1,7 @@
 <script lang="ts">
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
@@ -171,7 +172,8 @@
     : 'No naming configs match your search';
 </script>
 
-<!-- Actions Bar -->
+<PageTitle parts={['Naming', data.currentDatabase.name]} />
+
 <ActionsBar>
   <SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
   <div title={sourceFilterDisabledReason ?? undefined}>
@@ -185,6 +187,7 @@
   </div>
   <ActionButton
     icon={Plus}
+    label="Add naming config"
     on:click={() =>
       goto(resolve('/media-management/[databaseId]/naming/new', { databaseId: data.currentDatabase.id.toString() }))}
   />

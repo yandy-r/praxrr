@@ -54,7 +54,12 @@
     {#each descriptor.fields as field (field.key)}
       {#if field.kind === 'checkbox'}
         <div class="flex items-start gap-3">
-          <IconCheckbox icon={Check} checked={checkboxState[field.key]} on:click={() => toggle(field.key)} />
+          <IconCheckbox
+            label={field.label}
+            icon={Check}
+            checked={checkboxState[field.key]}
+            on:click={() => toggle(field.key)}
+          />
           <input type="hidden" name={field.key} value={checkboxState[field.key] ? 'on' : ''} />
           <button type="button" class="flex-1 text-left" on:click={() => toggle(field.key)}>
             <span class="block text-sm font-medium text-neutral-700 dark:text-neutral-300">{field.label}</span>
@@ -98,6 +103,7 @@
             {#if !field.required}
               <div class="mt-2 flex items-center gap-2">
                 <IconCheckbox
+                  label={`Remove saved ${field.label} value`}
                   icon={Check}
                   checked={clearState[field.key] === true}
                   on:click={() => toggleClear(field.key)}

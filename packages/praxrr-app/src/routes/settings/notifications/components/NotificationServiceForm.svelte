@@ -174,6 +174,7 @@
               {#each types as type}
                 <div class="flex items-center gap-3">
                   <IconCheckbox
+                    label={type.label}
                     icon={Check}
                     checked={enabledTypesState[type.id]}
                     on:click={() => (enabledTypesState[type.id] = !enabledTypesState[type.id])}

@@ -15,28 +15,28 @@ Multi-variant button (primary/secondary/danger/ghost) with optional icon, respon
 import Button from '$ui/button/Button.svelte';
 ```
 
-| Prop               | Type                                              | Default       | Required | Description                                                                                        |
-| ------------------ | ------------------------------------------------- | ------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `text`             | `string`                                          | `''`          | No       | Button label text; when empty and `icon` is set, the button renders icon-only (square padding).    |
-| `variant`          | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'secondary'` | No       | Visual style. primary=accent fill, secondary=bordered neutral, danger=red fill, ghost=transparent. |
-| `size`             | `'xs' \| 'sm' \| 'md'`                            | `'sm'`        | No       | Size preset controlling padding, rounding, text size, and icon size (xs=12, sm=14, md=16).         |
-| `disabled`         | `boolean`                                         | `false`       | No       | Disables the button (ignored in anchor mode); applies not-allowed cursor and 50% opacity.          |
-| `icon`             | `ComponentType \| null`                           | `null`        | No       | Lucide/Svelte icon component to render alongside (or instead of) the text.                         |
-| `iconColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the icon; falls back to a neutral color for the ghost variant.       |
-| `textColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the text span; falls back to a neutral color for the ghost variant.  |
-| `iconPosition`     | `'left' \| 'right'`                               | `'left'`      | No       | Whether the icon renders before or after the text/slot.                                            |
-| `type`             | `'button' \| 'submit'`                            | `'button'`    | No       | Native button type (button mode only).                                                             |
-| `responsive`       | `boolean`                                         | `false`       | No       | When true, auto-switches to the `xs` size on screens below 768px via a `matchMedia` listener.      |
-| `hideTextOnMobile` | `boolean`                                         | `false`       | No       | Hides the text span on mobile (`hidden md:inline`), showing icon only on small screens.            |
-| `fullWidth`        | `boolean`                                         | `false`       | No       | Applies `w-full` to stretch the button to its container width.                                     |
-| `href`             | `string \| undefined`                             | `undefined`   | No       | When provided, renders an `<a>` anchor instead of a `<button>`.                                    |
-| `target`           | `string \| undefined`                             | `undefined`   | No       | Anchor target attribute (anchor mode only).                                                        |
-| `rel`              | `string \| undefined`                             | `undefined`   | No       | Anchor rel attribute (anchor mode only).                                                           |
-| `justify`          | `'center' \| 'between'`                           | `'center'`    | No       | Content alignment; `'between'` is used for dropdown-style triggers (`justify-between`).            |
-| `title`            | `string`                                          | `''`          | No       | Native title attribute, applied only when no tooltip is set.                                       |
-| `ariaLabel`        | `string`                                          | `''`          | No       | `aria-label`; falls back to the tooltip text when empty.                                           |
-| `tooltip`          | `string`                                          | `''`          | No       | Tooltip text rendered via the wrapping `Tooltip` component.                                        |
-| `tooltipPosition`  | `'top' \| 'bottom'`                               | `'bottom'`    | No       | Position passed to the `Tooltip`.                                                                  |
+| Prop               | Type                                              | Default       | Required | Description                                                                                                   |
+| ------------------ | ------------------------------------------------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `text`             | `string`                                          | `''`          | No       | Button label text; when empty and `icon` is set, the button renders icon-only (square padding).               |
+| `variant`          | `'primary' \| 'secondary' \| 'danger' \| 'ghost'` | `'secondary'` | No       | Visual style. primary=accent fill, secondary=bordered neutral, danger=red fill, ghost=transparent.            |
+| `size`             | `'xs' \| 'sm' \| 'md'`                            | `'sm'`        | No       | Size preset controlling padding, rounding, text size, and icon size (xs=12, sm=14, md=16).                    |
+| `disabled`         | `boolean`                                         | `false`       | No       | Disables the button (ignored in anchor mode); applies not-allowed cursor and 50% opacity.                     |
+| `icon`             | `ComponentType \| null`                           | `null`        | No       | Lucide/Svelte icon component to render alongside (or instead of) the text.                                    |
+| `iconColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the icon; falls back to a neutral color for the ghost variant.                  |
+| `textColor`        | `string`                                          | `''`          | No       | Tailwind class(es) applied to the text span; falls back to a neutral color for the ghost variant.             |
+| `iconPosition`     | `'left' \| 'right'`                               | `'left'`      | No       | Whether the icon renders before or after the text/slot.                                                       |
+| `type`             | `'button' \| 'submit'`                            | `'button'`    | No       | Native button type (button mode only).                                                                        |
+| `responsive`       | `boolean`                                         | `false`       | No       | When true, auto-switches to the `xs` size on screens below 768px via a `matchMedia` listener.                 |
+| `hideTextOnMobile` | `boolean`                                         | `false`       | No       | Visually hides the text on mobile (`sr-only md:not-sr-only md:inline`); it stays available to screen readers. |
+| `fullWidth`        | `boolean`                                         | `false`       | No       | Applies `w-full` to stretch the button to its container width.                                                |
+| `href`             | `string \| undefined`                             | `undefined`   | No       | When provided, renders an `<a>` anchor instead of a `<button>`.                                               |
+| `target`           | `string \| undefined`                             | `undefined`   | No       | Anchor target attribute (anchor mode only).                                                                   |
+| `rel`              | `string \| undefined`                             | `undefined`   | No       | Anchor rel attribute (anchor mode only).                                                                      |
+| `justify`          | `'center' \| 'between'`                           | `'center'`    | No       | Content alignment; `'between'` is used for dropdown-style triggers (`justify-between`).                       |
+| `title`            | `string`                                          | `''`          | No       | Native title attribute, applied only when no tooltip is set.                                                  |
+| `ariaLabel`        | `string`                                          | `''`          | No       | `aria-label`; falls back to `tooltip`, then to `title` for icon-only buttons.                                 |
+| `tooltip`          | `string`                                          | `''`          | No       | Tooltip text rendered via the wrapping `Tooltip` component.                                                   |
+| `tooltipPosition`  | `'top' \| 'bottom'`                               | `'bottom'`    | No       | Position passed to the `Tooltip`.                                                                             |
 
 ### Usage
 
@@ -89,7 +89,7 @@ import ActionButton from '$ui/actions/ActionButton.svelte';
 | `hasDropdown`      | `boolean`                         | `false`     | No       | Enables the dropdown slot region and the trigger's popup ARIA attributes.                                                                      |
 | `dropdownPosition` | `'left' \| 'right' \| 'middle'`   | `'left'`    | No       | Passed through to the dropdown slot as a slot prop for positioning.                                                                            |
 | `disabled`         | `boolean`                         | `false`     | No       | Disables the button; applies not-allowed cursor and 50% opacity, removes hover styles.                                                         |
-| `title`            | `string`                          | `''`        | No       | Native title/tooltip attribute on the button.                                                                                                  |
+| `label`            | `string`                          | —           | Yes      | Accessible name. Applied as both `aria-label` and the native `title` tooltip on the button.                                                    |
 | `type`             | `'button' \| 'submit'`            | `'button'`  | No       | Native button type.                                                                                                                            |
 | `variant`          | `'neutral' \| 'danger'`           | `'neutral'` | No       | Hover style; danger adds a red icon tint on group hover.                                                                                       |
 | `popupRole`        | `'menu' \| 'listbox' \| 'dialog'` | `'menu'`    | No       | Value of the trigger's `aria-haspopup`. `'dialog'` focuses the first tabbable control on keyboard open and disables auto-close on item choice. |
@@ -108,9 +108,9 @@ import ActionButton from '$ui/actions/ActionButton.svelte';
   }
 </script>
 
-<ActionButton icon={Plus} title="Add" on:click={add} />
+<ActionButton icon={Plus} label="Add" on:click={add} />
 
-<ActionButton icon={Filter} title="Filter" hasDropdown={true} dropdownPosition="right">
+<ActionButton icon={Filter} label="Filter" hasDropdown={true} dropdownPosition="right">
   <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
     <Dropdown position={dropdownPosition} role="menu" label="Filter" onClose={close}>
       <DropdownItem icon={FileText} label="Option A" />
@@ -138,7 +138,7 @@ import ActionButton from '$ui/actions/ActionButton.svelte';
 
 - Focus target on open: for `popupRole="dialog"`, the first tabbable element; otherwise the first enabled `menuitem`/`menuitemcheckbox`/`menuitemradio`/`option`, falling back to the first tabbable element.
 - With `hasDropdown`, the trigger sets `aria-haspopup={popupRole}`, `aria-expanded` (open state), and `aria-controls` (generated dropdown id).
-- When `title` is set, it is also applied as the trigger's `aria-label`. Give icon-only triggers a `title`.
+- `label` is required and is applied as the trigger's `aria-label` and `title`, so icon-only triggers always have an accessible name.
 
 ### Variants & Notes
 
@@ -174,7 +174,7 @@ import ActionsBar from '$ui/actions/ActionsBar.svelte';
 
 <ActionsBar className="md:justify-start">
   <SearchAction searchStore={search} responsive />
-  <ActionButton icon={Plus} title="Add" />
+  <ActionButton icon={Plus} label="Add" />
   <ViewToggle bind:value={view} />
 </ActionsBar>
 ```

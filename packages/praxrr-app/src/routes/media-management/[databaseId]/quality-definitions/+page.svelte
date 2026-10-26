@@ -2,6 +2,7 @@
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
   import CloneModal from '$ui/modal/CloneModal.svelte';
@@ -169,6 +170,8 @@
     : 'No quality definitions configs match your search';
 </script>
 
+<PageTitle parts={['Quality Definitions', data.currentDatabase.name]} />
+
 <!-- Actions Bar -->
 <ActionsBar>
   <SearchAction searchStore={search} placeholder="Search quality definitions..." responsive />
@@ -183,6 +186,7 @@
   </div>
   <ActionButton
     icon={Plus}
+    label="Add quality definitions config"
     on:click={() =>
       goto(
         resolve('/media-management/[databaseId]/quality-definitions/new', {

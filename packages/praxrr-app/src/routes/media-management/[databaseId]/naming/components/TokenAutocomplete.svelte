@@ -130,6 +130,7 @@
   }
 </script>
 
+<!-- Intentional: wrapper delegates keyboard for the combobox pattern; interaction lives on the input (FormInput) and option buttons. -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="relative" use:clickOutside={close} on:keydown={handleKeyDown}>
   <FormInput

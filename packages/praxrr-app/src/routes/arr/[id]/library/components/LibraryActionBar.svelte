@@ -99,7 +99,7 @@
 
 <ActionsBar>
   <SearchAction {searchStore} placeholder={searchPlaceholder} responsive />
-  <ActionButton icon={SlidersHorizontal} hasDropdown={true} dropdownPosition="right" title="Filter library">
+  <ActionButton icon={SlidersHorizontal} hasDropdown={true} dropdownPosition="right" label="Filter library">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
       <Dropdown
         position={dropdownPosition}
@@ -195,7 +195,7 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={TableProperties} hasDropdown={true} dropdownPosition="right" title="Toggle columns">
+  <ActionButton icon={TableProperties} hasDropdown={true} dropdownPosition="right" label="Toggle columns">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
       <Dropdown
         position={dropdownPosition}
@@ -234,7 +234,7 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={RefreshCw} hasDropdown={true} dropdownPosition="right" title="Refresh library">
+  <ActionButton icon={RefreshCw} hasDropdown={true} dropdownPosition="right" label="Refresh library">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
       <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label="Refresh library">
         <button
@@ -249,7 +249,7 @@
       </Dropdown>
     </svelte:fragment>
   </ActionButton>
-  <ActionButton icon={ExternalLink} hasDropdown={true} dropdownPosition="right" title={openLabel}>
+  <ActionButton icon={ExternalLink} hasDropdown={true} dropdownPosition="right" label={openLabel}>
     <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
       <Dropdown position={dropdownPosition} minWidth="10rem" role="menu" label={openLabel}>
         <button
@@ -270,7 +270,7 @@
     popupRole="dialog"
     dropdownPosition="right"
     disabled={disablePaginationControls || isPaginationLoading}
-    title="Rows per page"
+    label="Rows per page"
   >
     <svelte:fragment slot="dropdown" let:dropdownPosition>
       <Dropdown position={dropdownPosition} minWidth="10rem" role="dialog" label="Rows per page">

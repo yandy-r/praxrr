@@ -87,6 +87,7 @@
     {#if onRemove}
       <button
         type="button"
+        aria-label="Remove filter group"
         on:click={onRemove}
         class="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
       >
@@ -205,6 +206,7 @@
             <!-- Remove Rule -->
             <button
               type="button"
+              aria-label="Remove rule"
               on:click={() => removeChild(childIndex)}
               class="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
             >

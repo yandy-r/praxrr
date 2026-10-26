@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.format.name} - General - Praxrr</title>
+  <title>{data.format.name} - General - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <GeneralForm mode="edit" canWriteToBase={data.canWriteToBase} actionUrl="?/update" {initialData} />

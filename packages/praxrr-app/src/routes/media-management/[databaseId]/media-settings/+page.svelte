@@ -1,6 +1,7 @@
 <script lang="ts">
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
   import CloneModal from '$ui/modal/CloneModal.svelte';
@@ -105,11 +106,14 @@
   $: setItems(data.mediaSettingsConfigs);
 </script>
 
+<PageTitle parts={['Media Settings', data.currentDatabase.name]} />
+
 <!-- Actions Bar -->
 <ActionsBar>
   <SearchAction searchStore={search} placeholder="Search media settings..." responsive />
   <ActionButton
     icon={Plus}
+    label="Add media settings config"
     on:click={() =>
       goto(
         resolve('/media-management/[databaseId]/media-settings/new', { databaseId: data.currentDatabase.id.toString() })

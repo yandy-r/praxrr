@@ -64,6 +64,7 @@ import Table from '$ui/table/Table.svelte';
 | `emptyMessage`  | `string`                                                 | `'No data available'` | No       | Message shown when data is empty.                                                                                                |
 | `onRowClick`    | `((row: T) => void) \| undefined`                        | `undefined`           | No       | Callback fired when a row is clicked; makes rows show a pointer cursor.                                                          |
 | `rowHref`       | `((row: T) => string \| null \| undefined) \| undefined` | `undefined`           | No       | Returns an href per row; renders an overlay anchor covering the row/cell (supports right-click / open-in-new-tab).               |
+| `rowLabel`      | `((row: T) => string) \| undefined`                      | `undefined`           | No       | Accessible name for the row link when `rowHref` is set. Falls back to the first column's value, then `Row N`.                    |
 | `initialSort`   | `SortState \| null`                                      | `null`                | No       | Initial sort key/direction applied on mount.                                                                                     |
 | `onSortChange`  | `((sort: SortState \| null) => void) \| undefined`       | `undefined`           | No       | Callback fired whenever the sort state changes (null when sort is cleared on third click).                                       |
 | `actionsHeader` | `string`                                                 | `'Actions'`           | No       | Header text for the actions column (only rendered when the `actions` slot is used).                                              |
@@ -94,6 +95,7 @@ import Table from '$ui/table/Table.svelte';
 
 ### Variants & Notes
 
+- With `rowHref`, every cell has a click-through overlay anchor but only the first cell's link is focusable and named (via `rowLabel`); the others are `aria-hidden` with `tabindex="-1"` so each row exposes a single tab stop.
 - Desktop table layout vs mobile card layout (`responsive`); compact vs default padding; sortable vs static columns; row navigation via `onRowClick` or `rowHref`.
 - Cell renderers from `Column.cell` may return a string, an object `{ html }` (rendered with `@html`), or a Svelte `ComponentType` (mounted with prop `row`).
 - Sorting supports `column.sortComparator` (full-row), `column.sortAccessor`, or nested key-path lookup (e.g. `user.name`). Sort cycles asc → desc → cleared.

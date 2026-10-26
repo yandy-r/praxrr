@@ -1,10 +1,13 @@
 <script lang="ts">
   import QualityDefinitionsForm from '../../components/QualityDefinitionsForm.svelte';
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import type { PageData } from './$types';
 
   export let data: PageData;
 </script>
+
+<PageTitle parts={[data.qualityDefinitionsConfig.name, 'Sonarr Quality Definitions', data.currentDatabase.name]} />
 
 <QualityDefinitionsForm
   mode="edit"

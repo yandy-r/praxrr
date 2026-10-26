@@ -222,6 +222,7 @@
         }
         return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-profiles/${row.trashId}/`;
       }}
+      rowLabel={(row) => row.name}
       emptyMessage="No quality profiles cached. Try syncing sources."
       responsive
       {initialSort}

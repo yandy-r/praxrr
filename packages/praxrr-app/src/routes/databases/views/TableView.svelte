@@ -59,7 +59,7 @@
   ];
 </script>
 
-<Table {columns} data={items} hoverable={true} rowHref={getRowHref}>
+<Table {columns} data={items} hoverable={true} rowHref={getRowHref} rowLabel={(row) => row.name}>
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
       <div class="flex items-center gap-3">

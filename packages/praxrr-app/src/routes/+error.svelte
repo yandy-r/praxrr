@@ -6,6 +6,10 @@
   $: errorMessage = $page.error?.message || 'An unexpected error occurred';
 </script>
 
+<svelte:head>
+  <title>Error {statusCode} - Praxrr</title>
+</svelte:head>
+
 <div class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-neutral-50 px-4 dark:bg-neutral-900">
   <div class="flex max-w-6xl items-center gap-12">
     <!-- Left column: Error info and button -->

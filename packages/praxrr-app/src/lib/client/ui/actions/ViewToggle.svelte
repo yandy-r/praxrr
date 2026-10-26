@@ -9,7 +9,7 @@
   export let position: 'left' | 'right' | 'middle' = 'right';
 </script>
 
-<ActionButton icon={Eye} title="Choose view" hasDropdown={true} dropdownPosition={position}>
+<ActionButton icon={Eye} label="Choose view" hasDropdown={true} dropdownPosition={position}>
   <Dropdown slot="dropdown" label="View" {position}>
     <DropdownItem
       role="menuitemradio"

@@ -40,6 +40,7 @@
         <div class="space-y-2">
           <div class="flex items-center gap-3">
             <IconCheckbox
+              label="Apply Default Delay Profile"
               icon={Check}
               checked={settings.apply_default_delay_profiles}
               on:click={() => (settings.apply_default_delay_profiles = !settings.apply_default_delay_profiles)}

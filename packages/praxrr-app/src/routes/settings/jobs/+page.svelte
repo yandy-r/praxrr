@@ -8,6 +8,7 @@
   import ExpandableTable from '$lib/client/ui/table/ExpandableTable.svelte';
   import Badge from '$lib/client/ui/badge/Badge.svelte';
   import ActiveJobs from './components/ActiveJobs.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import JobHistory from './components/JobHistory.svelte';
   import { CheckCircle, XCircle, AlertCircle, MinusCircle } from 'lucide-svelte';
 
@@ -82,6 +83,8 @@
     return isPast ? `${seconds}s ago` : `in ${seconds}s`;
   }
 </script>
+
+<PageTitle parts={['Jobs', 'Settings']} />
 
 <div class="p-4 md:p-8">
   <!-- Header -->

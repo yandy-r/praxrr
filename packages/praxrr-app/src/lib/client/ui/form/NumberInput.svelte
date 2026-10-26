@@ -21,6 +21,13 @@
   export let onchange: ((value: number) => void) | undefined = undefined;
   export let onMinBlocked: (() => void) | undefined = undefined;
   export let onMaxBlocked: (() => void) | undefined = undefined;
+  // Humanized field name for the icon-only spinner buttons' accessible names.
+  $: labelOrName = name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 
   let inputValue = value === undefined || value === null ? '' : String(value);
   let isFocused = false;
@@ -175,6 +182,7 @@
       <button
         type="button"
         on:click={increment}
+        aria-label="Increase {labelOrName}"
         {disabled}
         class="flex flex-1 {buttonWidthClass} items-center justify-center {buttonTopRadius} border border-neutral-300 bg-white text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
@@ -183,6 +191,7 @@
       <button
         type="button"
         on:click={decrement}
+        aria-label="Decrease {labelOrName}"
         {disabled}
         class="flex flex-1 {buttonWidthClass} items-center justify-center {buttonBottomRadius} border border-t-0 border-neutral-300 bg-white text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >

@@ -22,7 +22,7 @@ Props:
 | `padding`   | `'none' \| 'sm' \| 'md' \| 'lg'` | `'md'`      | No       | Padding applied to header/body/footer regions. Maps to `none=''`, `sm='px-3 py-2'`, `md='px-4 py-3'`, `lg='px-5 py-4'`. Also controls the divider horizontal margin (`mx-3`/`mx-4`/`mx-5`). |
 | `hoverable` | `boolean`                        | `false`     | No       | When true, applies a background transition on hover even if the card is not interactive.                                                                                                    |
 | `href`      | `string \| undefined`            | `undefined` | No       | When set, the card renders as an `<a>` element with this href instead of a `<div>`. Makes the card interactive (cursor + hover).                                                            |
-| `onclick`   | `(() => void) \| undefined`      | `undefined` | No       | Click callback for the non-href (div) card. Bound via `on:click`. Presence makes the card interactive (cursor + hover).                                                                     |
+| `onclick`   | `(() => void) \| undefined`      | `undefined` | No       | Click callback for the non-href card, which then renders as a `<button>`. Bound via `on:click`. Presence makes the card interactive (cursor + hover).                                       |
 | `flush`     | `boolean`                        | `false`     | No       | Forces flush styling (neutral-50/neutral-900 background, stronger hover). Effective flush is `flush` OR the inherited `card-flush` context from a parent `CardGrid`.                        |
 | `className` | `string`                         | `''`        | No       | Extra CSS classes appended to the card's root element class list.                                                                                                                           |
 
@@ -43,15 +43,15 @@ Usage:
 Slots and events:
 
 - Default slot renders the body; the named `header` and `footer` slots are each rendered only when their slot has content (`$$slots.header` / `$$slots.footer`), separated from the body by a top/bottom border divider.
-- `onclick` is a callback prop invoked on card click in div mode only (via `on:click`). In href mode the card navigates instead and does not fire `onclick`.
+- `onclick` is a callback prop invoked on card click in button mode only (via `on:click`). In href mode the card navigates instead and does not fire `onclick`.
 
 Variants and notes:
 
 - Padding: `none` | `sm` | `md` | `lg`.
-- Rendering modes: anchor (when `href` is set) versus div (default).
+- Rendering modes: anchor (when `href` is set), `<button type="button">` (when `onclick` is set), versus plain div (default).
 - States: interactive (`href` or `onclick`) gets `cursor-pointer` plus hover background; hoverable-only gets a hover background without the cursor; flush versus non-flush background and hover styling.
 - This component uses the legacy Svelte slot API (`export let` props, `<slot>`, `$$slots`), not Svelte 5 runes. Root classes always include `rounded-xl border` and `overflow-hidden`.
-- The interactive div card uses `on:click` and suppresses accessibility warnings via `svelte-ignore`; for keyboard-accessible navigation prefer href mode. `isFlush = flush || getContext('card-flush')`, and `getContext` is wrapped in try/catch so the card is safe to use outside a `CardGrid`.
+- An `onclick` card renders a real `<button type="button">` (keyboard-activatable with Enter/Space, no `svelte-ignore` needed); its inner wrappers are block `<span>`s so the content stays valid inside a button. For navigation prefer href mode. `isFlush = flush || getContext('card-flush')`, and `getContext` is wrapped in try/catch so the card is safe to use outside a `CardGrid`.
 
 ## CardGrid
 

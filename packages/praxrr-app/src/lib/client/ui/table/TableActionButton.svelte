@@ -47,6 +47,7 @@
     variant
   ]} disabled:cursor-not-allowed disabled:opacity-50"
   {title}
+  aria-label={title}
 >
   <svelte:component this={icon} size={iconSizes[size]} />
 </button>

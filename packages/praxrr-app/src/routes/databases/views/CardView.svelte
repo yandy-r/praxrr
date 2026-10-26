@@ -61,10 +61,10 @@
 
 <div class="grid grid-cols-1 gap-3">
   {#each items as item}
-    <a
-      href={getItemHref(item)}
-      class="group cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
+    <div
+      class="group relative cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 transition-all hover:border-neutral-300 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700"
     >
+      <a href={getItemHref(item)} aria-label={item.name} class="absolute inset-0 z-[1] rounded-lg"></a>
       <!-- Top row: Avatar, Name, Action buttons -->
       <div class="flex items-center gap-3">
         <DatabaseAvatar name={item.name} repoUrl={item.repositoryUrl} size="md" />
@@ -94,6 +94,8 @@
         <div class="relative z-10 flex flex-shrink-0 items-center gap-1">
           <button
             type="button"
+            aria-label="View {item.name} on GitHub"
+            title="View on GitHub"
             on:click={(e) => handleExternalClick(e, item.repositoryUrl)}
             class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
           >
@@ -101,6 +103,8 @@
           </button>
           <button
             type="button"
+            aria-label="Unlink {item.name}"
+            title="Unlink"
             on:click={(e) => handleUnlinkClick(e, item)}
             class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
           >
@@ -129,6 +133,6 @@
           <Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
         {/if}
       </div>
-    </a>
+    </div>
   {/each}
 </div>

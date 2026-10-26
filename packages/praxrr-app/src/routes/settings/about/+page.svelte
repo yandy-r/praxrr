@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import { Info, FolderOpen, Database, HelpCircle, Heart, Package, Users } from 'lucide-svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import VersionBadge from './components/VersionBadge.svelte';
   import Table from '$ui/table/Table.svelte';
   import ExpandableTable from '$ui/table/ExpandableTable.svelte';
@@ -138,6 +139,8 @@
     { key: 'tags', header: 'Tags' },
   ];
 </script>
+
+<PageTitle parts={['About', 'Settings']} />
 
 <div class="p-4 md:p-8">
   <h1 class="mb-6 text-3xl font-bold text-neutral-900 dark:text-neutral-50">About Praxrr</h1>

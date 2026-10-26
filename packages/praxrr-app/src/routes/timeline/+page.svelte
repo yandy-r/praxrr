@@ -196,7 +196,7 @@
   $: sourceCounts = result?.sourceCounts ?? null;
 </script>
 
-<svelte:head><title>Timeline · Praxrr</title></svelte:head>
+<svelte:head><title>Timeline - Praxrr</title></svelte:head>
 
 <svelte:window on:keydown={handleDrawerKeydown} />
 

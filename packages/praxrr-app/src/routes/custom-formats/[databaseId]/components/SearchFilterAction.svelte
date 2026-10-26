@@ -20,7 +20,7 @@
   const searchInHeaderId = uniqueId('search-in-header');
 </script>
 
-<ActionButton icon={Binoculars} hasDropdown square title="Choose search filters" dropdownPosition="right">
+<ActionButton icon={Binoculars} hasDropdown square label="Choose search filters" dropdownPosition="right">
   <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
     <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Choose search filters" onClose={close}>
       <div role="group" aria-labelledby={searchInHeaderId}>

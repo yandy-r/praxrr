@@ -407,3 +407,30 @@ Notes:
 Variants:
 
 - The metadata line always shows platform and channel; the version segment is conditionally appended.
+
+## PageTitle
+
+Sets the document `<title>` through `<svelte:head>`. Pass the parts from most to least specific; `Praxrr` is always appended and the parts are joined with `-`. Null, undefined, and blank parts are dropped.
+
+Import:
+
+```svelte
+import PageTitle from '$ui/meta/PageTitle.svelte';
+```
+
+Props:
+
+| Prop    | Type                                 | Default | Required | Description                                                     |
+| ------- | ------------------------------------ | ------- | -------- | --------------------------------------------------------------- |
+| `parts` | `Array<string \| null \| undefined>` | —       | Yes      | Title segments, most specific first; `Praxrr` is appended last. |
+
+Usage:
+
+```svelte
+<PageTitle parts={['Naming', db.name]} />
+<!-- <title>Naming - MyDB - Praxrr</title> -->
+```
+
+Notes:
+
+- Every routed page should render one so screen reader users and browser tabs/history get a distinct page name; the root layout's `Praxrr` title is only the fallback.

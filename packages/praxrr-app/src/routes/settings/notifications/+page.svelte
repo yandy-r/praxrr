@@ -4,6 +4,7 @@
   import { Plus, Trash2, Bell, BellOff, Send, Loader2, Pencil } from 'lucide-svelte';
   import Modal from '$ui/modal/Modal.svelte';
   import NotificationHistory from './components/NotificationHistory.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import type { Column } from '$ui/table/types';
@@ -79,6 +80,8 @@
     }
   }
 </script>
+
+<PageTitle parts={['Notifications', 'Settings']} />
 
 <div class="p-4 md:p-8">
   <!-- Header -->

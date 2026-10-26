@@ -213,6 +213,7 @@
         }
         return `/databases/trash/${row.sourceDatabaseId ?? data.source.id}/quality-sizes/${row.trashId}/`;
       }}
+      rowLabel={(row) => row.name}
       emptyMessage="No quality sizes cached. Try syncing sources."
       responsive
       {initialSort}

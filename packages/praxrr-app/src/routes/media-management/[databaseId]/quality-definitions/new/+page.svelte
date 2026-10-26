@@ -1,6 +1,7 @@
 <script lang="ts">
   import QualityDefinitionsForm from '../components/QualityDefinitionsForm.svelte';
   import DirtyModal from '$ui/modal/DirtyModal.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import RadarrIcon from '$lib/client/assets/Radarr.svg';
   import SonarrIcon from '$lib/client/assets/Sonarr.svg';
   import LidarrIcon from '$lib/client/assets/Lidarr.png';
@@ -44,6 +45,8 @@
         ? data.sonarrQualities
         : data.lidarrQualities;
 </script>
+
+<PageTitle parts={['New Quality Definitions Config', data.currentDatabase.name]} />
 
 {#if !selectedArrType}
   <div class="grid gap-4 sm:grid-cols-2">

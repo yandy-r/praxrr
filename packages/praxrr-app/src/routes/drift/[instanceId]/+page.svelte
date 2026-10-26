@@ -128,7 +128,7 @@
 </script>
 
 <svelte:head>
-  <title>Drift Detail - Praxrr</title>
+  <title>{detail?.instanceName ?? `Instance ${data.instanceId}`} - Drift Detail - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

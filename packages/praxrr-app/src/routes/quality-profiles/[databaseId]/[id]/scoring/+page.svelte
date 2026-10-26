@@ -575,7 +575,7 @@
 </script>
 
 <svelte:head>
-  <title>Scoring - Praxrr</title>
+  <title>{data.profileName} - Scoring - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 {#if scoring}
@@ -686,7 +686,7 @@
 
     <ActionsBar className="md:w-full">
       <SearchAction {searchStore} placeholder="Search custom formats..." responsive />
-      <ActionButton icon={ArrowUpDown} hasDropdown={true} dropdownPosition="right" title="Sort by">
+      <ActionButton icon={ArrowUpDown} hasDropdown={true} dropdownPosition="right" label="Sort by">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
           <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="10rem" role="menu" label="Sort by">
             <div role="presentation" class="py-1">
@@ -738,7 +738,7 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={Layers} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Group by">
+      <ActionButton icon={Layers} hasDropdown={true} popupRole="dialog" dropdownPosition="right" label="Group by">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
           <Dropdown position={dropdownPosition} mobilePosition="middle" minWidth="14rem" role="dialog" label="Group by">
             <div role="presentation" class="py-1">
@@ -786,7 +786,7 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={LayoutGrid} hasDropdown={true} dropdownPosition="right" title="Tile columns">
+      <ActionButton icon={LayoutGrid} hasDropdown={true} dropdownPosition="right" label="Tile columns">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
           <Dropdown
             position={dropdownPosition}
@@ -816,7 +816,7 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={Settings} hasDropdown={true} dropdownPosition="right" title="Display options">
+      <ActionButton icon={Settings} hasDropdown={true} dropdownPosition="right" label="Display options">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
           <Dropdown
             position={dropdownPosition}
@@ -843,7 +843,7 @@
           </Dropdown>
         </svelte:fragment>
       </ActionButton>
-      <ActionButton icon={User} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Profiles">
+      <ActionButton icon={User} hasDropdown={true} popupRole="dialog" dropdownPosition="right" label="Profiles">
         <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
           <Dropdown position={dropdownPosition} minWidth="16rem" role="dialog" label="Profiles">
             <!-- Save current config form -->

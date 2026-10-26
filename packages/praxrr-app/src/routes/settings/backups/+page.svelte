@@ -11,7 +11,7 @@
   import ActionsBar from '$lib/client/ui/actions/ActionsBar.svelte';
   import ActionButton from '$lib/client/ui/actions/ActionButton.svelte';
   import SearchAction from '$lib/client/ui/actions/SearchAction.svelte';
-  import Tooltip from '$ui/tooltip/Tooltip.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import { getPersistentSearchStore } from '$lib/client/stores/search';
 
   export let data: PageData;
@@ -106,6 +106,8 @@
   }
 </script>
 
+<PageTitle parts={['Backups', 'Settings']} />
+
 <div class="p-4 md:p-8">
   <!-- Header -->
   <div class="mb-8">
@@ -185,15 +187,9 @@
   <div class="mb-4">
     <ActionsBar>
       <SearchAction {searchStore} placeholder="Search backups..." />
-      <Tooltip text="Upload Backup">
-        <ActionButton icon={Upload} on:click={triggerFileUpload} />
-      </Tooltip>
-      <Tooltip text="Create Backup">
-        <ActionButton icon={FolderArchive} on:click={triggerCreateBackup} />
-      </Tooltip>
-      <Tooltip text="Run Backup Cleanup">
-        <ActionButton icon={BrushCleaning} on:click={triggerCleanupBackups} />
-      </Tooltip>
+      <ActionButton icon={Upload} label="Upload backup" on:click={triggerFileUpload} />
+      <ActionButton icon={FolderArchive} label="Create backup" on:click={triggerCreateBackup} />
+      <ActionButton icon={BrushCleaning} label="Run backup cleanup" on:click={triggerCleanupBackups} />
     </ActionsBar>
   </div>
 

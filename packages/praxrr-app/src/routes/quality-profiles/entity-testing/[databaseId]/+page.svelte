@@ -356,7 +356,7 @@
     <SearchAction searchStore={search} placeholder={searchPlaceholder} responsive />
     <ActionButton
       icon={Plus}
-      title="Add test entity"
+      label="Add test entity"
       on:click={() => (data.canWriteToBase ? (showAddModal = true) : notifyReadOnly())}
     />
     <ActionButton
@@ -364,7 +364,7 @@
       hasDropdown={true}
       dropdownPosition="middle"
       square={!selectedProfile}
-      title={selectedProfile ? `Quality profile: ${selectedProfile.name}` : 'Select quality profile'}
+      label={selectedProfile ? `Quality profile: ${selectedProfile.name}` : 'Select quality profile'}
     >
       {#if selectedProfile}
         <span class="ml-2 text-sm text-neutral-700 dark:text-neutral-300">{selectedProfile.name}</span>
@@ -386,7 +386,7 @@
         {/each}
       </Dropdown>
     </ActionButton>
-    <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="middle" title="Filter by type">
+    <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="middle" label="Filter by type">
       <Dropdown slot="dropdown" position="middle" role="menu" label="Filter by type">
         <DropdownItem
           icon={Film}
@@ -404,7 +404,7 @@
         />
       </Dropdown>
     </ActionButton>
-    <ActionButton icon={Info} title="How entity testing works" on:click={() => (showInfoModal = true)} />
+    <ActionButton icon={Info} label="How entity testing works" on:click={() => (showInfoModal = true)} />
   </ActionsBar>
 
   <!-- Entity Testing Content -->

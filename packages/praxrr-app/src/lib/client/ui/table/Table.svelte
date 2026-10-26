@@ -13,6 +13,8 @@
   export let emptyMessage: string = 'No data available';
   export let onRowClick: ((row: T) => void) | undefined = undefined;
   export let rowHref: ((row: T) => string | null | undefined) | undefined = undefined;
+  // Accessible name for a linked row; required with rowHref so each row exposes one named link.
+  export let rowLabel: ((row: T) => string) | undefined = undefined;
   export let initialSort: SortState | null = null;
   export let onSortChange: ((sort: SortState | null) => void) | undefined = undefined;
   export let actionsHeader: string = 'Actions';
@@ -72,6 +74,25 @@
       default:
         return 'text-left';
     }
+  }
+
+  /**
+   * Accessible name for a linked row: explicit rowLabel, else the first column's value, else "Row N".
+   */
+  function rowLinkLabel(row: T, rowIndex: number): string {
+    const explicit = rowLabel?.(row);
+    if (explicit) return explicit;
+    const first = columns[0];
+    if (first) {
+      const rendered = first.cell?.(row);
+      if (typeof rendered === 'string' && rendered.trim()) return rendered;
+      const value = getCellValue(row, first.key);
+      if (value != null) {
+        const text = String(value);
+        if (text.trim()) return text;
+      }
+    }
+    return `Row ${rowIndex + 1}`;
   }
 
   function toggleSort(column: Column<T>) {
@@ -170,7 +191,7 @@
     {:else}
       {#each displayData as row, rowIndex}
         {@const rowUrl = rowHref?.(row) ?? null}
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -- mouse convenience only; keyboard users activate the labelled full-card overlay link. -->
         <div
           class="group/row relative overflow-hidden rounded-xl border border-neutral-300 bg-white dark:border-neutral-700/60 dark:bg-neutral-800/50 {onRowClick ||
           rowUrl
@@ -179,7 +200,7 @@
           on:click={() => onRowClick && onRowClick(row)}
         >
           {#if rowUrl}
-            <a href={rowUrl} class="absolute inset-0 z-10" aria-label="Open {columns[0]?.header || 'item'}"></a>
+            <a href={rowUrl} class="absolute inset-0 z-10" aria-label={rowLinkLabel(row, rowIndex)}></a>
           {/if}
           <!-- Primary row: first column as title + actions -->
           <div class="flex items-center justify-between gap-3 px-4 py-3">
@@ -335,7 +356,11 @@
                   class={`${compact ? 'px-4 py-2' : 'px-6 py-4'} text-sm text-neutral-900 dark:text-neutral-100 ${getAlignClass(column.align)} ${column.width || ''} ${rowUrl ? 'relative' : ''}`}
                 >
                   {#if rowUrl}
-                    <a href={rowUrl} class="cell-link" aria-label="Open row"></a>
+                    {#if colIndex === 0}
+                      <a href={rowUrl} class="cell-link" aria-label={rowLinkLabel(row, rowIndex)}></a>
+                    {:else}
+                      <a href={rowUrl} class="cell-link" aria-hidden="true" tabindex="-1"></a>
+                    {/if}
                   {/if}
                   {#if column.cell}
                     {@const rendered = column.cell(row)}
@@ -378,6 +403,11 @@
     position: absolute;
     inset: 0;
     z-index: 1;
+  }
+
+  /* The link fills the cell, so draw the focus ring inside to avoid clipping */
+  .cell-link:focus-visible {
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   td :global(ul) {

@@ -183,7 +183,14 @@
   $: columns = showSourceBadges ? [baseColumns[0], sourceColumn, ...baseColumns.slice(1)] : baseColumns;
 </script>
 
-<Table {columns} data={configs} rowHref={getRowHref} hoverable={true}>
+<Table
+  {columns}
+  data={configs}
+  rowHref={getRowHref}
+  rowLabel={(row) =>
+    `${getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)} (${getAppLabel(row.arr_type)})`}
+  hoverable={true}
+>
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
       <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)}</span>
@@ -219,10 +226,10 @@
     {/if}
   </svelte:fragment>
 
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
   <svelte:fragment slot="actions" let:row>
     {#if isEditableRow(row)}
-      <div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+      <div role="presentation" class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
         <Button
           icon={Download}
           size="xs"

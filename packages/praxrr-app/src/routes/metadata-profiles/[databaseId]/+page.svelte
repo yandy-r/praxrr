@@ -145,7 +145,11 @@
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search metadata profiles..." responsive />
     <ViewToggle bind:value={$view} />
-    <ActionButton icon={Plus} on:click={() => goto(`/metadata-profiles/${$page.params.databaseId}/new`)} />
+    <ActionButton
+      icon={Plus}
+      label="Add metadata profile"
+      on:click={() => goto(`/metadata-profiles/${$page.params.databaseId}/new`)}
+    />
   </ActionsBar>
 
   <div class="mt-6">
@@ -169,6 +173,7 @@
         {columns}
         emptyMessage="No metadata profiles found"
         rowHref={getRowHref}
+        rowLabel={(row) => row.name}
         compact={false}
         hoverable={true}
       >
@@ -202,10 +207,10 @@
         {#each $filtered as profile (profile.id)}
           <Card href={getRowHref(profile)} hoverable>
             <svelte:fragment slot="header">
-              <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
               <div class="flex items-center justify-between gap-2">
                 <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
-                <div class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+                <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+                <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
                   <Button
                     icon={Download}
                     size="xs"

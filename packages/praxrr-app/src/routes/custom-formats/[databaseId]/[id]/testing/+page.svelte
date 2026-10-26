@@ -109,7 +109,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.format.name} - Testing - Praxrr</title>
+  <title>{data.format.name} - Testing - {data.currentDatabase.name} - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

@@ -48,11 +48,11 @@
     in:fade={{ duration: 140 }}
     out:fade={{ duration: 110 }}
   >
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y-click-events-have-key-events -- backdrop click-to-close; Escape is handled on the dialog panel below. -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -- see above -->
     <div class="flex min-h-full w-full items-start justify-center sm:items-center" on:click|self={handleClose}>
       <!-- Modal -->
-      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -- panel hosts the focus trap; interactions are on its interactive children. -->
       <div
         class="relative my-4 flex w-full flex-col rounded-lg border border-neutral-200 bg-white shadow-xl sm:my-0 dark:border-neutral-700 dark:bg-neutral-900"
         style={`max-width: ${maxWidth}; max-height: ${maxHeight};`}
@@ -83,7 +83,7 @@
         </div>
 
         <!-- Body -->
-        <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+        <!-- svelte-ignore a11y-no-noninteractive-tabindex -- focusable scroll region so keyboard users can scroll an overflowing modal body. -->
         <div
           class="flex-1 overflow-auto px-6 py-4"
           role={bodyOverflows ? 'region' : undefined}

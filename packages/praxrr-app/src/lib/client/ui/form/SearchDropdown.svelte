@@ -133,7 +133,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y-no-static-element-interactions -- keydown is delegated from the combobox input inside; see handleKeyDown's target check. -->
 <div class="relative" use:clickOutside={close} class:w-full={fullWidth} on:keydown={handleKeyDown}>
   <FormInput
     {label}

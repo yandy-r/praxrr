@@ -61,7 +61,7 @@
   <SearchAction {searchStore} placeholder="Search logs..." responsive />
 
   <!-- Log File Selector -->
-  <ActionButton icon={FileText} hasDropdown={true} dropdownPosition="right" title="Select log file">
+  <ActionButton icon={FileText} hasDropdown={true} dropdownPosition="right" label="Select log file">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
       <Dropdown position={dropdownPosition} minWidth="20rem" role="menu" label="Select log file">
         <div role="presentation" class="max-h-64 overflow-y-auto">
@@ -98,7 +98,7 @@
   </ActionButton>
 
   <!-- Level Filter -->
-  <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" title="Filter by level">
+  <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" label="Filter by level">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
       <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
         {#each logLevels as level}
@@ -119,7 +119,7 @@
   </ActionButton>
 
   <!-- Source Filter -->
-  <ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right" title="Filter by source">
+  <ActionButton icon={Layers} hasDropdown={true} dropdownPosition="right" label="Filter by source">
     <svelte:fragment slot="dropdown" let:dropdownPosition let:open>
       <Dropdown position={dropdownPosition} minWidth="12rem" role="menu" label="Filter by source">
         <div role="presentation" class="max-h-64 overflow-y-auto">
@@ -146,15 +146,15 @@
     </svelte:fragment>
   </ActionButton>
 
-  <ActionButton title="Refresh logs" on:click={onRefresh}>
+  <ActionButton label="Refresh logs" on:click={onRefresh}>
     <RefreshCw size={20} class="text-neutral-700 dark:text-neutral-300 {isRefreshing ? 'animate-spin' : ''}" />
   </ActionButton>
 
   <!-- Cleanup -->
   {#if onCleanup}
-    <ActionButton icon={BrushCleaning} title="Run log cleanup" on:click={onCleanup} />
+    <ActionButton icon={BrushCleaning} label="Run log cleanup" on:click={onCleanup} />
   {/if}
 
   <!-- Download -->
-  <ActionButton icon={Download} title="Download logs as JSON" on:click={onDownload} />
+  <ActionButton icon={Download} label="Download logs as JSON" on:click={onDownload} />
 </ActionsBar>

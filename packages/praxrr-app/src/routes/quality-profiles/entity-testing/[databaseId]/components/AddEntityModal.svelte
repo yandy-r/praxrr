@@ -238,7 +238,7 @@
           on:submit={handleSubmit}
           on:clearQuery={clearSearch}
         />
-        <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="right" title="Filter by type">
+        <ActionButton icon={Clapperboard} hasDropdown={true} dropdownPosition="right" label="Filter by type">
           <svelte:fragment slot="dropdown" let:dropdownPosition>
             <Dropdown position={dropdownPosition} role="menu" label="Filter by type">
               <DropdownItem
@@ -262,7 +262,7 @@
           icon={sortDirection === 'asc' ? ArrowUpAZ : ArrowDownAZ}
           hasDropdown={true}
           dropdownPosition="right"
-          title="Sort by"
+          label="Sort by"
         >
           <svelte:fragment slot="dropdown" let:dropdownPosition>
             <Dropdown position={dropdownPosition} role="menu" label="Sort by">

@@ -216,7 +216,7 @@
 </script>
 
 <svelte:head>
-  <title>Canary Rollout Detail - Praxrr</title>
+  <title>{data.rollout.canaryInstanceName} - Canary Rollout Detail - Praxrr</title>
 </svelte:head>
 
 <div class="space-y-6">

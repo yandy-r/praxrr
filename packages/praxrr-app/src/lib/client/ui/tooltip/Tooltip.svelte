@@ -107,7 +107,7 @@
   });
 </script>
 
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y-no-static-element-interactions -- hover/focus delegation for the slotted trigger; the trigger keeps its own interactive semantics. -->
 <div
   class="inline-flex"
   bind:this={wrapperEl}

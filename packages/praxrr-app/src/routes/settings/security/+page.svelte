@@ -18,6 +18,7 @@
   } from 'lucide-svelte';
   import { parseUTC } from '$shared/utils/dates';
   import Button from '$ui/button/Button.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
   import FormInput from '$ui/form/FormInput.svelte';
   import Table from '$ui/table/Table.svelte';
@@ -251,6 +252,8 @@
     },
   ];
 </script>
+
+<PageTitle parts={['Security', 'Settings']} />
 
 <div class="p-4 md:p-8">
   <div class="mb-8">

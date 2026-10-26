@@ -1,11 +1,13 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
+  import { page } from '$app/stores';
   import { Camera, Plus, Trash2 } from 'lucide-svelte';
   import Card from '$ui/card/Card.svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Table from '$ui/table/Table.svelte';
   import Button from '$ui/button/Button.svelte';
   import Modal from '$ui/modal/Modal.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import { alertStore } from '$alerts/store';
   import type { Column } from '$ui/table/types';
   import type { PcdSnapshotDetail, SnapshotTrigger, SnapshotType } from '$pcd/snapshots/types.ts';
@@ -179,9 +181,7 @@
   }
 </script>
 
-<svelte:head>
-  <title>Snapshots - Praxrr</title>
-</svelte:head>
+<PageTitle parts={['Snapshots', $page.data.database?.name]} />
 
 <div class="space-y-8 pt-4">
   <div class="flex flex-wrap items-end justify-between gap-3">
@@ -262,6 +262,7 @@
       {columns}
       data={data.snapshots}
       rowHref={(row) => `/databases/${data.databaseId}/snapshots/${row.id}`}
+      rowLabel={(row) => `${row.description || 'Snapshot'} #${row.id}`}
       emptyMessage="No snapshots recorded for this database."
       hoverable
       compact

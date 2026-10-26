@@ -174,7 +174,9 @@
 </script>
 
 <svelte:head>
-  <title>Resolved Config - Praxrr</title>
+  <title
+    >Resolved Config - {data.databases.find((db) => db.id === data.selectedDatabaseId)?.name ?? 'Database'} - Praxrr</title
+  >
 </svelte:head>
 
 <div class="space-y-8">

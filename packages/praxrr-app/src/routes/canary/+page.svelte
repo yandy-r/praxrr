@@ -238,6 +238,7 @@
         {columns}
         data={data.rollouts}
         rowHref={(row) => `/canary/${row.id}`}
+        rowLabel={(row) => `${row.canaryInstanceName} canary rollout #${row.id}`}
         emptyMessage="No canary rollouts recorded yet."
         hoverable
         compact

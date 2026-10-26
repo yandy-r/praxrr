@@ -115,13 +115,13 @@
   {#each visibleFormats as format}
     <Card href={getCardHref(format)} hoverable>
       <svelte:fragment slot="header">
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="flex items-start justify-between gap-2">
           <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
             {format.name}
           </h3>
           {#if isEditableRow(format)}
-            <div class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+            <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+            <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
               {#if format.testCount > 0}
                 <div
                   class="flex items-center gap-1 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"

@@ -7,11 +7,14 @@
   import ArrDefaultsSettings from './components/ArrDefaultsSettings.svelte';
   import SetupGuideSettings from './components/SetupGuideSettings.svelte';
   import CollapsibleCard from '$ui/card/CollapsibleCard.svelte';
+  import PageTitle from '$ui/meta/PageTitle.svelte';
   import { SETTINGS_LOGGING, SETTINGS_AI, SETTINGS_TMDB, SETTINGS_BACKUP } from '$shared/disclosure/sectionKeys';
   import type { PageData } from './$types';
 
   export let data: PageData;
 </script>
+
+<PageTitle parts={['General', 'Settings']} />
 
 <div class="p-4 md:p-8">
   <div class="mb-8">

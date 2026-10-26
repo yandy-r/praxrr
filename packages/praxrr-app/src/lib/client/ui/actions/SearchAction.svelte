@@ -107,7 +107,7 @@
       type="button"
       on:click={openModal}
       class="relative flex h-10 w-full items-center justify-between rounded-xl border border-neutral-300 bg-white px-3 transition-colors hover:bg-neutral-50 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:hover:bg-neutral-800"
-      title="Search"
+      aria-label="Search"
     >
       <span class="flex items-center gap-2">
         {#if !hideIcon}
@@ -125,7 +125,7 @@
 
   <!-- Mobile: Search modal -->
   {#if modalOpen}
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -- backdrop click-to-close; Escape is handled in the input's keydown handler. -->
     <div
       class="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 px-4 pt-4"
       on:click={handleBackdropClick}
@@ -168,6 +168,7 @@
           <!-- Clear/Close button -->
           {#if query}
             <button
+              aria-label="Clear search"
               on:click={handleClear}
               class="absolute right-6 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800"
             >
@@ -175,6 +176,7 @@
             </button>
           {:else if activeQuery}
             <button
+              aria-label="Clear filter"
               on:click={handleClearQuery}
               class="absolute right-6 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800"
             >
@@ -182,6 +184,7 @@
             </button>
           {:else}
             <button
+              aria-label="Close search"
               on:click={closeModal}
               class="absolute right-6 flex h-8 w-8 items-center justify-center rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800"
             >
@@ -232,6 +235,7 @@
       <!-- Clear button -->
       {#if query}
         <button
+          aria-label="Clear search"
           on:click={handleClear}
           class="absolute right-2 flex h-6 w-6 items-center justify-center rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800"
         >
@@ -239,6 +243,7 @@
         </button>
       {:else if activeQuery}
         <button
+          aria-label="Clear filter"
           on:click={handleClearQuery}
           class="absolute right-2 flex h-6 w-6 items-center justify-center rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800"
         >

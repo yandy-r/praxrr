@@ -219,6 +219,7 @@
                   {:else}
                     <button
                       type="button"
+                      aria-label={`Edit score for ${contribution.cfName}`}
                       class="focus-visible:ring-accent-400 rounded px-1 py-0.5 text-left transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-neutral-800"
                       on:click={() => (editingCfName = contribution.cfName)}
                     >

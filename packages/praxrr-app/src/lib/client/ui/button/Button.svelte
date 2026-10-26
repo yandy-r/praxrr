@@ -91,7 +91,7 @@
       {target}
       {rel}
       title={!tooltip && title ? title : undefined}
-      aria-label={ariaLabel || tooltip || undefined}
+      aria-label={ariaLabel || tooltip || (isIconOnly && title ? title : undefined)}
       class={classes}
       {...$$restProps}
       on:click
@@ -101,7 +101,7 @@
         <svelte:component this={icon} size={iconSize} class={baseIconColor} />
       {/if}
       {#if text}
-        <span class="{baseTextColor} {hideTextOnMobile ? 'hidden md:inline' : ''}">{text}</span>
+        <span class="{baseTextColor} {hideTextOnMobile ? 'sr-only md:not-sr-only md:inline' : ''}">{text}</span>
       {/if}
       <slot />
       {#if icon && iconPosition === 'right'}
@@ -113,7 +113,7 @@
       {type}
       {disabled}
       title={!tooltip && title ? title : undefined}
-      aria-label={ariaLabel || tooltip || undefined}
+      aria-label={ariaLabel || tooltip || (isIconOnly && title ? title : undefined)}
       class={classes}
       {...$$restProps}
       on:click
@@ -123,7 +123,7 @@
         <svelte:component this={icon} size={iconSize} class={baseIconColor} />
       {/if}
       {#if text}
-        <span class="{baseTextColor} {hideTextOnMobile ? 'hidden md:inline' : ''}">{text}</span>
+        <span class="{baseTextColor} {hideTextOnMobile ? 'sr-only md:not-sr-only md:inline' : ''}">{text}</span>
       {/if}
       <slot />
       {#if icon && iconPosition === 'right'}

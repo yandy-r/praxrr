@@ -230,6 +230,7 @@
   hoverable={true}
   compact={false}
   rowHref={getRowHref}
+  rowLabel={(row) => row.name}
   pageSize={50}
 >
   <svelte:fragment slot="cell" let:row let:column>
@@ -247,10 +248,10 @@
     {/if}
   </svelte:fragment>
 
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <svelte:fragment slot="actions" let:row>
     {#if isEditableRow(row)}
-      <div class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
+      <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
+      <div role="presentation" class="flex items-center justify-end gap-0.5" on:click|stopPropagation>
         <Button
           icon={Download}
           size="xs"

@@ -183,8 +183,8 @@
         </p>
         <ActionsBar>
           <SearchAction searchStore={demoSearch} placeholder="Search..." responsive />
-          <ActionButton icon={Plus} title="Add" />
-          <ActionButton icon={Filter} title="Filter options" hasDropdown={true} dropdownPosition="right">
+          <ActionButton icon={Plus} label="Add" />
+          <ActionButton icon={Filter} label="Filter options" hasDropdown={true} dropdownPosition="right">
             <svelte:fragment slot="dropdown">
               <Dropdown position="right" label="Filter options">
                 <DropdownItem icon={FileText} label="Option A" />
@@ -192,7 +192,7 @@
               </Dropdown>
             </svelte:fragment>
           </ActionButton>
-          <ActionButton icon={Info} title="Info" />
+          <ActionButton icon={Info} label="Info" />
           <ViewToggle bind:value={demoView} />
         </ActionsBar>
       </div>
@@ -209,9 +209,9 @@
       <div class="space-y-3">
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">Buttons only</p>
         <ActionsBar className="md:justify-start">
-          <ActionButton icon={Plus} title="Add" />
-          <ActionButton icon={Trash2} variant="danger" title="Delete" />
-          <ActionButton icon={Info} title="Info" />
+          <ActionButton icon={Plus} label="Add" />
+          <ActionButton icon={Trash2} variant="danger" label="Delete" />
+          <ActionButton icon={Info} label="Info" />
         </ActionsBar>
       </div>
     </ComponentCard>
@@ -394,7 +394,8 @@
         <div class="max-w-sm">
           <Card hoverable onclick={() => {}}>
             <svelte:fragment slot="header">
-              <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Clickable Card</h3>
+              <!-- span (not h3): a clickable Card renders a <button>, and headings inside buttons are invalid HTML -->
+              <span class="block text-sm font-semibold text-neutral-900 dark:text-neutral-100">Clickable Card</span>
             </svelte:fragment>
             <p class="text-sm text-neutral-600 dark:text-neutral-400">
               Hover and click this card. Shows cursor and bg transition.
@@ -541,7 +542,7 @@
           Dropdown + DropdownItem (hover or click/Enter to open)
         </p>
         <ActionsBar className="md:justify-start">
-          <ActionButton icon={Filter} title="Dropdown examples" hasDropdown={true} dropdownPosition="left">
+          <ActionButton icon={Filter} label="Dropdown examples" hasDropdown={true} dropdownPosition="left">
             <svelte:fragment slot="dropdown">
               <Dropdown position="left" label="Dropdown examples">
                 <DropdownItem icon={FileText} label="Normal item" />
@@ -553,7 +554,7 @@
           </ActionButton>
           <ActionButton
             icon={Settings}
-            title="Dialog popup example"
+            label="Dialog popup example"
             hasDropdown={true}
             popupRole="dialog"
             dropdownPosition="left"
@@ -671,33 +672,33 @@
     <ComponentCard
       name="IconCheckbox"
       paths={['form/IconCheckbox']}
-      description="Icon-based checkbox toggle with five named colors (accent, blue, green, red, neutral) plus hex color support. Two variants (filled/outline), three shapes (rounded, square, circle). Used for toggling custom formats, conditions, etc."
+      description="Icon-based checkbox toggle with five named colors (accent, blue, green, red, neutral) plus hex color support. Two variants (filled/outline), three shapes (rounded, square, circle). Interactive checkboxes require a label for their accessible name; use decorative only inside an already named interactive control."
     >
       <div class="space-y-3">
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">Colors (filled)</p>
         <div class="flex flex-wrap items-center gap-3">
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} color="accent" bind:checked={checkedAccent} />
+            <IconCheckbox label="Accent" icon={Check} color="accent" bind:checked={checkedAccent} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Accent</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} color="blue" bind:checked={checkedBlue} />
+            <IconCheckbox label="Blue" icon={Check} color="blue" bind:checked={checkedBlue} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Blue</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} color="green" bind:checked={checkedGreen} />
+            <IconCheckbox label="Green" icon={Check} color="green" bind:checked={checkedGreen} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Green</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} color="red" bind:checked={checkedRed} />
+            <IconCheckbox label="Red" icon={Check} color="red" bind:checked={checkedRed} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Red</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} color="neutral" bind:checked={checkedNeutral} />
+            <IconCheckbox label="Neutral" icon={Check} color="neutral" bind:checked={checkedNeutral} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Neutral</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Star} color="#FFC230" checked />
+            <IconCheckbox label="Hex" icon={Star} color="#FFC230" checked />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Hex</span>
           </div>
         </div>
@@ -706,11 +707,17 @@
       <div class="space-y-3">
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">Outline variant</p>
         <div class="flex flex-wrap items-center gap-3">
-          <IconCheckbox icon={Check} color="accent" variant="outline" bind:checked={checkedOutline} />
-          <IconCheckbox icon={Check} color="green" variant="outline" checked />
-          <IconCheckbox icon={Check} color="red" variant="outline" checked />
-          <IconCheckbox icon={Check} color="blue" variant="outline" checked />
-          <IconCheckbox icon={Check} color="neutral" variant="outline" checked />
+          <IconCheckbox
+            label="Accent outline"
+            icon={Check}
+            color="accent"
+            variant="outline"
+            bind:checked={checkedOutline}
+          />
+          <IconCheckbox label="Green outline" icon={Check} color="green" variant="outline" checked />
+          <IconCheckbox label="Red outline" icon={Check} color="red" variant="outline" checked />
+          <IconCheckbox label="Blue outline" icon={Check} color="blue" variant="outline" checked />
+          <IconCheckbox label="Neutral outline" icon={Check} color="neutral" variant="outline" checked />
         </div>
       </div>
 
@@ -720,23 +727,23 @@
         </p>
         <div class="flex flex-wrap items-center gap-3">
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} shape="rounded" bind:checked={checkedSquare} />
+            <IconCheckbox label="Rounded" icon={Check} shape="rounded" bind:checked={checkedSquare} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Rounded</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} shape="square" bind:checked={checkedSquare} />
+            <IconCheckbox label="Square" icon={Check} shape="square" bind:checked={checkedSquare} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Square</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} shape="circle" bind:checked={checkedCircle} />
+            <IconCheckbox label="Circle" icon={Check} shape="circle" bind:checked={checkedCircle} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Circle</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} bind:checked={unchecked} />
+            <IconCheckbox label="Unchecked" icon={Check} bind:checked={unchecked} />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Unchecked</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <IconCheckbox icon={Check} checked disabled />
+            <IconCheckbox label="Disabled" icon={Check} checked disabled />
             <span class="text-xs text-neutral-500 dark:text-neutral-400">Disabled</span>
           </div>
         </div>
