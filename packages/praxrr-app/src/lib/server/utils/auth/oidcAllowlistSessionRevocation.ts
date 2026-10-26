@@ -18,7 +18,7 @@ function sorted(values: ReadonlySet<string>): string[] {
 /**
  * Hash the canonical, order-independent policy without persisting configured identities.
  *
- * Canonical form (v1): `{ v, configured, subjects, emails, emailDomains, groups, groupsClaim,
+ * Canonical form (v2): `{ v, configured, subjects, emails, emailDomains, groups, groupsClaim,
  * allowAll }` where every set is sorted, `groupsClaim` is nulled unless group entries exist
  * (a claim name can never match without entries), and `allowAll` is forced to `false` while
  * any list is configured (lists are authoritative, so the flag is inert). The fingerprint
@@ -26,10 +26,11 @@ function sorted(values: ReadonlySet<string>): string[] {
  *
  * Bump `v` whenever `evaluateOidcAllowlist` semantics change so every deployment re-revokes
  * once against the new definition instead of trusting fingerprints hashed under old rules.
+ * v2: email matching folds only ASCII in the local part and compares domains in punycode form.
  */
 export function fingerprintOidcAllowlist(policy: OidcAllowlistPolicy): string {
   const canonical = JSON.stringify({
-    v: 1,
+    v: 2,
     configured: policy.configured,
     subjects: sorted(policy.subjects),
     emails: sorted(policy.emails),

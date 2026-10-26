@@ -266,7 +266,13 @@ Deno.test('parseOidcAllowlist: invalid entries retain their original trimmed spe
 });
 
 Deno.test('OIDC token verification requires a non-empty subject and numeric expiration', () => {
-  const valid = { sub: 'account', iss: 'https://idp.test', aud: 'praxrr', exp: Math.floor(Date.now() / 1000) + 600 };
+  const valid = {
+    sub: 'account',
+    iss: 'https://idp.test',
+    aud: 'praxrr',
+    exp: Math.floor(Date.now() / 1000) + 600,
+    iat: Math.floor(Date.now() / 1000),
+  };
   const options = { issuer: 'https://idp.test', clientId: 'praxrr' };
   for (const changes of [
     { sub: undefined },
@@ -281,4 +287,125 @@ Deno.test('OIDC token verification requires a non-empty subject and numeric expi
   }
   const claims = decodeIdToken(`header.${btoa(JSON.stringify(valid))}.signature`);
   verifyIdToken(claims, options);
+});
+
+// --- ASCII-only case folding and punycode domains (YAN-1601) ------------------------------------
+
+function verifiedClaims(email: string): { sub: string; email: string; email_verified: true } {
+  return { sub: 'x', email, email_verified: true };
+}
+
+Deno.test('evaluateOidcAllowlist: local parts fold ASCII case only, never Unicode lookalikes', () => {
+  const policy = parseOidcAllowlist({ emails: 'kim@example.com, admin@example.com' });
+  // ASCII case folding still works for both sides.
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('KIM@Example.COM'), policy), { allowed: true, matchedBy: 'email' });
+  // U+212A KELVIN SIGN and U+0130 LATIN CAPITAL I WITH DOT ABOVE lowercase to ASCII under Unicode rules.
+  for (const email of ['\u212Aim@example.com', 'adm\u0130n@example.com', 'ADM\u0130N@EXAMPLE.COM']) {
+    assertEquals(evaluateOidcAllowlist(verifiedClaims(email), policy), { allowed: false, reason: 'no-match' }, email);
+  }
+});
+
+Deno.test('parseOidcAllowlist: entry local parts are ASCII-lowercased only', () => {
+  const policy = parseOidcAllowlist({ emails: '\u212Aim@example.com, Kim@Example.com' });
+  assertEquals([...policy.emails].sort(), ['kim@example.com', '\u212Aim@example.com'].sort());
+  // The Kelvin entry matches only itself, not the ASCII spelling it would fold to under toLowerCase().
+  const kelvinOnly = parseOidcAllowlist({ emails: '\u212Aim@example.com' });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('kim@example.com'), kelvinOnly), {
+    allowed: false,
+    reason: 'no-match',
+  });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('\u212Aim@example.com'), kelvinOnly), {
+    allowed: true,
+    matchedBy: 'email',
+  });
+});
+
+Deno.test('evaluateOidcAllowlist: a Kelvin-sign spelling of a domain label never matches the ASCII domain', () => {
+  const policy = parseOidcAllowlist({ emails: '@kexample.com, ok@kexample.com' });
+  for (const email of ['a@\u212Aexample.com', 'ok@\u212Aexample.com']) {
+    assertEquals(evaluateOidcAllowlist(verifiedClaims(email), policy), { allowed: false, reason: 'no-match' }, email);
+  }
+  // A Kelvin domain entry is rejected as unrepresentable rather than silently becoming 'kexample.com'.
+  const entry = parseOidcAllowlist({ emails: '@\u212Aexample.com' });
+  assertEquals(entry.invalidEntries, ['@\u212Aexample.com']);
+  assertEquals(entry.usableEntryCount, 0);
+});
+
+Deno.test('toAsciiDomain: labels the UTS46 mapping rewrites never fold onto an existing IDN domain', () => {
+  const folded = ['ｂücher.example', 'bü\u00ADcher.example', '\u212Aü.example', 'ｘｎ--bcher-kva.example'];
+  for (const domain of folded) {
+    const entry = parseOidcAllowlist({ emails: `@${domain}, ana@${domain}` });
+    assertEquals(entry.invalidEntries, [`@${domain}`, `ana@${domain}`], domain);
+    assertEquals(entry.usableEntryCount, 0, domain);
+  }
+  const policy = parseOidcAllowlist({ emails: '@bücher.example, @kü.example' });
+  assertEquals([...policy.emailDomains].sort(), ['xn--bcher-kva.example', 'xn--k-eha.example']);
+  for (const domain of folded) {
+    assertEquals(
+      evaluateOidcAllowlist(verifiedClaims(`x@${domain}`), policy),
+      { allowed: false, reason: 'no-match' },
+      domain
+    );
+  }
+});
+
+Deno.test('toAsciiDomain: genuine IDN spelling matches its punycode form in both directions', () => {
+  const unicodeEntry = parseOidcAllowlist({ emails: '@bücher.example' });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('x@xn--bcher-kva.example'), unicodeEntry), {
+    allowed: true,
+    matchedBy: 'email-domain',
+  });
+  const punycodeEntry = parseOidcAllowlist({ emails: '@xn--bcher-kva.example' });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('x@bücher.example'), punycodeEntry), {
+    allowed: true,
+    matchedBy: 'email-domain',
+  });
+});
+
+Deno.test('toAsciiDomain: non-ASCII uppercase labels fail closed (ASCII-only case folding)', () => {
+  const entry = parseOidcAllowlist({ emails: '@BÜCHER.example' });
+  assertEquals(entry.invalidEntries, ['@BÜCHER.example']);
+  const policy = parseOidcAllowlist({ emails: '@bücher.example' });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('x@BÜCHER.example'), policy), {
+    allowed: false,
+    reason: 'no-match',
+  });
+});
+
+Deno.test('IDN domains compare in punycode form in both directions', () => {
+  const unicodeEntry = parseOidcAllowlist({ emails: '@Bücher.Example, ana@Bücher.Example' });
+  assertEquals([...unicodeEntry.emailDomains], ['xn--bcher-kva.example']);
+  assertEquals([...unicodeEntry.emails], ['ana@xn--bcher-kva.example']);
+  for (const email of ['x@xn--bcher-kva.example', 'x@XN--BCHER-KVA.EXAMPLE', 'x@bücher.example']) {
+    assertEquals(
+      evaluateOidcAllowlist(verifiedClaims(email), unicodeEntry),
+      { allowed: true, matchedBy: 'email-domain' },
+      email
+    );
+  }
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('ANA@bücher.example'), unicodeEntry), {
+    allowed: true,
+    matchedBy: 'email',
+  });
+
+  const punycodeEntry = parseOidcAllowlist({ emails: '@xn--bcher-kva.example' });
+  assertEquals(evaluateOidcAllowlist(verifiedClaims('x@bücher.example'), punycodeEntry), {
+    allowed: true,
+    matchedBy: 'email-domain',
+  });
+  // Unrelated domains and subdomains of the IDN domain still do not match.
+  for (const email of ['x@sub.bücher.example', 'x@buecher.example', 'x@bücher.example.evil']) {
+    assertEquals(
+      evaluateOidcAllowlist(verifiedClaims(email), punycodeEntry),
+      { allowed: false, reason: 'no-match' },
+      email
+    );
+  }
+});
+
+Deno.test('evaluateOidcAllowlist: claim domains that cannot be converted never match', () => {
+  const policy = parseOidcAllowlist({ emails: '@example.com' });
+  for (const email of ['a@', 'a@exa mple.com', 'a@example.com:8080', 'a@exa\u0000mple.com', 'a@@']) {
+    assertEquals(evaluateOidcAllowlist(verifiedClaims(email), policy), { allowed: false, reason: 'no-match' }, email);
+  }
 });

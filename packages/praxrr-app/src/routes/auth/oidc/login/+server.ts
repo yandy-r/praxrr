@@ -1,7 +1,15 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { config } from '$config';
-import { getDiscoveryDocument, generateState, buildAuthorizationUrl } from '$auth/oidc.ts';
+import {
+  getDiscoveryDocument,
+  generateState,
+  generateNonce,
+  generateCodeVerifier,
+  codeChallengeS256,
+  buildAuthorizationUrl,
+} from '$auth/oidc.ts';
+import { oidcFlowCookieOptions } from '$auth/oidcFlowCookie.ts';
 import { getClientIp } from '$auth/network.ts';
 import { logger } from '$logger/logger.ts';
 
@@ -9,7 +17,7 @@ import { logger } from '$logger/logger.ts';
  * GET /auth/oidc/login
  *
  * Start the OIDC login flow:
- * validate configuration, generate state, and redirect to the provider authorization URL.
+ * validate configuration, generate state/nonce/PKCE verifier, and redirect to the provider authorization URL.
  */
 export const GET: RequestHandler = async (event) => {
   const { cookies } = event;
@@ -39,26 +47,37 @@ export const GET: RequestHandler = async (event) => {
     meta: { ip },
   });
 
-  // Fetch discovery document
-  const discovery = await getDiscoveryDocument(config.oidc.discoveryUrl);
+  // Fetch discovery document (refuses non-https endpoints)
+  let discovery;
+  try {
+    discovery = await getDiscoveryDocument(config.oidc.discoveryUrl);
+  } catch (err) {
+    await logger.error('OIDC discovery failed', {
+      source: 'Auth:OIDC',
+      meta: { ip, error: err instanceof Error ? err.message : String(err) },
+    });
+    throw error(500, 'OIDC provider is unavailable or misconfigured');
+  }
 
-  // Generate state token for CSRF protection
+  // Per-attempt secrets: CSRF state, ID-token nonce, and PKCE verifier
   const state = generateState();
+  const nonce = generateNonce();
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await codeChallengeS256(codeVerifier);
 
-  // Store state in cookie (10 minute expiry)
-  cookies.set('oidc_state', state, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: false,
-    maxAge: 60 * 10,
-  });
+  // Store them in short-lived httpOnly cookies (10 minute expiry)
+  const cookieOptions = { ...oidcFlowCookieOptions(event), maxAge: 60 * 10 };
+  cookies.set('oidc_state', state, cookieOptions);
+  cookies.set('oidc_nonce', nonce, cookieOptions);
+  cookies.set('oidc_code_verifier', codeVerifier, cookieOptions);
 
   // Build authorization URL and redirect
   const authUrl = buildAuthorizationUrl(discovery.authorization_endpoint, {
     clientId: config.oidc.clientId,
     redirectUri: `${config.serverUrl}/auth/oidc/callback`,
     state,
+    nonce,
+    codeChallenge,
   });
 
   throw redirect(302, authUrl);

@@ -1,11 +1,13 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SvelteKit app ambient types for route tests
 /// <reference path="../../app.d.ts" />
 
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { CHECK_IDS, SECURITY_POSTURE_ENGINE_VERSION } from '$shared/security/index.ts';
+import { buildPostureInputs } from '$lib/server/security/gather.ts';
+import { clearDiscoveryCache, getDiscoveryDocument } from '$auth/oidc.ts';
 import { createDnsTransportResolver, overrideDnsTransportResolverForTest } from '$lib/server/security/dnsTransport.ts';
 import type { DnsRecordType, DnsTransportResolver, ResolveDns } from '$lib/server/security/dnsTransport.ts';
 import type { SecurityPostureSummaryResponse } from '$lib/server/security/responses.ts';
@@ -204,7 +206,7 @@ migratedTest('GET /security-posture/summary emits bounded redacted DNS evidence 
 		const first = await getSummary();
 		assertEquals(first.status, 200);
 		assertEquals(first.cacheControl, 'no-store');
-		assertEquals(first.body.engineVersion, '6');
+		assertEquals(first.body.engineVersion, '7');
 
 		const publicRow = rowByHost(first.body, 'public.example.com');
 		assertEquals(publicRow.arrType, 'radarr');
@@ -361,8 +363,8 @@ migratedTest(
   async () => {
     const { status, body } = await getSummary();
     assertEquals(status, 200);
-    // Report surface: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens → '6' OIDC allowlist.
-    assertEquals(body.engineVersion, '6');
+    // Report surface: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens → '6' OIDC allowlist → '7' OIDC endpoint transport.
+    assertEquals(body.engineVersion, '7');
 
     // A no-context ({}) event cannot observe transport, so it is reported unknown and never assumed safe.
     const transportAdvisory = body.advisories.find((a) => a.id === 'session_cookie_transport');
@@ -388,5 +390,214 @@ migratedTest(
     // direct-secure transport (url.protocol === 'https:') + default auto => no advisory, verified Secure assurance.
     assert(!body.advisories.some((a) => a.id === 'session_cookie_transport'));
     assert(body.assurances.some((a) => a.id === 'session_cookie_secure' && a.verified));
+  }
+);
+
+type MutableOidcConfig = {
+  authMode: string;
+  oidc: { discoveryUrl: string | null; clientId: string | null; clientSecret: string | null };
+};
+
+/** Run `fn` with the OIDC config temporarily replaced; always restores config and the discovery cache. */
+async function withOidcConfig(
+  overrides: { authMode?: string; discoveryUrl: string | null },
+  fn: () => Promise<void>
+): Promise<void> {
+  const mutable = config as unknown as MutableOidcConfig;
+  const original = { authMode: mutable.authMode, oidc: { ...mutable.oidc } };
+  mutable.authMode = overrides.authMode ?? 'oidc';
+  mutable.oidc.discoveryUrl = overrides.discoveryUrl;
+  mutable.oidc.clientId = 'client';
+  mutable.oidc.clientSecret = 'placeholder';
+  clearDiscoveryCache();
+  try {
+    await fn();
+  } finally {
+    clearDiscoveryCache();
+    mutable.authMode = original.authMode;
+    Object.assign(mutable.oidc, original.oidc);
+  }
+}
+
+migratedTest('buildPostureInputs reports an insecure OIDC discovery URL only in oidc mode', async () => {
+  await withOidcConfig({ discoveryUrl: 'http://idp.example.com/.well-known/openid-configuration' }, async () => {
+    assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, ['discovery']);
+
+    const { body } = await getSummary();
+    const control = body.checks.find((c) => c.id === 'control_plane_auth');
+    assert(control?.recommendations.some((r) => r.headline === 'OIDC sign-in is blocked by an insecure endpoint'));
+    assertEquals(control?.status, 'attention');
+  });
+
+  // Same URL, but the deployment is not in oidc mode: nothing to report.
+  await withOidcConfig(
+    { authMode: 'on', discoveryUrl: 'http://idp.example.com/.well-known/openid-configuration' },
+    async () => {
+      assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, []);
+    }
+  );
+});
+
+/** Replace `globalThis.fetch` for the duration of `fn`; always restores it. */
+async function withFetchStub(stub: () => Promise<Response>, fn: () => Promise<void>): Promise<void> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = stub as typeof fetch;
+  try {
+    await fn();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+function discoveryDoc(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    issuer: 'https://idp.example.com',
+    authorization_endpoint: 'https://idp.example.com/authorize',
+    token_endpoint: 'https://idp.example.com/token',
+    jwks_uri: 'https://idp.example.com/jwks',
+    ...overrides,
+  };
+}
+
+migratedTest('buildPostureInputs accepts https and loopback http OIDC endpoints', async () => {
+  for (const discoveryUrl of [
+    'https://idp.example.com/.well-known/openid-configuration',
+    'http://localhost:8080/realms/x/.well-known/openid-configuration',
+    'http://127.0.0.1:8080/.well-known/openid-configuration',
+    'http://[::1]:8080/.well-known/openid-configuration',
+  ]) {
+    await withOidcConfig({ discoveryUrl }, async () => {
+      await withFetchStub(
+        () => Promise.resolve(Response.json(discoveryDoc())),
+        async () => {
+          assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, [], discoveryUrl);
+        }
+      );
+    });
+  }
+});
+
+migratedTest('buildPostureInputs discovers insecure endpoints without a prior sign-in', async () => {
+  const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+  const cases: Array<[string, Record<string, unknown>, string[]]> = [
+    ['token', { token_endpoint: 'http://idp.example.com/token' }, ['token']],
+    ['jwks', { jwks_uri: 'http://idp.example.com/jwks' }, ['jwks']],
+    ['authorization', { authorization_endpoint: 'http://idp.example.com/authorize' }, ['authorization']],
+  ];
+  for (const [label, overrides, expected] of cases) {
+    await withOidcConfig({ discoveryUrl }, async () => {
+      await withFetchStub(
+        () => Promise.resolve(Response.json(discoveryDoc(overrides))),
+        async () => {
+          assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, expected, label);
+        }
+      );
+    });
+  }
+});
+
+migratedTest('buildPostureInputs still builds the report when discovery cannot be fetched', async () => {
+  const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+  await withOidcConfig({ discoveryUrl }, async () => {
+    await withFetchStub(
+      () => Promise.reject(new Error('network unreachable')),
+      async () => {
+        assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, []);
+        const { body } = await getSummary();
+        assert(body.checks.some((c) => c.id === 'control_plane_auth'));
+      }
+    );
+  });
+});
+
+migratedTest('buildPostureInputs does not fetch discovery outside oidc mode or for an insecure URL', async () => {
+  let fetches = 0;
+  const countingStub = () => {
+    fetches++;
+    return Promise.reject(new Error('unexpected fetch'));
+  };
+  await withFetchStub(countingStub, async () => {
+    await withOidcConfig(
+      { authMode: 'on', discoveryUrl: 'https://idp.example.com/.well-known/openid-configuration' },
+      async () => {
+        await buildPostureInputs({});
+      }
+    );
+    await withOidcConfig({ discoveryUrl: 'http://idp.example.com/.well-known/openid-configuration' }, async () => {
+      await buildPostureInputs({});
+    });
+  });
+  assertEquals(fetches, 0);
+});
+
+migratedTest('buildPostureInputs reads token and JWKS endpoints from the cached discovery document', async () => {
+  const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+  await withOidcConfig({ discoveryUrl }, async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = () =>
+      Promise.resolve(
+        Response.json({
+          issuer: 'https://idp.example.com',
+          authorization_endpoint: 'https://idp.example.com/authorize',
+          token_endpoint: 'https://idp.example.com/token',
+          jwks_uri: 'https://idp.example.com/jwks',
+        })
+      );
+    try {
+      await getDiscoveryDocument(discoveryUrl);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, []);
+  });
+});
+
+migratedTest(
+  'buildPostureInputs reports an insecure token endpoint from a discovery document that failed transport checks',
+  async () => {
+    const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+    await withOidcConfig({ discoveryUrl }, async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = () =>
+        Promise.resolve(
+          Response.json({
+            issuer: 'https://idp.example.com',
+            authorization_endpoint: 'https://idp.example.com/authorize',
+            token_endpoint: 'http://idp.example.com/token',
+            jwks_uri: 'https://idp.example.com/jwks',
+          })
+        );
+      try {
+        await assertRejects(() => getDiscoveryDocument(discoveryUrl), Error, 'token endpoint');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, ['token']);
+    });
+  }
+);
+
+migratedTest(
+  'buildPostureInputs reports an insecure JWKS URI from a discovery document that failed transport checks',
+  async () => {
+    const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
+    await withOidcConfig({ discoveryUrl }, async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = () =>
+        Promise.resolve(
+          Response.json({
+            issuer: 'https://idp.example.com',
+            authorization_endpoint: 'https://idp.example.com/authorize',
+            token_endpoint: 'https://idp.example.com/token',
+            jwks_uri: 'http://idp.example.com/jwks',
+          })
+        );
+      try {
+        await assertRejects(() => getDiscoveryDocument(discoveryUrl), Error, 'jwks_uri');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      assertEquals((await buildPostureInputs({})).oidcInsecureEndpoints, ['jwks']);
+    });
   }
 );

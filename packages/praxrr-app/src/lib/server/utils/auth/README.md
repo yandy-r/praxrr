@@ -145,18 +145,21 @@ sequenceDiagram
     U->>P: GET /auth/login
     P->>U: Show "Sign in with SSO" button
     U->>P: GET /auth/oidc/login
-    P->>P: Generate state, store in cookie
-    P->>U: Redirect to IDP
+    P->>P: Generate state, nonce, PKCE code_verifier
+    P->>U: Set httpOnly state/nonce/verifier cookies
+    P->>U: Redirect to IDP authorize (state, nonce, S256 code_challenge)
     U->>IDP: Login at provider
-    IDP->>U: Redirect /auth/oidc/callback?code=xxx
-    U->>P: GET /auth/oidc/callback
-    P->>P: Verify state
-    P->>IDP: Exchange code for tokens
+    IDP->>U: Redirect /auth/oidc/callback?code=xxx&state=yyy
+    U->>P: GET /auth/oidc/callback (with flow cookies)
+    P->>P: Verify state against cookie
+    P->>IDP: Exchange code for tokens (code_verifier)
     IDP->>P: access_token + id_token
-    P->>P: Verify id_token
+    P->>IDP: Fetch JWKS (jwks_uri)
+    P->>P: Verify id_token signature (alg allowlist)
+    P->>P: Verify claims (iss, aud, exp, iat, azp) and nonce against cookie
     P->>P: Allowlist check (refuse 403 if not allowed)
     P->>P: Create session
-    P->>U: Set cookie, redirect /
+    P->>U: Set session cookie, redirect /
 ```
 
 ### AUTH=off
@@ -259,17 +262,17 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 
 ## Files
 
-| File               | Purpose                                             |
-| ------------------ | --------------------------------------------------- |
-| `middleware.ts`    | Core auth logic (getAuthState, isPublicPath)        |
-| `password.ts`      | Bcrypt hash/verify                                  |
-| `network.ts`       | IP detection (getClientIp, isLocalAddress)          |
-| `userAgent.ts`     | Parse browser/OS/device from user agent             |
-| `apiTokens.ts`     | Token secret generation, hashing, create, resolve   |
-| `principal.ts`     | `AuthPrincipal` (session / bypass / token + scopes) |
-| `scopePolicy.ts`   | Route → required token scope (fail-closed)          |
-| `oidc.ts`          | OIDC discovery, token exchange, JWT parsing         |
-| `oidcAllowlist.ts` | Sign-in allowlist parse + evaluate (fail-closed)    |
+| File               | Purpose                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| `middleware.ts`    | Core auth logic (getAuthState, isPublicPath)                           |
+| `password.ts`      | Bcrypt hash/verify                                                     |
+| `network.ts`       | IP detection (getClientIp, isLocalAddress)                             |
+| `userAgent.ts`     | Parse browser/OS/device from user agent                                |
+| `apiTokens.ts`     | Token secret generation, hashing, create, resolve                      |
+| `principal.ts`     | `AuthPrincipal` (session / bypass / token + scopes)                    |
+| `scopePolicy.ts`   | Route → required token scope (fail-closed)                             |
+| `oidc.ts`          | OIDC discovery, PKCE/nonce, token exchange, JWKS ID-token verification |
+| `oidcAllowlist.ts` | Sign-in allowlist parse + evaluate (fail-closed)                       |
 
 ## Environment Variables
 
@@ -278,6 +281,8 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 AUTH=on                    # on, local, off, oidc
 
 # OIDC (only when AUTH=oidc)
+# The discovery URL and the authorization, token, and JWKS endpoints it advertises must be
+# https (http is accepted only for loopback hosts: localhost, 127.0.0.0/8, ::1).
 OIDC_DISCOVERY_URL=https://auth.example.com/.well-known/openid-configuration
 OIDC_CLIENT_ID=praxrr
 OIDC_CLIENT_SECRET=your-secret
@@ -296,8 +301,9 @@ Only allowlisted identities may obtain a Praxrr account or session:
 
 - **Subjects** match the ID token's `sub` claim exactly (case-sensitive).
 - **Emails** require `email_verified` to be the boolean `true` or the string
-  `'true'`; addresses match case-insensitively, and `@domain.com` entries match
-  the domain part exactly (no subdomains).
+  `'true'`; the local part matches after ASCII-only case folding, the domain is
+  compared in punycode (ASCII) form, and `@domain.com` entries match the domain
+  part exactly (no subdomains).
 - **Groups** match the claim named by `OIDC_GROUPS_CLAIM` (string or array).
   This is a top-level ID-token claim only: no dotted paths and no userinfo
   lookup. Praxrr requests `openid email profile`; a provider mapper may be

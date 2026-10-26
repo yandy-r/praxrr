@@ -28,6 +28,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     oidcAllowlistConfigured: false,
     oidcAllowAllUsers: false,
     oidcAllowlistInvalidEntries: [],
+    oidcInsecureEndpoints: [],
     oidcAllowlistUsableEntryCount: 0,
     apiTokens: { activeCount: 1, legacyActive: true },
     instances: [],
@@ -408,6 +409,54 @@ Deno.test('control_plane_auth: ignored allowlist entries surface in every OIDC b
       `${label} phrases the ignored-entry detail for its usable-entry state`
     );
   }
+});
+
+Deno.test('control_plane_auth: an insecure OIDC endpoint blocks sign-in and is reported by kind', () => {
+  const base = {
+    authMode: 'oidc',
+    oidcConfigured: true,
+    oidcAllowlistConfigured: true,
+    oidcAllowlistUsableEntryCount: 1,
+  } as const;
+
+  for (const kind of ['discovery', 'token', 'jwks'] as const) {
+    const result = runCheck('control_plane_auth', makeInputs({ ...base, oidcInsecureEndpoints: [kind] }));
+    assertEquals(result.score, 70, kind);
+    assertEquals(result.status, 'attention', kind);
+    assertEquals(result.recommendations.length, 1, kind);
+    const [recommendation] = result.recommendations;
+    assertEquals(recommendation.line.tone, 'warning');
+    assertEquals(recommendation.fix.kind, 'env-var');
+    assertEquals(recommendation.fix.kind === 'env-var' ? recommendation.fix.name : null, 'OIDC_DISCOVERY_URL');
+    const detail = recommendation.line.detail.join(' ');
+    assert(detail.includes('https'), kind);
+    assert(detail.includes('loopback'), kind);
+  }
+
+  const several = runCheck('control_plane_auth', makeInputs({ ...base, oidcInsecureEndpoints: ['token', 'jwks'] }));
+  const detail = several.recommendations[0].line.detail.join(' ');
+  assert(detail.includes('token endpoint') && detail.includes('JWKS endpoint'));
+  assert(!detail.includes('discovery URL'));
+
+  // No finding when every endpoint is acceptable (https or loopback http never reach this list).
+  const clean = runCheck('control_plane_auth', makeInputs({ ...base, oidcInsecureEndpoints: [] }));
+  assertEquals(clean.score, 100);
+  assertEquals(clean.status, 'pass');
+  assertEquals(clean.recommendations.length, 0);
+
+  // The finding stacks with the ignored-allowlist-entries warning rather than hiding it.
+  const stacked = runCheck(
+    'control_plane_auth',
+    makeInputs({ ...base, oidcInsecureEndpoints: ['discovery'], oidcAllowlistInvalidEntries: ['@no-dot'] })
+  );
+  assertEquals(stacked.recommendations.length, 2);
+
+  // Only an OIDC deployment is graded for it.
+  assertEquals(
+    runCheck('control_plane_auth', makeInputs({ authMode: 'on', oidcInsecureEndpoints: ['discovery'] })).recommendations
+      .length,
+    0
+  );
 });
 
 // --- arr_transport ----------------------------------------------------------------------------

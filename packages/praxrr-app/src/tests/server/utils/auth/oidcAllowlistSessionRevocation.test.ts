@@ -231,6 +231,39 @@ migratedTest('unchanged policy leaves existing sessions and fingerprint untouche
   });
 });
 
+migratedTest('a fingerprint stored under the previous canonical version revokes OIDC sessions', async () => {
+  const policy = parseOidcAllowlist({ subjects: 'subject-a', emails: 'user@example.com' });
+  const oidcId = usersQueries.getOrCreateOidcUser('subject-a');
+  const localId = usersQueries.create('admin', 'local-hash');
+  const localSession = hashSessionToken(sessionsQueries.create(localId, 1));
+  sessionsQueries.create(oidcId, 1);
+
+  // Fingerprint of the same ASCII-only policy as the earlier canonical version (v: 1) produced it.
+  const sortedValues = (values: ReadonlySet<string>) => [...values].sort();
+  const previousCanonical = JSON.stringify({
+    v: 1,
+    configured: policy.configured,
+    subjects: sortedValues(policy.subjects),
+    emails: sortedValues(policy.emails),
+    emailDomains: sortedValues(policy.emailDomains),
+    groups: sortedValues(policy.groups),
+    groupsClaim: policy.groups.size > 0 ? policy.groupsClaim : null,
+    allowAll: policy.configured ? false : policy.allowAll,
+  });
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(previousCanonical));
+  const previousFingerprint = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  assert(previousFingerprint !== fingerprintOidcAllowlist(policy));
+  oidcAllowlistStateQueries.storeFingerprint(previousFingerprint);
+
+  await withAuthPolicy('oidc', policy, async () => {
+    assertEquals(await revokeOidcSessionsOnAllowlistChange(), { changed: true, deletedSessions: 1 });
+  });
+  assertEquals(sessionIds(), [localSession]);
+  assertEquals(oidcAllowlistStateQueries.getFingerprint(), fingerprintOidcAllowlist(policy));
+});
+
 migratedTest('adding an invalid-only entry changes configured state and revokes OIDC sessions', async () => {
   const oidcId = usersQueries.getOrCreateOidcUser('subject-a');
   const localId = usersQueries.create('admin', 'local-hash');

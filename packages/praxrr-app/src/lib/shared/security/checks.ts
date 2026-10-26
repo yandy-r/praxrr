@@ -362,6 +362,31 @@ function oidcInvalidEntriesRecommendation(inputs: PostureInputs): ShieldRecommen
   });
 }
 
+const OIDC_ENDPOINT_LABEL = {
+  discovery: 'discovery URL (OIDC_DISCOVERY_URL)',
+  authorization: 'authorization endpoint',
+  token: 'token endpoint',
+  jwks: 'JWKS endpoint',
+} as const;
+
+function oidcInsecureEndpointsRecommendation(inputs: PostureInputs): ShieldRecommendation | null {
+  if (inputs.oidcInsecureEndpoints.length === 0) return null;
+  const names = inputs.oidcInsecureEndpoints.map((kind) => OIDC_ENDPOINT_LABEL[kind]).join(', ');
+  return rec(
+    'OIDC sign-in is blocked by an insecure endpoint',
+    [
+      `The OIDC ${names} does not use https, so Praxrr refuses to sign anyone in. Use an https URL; plain http is accepted only for loopback hosts (localhost, 127.0.0.0/8, ::1). Check OIDC_DISCOVERY_URL and the endpoints your provider advertises.`,
+    ],
+    'warning',
+    {
+      kind: 'env-var',
+      name: 'OIDC_DISCOVERY_URL',
+      docHref: 'https://docs.praxrr.dev/guides/configuration/#oidc-endpoint-transport',
+      label: 'Use an https OIDC provider URL',
+    }
+  );
+}
+
 const controlPlaneAuth: SecurityCheck = {
   id: ID_AUTH,
   label: LABEL_AUTH,
@@ -419,7 +444,24 @@ const controlPlaneAuth: SecurityCheck = {
           );
         }
 
-        // Provider configured: grade the sign-in allowlist (YAN-436).
+        // Provider configured: an endpoint that fails the transport policy blocks every sign-in,
+        // so it grades like the other "sign-in is blocked" states regardless of the allowlist.
+        const insecureRecommendation = oidcInsecureEndpointsRecommendation(inputs);
+        if (insecureRecommendation) {
+          return result(
+            ID_AUTH,
+            LABEL_AUTH,
+            70,
+            W,
+            'attention',
+            false,
+            null,
+            ['OIDC uses a provider endpoint that is not served over https, so sign-ins are refused.'],
+            [insecureRecommendation, ...invalidRecommendations]
+          );
+        }
+
+        // Grade the sign-in allowlist (YAN-436).
         if (inputs.oidcAllowlistConfigured) {
           if (inputs.oidcAllowlistUsableEntryCount === 0) {
             return result(
