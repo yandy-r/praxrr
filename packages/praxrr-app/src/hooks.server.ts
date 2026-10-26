@@ -345,7 +345,7 @@ const authHandle: Handle = async ({ event, resolve }) => {
   // HEAD probe) and live-triggered `__data.json` refetches (`x-praxrr-live: 1`) are skipped so an
   // idle background tab cannot keep the session alive forever.
   if (auth.session && event.url.pathname !== LIVE_EVENTS_PATH && event.request.headers.get('x-praxrr-live') !== '1') {
-    maybeExtendSession(auth.session);
+    maybeExtendSession(event, auth.session);
   }
 
   const wizardRedirect = resolveWizardRedirect(event);

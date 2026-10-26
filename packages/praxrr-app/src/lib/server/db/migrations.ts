@@ -94,6 +94,7 @@ import { migration as migration20261022AddNotificationHistoryAttempts } from './
 import { migration as migration20261023CreateArrTrashGuideNamespaces } from './migrations/20261023_create_arr_trash_guide_namespaces.ts';
 import { migration as migration20261024BoundScheduleIntervals } from './migrations/20261024_bound_schedule_intervals.ts';
 import { migration as migration20261025CreateArrManagedEntities } from './migrations/20261025_create_arr_managed_entities.ts';
+import { migration as migration20261026HashSessionIds } from './migrations/20261026_hash_session_ids.ts';
 
 export interface Migration {
   version: number;
@@ -422,6 +423,7 @@ export function loadMigrations(): Migration[] {
     migration20261023CreateArrTrashGuideNamespaces,
     migration20261024BoundScheduleIntervals,
     migration20261025CreateArrManagedEntities,
+    migration20261026HashSessionIds,
   ];
 
   // Sort by version number

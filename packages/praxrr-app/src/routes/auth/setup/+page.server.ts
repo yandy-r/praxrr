@@ -84,7 +84,7 @@ export const actions: Actions = {
 
       // Create session with metadata
       const durationHours = authSettingsQueries.getSessionDurationHours();
-      const sessionId = sessionsQueries.create(userId, durationHours, {
+      const sessionToken = sessionsQueries.create(userId, durationHours, {
         ipAddress,
         userAgent,
         browser: parsed.browser,
@@ -99,7 +99,7 @@ export const actions: Actions = {
 
       // Set session cookie
       const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-      cookies.set('session', sessionId, sessionCookieOptions(event, expires));
+      cookies.set('session', sessionToken, sessionCookieOptions(event, expires));
 
       // Redirect to home
       throw redirect(303, '/');

@@ -6,7 +6,7 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { usersQueries, isOidcUser, type User } from '$db/queries/users.ts';
-import { sessionsQueries, type Session } from '$db/queries/sessions.ts';
+import { sessionsQueries, hashSessionToken, type Session } from '$db/queries/sessions.ts';
 import { hashPassword, verifyPassword } from '$auth/password.ts';
 import { actions, load } from '../../routes/settings/security/+page.server.ts';
 
@@ -43,7 +43,16 @@ interface Fixture {
   a: User;
   b: User;
   c: User;
+  /** Raw cookie tokens (bearers); stored ids are their sha256 (see storedIds). */
   sessions: {
+    aCurrent: string;
+    aOther: string;
+    aExpired: string;
+    b: string;
+    c: string;
+  };
+  /** Stored sessions.id values (hashes of the bearers above) for locals.session.id / row assertions. */
+  storedIds: {
     aCurrent: string;
     aOther: string;
     aExpired: string;
@@ -69,24 +78,31 @@ async function seed(): Promise<Fixture> {
   db.execute(
     'UPDATE sessions SET expires_at = ? WHERE id = ?',
     new Date(Date.now() - 3600_000).toISOString(),
-    aExpired
+    hashSessionToken(aExpired)
   );
   const bSession = sessionsQueries.create(b.id, 1);
   const cSession = sessionsQueries.create(c.id, 1);
 
-  const publicIdOf = (id: string) =>
-    db.queryFirst<{ public_id: string }>('SELECT public_id FROM sessions WHERE id = ?', id)!.public_id;
+  const publicIdOf = (storedId: string) =>
+    db.queryFirst<{ public_id: string }>('SELECT public_id FROM sessions WHERE id = ?', storedId)!.public_id;
 
   return {
     a,
     b,
     c,
     sessions: { aCurrent, aOther, aExpired, b: bSession, c: cSession },
+    storedIds: {
+      aCurrent: hashSessionToken(aCurrent),
+      aOther: hashSessionToken(aOther),
+      aExpired: hashSessionToken(aExpired),
+      b: hashSessionToken(bSession),
+      c: hashSessionToken(cSession),
+    },
     publicIds: {
-      aCurrent: publicIdOf(aCurrent),
-      aOther: publicIdOf(aOther),
-      b: publicIdOf(bSession),
-      c: publicIdOf(cSession),
+      aCurrent: publicIdOf(hashSessionToken(aCurrent)),
+      aOther: publicIdOf(hashSessionToken(aOther)),
+      b: publicIdOf(hashSessionToken(bSession)),
+      c: publicIdOf(hashSessionToken(cSession)),
     },
   };
 }
@@ -149,9 +165,9 @@ migratedTest('load: own unexpired rows only, exact keys, no bearer, flags and no
   const allBearers = Object.values(fx.sessions);
   // user -> current bearer, expected public_ids of own unexpired rows, current row's public_id
   const matrix: Array<[User, string, string[], string]> = [
-    [fx.a, fx.sessions.aCurrent, [fx.publicIds.aCurrent, fx.publicIds.aOther], fx.publicIds.aCurrent],
-    [fx.b, fx.sessions.b, [fx.publicIds.b], fx.publicIds.b],
-    [fx.c, fx.sessions.c, [fx.publicIds.c], fx.publicIds.c],
+    [fx.a, fx.storedIds.aCurrent, [fx.publicIds.aCurrent, fx.publicIds.aOther], fx.publicIds.aCurrent],
+    [fx.b, fx.storedIds.b, [fx.publicIds.b], fx.publicIds.b],
+    [fx.c, fx.storedIds.c, [fx.publicIds.c], fx.publicIds.c],
   ];
 
   for (const [user, sessionId, expectedPublicIds, currentPublicId] of matrix) {
@@ -184,14 +200,14 @@ migratedTest('load: denied principals get empty sessions and canManageSessions=f
 
   const denied: App.Locals[] = [
     localsOf(null, null), // anonymous
-    localsOf(fx.a, fx.sessions.aCurrent, undefined, true), // auth bypass
+    localsOf(fx.a, fx.storedIds.aCurrent, undefined, true), // auth bypass
     localsOf({ id: 0, username: 'api' } as User, null), // API-key principal
-    localsOf(fx.a, fx.sessions.aCurrent, fx.a.id + 1), // user/session mismatch
-    localsOf(fx.a, fx.sessions.aExpired), // expired session
+    localsOf(fx.a, fx.storedIds.aCurrent, fx.a.id + 1), // user/session mismatch
+    localsOf(fx.a, fx.storedIds.aExpired), // expired session
   ];
 
-  sessionsQueries.deleteById(fx.sessions.b);
-  denied.push(localsOf(fx.b, fx.sessions.b)); // deleted current row
+  sessionsQueries.deleteByToken(fx.sessions.b);
+  denied.push(localsOf(fx.b, fx.storedIds.b)); // deleted current row
 
   for (const locals of denied) {
     const { payload } = await loadPayload(locals);
@@ -202,7 +218,7 @@ migratedTest('load: denied principals get empty sessions and canManageSessions=f
 
 migratedTest('revoke: foreign/unknown/current uniform 404, malformed 400, own other succeeds', async () => {
   const fx = await seed();
-  const locals = localsOf(fx.a, fx.sessions.aCurrent);
+  const locals = localsOf(fx.a, fx.storedIds.aCurrent);
   const snapshot = sessionIdSet();
 
   const expect404 = async (localsFor: App.Locals, fd: (f: FormData) => void) => {
@@ -241,15 +257,15 @@ migratedTest('revoke: foreign/unknown/current uniform 404, malformed 400, own ot
   }
 
   // Stale principal: current session deleted -> 401
-  sessionsQueries.deleteById(fx.sessions.c);
+  sessionsQueries.deleteByToken(fx.sessions.c);
   const staleResult = (await actions.revokeSession(
-    formEvent(localsOf(fx.c, fx.sessions.c), (f) => f.set('public_id', fx.publicIds.aOther))
+    formEvent(localsOf(fx.c, fx.storedIds.c), (f) => f.set('public_id', fx.publicIds.aOther))
   )) as ActionFailure;
   assertEquals(staleResult.status, 401);
 
   assertEquals(
     sessionIdSet(),
-    snapshot.filter((id) => id !== fx.sessions.c)
+    snapshot.filter((id) => id !== fx.storedIds.c)
   );
 
   // Own other succeeds; only that row deleted
@@ -259,7 +275,7 @@ migratedTest('revoke: foreign/unknown/current uniform 404, malformed 400, own ot
   assertEquals(ok.sessionRevoked, true);
   assertEquals(
     sessionIdSet(),
-    snapshot.filter((id) => id !== fx.sessions.c && id !== fx.sessions.aOther)
+    snapshot.filter((id) => id !== fx.storedIds.c && id !== fx.storedIds.aOther)
   );
 });
 
@@ -271,11 +287,11 @@ migratedTest('revokeOtherSessions: own others gone, current and other users unto
     assertEquals(result.status, 401);
   }
 
-  const result = (await actions.revokeOtherSessions(noFormEvent(localsOf(fx.a, fx.sessions.aCurrent)))) as {
+  const result = (await actions.revokeOtherSessions(noFormEvent(localsOf(fx.a, fx.storedIds.aCurrent)))) as {
     sessionsRevoked: number;
   };
   assertEquals(result.sessionsRevoked, 2); // aOther + aExpired
-  assertEquals(sessionIdSet().sort(), [fx.sessions.aCurrent, fx.sessions.b, fx.sessions.c].sort());
+  assertEquals(sessionIdSet().sort(), [fx.storedIds.aCurrent, fx.storedIds.b, fx.storedIds.c].sort());
 });
 
 migratedTest('changePassword: principal-only update, OIDC 403, denied 401, other users unaffected', async () => {
@@ -294,7 +310,7 @@ migratedTest('changePassword: principal-only update, OIDC 403, denied 401, other
 
   // A changes A's hash via locals principal (no cookie read)
   const ok = (await actions.changePassword(
-    formEvent(localsOf(fx.a, fx.sessions.aCurrent), passwordForm('alice-pass-1', 'alice-new-pass', 'alice-new-pass'))
+    formEvent(localsOf(fx.a, fx.storedIds.aCurrent), passwordForm('alice-pass-1', 'alice-new-pass', 'alice-new-pass'))
   )) as { passwordSuccess: boolean };
   assertEquals(ok.passwordSuccess, true);
   const afterA = usersQueries.getById(fx.a.id)!.password_hash;
@@ -305,14 +321,14 @@ migratedTest('changePassword: principal-only update, OIDC 403, denied 401, other
 
   // Existing validation preserved (wrong current password)
   const wrong = (await actions.changePassword(
-    formEvent(localsOf(fx.b, fx.sessions.b), passwordForm('wrong-pass', 'bob-new-pass', 'bob-new-pass'))
+    formEvent(localsOf(fx.b, fx.storedIds.b), passwordForm('wrong-pass', 'bob-new-pass', 'bob-new-pass'))
   )) as ActionFailure;
   assertEquals(wrong.status, 400);
   assertEquals(wrong.data?.passwordError, 'Current password is incorrect');
 
   // File value handled safely
   const fileValue = (await actions.changePassword(
-    formEvent(localsOf(fx.b, fx.sessions.b), (f) => f.set('currentPassword', new File(['x'], 'f.bin')))
+    formEvent(localsOf(fx.b, fx.storedIds.b), (f) => f.set('currentPassword', new File(['x'], 'f.bin')))
   )) as ActionFailure;
   assertEquals(fileValue.status, 400);
   assertEquals(fileValue.data?.passwordError, 'All fields are required');
@@ -320,7 +336,7 @@ migratedTest('changePassword: principal-only update, OIDC 403, denied 401, other
 
   // OIDC -> 403
   const oidc = (await actions.changePassword(
-    formEvent(localsOf(fx.c, fx.sessions.c), passwordForm('any', 'oidc-new-pass', 'oidc-new-pass'))
+    formEvent(localsOf(fx.c, fx.storedIds.c), passwordForm('any', 'oidc-new-pass', 'oidc-new-pass'))
   )) as ActionFailure;
   assertEquals(oidc.status, 403);
   assertEquals(usersQueries.getById(fx.c.id)!.password_hash, before.c);
@@ -329,7 +345,7 @@ migratedTest('changePassword: principal-only update, OIDC 403, denied 401, other
   for (const deniedLocals of [
     localsOf(null, null),
     localsOf({ id: 0, username: 'api' } as User, null),
-    localsOf(fx.b, fx.sessions.b, fx.b.id + 1),
+    localsOf(fx.b, fx.storedIds.b, fx.b.id + 1),
   ]) {
     const result = (await actions.changePassword(
       formEvent(deniedLocals, passwordForm('bob-pass-123', 'hacked-pass', 'hacked-pass'))

@@ -29,12 +29,12 @@ Option A as originally proposed emitted a `verified:true` `session_cookie_secure
 ### Honesty discipline adopted from Option C, with its theater removed
 
 - Keep the honest, static `session_secret` **assurance** (no invented `SESSION_SECRET`).
-- **Drop** Option C's CSPRNG self-verify tripwire: `crypto.randomUUID()` is a platform CSPRNG that cannot regress via application code, so the tripwire has near-zero signal, and the claim that it "validates the same id-generation path `sessionsQueries.create` uses" is an overstatement (it exercises the primitive in isolation). No entropy probe is added.
+- **Drop** Option C's CSPRNG self-verify tripwire: `crypto.getRandomValues` is a platform CSPRNG that cannot regress via application code, so the tripwire has near-zero signal, and the claim that it "validates the same id-generation path `sessionsQueries.create` uses" is an overstatement (it exercises the primitive in isolation). No entropy probe is added.
 - Flag `svelte.config.js`'s `csrf.trustedOrigins:['*']` as an out-of-scope, build-time, runtime-unobservable fact and **do not** assert SvelteKit's origin check is on; the `SameSite=Lax` claim is the honest, narrower one.
 
 ## 3. "session-secret" interpretation
 
-This codebase has **no cookie-signing secret**: session ids are opaque server-side `crypto.randomUUID()` tokens (~122-bit) stored in the `sessions` table, and SvelteKit cookies are unsigned (verified by the brief's grep; no `SESSION_SECRET`, no HMAC key). The only session-adjacent secrets are the app API key (already graded by `app_key_at_rest`) and the OIDC client secret (graded via OIDC state).
+This codebase has **no cookie-signing secret**: session tokens are opaque 32-byte random values (256-bit, hex) held only in the cookie, with just their sha256 stored as `sessions.id`, and SvelteKit cookies are unsigned (verified by the brief's grep; no `SESSION_SECRET`, no HMAC key). The only session-adjacent secrets are the app API key (already graded by `app_key_at_rest`) and the OIDC client secret (graded via OIDC state).
 
 Therefore:
 

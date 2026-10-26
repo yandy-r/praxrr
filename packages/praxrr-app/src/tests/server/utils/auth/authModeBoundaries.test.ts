@@ -13,7 +13,7 @@ import { config, type AuthMode } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { usersQueries, isOidcUser, OIDC_PASSWORD_PLACEHOLDER } from '$db/queries/users.ts';
-import { sessionsQueries } from '$db/queries/sessions.ts';
+import { sessionsQueries, hashSessionToken } from '$db/queries/sessions.ts';
 import {
   getAuthState,
   cleanupModeMismatchedSessions,
@@ -105,11 +105,17 @@ function eventStub(opts: {
   } as unknown as RequestEvent;
 }
 
-/** Session-cookie event plus the raw session id it carries. */
-function sessionEventWithId(userId: number, ip = '203.0.113.9'): { event: RequestEvent; sessionId: string } {
-  const sessionId = sessionsQueries.create(userId, 1, { ipAddress: ip, browser: 'Firefox', os: 'Linux' });
-  const event = eventStub({ path: '/settings/security', cookies: { session: sessionId }, ip });
-  return { event, sessionId };
+/** Session-cookie event carrying the raw bearer; `storedId` is the row's hashed id. */
+function sessionEventWithId(
+  userId: number,
+  ip = '203.0.113.9'
+): {
+  event: RequestEvent;
+  storedId: string;
+} {
+  const sessionToken = sessionsQueries.create(userId, 1, { ipAddress: ip, browser: 'Firefox', os: 'Linux' });
+  const event = eventStub({ path: '/settings/security', cookies: { session: sessionToken }, ip });
+  return { event, storedId: hashSessionToken(sessionToken) };
 }
 
 // ---------------------------------------------------------------------------
@@ -146,28 +152,28 @@ for (const mode of ['on', 'local'] as const) {
 for (const mode of ['on', 'local'] as const) {
   migratedTest(`getAuthState drops an OIDC session under AUTH=${mode} (remote client)`, async () => {
     const oidcId = usersQueries.getOrCreateOidcUser('sub1');
-    const { event, sessionId } = sessionEventWithId(oidcId);
+    const { event, storedId } = sessionEventWithId(oidcId);
 
     await withAuthMode(mode, () => {
       const state = getAuthState(event);
       assertEquals(state.user, null);
       assertEquals(state.principal, null);
       assertEquals(state.session, null, 'mismatched session must not be surfaced');
-      assertEquals(sessionIds(), [sessionId], 'session row untouched by getAuthState');
+      assertEquals(sessionIds(), [storedId], 'session row untouched by getAuthState');
     });
   });
 }
 
 migratedTest('getAuthState keeps a local session under AUTH=on/local (remote client)', async () => {
   const localId = usersQueries.create('admin', await hashPassword('admin-pass-123'));
-  const { event, sessionId } = sessionEventWithId(localId);
+  const { event, storedId } = sessionEventWithId(localId);
 
   for (const mode of ['on', 'local'] as const) {
     await withAuthMode(mode, () => {
       const state = getAuthState(event);
       assertEquals(state.user?.id, localId, mode);
       assertEquals(state.principal?.kind, 'session', mode);
-      assertEquals(state.session?.id, sessionId, mode);
+      assertEquals(state.session?.id, storedId, mode);
     });
   }
 });
@@ -187,7 +193,7 @@ migratedTest('getAuthState drops a local session under AUTH=oidc but keeps an OI
     const kept = getAuthState(oidc.event);
     assertEquals(kept.user?.id, oidcId);
     assertEquals(kept.principal?.kind, 'session');
-    assertEquals(kept.session?.id, oidc.sessionId);
+    assertEquals(kept.session?.id, oidc.storedId);
   });
 });
 
@@ -197,12 +203,12 @@ migratedTest(
     db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', 'OIDC:legacy', 'OIDC_NO_PASSWORD');
     const legacy = usersQueries.getByUsername('OIDC:legacy')!;
     assertEquals(isOidcUser(legacy), false, 'placeholder alone or prefix-case alone is not OIDC');
-    const { event, sessionId } = sessionEventWithId(legacy.id);
+    const { event, storedId } = sessionEventWithId(legacy.id);
 
     await withAuthMode('on', () => {
       const state = getAuthState(event);
       assertEquals(state.user?.id, legacy.id);
-      assertEquals(state.session?.id, sessionId);
+      assertEquals(state.session?.id, storedId);
     });
 
     await withAuthMode('oidc', () => {
@@ -221,12 +227,12 @@ migratedTest("an 'oidc:admin' row with a real password hash counts as local", as
   assertEquals(isOidcUser(row), false, 'real hash disqualifies the OIDC classification');
   assertEquals(usersQueries.existsLocal(), true);
   assertEquals(usersQueries.getAllUsernames(), ['oidc:admin']);
-  const { event, sessionId } = sessionEventWithId(row.id);
+  const { event, storedId } = sessionEventWithId(row.id);
 
   await withAuthMode('on', () => {
     const state = getAuthState(event);
     assertEquals(state.user?.id, row.id);
-    assertEquals(state.session?.id, sessionId);
+    assertEquals(state.session?.id, storedId);
   });
 
   await withAuthMode('oidc', () => {
@@ -364,7 +370,10 @@ migratedTest('cleanupModeMismatchedSessions deletes only mismatched rows per mod
 
   const seed = () => {
     db.execute('DELETE FROM sessions');
-    return { local: sessionsQueries.create(localId, 1), oidc: sessionsQueries.create(oidcId, 1) };
+    return {
+      local: hashSessionToken(sessionsQueries.create(localId, 1)),
+      oidc: hashSessionToken(sessionsQueries.create(oidcId, 1)),
+    };
   };
 
   // oidc keeps only OIDC-user sessions

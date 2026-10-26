@@ -120,7 +120,7 @@ export const POST: RequestHandler = async (event) => {
   const userAgent = event.request.headers.get('user-agent') ?? '';
   const parsed = parseUserAgent(userAgent);
   const durationHours = authSettingsQueries.getSessionDurationHours();
-  const sessionId = sessionsQueries.create(userRow.id, durationHours, {
+  const sessionToken = sessionsQueries.create(userRow.id, durationHours, {
     ipAddress,
     userAgent,
     browser: parsed.browser,
@@ -128,7 +128,7 @@ export const POST: RequestHandler = async (event) => {
     deviceType: parsed.deviceType,
   });
   const expires = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-  event.cookies.set('session', sessionId, sessionCookieOptions(event, expires));
+  event.cookies.set('session', sessionToken, sessionCookieOptions(event, expires));
 
   await logger.info(`Passkey login successful for '${userRow.username}'`, {
     source: 'Auth:WebAuthn',

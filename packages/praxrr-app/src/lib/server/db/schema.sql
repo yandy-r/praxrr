@@ -934,10 +934,11 @@ CREATE INDEX idx_user_interface_preferences_user_id
 -- TABLE: sessions
 -- Purpose: Store user sessions (allows login from multiple devices)
 -- Migration: 036_create_auth_tables.ts, 037_add_session_metadata.ts
+-- Note: id stores the sha256 hex of the session cookie value (Migration 20261026); never a bearer credential
 -- ==============================================================================
 
 CREATE TABLE sessions (
-    id TEXT PRIMARY KEY,                    -- UUID
+    id TEXT PRIMARY KEY,                    -- sha256 hex of the session cookie value (Migration 20261026)
     user_id INTEGER NOT NULL,
     expires_at DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
