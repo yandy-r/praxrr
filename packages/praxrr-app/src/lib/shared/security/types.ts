@@ -237,6 +237,14 @@ export interface PostureInputs {
   readonly oidcConfigured: boolean;
   /** Some but not all OIDC settings present (a misconfiguration that weakens `oidc`). */
   readonly oidcPartiallyConfigured: boolean;
+  /** Any nonempty subject/email/group token is configured, including an email token rejected as malformed. */
+  readonly oidcAllowlistConfigured: boolean;
+  /** Number of usable subject, email, email-domain and group entries across the sign-in allowlists. */
+  readonly oidcAllowlistUsableEntryCount: number;
+  /** `OIDC_ALLOW_ALL_USERS` opt-out — every provider-authenticated identity may sign in. */
+  readonly oidcAllowAllUsers: boolean;
+  /** Raw `OIDC_ALLOWED_EMAILS` entries ignored as malformed (safe to echo — not secrets). */
+  readonly oidcAllowlistInvalidEntries: readonly string[];
   /** `null` when the token table could not be read (the check is then not measurable). */
   readonly apiTokens: ApiTokenFacts | null;
   readonly instances: readonly InstanceFact[];

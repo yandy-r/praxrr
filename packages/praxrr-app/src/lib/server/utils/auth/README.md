@@ -153,7 +153,9 @@ sequenceDiagram
     P->>P: Verify state
     P->>IDP: Exchange code for tokens
     IDP->>P: access_token + id_token
-    P->>P: Verify id_token, create session
+    P->>P: Verify id_token
+    P->>P: Allowlist check (refuse 403 if not allowed)
+    P->>P: Create session
     P->>U: Set cookie, redirect /
 ```
 
@@ -199,7 +201,7 @@ sequenceDiagram
 | ------------------------- | -------------------------------------------- |
 | Not logged in             | Redirect to `/auth/login` (shows SSO button) |
 | Click "Sign in with SSO"  | Redirect to OIDC provider                    |
-| Return from provider      | Create session, redirect to `/`              |
+| Return from provider      | Allowlist check, then session + redirect `/` |
 | Session expired           | Redirect to `/auth/login`                    |
 | Visit `/auth/setup`       | Redirect to `/` (no setup needed)            |
 | `/api/v1/*` + valid token | Allow if scope suffices, else 403            |
@@ -250,19 +252,24 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 - **Multiple sessions**: Users can be logged in from multiple devices
 - **Metadata tracked**: IP, user agent, browser, OS, device type, last active
 - **Downgrading**: before downgrading below migration 20261026, run `DELETE FROM sessions`, since stored hashes would act as cookie values on older versions.
+- **OIDC upgrades and policy changes**: users are signed out on the first boot after upgrading
+  to the allowlist-enforcing version and whenever the allowlist policy changes. An identity
+  refused by the current policy loses its sessions. Review and revoke API tokens that should
+  not retain access in Settings → Security before upgrading; API tokens are managed separately.
 
 ## Files
 
-| File             | Purpose                                             |
-| ---------------- | --------------------------------------------------- |
-| `middleware.ts`  | Core auth logic (getAuthState, isPublicPath)        |
-| `password.ts`    | Bcrypt hash/verify                                  |
-| `network.ts`     | IP detection (getClientIp, isLocalAddress)          |
-| `userAgent.ts`   | Parse browser/OS/device from user agent             |
-| `apiTokens.ts`   | Token secret generation, hashing, create, resolve   |
-| `principal.ts`   | `AuthPrincipal` (session / bypass / token + scopes) |
-| `scopePolicy.ts` | Route → required token scope (fail-closed)          |
-| `oidc.ts`        | OIDC discovery, token exchange, JWT parsing         |
+| File               | Purpose                                             |
+| ------------------ | --------------------------------------------------- |
+| `middleware.ts`    | Core auth logic (getAuthState, isPublicPath)        |
+| `password.ts`      | Bcrypt hash/verify                                  |
+| `network.ts`       | IP detection (getClientIp, isLocalAddress)          |
+| `userAgent.ts`     | Parse browser/OS/device from user agent             |
+| `apiTokens.ts`     | Token secret generation, hashing, create, resolve   |
+| `principal.ts`     | `AuthPrincipal` (session / bypass / token + scopes) |
+| `scopePolicy.ts`   | Route → required token scope (fail-closed)          |
+| `oidc.ts`          | OIDC discovery, token exchange, JWT parsing         |
+| `oidcAllowlist.ts` | Sign-in allowlist parse + evaluate (fail-closed)    |
 
 ## Environment Variables
 
@@ -274,7 +281,40 @@ AUTH=on                    # on, local, off, oidc
 OIDC_DISCOVERY_URL=https://auth.example.com/.well-known/openid-configuration
 OIDC_CLIENT_ID=praxrr
 OIDC_CLIENT_SECRET=your-secret
+
+# Sign-in allowlist (fail-closed; at least one list or the opt-out is required)
+OIDC_ALLOWED_SUBJECTS=auth0|12345          # exact `sub` claims, comma/newline-separated
+OIDC_ALLOWED_EMAILS=you@example.com,@yourdomain.com  # verified emails / @domains
+OIDC_ALLOWED_GROUPS=praxrr-admins          # exact names; spaces within entries are preserved
+OIDC_GROUPS_CLAIM=groups                   # top-level ID-token claim; no dotted paths/userinfo
+OIDC_ALLOW_ALL_USERS=false                 # opt-out: accept every provider identity
 ```
+
+### OIDC sign-in allowlist
+
+Only allowlisted identities may obtain a Praxrr account or session:
+
+- **Subjects** match the ID token's `sub` claim exactly (case-sensitive).
+- **Emails** require `email_verified` to be the boolean `true` or the string
+  `'true'`; addresses match case-insensitively, and `@domain.com` entries match
+  the domain part exactly (no subdomains).
+- **Groups** match the claim named by `OIDC_GROUPS_CLAIM` (string or array).
+  This is a top-level ID-token claim only: no dotted paths and no userinfo
+  lookup. Praxrr requests `openid email profile`; a provider mapper may be
+  needed to emit the groups claim in the ID token.
+- All allowlists accept comma or newline separators, not whitespace alone;
+  spaces within entries (including group names) are preserved.
+- Never use user-editable `name` or `preferred_username` as identity selectors.
+  For multi-tenant providers, prefer subject/group restrictions over domains.
+- When any list is set, the lists alone decide — `OIDC_ALLOW_ALL_USERS` is
+  ignored. When no list is set, `OIDC_ALLOW_ALL_USERS=1|true|yes|on` accepts
+  every provider identity; otherwise every new sign-in is refused (403, no
+  user row, no session). Sessions are signed out on first boot of the upgraded
+  version or when the policy changes; a refused identity loses its sessions.
+- Malformed entries (an `@domain` without a dot) never grant access; Shield
+  Check surfaces them. Parsing never throws — a typo cannot brick startup.
+- Restrict who may use this client in the provider as well; Praxrr's allowlist
+  is the inner control, not the only one.
 
 ## Routes
 

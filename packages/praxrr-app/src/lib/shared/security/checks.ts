@@ -344,6 +344,19 @@ export function buildTransportRows(instances: readonly InstanceFact[]): Transpor
 const ID_AUTH: SecurityCheckId = 'control_plane_auth';
 const LABEL_AUTH = 'Control-plane authentication';
 
+function oidcInvalidEntriesRecommendation(inputs: PostureInputs): ShieldRecommendation | null {
+  const invalidEntry = inputs.oidcAllowlistInvalidEntries[0];
+  if (invalidEntry === undefined) return null;
+  return rec(
+    'OIDC allowlist entries were ignored',
+    [
+      `Some OIDC_ALLOWED_EMAILS entries (for example ${invalidEntry}) are not valid email addresses or @domain values, so they match nobody. Fix or remove them; the remaining entries still apply.`,
+    ],
+    'warning',
+    { kind: 'env-var', name: 'OIDC_ALLOWED_EMAILS', label: 'Fix the ignored allowlist entries' }
+  );
+}
+
 const controlPlaneAuth: SecurityCheck = {
   id: ID_AUTH,
   label: LABEL_AUTH,
@@ -363,8 +376,68 @@ const controlPlaneAuth: SecurityCheck = {
           ['Every page requires a signed-in user; API tokens authenticate only /api/v1/* requests.'],
           []
         );
-      case 'oidc':
-        if (inputs.oidcConfigured) {
+      case 'oidc': {
+        const invalidRecommendation = oidcInvalidEntriesRecommendation(inputs);
+        const invalidRecommendations: ShieldRecommendation[] = invalidRecommendation ? [invalidRecommendation] : [];
+
+        if (!inputs.oidcConfigured) {
+          return result(
+            ID_AUTH,
+            LABEL_AUTH,
+            50,
+            W,
+            'attention',
+            false,
+            null,
+            [
+              inputs.oidcPartiallyConfigured
+                ? 'OIDC is selected but only partially configured.'
+                : 'OIDC is selected but not configured yet.',
+            ],
+            [
+              rec(
+                inputs.oidcPartiallyConfigured
+                  ? 'OIDC is only partially configured'
+                  : 'OIDC is enabled but not configured',
+                [
+                  inputs.oidcPartiallyConfigured
+                    ? 'Some OIDC settings are set but others are missing, so sign-in is broken. Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.'
+                    : 'Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET so sign-in works; until then users cannot authenticate.',
+                ],
+                'warning',
+                { kind: 'env-var', name: 'OIDC_DISCOVERY_URL', label: 'Complete the OIDC configuration' }
+              ),
+              ...invalidRecommendations,
+            ]
+          );
+        }
+
+        // Provider configured: grade the sign-in allowlist (YAN-436).
+        if (inputs.oidcAllowlistConfigured) {
+          if (inputs.oidcAllowlistUsableEntryCount === 0) {
+            return result(
+              ID_AUTH,
+              LABEL_AUTH,
+              50,
+              W,
+              'attention',
+              false,
+              null,
+              ['OIDC has an identity allowlist, but none of its entries can match, so new sign-ins are blocked.'],
+              [
+                rec(
+                  'OIDC sign-in is blocked without a usable allowlist',
+                  [
+                    'The allowlist has no usable subject, email, email-domain or group entries. Fix or replace the values in OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS; OIDC_ALLOW_ALL_USERS cannot override a configured allowlist.',
+                  ],
+                  'warning',
+                  { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Set a usable OIDC sign-in allowlist' }
+                ),
+                ...invalidRecommendations,
+              ]
+            );
+          }
+
           return result(
             ID_AUTH,
             LABEL_AUTH,
@@ -373,10 +446,35 @@ const controlPlaneAuth: SecurityCheck = {
             'pass',
             false,
             null,
-            ['Authentication is delegated to your OIDC provider.'],
-            []
+            ['Authentication is delegated to your OIDC provider, and only allowlisted identities can sign in.'],
+            invalidRecommendations
           );
         }
+
+        if (inputs.oidcAllowAllUsers) {
+          return result(
+            ID_AUTH,
+            LABEL_AUTH,
+            70,
+            W,
+            'attention',
+            false,
+            null,
+            ['Authentication is delegated to your OIDC provider; every identity it accepts may sign in.'],
+            [
+              rec(
+                'Any OIDC identity can sign in',
+                [
+                  'OIDC_ALLOW_ALL_USERS is set and no allowlist is, so every account your provider accepts becomes a Praxrr administrator. Restrict sign-in with OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS — and also limit who can reach this client in the provider.',
+                ],
+                'warning',
+                { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Restrict which identities may sign in' }
+              ),
+              ...invalidRecommendations,
+            ]
+          );
+        }
+
         return result(
           ID_AUTH,
           LABEL_AUTH,
@@ -385,26 +483,20 @@ const controlPlaneAuth: SecurityCheck = {
           'attention',
           false,
           null,
-          [
-            inputs.oidcPartiallyConfigured
-              ? 'OIDC is selected but only partially configured.'
-              : 'OIDC is selected but not configured yet.',
-          ],
+          ['OIDC is configured, but no identity allowlist is set, so new sign-ins are refused.'],
           [
             rec(
-              inputs.oidcPartiallyConfigured
-                ? 'OIDC is only partially configured'
-                : 'OIDC is enabled but not configured',
+              'OIDC sign-in is blocked until an allowlist is set',
               [
-                inputs.oidcPartiallyConfigured
-                  ? 'Some OIDC settings are set but others are missing, so sign-in is broken. Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET.'
-                  : 'Set OIDC_DISCOVERY_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET so sign-in works; until then users cannot authenticate.',
+                'No OIDC_ALLOWED_SUBJECTS, OIDC_ALLOWED_EMAILS or OIDC_ALLOWED_GROUPS is set, so Praxrr refuses every new OIDC sign-in. Set one of the allowlist variables, or set OIDC_ALLOW_ALL_USERS=true to explicitly accept every identity the provider authenticates.',
               ],
               'warning',
-              { kind: 'env-var', name: 'OIDC_DISCOVERY_URL', label: 'Complete the OIDC configuration' }
+              { kind: 'env-var', name: 'OIDC_ALLOWED_*', label: 'Set an OIDC sign-in allowlist' }
             ),
+            ...invalidRecommendations,
           ]
         );
+      }
       case 'local':
         return result(
           ID_AUTH,

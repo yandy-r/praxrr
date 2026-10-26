@@ -34,6 +34,7 @@ import { setupStateQueries } from '$db/queries/setupState.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
 import { resolveWizardRedirect } from '$server/setup/progress.ts';
 import { resolveDefaultDatabaseConfig } from '$server/setup/defaultDatabase.ts';
+import { revokeOidcSessionsOnAllowlistChange } from '$auth/oidcAllowlistSessionRevocation.ts';
 import { applyPendingRestoreAtStartup } from '$server/backups/applyRestore.ts';
 
 // Initialize configuration on server startup
@@ -255,6 +256,9 @@ if (mismatchedCount > 0) {
     }
   );
 }
+
+// Revoke existing OIDC sessions when the effective allowlist changed between OIDC startups
+await revokeOidcSessionsOnAllowlistChange();
 
 // Log server ready
 await logger.info('Server ready', {

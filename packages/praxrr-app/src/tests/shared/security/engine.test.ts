@@ -28,6 +28,10 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     port: 6868,
     oidcConfigured: false,
     oidcPartiallyConfigured: false,
+    oidcAllowlistConfigured: false,
+    oidcAllowAllUsers: false,
+    oidcAllowlistInvalidEntries: [],
+    oidcAllowlistUsableEntryCount: 0,
     apiTokens: { activeCount: 1, legacyActive: true },
     instances: [
       { id: 1, name: 'Radarr', arrType: 'radarr', url: 'http://radarr:7878' },
@@ -435,6 +439,13 @@ Deno.test('computeShieldReport: actionability invariant — no warning/danger re
         configuredVersions: ['1', '2'],
         instanceKeyVersions: [{ instanceId: 1, keyVersion: '1' }],
       },
+    }),
+    makeInputs({
+      authMode: 'oidc',
+      oidcConfigured: true,
+      oidcAllowlistConfigured: true,
+      oidcAllowlistUsableEntryCount: 0,
+      oidcAllowlistInvalidEntries: ['@no-dot'],
     }),
   ];
   for (const inputs of cases) {

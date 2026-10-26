@@ -25,6 +25,10 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     port: 6868,
     oidcConfigured: false,
     oidcPartiallyConfigured: false,
+    oidcAllowlistConfigured: false,
+    oidcAllowAllUsers: false,
+    oidcAllowlistInvalidEntries: [],
+    oidcAllowlistUsableEntryCount: 0,
     apiTokens: { activeCount: 1, legacyActive: true },
     instances: [],
     rotation: { activeVersion: '1', configuredVersions: ['1'], instanceKeyVersions: [] },
@@ -259,8 +263,57 @@ Deno.test('shieldStatus: every transport tier has a non-colour label and mixed i
 
 Deno.test('control_plane_auth: scores every mode and never returns null', () => {
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'on' })).score, 100);
-  assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: true })).score, 100);
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: false })).score, 50);
+
+  // OIDC allowlist branches (YAN-436).
+
+  const oidcAllowlistedInvalid = runCheck(
+    'control_plane_auth',
+    makeInputs({
+      authMode: 'oidc',
+      oidcConfigured: true,
+      oidcAllowlistConfigured: true,
+      oidcAllowlistInvalidEntries: ['@no-dot'],
+      oidcAllowlistUsableEntryCount: 1,
+    })
+  );
+  assertEquals(oidcAllowlistedInvalid.score, 100);
+  assertEquals(oidcAllowlistedInvalid.status, 'pass');
+  assertEquals(oidcAllowlistedInvalid.recommendations.length, 1);
+  assertEquals(oidcAllowlistedInvalid.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcAllowlistedInvalid.recommendations[0].fix.kind, 'env-var');
+
+  const oidcAllowAll = runCheck(
+    'control_plane_auth',
+    makeInputs({ authMode: 'oidc', oidcConfigured: true, oidcAllowAllUsers: true })
+  );
+  assertEquals(oidcAllowAll.score, 70);
+  assertEquals(oidcAllowAll.status, 'attention');
+  assertEquals(oidcAllowAll.recommendations.length, 1);
+  assertEquals(oidcAllowAll.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcAllowAll.recommendations[0].fix.kind, 'env-var');
+
+  const oidcFailClosed = runCheck('control_plane_auth', makeInputs({ authMode: 'oidc', oidcConfigured: true }));
+  assertEquals(oidcFailClosed.score, 50);
+  assertEquals(oidcFailClosed.status, 'attention');
+  assertEquals(oidcFailClosed.recommendations.length, 1);
+  assertEquals(oidcFailClosed.recommendations[0].line.tone, 'warning');
+  assertEquals(oidcFailClosed.recommendations[0].fix.kind, 'env-var');
+
+  // Lists stay authoritative over the opt-out: a configured allowlist still scores 100.
+  assertEquals(
+    runCheck(
+      'control_plane_auth',
+      makeInputs({
+        authMode: 'oidc',
+        oidcConfigured: true,
+        oidcAllowlistConfigured: true,
+        oidcAllowlistUsableEntryCount: 1,
+        oidcAllowAllUsers: true,
+      })
+    ).score,
+    100
+  );
   assertEquals(runCheck('control_plane_auth', makeInputs({ authMode: 'local' })).score, 60);
 
   const offPublic = runCheck('control_plane_auth', makeInputs({ authMode: 'off', bindHost: '0.0.0.0' }));
@@ -284,6 +337,67 @@ Deno.test('control_plane_auth: scores every mode and never returns null', () => 
 
   for (const authMode of ['on', 'local', 'off', 'oidc'] as const) {
     assert(runCheck('control_plane_auth', makeInputs({ authMode })).score !== null, `${authMode} must score`);
+  }
+});
+
+Deno.test('control_plane_auth: a configured allowlist with zero usable entries is blocked', () => {
+  const result = runCheck(
+    'control_plane_auth',
+    makeInputs({
+      authMode: 'oidc',
+      oidcConfigured: true,
+      oidcAllowlistConfigured: true,
+      oidcAllowlistUsableEntryCount: 0,
+      oidcAllowlistInvalidEntries: ['@no-dot'],
+      oidcAllowAllUsers: true,
+    })
+  );
+
+  assertEquals(result.score, 50);
+  assertEquals(result.status, 'attention');
+  assert(result.detail[0].includes('none of its entries can match'));
+  assertEquals(result.recommendations.length, 2);
+  assert(result.recommendations.some((recommendation) => recommendation.line.headline.includes('usable allowlist')));
+  assert(
+    result.recommendations.some(
+      (recommendation) => recommendation.line.headline === 'OIDC allowlist entries were ignored'
+    )
+  );
+});
+
+Deno.test('control_plane_auth: ignored allowlist entries surface in every OIDC branch', () => {
+  const cases: readonly { label: string; overrides: Partial<PostureInputs> }[] = [
+    {
+      label: 'incomplete provider',
+      overrides: { oidcConfigured: false, oidcPartiallyConfigured: true },
+    },
+    {
+      label: 'usable allowlist',
+      overrides: { oidcConfigured: true, oidcAllowlistConfigured: true, oidcAllowlistUsableEntryCount: 1 },
+    },
+    {
+      label: 'configured allowlist without usable entries',
+      overrides: { oidcConfigured: true, oidcAllowlistConfigured: true },
+    },
+    { label: 'allow all', overrides: { oidcConfigured: true, oidcAllowAllUsers: true } },
+    { label: 'blocked without an allowlist', overrides: { oidcConfigured: true } },
+  ];
+
+  for (const { label, overrides } of cases) {
+    const result = runCheck(
+      'control_plane_auth',
+      makeInputs({
+        ...overrides,
+        authMode: 'oidc',
+        oidcAllowlistInvalidEntries: ['@no-dot'],
+      })
+    );
+    assert(
+      result.recommendations.some(
+        (recommendation) => recommendation.line.headline === 'OIDC allowlist entries were ignored'
+      ),
+      `${label} must surface ignored allowlist entries`
+    );
   }
 });
 

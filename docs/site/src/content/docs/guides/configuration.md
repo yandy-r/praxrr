@@ -114,6 +114,62 @@ returns 404. See [Metrics](./metrics/).
 
 OIDC requires `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 
+### Restricting which OIDC identities may sign in
+
+By default Praxrr now restricts OIDC sign-in to an operator-configured allowlist
+(fail-closed). Set at least one of these variables, or explicitly opt out:
+
+| Variable                | Default  | Description                                                                         |
+| ----------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `OIDC_ALLOWED_SUBJECTS` | unset    | Comma- or newline-separated `sub` claims allowed to sign in                         |
+| `OIDC_ALLOWED_EMAILS`   | unset    | Verified email addresses and/or `@domain.com` entries allowed to sign in            |
+| `OIDC_ALLOWED_GROUPS`   | unset    | Exact group names (from the top-level ID-token claim) allowed to sign in            |
+| `OIDC_GROUPS_CLAIM`     | `groups` | Top-level ID-token claim from which groups are read; dotted paths are not supported |
+| `OIDC_ALLOW_ALL_USERS`  | unset    | Opt-out: accept every identity the provider authenticates                           |
+
+Matching rules:
+
+- **Subject** — exact, case-sensitive match against the ID token's `sub` claim.
+- **Email** — the provider must mark the email `email_verified: true` (boolean) or
+  `email_verified: 'true'` (string); addresses match case-insensitively,
+  `@domain.com` entries match the domain part exactly (no subdomain matching).
+- **Groups** — the groups claim may be a single string or an array; any overlap
+  with the configured list allows sign-in.
+- When any list is set, the lists alone decide (the opt-out is ignored).
+- When **no** list is set and `OIDC_ALLOW_ALL_USERS` is not enabled, every new
+  OIDC sign-in is refused with 403 — a missing allowlist never becomes
+  "allow everyone".
+
+All three allowlist variables accept comma- or newline-separated entries. Spaces
+inside an entry are preserved, so group names such as `Praxrr Admins` work; do not
+use spaces alone as separators. `OIDC_GROUPS_CLAIM` names only a **top-level ID
+token claim** (default `groups`): dotted claim paths and userinfo claims are not
+read. Praxrr requests the `openid email profile` scopes; a provider-side mapper
+may also be required to emit the configured groups claim in the ID token. Never
+use user-editable `name` or `preferred_username` values as allowlist identities.
+For multi-tenant providers, prefer stable subject and/or group restrictions over
+email domains, because a domain alone does not establish tenant membership.
+
+> **Upgrade note:** before this behavior shipped, any identity your provider
+> authenticated became an administrator. After upgrading, set an allowlist (or
+> `OIDC_ALLOW_ALL_USERS=true` to keep the old behavior) — otherwise **new**
+> sign-ins are refused. Users are signed out on the first boot of the upgraded
+> version and whenever the allowlist policy changes; an identity refused by the
+> current policy loses its sessions. Before upgrading, review and revoke API
+> tokens that should no longer have access in **Settings → Security**. Also
+> restrict who can use this client in your provider (realm/client restrictions)
+> so the control does not depend on Praxrr alone.
+
+Example:
+
+```env
+OIDC_ALLOWED_EMAILS=you@example.com,@yourdomain.com
+OIDC_ALLOWED_GROUPS=praxrr-admins
+```
+
+Malformed entries (for example an `@domain` without a dot) never grant access
+and are surfaced by Shield Check.
+
 Mode boundaries: OIDC and local accounts are separate identities. Under `AUTH=oidc`,
 password login and first-run setup are disabled and the OIDC endpoints are the only way
 in; in other modes the OIDC endpoints return 404. Sessions created in the other mode are

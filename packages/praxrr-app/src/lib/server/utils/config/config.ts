@@ -3,6 +3,7 @@
  */
 
 import { parseTrustedOrigins, parseTrustedProxy, type TrustedProxyConfig } from '$shared/security/index.ts';
+import { parseOidcAllowlist, type OidcAllowlistPolicy } from '$auth/oidcAllowlist.ts';
 import type { CookieSecureMode } from '$shared/security/types.ts';
 
 export type AuthMode = 'on' | 'local' | 'off' | 'oidc';
@@ -39,6 +40,8 @@ class Config {
     discoveryUrl: string | null;
     clientId: string | null;
     clientSecret: string | null;
+    /** Sign-in allowlist restricting which OIDC identities may sign in (YAN-436). */
+    readonly allowlist: OidcAllowlistPolicy;
   };
   public readonly arrCredentialMasterKey: string | null;
   public readonly arrCredentialMasterKeyVersion: string | null;
@@ -104,6 +107,15 @@ class Config {
       discoveryUrl: Deno.env.get('OIDC_DISCOVERY_URL') || null,
       clientId: Deno.env.get('OIDC_CLIENT_ID') || null,
       clientSecret: Deno.env.get('OIDC_CLIENT_SECRET') || null,
+      // Parsed once; fail-closed but NON-throwing so a malformed entry cannot brick boot
+      // and Shield Check can surface it (YAN-436).
+      allowlist: parseOidcAllowlist({
+        subjects: Deno.env.get('OIDC_ALLOWED_SUBJECTS') ?? null,
+        emails: Deno.env.get('OIDC_ALLOWED_EMAILS') ?? null,
+        groups: Deno.env.get('OIDC_ALLOWED_GROUPS') ?? null,
+        groupsClaim: Deno.env.get('OIDC_GROUPS_CLAIM') ?? null,
+        allowAll: Deno.env.get('OIDC_ALLOW_ALL_USERS') ?? null,
+      }),
     };
 
     this.arrCredentialMasterKey = Deno.env.get('ARR_CREDENTIAL_MASTER_KEY') || null;

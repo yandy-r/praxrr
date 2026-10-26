@@ -26,10 +26,14 @@ export interface IdTokenClaims {
   email?: string;
   name?: string;
   preferred_username?: string;
+  /** Some providers send a string; only `true` / `'true'` count as verified. */
+  email_verified?: boolean | string;
   iss: string;
   aud: string | string[];
   exp: number;
   iat: number;
+  /** Any other claim the provider includes (groups, roles, …). */
+  [claim: string]: unknown;
 }
 
 // Cache discovery document (doesn't change often)
@@ -168,6 +172,13 @@ export function verifyIdToken(
     issuer: string;
   }
 ): void {
+  if (typeof claims.sub !== 'string' || claims.sub.length === 0) {
+    throw new Error('ID token must contain a non-empty subject');
+  }
+  if (typeof claims.exp !== 'number' || !Number.isFinite(claims.exp)) {
+    throw new Error('ID token must contain a numeric expiration');
+  }
+
   // Verify issuer
   if (claims.iss !== opts.issuer) {
     throw new Error(`Invalid issuer: expected ${opts.issuer}, got ${claims.iss}`);
@@ -181,7 +192,7 @@ export function verifyIdToken(
 
   // Verify expiration
   const now = Math.floor(Date.now() / 1000);
-  if (claims.exp && claims.exp < now) {
+  if (claims.exp < now) {
     throw new Error('ID token has expired');
   }
 }
