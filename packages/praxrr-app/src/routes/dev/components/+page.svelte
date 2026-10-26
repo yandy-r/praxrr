@@ -45,6 +45,8 @@
   const demoSearch = createSearchStore();
   let demoView: ViewMode = 'table';
   let demoDropdownOpen = false;
+  let demoPopupName = '';
+  let demoPopupSaved = '';
   let demoFormText = '';
   let demoFormPassword = '';
   let demoFormTextarea = '';
@@ -182,9 +184,9 @@
         <ActionsBar>
           <SearchAction searchStore={demoSearch} placeholder="Search..." responsive />
           <ActionButton icon={Plus} title="Add" />
-          <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right">
+          <ActionButton icon={Filter} title="Filter options" hasDropdown={true} dropdownPosition="right">
             <svelte:fragment slot="dropdown">
-              <Dropdown position="right">
+              <Dropdown position="right" label="Filter options">
                 <DropdownItem icon={FileText} label="Option A" />
                 <DropdownItem icon={FileText} label="Option B" />
               </Dropdown>
@@ -536,16 +538,35 @@
     >
       <div class="space-y-3">
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">
-          Dropdown + DropdownItem (hover to open)
+          Dropdown + DropdownItem (hover or click/Enter to open)
         </p>
         <ActionsBar className="md:justify-start">
-          <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="left">
+          <ActionButton icon={Filter} title="Dropdown examples" hasDropdown={true} dropdownPosition="left">
             <svelte:fragment slot="dropdown">
-              <Dropdown position="left">
+              <Dropdown position="left" label="Dropdown examples">
                 <DropdownItem icon={FileText} label="Normal item" />
                 <DropdownItem icon={Info} label="Selected item" selected />
                 <DropdownItem icon={Trash2} label="Danger item" danger />
                 <DropdownItem icon={Plus} label="Disabled item" disabled />
+              </Dropdown>
+            </svelte:fragment>
+          </ActionButton>
+          <ActionButton
+            icon={Settings}
+            title="Dialog popup example"
+            hasDropdown={true}
+            popupRole="dialog"
+            dropdownPosition="left"
+          >
+            <svelte:fragment slot="dropdown">
+              <Dropdown position="left" role="dialog" label="Dialog popup example" minWidth="14rem">
+                <form class="space-y-2 p-3" on:submit|preventDefault={() => (demoPopupSaved = demoPopupName)}>
+                  <FormInput label="Profile name" name="demo-popup-name" bind:value={demoPopupName} />
+                  <Button type="submit" text="Save" size="sm" />
+                  {#if demoPopupSaved}
+                    <p class="text-xs text-neutral-600 dark:text-neutral-400">Saved: {demoPopupSaved}</p>
+                  {/if}
+                </form>
               </Dropdown>
             </svelte:fragment>
           </ActionButton>
@@ -1063,18 +1084,20 @@
         <p class="text-xs font-medium text-neutral-500 uppercase dark:text-neutral-400">
           ReorderableList (drag to reorder)
         </p>
-        <ReorderableList
-          items={demoReorderItems}
-          getKey={(item) => item.id}
-          onReorder={(items) => (demoReorderItems = items)}
-        >
-          <svelte:fragment let:item let:index>
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-xs text-neutral-400">{index + 1}</span>
-              <span class="text-sm text-neutral-700 dark:text-neutral-300">{item.label}</span>
-            </div>
-          </svelte:fragment>
-        </ReorderableList>
+        <section aria-label="Reorderable list demo">
+          <ReorderableList
+            items={demoReorderItems}
+            getKey={(item) => item.id}
+            onReorder={(items) => (demoReorderItems = items)}
+          >
+            <svelte:fragment let:item let:index>
+              <div class="flex items-center gap-3">
+                <span class="font-mono text-xs text-neutral-400">{index + 1}</span>
+                <span class="text-sm text-neutral-700 dark:text-neutral-300">{item.label}</span>
+              </div>
+            </svelte:fragment>
+          </ReorderableList>
+        </section>
       </div>
 
       <div class="space-y-3">

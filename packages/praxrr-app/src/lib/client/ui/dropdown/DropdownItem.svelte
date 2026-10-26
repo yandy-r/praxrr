@@ -10,6 +10,7 @@
   export let selected: boolean = false;
   export let compact: boolean = false;
   export let onSelect: (() => void) | null = null;
+  export let role: 'menuitem' | 'menuitemcheckbox' | 'menuitemradio' | 'option' = 'menuitem';
 
   const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
@@ -27,6 +28,10 @@
 
   $: iconSize = compact ? 12 : 16;
 
+  $: ariaChecked = role === 'menuitemcheckbox' || role === 'menuitemradio' ? selected : undefined;
+  $: ariaSelected = role === 'option' ? selected : undefined;
+  $: ariaCurrent = role === 'menuitem' && selected ? (true as const) : undefined;
+
   function handleClick(event: MouseEvent) {
     onSelect?.();
     dispatch('click', event);
@@ -34,8 +39,13 @@
 </script>
 
 <button
+  type="button"
   class="flex w-full items-center border-b border-neutral-200 text-left transition-colors last:border-b-0 dark:border-neutral-700/60 {baseSurfaceClass} {sizeClasses} {stateClasses}"
   {disabled}
+  {role}
+  aria-checked={ariaChecked}
+  aria-selected={ariaSelected}
+  aria-current={ariaCurrent}
   onclick={handleClick}
 >
   {#if icon}

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { tick } from 'svelte';
+  import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import StickyCard from '$ui/card/StickyCard.svelte';
   import Button from '$ui/button/Button.svelte';
   import Modal from '$ui/modal/Modal.svelte';
@@ -167,8 +170,35 @@
 
   let selectedUnitId: string = defaultUnit;
   let showUnitDropdown = false;
+  const unitDropdownId = uniqueId('quality-unit-dropdown');
+  let unitTriggerEl: HTMLButtonElement | undefined;
 
   $: selectedUnit = unitOptions.find((u) => u.id === selectedUnitId) || unitOptions[0];
+
+  function closeUnitDropdown() {
+    showUnitDropdown = false;
+    unitTriggerEl?.focus();
+  }
+
+  async function toggleUnitDropdown(event: MouseEvent) {
+    showUnitDropdown = !showUnitDropdown;
+    if (showUnitDropdown && event.detail === 0) {
+      await tick();
+      document.getElementById(unitDropdownId)?.querySelector<HTMLElement>('[role="option"]')?.focus();
+    }
+  }
+
+  function handleUnitTriggerKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && showUnitDropdown) {
+      event.preventDefault();
+      closeUnitDropdown();
+    }
+  }
+
+  function selectUnit(unitId: string) {
+    selectedUnitId = unitId;
+    closeUnitDropdown();
+  }
 
   // Convert from base (MB/min) to display unit
   function toDisplayUnit(value: number): number {
@@ -305,11 +335,19 @@
   </div>
   <div slot="right" class="flex items-center gap-2">
     <!-- Unit selector (hidden on mobile) -->
-    <div class="relative hidden md:block">
+    <div
+      class="relative hidden md:block"
+      use:clickOutside={() => (showUnitDropdown = false)}
+      use:focusOutside={() => (showUnitDropdown = false)}
+    >
       <button
         type="button"
-        on:click={() => (showUnitDropdown = !showUnitDropdown)}
-        on:blur={() => setTimeout(() => (showUnitDropdown = false), 150)}
+        bind:this={unitTriggerEl}
+        aria-haspopup="listbox"
+        aria-expanded={showUnitDropdown}
+        aria-controls={unitDropdownId}
+        on:click={toggleUnitDropdown}
+        on:keydown={handleUnitTriggerKeydown}
         class="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 md:py-2 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
       >
         {selectedUnit.label}
@@ -317,15 +355,20 @@
       </button>
 
       {#if showUnitDropdown}
-        <Dropdown position="left" minWidth="12rem">
+        <Dropdown
+          id={unitDropdownId}
+          role="listbox"
+          label="Size unit"
+          onClose={closeUnitDropdown}
+          position="left"
+          minWidth="12rem"
+        >
           {#each unitOptions as unit}
             <DropdownItem
               label="{unit.label} ({unit.short})"
+              role="option"
               selected={selectedUnitId === unit.id}
-              on:click={() => {
-                selectedUnitId = unit.id;
-                showUnitDropdown = false;
-              }}
+              onSelect={() => selectUnit(unit.id)}
             />
           {/each}
         </Dropdown>

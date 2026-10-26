@@ -15,28 +15,29 @@ Labeled text field wrapper supporting text/number/email/password/url/time/date i
 import FormInput from '$ui/form/FormInput.svelte';
 ```
 
-| Prop                | Type                                                                       | Default  | Required | Description                                                                                      |
-| ------------------- | -------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `label`             | `string`                                                                   | —        | Yes      | Field label text (rendered in a `<label>`).                                                      |
-| `description`       | `string`                                                                   | `''`     | No       | Helper text shown under the label.                                                               |
-| `placeholder`       | `string`                                                                   | `''`     | No       | Input placeholder.                                                                               |
-| `value`             | `string`                                                                   | `''`     | No       | Bindable input value.                                                                            |
-| `textarea`          | `boolean`                                                                  | `false`  | No       | Render a multi-line `<textarea>` instead of `<input>`.                                           |
-| `rows`              | `number`                                                                   | `6`      | No       | Textarea row count (only for textarea mode).                                                     |
-| `type`              | `'text' \| 'number' \| 'email' \| 'password' \| 'url' \| 'time' \| 'date'` | `'text'` | No       | Native input type (ignored when textarea/wrap; overridden by `private_`).                        |
-| `required`          | `boolean`                                                                  | `false`  | No       | Marks field required and renders a red asterisk.                                                 |
-| `hideLabel`         | `boolean`                                                                  | `false`  | No       | Visually hide the label (sr-only); also collapses container spacing when no description.         |
-| `name`              | `string`                                                                   | `''`     | No       | Input name and id (label for-attribute).                                                         |
-| `autocomplete`      | `string`                                                                   | `''`     | No       | Autocomplete attribute (only applied on non-textarea/non-wrap inputs).                           |
-| `private_`          | `boolean`                                                                  | `false`  | No       | Password mode: masks input and adds an Eye/EyeOff visibility toggle button.                      |
-| `readonly`          | `boolean`                                                                  | `false`  | No       | Read-only field with muted styling.                                                              |
-| `mono`              | `boolean`                                                                  | `false`  | No       | Use monospace font.                                                                              |
-| `disabled`          | `boolean`                                                                  | `false`  | No       | Disable the input with muted styling.                                                            |
-| `showPrivateToggle` | `boolean`                                                                  | `true`   | No       | In `private_` mode, show/hide the reveal button.                                                 |
-| `wrap`              | `boolean`                                                                  | `false`  | No       | Render a single-visual-line textarea that auto-resizes to content (via the `autoResize` action). |
-| `size`              | `'sm' \| 'md' \| 'lg'`                                                     | `'md'`   | No       | Sizing/padding/rounding preset.                                                                  |
-| `inputClass`        | `string`                                                                   | `''`     | No       | Extra CSS classes appended to the input element.                                                 |
-| `inputElement`      | `HTMLInputElement \| HTMLTextAreaElement \| null`                          | `null`   | No       | Bindable reference to the underlying input/textarea element.                                     |
+| Prop                | Type                                                                       | Default     | Required | Description                                                                                      |
+| ------------------- | -------------------------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `label`             | `string`                                                                   | —           | Yes      | Field label text (rendered in a `<label>`).                                                      |
+| `description`       | `string`                                                                   | `''`        | No       | Helper text shown under the label.                                                               |
+| `placeholder`       | `string`                                                                   | `''`        | No       | Input placeholder.                                                                               |
+| `value`             | `string`                                                                   | `''`        | No       | Bindable input value.                                                                            |
+| `textarea`          | `boolean`                                                                  | `false`     | No       | Render a multi-line `<textarea>` instead of `<input>`.                                           |
+| `rows`              | `number`                                                                   | `6`         | No       | Textarea row count (only for textarea mode).                                                     |
+| `type`              | `'text' \| 'number' \| 'email' \| 'password' \| 'url' \| 'time' \| 'date'` | `'text'`    | No       | Native input type (ignored when textarea/wrap; overridden by `private_`).                        |
+| `required`          | `boolean`                                                                  | `false`     | No       | Marks field required and renders a red asterisk.                                                 |
+| `hideLabel`         | `boolean`                                                                  | `false`     | No       | Visually hide the label (sr-only); also collapses container spacing when no description.         |
+| `name`              | `string`                                                                   | `''`        | No       | Input name; also the id and label `for` target when `id` is not set.                             |
+| `id`                | `string \| undefined`                                                      | `undefined` | No       | Input/textarea id and label `for` target. Falls back to `name`.                                  |
+| `autocomplete`      | `string`                                                                   | `''`        | No       | Autocomplete attribute (only applied on non-textarea/non-wrap inputs).                           |
+| `private_`          | `boolean`                                                                  | `false`     | No       | Password mode: masks input and adds an Eye/EyeOff visibility toggle button.                      |
+| `readonly`          | `boolean`                                                                  | `false`     | No       | Read-only field with muted styling.                                                              |
+| `mono`              | `boolean`                                                                  | `false`     | No       | Use monospace font.                                                                              |
+| `disabled`          | `boolean`                                                                  | `false`     | No       | Disable the input with muted styling.                                                            |
+| `showPrivateToggle` | `boolean`                                                                  | `true`      | No       | In `private_` mode, show/hide the reveal button.                                                 |
+| `wrap`              | `boolean`                                                                  | `false`     | No       | Render a single-visual-line textarea that auto-resizes to content (via the `autoResize` action). |
+| `size`              | `'sm' \| 'md' \| 'lg'`                                                     | `'md'`      | No       | Sizing/padding/rounding preset.                                                                  |
+| `inputClass`        | `string`                                                                   | `''`        | No       | Extra CSS classes appended to the input element.                                                 |
+| `inputElement`      | `HTMLInputElement \| HTMLTextAreaElement \| null`                          | `null`      | No       | Bindable reference to the underlying input/textarea element.                                     |
 
 ### Usage
 
@@ -64,6 +65,7 @@ import FormInput from '$ui/form/FormInput.svelte';
 
 - Sizes: `sm`, `md`, `lg`. Modes: `textarea`, `private_` (password), `wrap` (auto-resize).
 - `mono` font; `readonly`/`disabled` muted states; time/date types get a dark color-scheme.
+- Attributes not declared as props (`$$restProps`, e.g. `role`, `aria-*`) are spread onto the `<input>`/`<textarea>` in every render branch, not onto the wrapper. `SearchDropdown` uses this to pass its combobox attributes. Set `id` when `name` is empty or shared, so the label stays associated with the field.
 - Svelte 4 syntax (`export let`, `createEventDispatcher`, `on:*`, `$$slots.suffix`). Render-branch precedence: textarea, then `private_`, then wrap, then plain input.
 - In `private_` mode the input type toggles between `'text'`/`'password'` regardless of `type`; `hasSuffix` derives from `$$slots.suffix`.
 
@@ -227,7 +229,7 @@ import TimeInput from '$ui/form/TimeInput.svelte';
 
 ## SearchDropdown
 
-Single-select searchable combobox built on `FormInput`. Filters options by typed text, is keyboard navigable (Arrow/Enter/Escape), offers a clear button, and supports a custom item slot.
+Single-select searchable combobox built on `FormInput`. Filters options by typed text, is keyboard navigable (Arrow/Enter/Escape), offers a clear button, and supports a custom item slot. The input carries the ARIA combobox pattern.
 
 ```svelte
 import SearchDropdown from '$ui/form/SearchDropdown.svelte';
@@ -279,7 +281,9 @@ import SearchDropdown from '$ui/form/SearchDropdown.svelte';
 
 - Sizes: `sm`, `md`, `lg`; `fullWidth`; `constrainMenuHeight` on/off.
 - Closes on outside click (`use:clickOutside`) and on blur after 100ms. The highlight index syncs to the selected or first filtered option.
-- `selectOption` dispatches change but does not itself set `value` (the parent must bind or handle change). Renders a clear button in `FormInput`'s suffix slot when a value is set.
+- `selectOption` dispatches change but does not itself set `value` (the parent must bind or handle change). Renders a clear button (`aria-label="Clear selection"`) in `FormInput`'s suffix slot when a value is set; clearing refocuses the input.
+- ARIA: the input (forwarded through `FormInput`) has `role="combobox"`, `aria-haspopup="listbox"`, `aria-autocomplete="list"`, `aria-controls` (generated listbox id), `aria-expanded` (open with at least one match), and `aria-activedescendant` pointing at the highlighted option. Its id is `name`, or a generated id when `name` is empty. The menu is `role="listbox"` labelled by `label`; options are `role="option"` buttons with `tabindex="-1"` and `aria-selected`, so focus stays in the input.
+- Arrow keys and Enter are handled only when the input is the event target; Escape (from anywhere inside the wrapper, when open) is prevented and stopped, closes the menu, and refocuses the input, so it does not also close an enclosing modal.
 
 ## MarkdownInput
 
@@ -369,23 +373,24 @@ import TagInput from '$ui/form/TagInput.svelte';
 
 ## IconCheckbox
 
-Icon-rendering checkbox button (`role=checkbox`) with named/hex/CSS-var colors, filled or outline variants, and three shapes. The icon shows only when checked.
+Icon-rendering checkbox button (`role=checkbox`) with named/hex/CSS-var colors, filled or outline variants, and three shapes. The icon shows only when checked. In `decorative` mode it renders a non-interactive indicator instead of a button.
 
 ```svelte
 import IconCheckbox from '$ui/form/IconCheckbox.svelte';
 ```
 
-| Prop              | Type                                                                                    | Default     | Required | Description                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------- | ----------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `checked`         | `boolean`                                                                               | `false`     | No       | Bindable checked state.                                                                                               |
-| `icon`            | `ComponentType`                                                                         | —           | Yes      | Lucide/Svelte icon component rendered (size 14) when checked.                                                         |
-| `color`           | `'accent' \| 'blue' \| 'green' \| 'red' \| 'neutral' \| #${string} \| var(--${string})` | `'accent'`  | No       | Named color, hex (e.g. `#FFC230`), or CSS var (e.g. `var(--arr-radarr-color)`). Custom colors apply via inline style. |
-| `shape`           | `'square' \| 'circle' \| 'rounded'`                                                     | `'rounded'` | No       | Corner shape (square=`rounded-none`, circle=`rounded-full`, rounded=`rounded-lg`).                                    |
-| `disabled`        | `boolean`                                                                               | `false`     | No       | Disable the button (opacity plus not-allowed cursor).                                                                 |
-| `variant`         | `'filled' \| 'outline'`                                                                 | `'filled'`  | No       | Filled background vs. outlined with a colored icon.                                                                   |
-| `iconColor`       | `string`                                                                                | `''`        | No       | Override icon color class (else white for filled / color for outline).                                                |
-| `stopPropagation` | `boolean`                                                                               | `false`     | No       | Call `event.stopPropagation()` on click before dispatching.                                                           |
-| `title`           | `string \| undefined`                                                                   | `undefined` | No       | Native title tooltip.                                                                                                 |
+| Prop              | Type                                                                                    | Default     | Required | Description                                                                                                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------- | ----------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checked`         | `boolean`                                                                               | `false`     | No       | Bindable checked state.                                                                                                                                                                               |
+| `icon`            | `ComponentType`                                                                         | —           | Yes      | Lucide/Svelte icon component rendered (size 14) when checked.                                                                                                                                         |
+| `color`           | `'accent' \| 'blue' \| 'green' \| 'red' \| 'neutral' \| #${string} \| var(--${string})` | `'accent'`  | No       | Named color, hex (e.g. `#FFC230`), or CSS var (e.g. `var(--arr-radarr-color)`). Custom colors apply via inline style.                                                                                 |
+| `shape`           | `'square' \| 'circle' \| 'rounded'`                                                     | `'rounded'` | No       | Corner shape (square=`rounded-none`, circle=`rounded-full`, rounded=`rounded-lg`).                                                                                                                    |
+| `disabled`        | `boolean`                                                                               | `false`     | No       | Disable the button (opacity plus not-allowed cursor).                                                                                                                                                 |
+| `variant`         | `'filled' \| 'outline'`                                                                 | `'filled'`  | No       | Filled background vs. outlined with a colored icon.                                                                                                                                                   |
+| `iconColor`       | `string`                                                                                | `''`        | No       | Override icon color class (else white for filled / color for outline).                                                                                                                                |
+| `stopPropagation` | `boolean`                                                                               | `false`     | No       | Call `event.stopPropagation()` on click before dispatching.                                                                                                                                           |
+| `title`           | `string \| undefined`                                                                   | `undefined` | No       | Native title tooltip.                                                                                                                                                                                 |
+| `decorative`      | `boolean`                                                                               | `false`     | No       | Render an `aria-hidden` `<span>` with the same styling instead of the checkbox button. No `role`, `aria-checked`, `title`, or click event. Use inside another control that already exposes the state. |
 
 ### Usage
 
@@ -415,6 +420,7 @@ import IconCheckbox from '$ui/form/IconCheckbox.svelte';
 - `variant`: `filled` or `outline`; `shape`: `square`, `circle`, or `rounded`; colors `accent`/`blue`/`green`/`red`/`neutral` plus hex and CSS var.
 - Named colors resolve to Tailwind class maps; hex/var colors resolve via an inline `buttonStyle`. Only the five named colors are supported — other names fall back to `accent`.
 - The component does not mutate `checked` itself, so a standalone `on:click` handler must toggle it.
+- Use `decorative` when the checkbox is a visual indicator inside a larger interactive element (for example a row `<button aria-pressed>` in `CustomGroupManager`); this avoids nesting a button inside a button and announcing the state twice. The parent control must expose the state itself.
 
 ## Toggle
 

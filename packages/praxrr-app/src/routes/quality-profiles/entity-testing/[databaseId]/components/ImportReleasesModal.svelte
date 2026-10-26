@@ -23,6 +23,13 @@
   let saving = false;
   let formRef: HTMLFormElement;
 
+  function closeActionMenu(close: () => void, event: MouseEvent) {
+    const menu = (event.currentTarget as HTMLElement).closest('[id^="action-menu-"]');
+    const trigger = menu?.id ? document.querySelector<HTMLButtonElement>(`[aria-controls="${menu.id}"]`) : null;
+    close();
+    trigger?.focus();
+  }
+
   // Layer selection
   let selectedLayer: 'user' | 'base' = canWriteToBase ? 'base' : 'user';
 
@@ -389,15 +396,22 @@
       {:else}
         <ActionsBar>
           <SearchAction {searchStore} placeholder="Search library..." />
-          <ActionButton icon={Server} hasDropdown={true} dropdownPosition="right" square={!selectedInstance}>
+          <ActionButton
+            icon={Server}
+            hasDropdown={true}
+            dropdownPosition="right"
+            square={!selectedInstance}
+            title={selectedInstance ? selectedInstance.name : 'Select instance'}
+          >
             {#if selectedInstance}
               <span class="ml-2 text-sm text-neutral-700 dark:text-neutral-300">{selectedInstance.name}</span>
             {/if}
             <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
+              <Dropdown position={dropdownPosition} role="menu" label="Select instance">
                 {#each filteredInstances as instance}
                   <DropdownItem
                     label={instance.name}
+                    role="menuitemradio"
                     selected={selectedInstanceId === instance.id}
                     on:click={() => selectInstance(instance.id)}
                   />
@@ -537,25 +551,41 @@
             icon={sortDirection === 'asc' ? ArrowUpAZ : ArrowDownAZ}
             hasDropdown={true}
             dropdownPosition="right"
+            title="Sort by"
           >
             <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
-                <DropdownItem label="Title" selected={sortField === 'title'} on:click={() => setSortField('title')} />
-                <DropdownItem label="Size" selected={sortField === 'size'} on:click={() => setSortField('size')} />
+              <Dropdown position={dropdownPosition} role="menu" label="Sort by">
+                <DropdownItem
+                  label="Title"
+                  role="menuitemradio"
+                  selected={sortField === 'title'}
+                  on:click={() => setSortField('title')}
+                />
+                <DropdownItem
+                  label="Size"
+                  role="menuitemradio"
+                  selected={sortField === 'size'}
+                  on:click={() => setSortField('size')}
+                />
                 <DropdownItem
                   label="Indexers"
+                  role="menuitemradio"
                   selected={sortField === 'indexers'}
                   on:click={() => setSortField('indexers')}
                 />
               </Dropdown>
             </svelte:fragment>
           </ActionButton>
-          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right">
-            <svelte:fragment slot="dropdown" let:dropdownPosition>
-              <Dropdown position={dropdownPosition}>
+          <ActionButton icon={CircuitBoard} hasDropdown={true} dropdownPosition="right" title="Select releases">
+            <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
+              <Dropdown position={dropdownPosition} role="menu" label="Select releases">
                 <DropdownItem
                   label={allFilteredSelected ? 'Deselect All' : 'Select All'}
-                  on:click={selectAllReleases}
+                  role="menuitem"
+                  on:click={(event) => {
+                    closeActionMenu(close, event.detail);
+                    selectAllReleases();
+                  }}
                 />
               </Dropdown>
             </svelte:fragment>

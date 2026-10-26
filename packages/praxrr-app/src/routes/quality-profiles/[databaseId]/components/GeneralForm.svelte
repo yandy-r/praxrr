@@ -11,6 +11,7 @@
   import StickyCard from '$ui/card/StickyCard.svelte';
   import { QP_METADATA } from '$shared/disclosure/sectionKeys';
   import { alertStore } from '$alerts/store';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import { current, isDirty, initEdit, initCreate, update } from '$lib/client/stores/dirty';
 
   // Form data shape
@@ -84,10 +85,79 @@
   // Language autocomplete state
   let languageSearchQuery = initialData.language || 'Any';
   let showLanguageDropdown = false;
+  let languageInputElement: HTMLInputElement | HTMLTextAreaElement | null = null;
+  let languageHighlightedIndex = -1;
+  const languageListboxId = uniqueId('language-options');
 
   $: filteredLanguages = availableLanguages.filter((lang) =>
     lang.name.toLowerCase().includes(languageSearchQuery.toLowerCase())
   );
+  $: if (!showLanguageDropdown) {
+    languageHighlightedIndex = -1;
+  } else if (
+    filteredLanguages.length > 0 &&
+    (languageHighlightedIndex < 0 || languageHighlightedIndex >= filteredLanguages.length)
+  ) {
+    const selectedIndex = selectedLanguageName
+      ? filteredLanguages.findIndex((lang) => lang.name === selectedLanguageName)
+      : -1;
+    languageHighlightedIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  } else if (filteredLanguages.length === 0) {
+    languageHighlightedIndex = -1;
+  }
+
+  function closeLanguageDropdown(restoreFocus = false) {
+    showLanguageDropdown = false;
+    languageHighlightedIndex = -1;
+    if (restoreFocus) languageInputElement?.focus();
+  }
+
+  function moveLanguageHighlight(direction: 1 | -1) {
+    if (filteredLanguages.length === 0) {
+      languageHighlightedIndex = -1;
+      return;
+    }
+    if (languageHighlightedIndex < 0 || languageHighlightedIndex >= filteredLanguages.length) {
+      languageHighlightedIndex = direction === 1 ? 0 : filteredLanguages.length - 1;
+      return;
+    }
+    languageHighlightedIndex =
+      (languageHighlightedIndex + direction + filteredLanguages.length) % filteredLanguages.length;
+  }
+
+  function handleLanguageKeydown(event: KeyboardEvent) {
+    if (event.target !== languageInputElement) return;
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        if (!showLanguageDropdown) showLanguageDropdown = true;
+        moveLanguageHighlight(1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        if (!showLanguageDropdown) showLanguageDropdown = true;
+        moveLanguageHighlight(-1);
+        break;
+      case 'Enter':
+        if (showLanguageDropdown && filteredLanguages.length > 0) {
+          event.preventDefault();
+          const index =
+            languageHighlightedIndex >= 0 && languageHighlightedIndex < filteredLanguages.length
+              ? languageHighlightedIndex
+              : 0;
+          selectLanguage(filteredLanguages[index]);
+          languageInputElement?.focus();
+        }
+        break;
+      case 'Escape':
+        if (showLanguageDropdown) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeLanguageDropdown(true);
+        }
+        break;
+    }
+  }
 
   function selectLanguage(language: LanguageOption) {
     update('language', language.name);
@@ -104,6 +174,7 @@
   function handleLanguageInput(value: string) {
     languageSearchQuery = value;
     showLanguageDropdown = true;
+    languageHighlightedIndex = filteredLanguages.length > 0 ? 0 : -1;
 
     const exactMatch = availableLanguages.find((l) => l.name.toLowerCase() === languageSearchQuery.toLowerCase());
     if (!exactMatch) {
@@ -112,7 +183,6 @@
       update('language', exactMatch.name);
     }
   }
-
   function handleLanguageFocus() {
     showLanguageDropdown = true;
   }
@@ -247,12 +317,22 @@
           <!-- Language -->
           {#if availableLanguages.length > 0}
             <div class="space-y-2">
-              <div class="relative">
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <div class="relative" onkeydown={handleLanguageKeydown}>
                 {#if selectedLanguageName}
                   <FormInput
                     label="Language"
                     name="language-search"
                     value={languageSearchQuery}
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded={showLanguageDropdown && filteredLanguages.length > 0}
+                    aria-controls={languageListboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={showLanguageDropdown && languageHighlightedIndex >= 0
+                      ? `${languageListboxId}-${languageHighlightedIndex}`
+                      : undefined}
+                    bind:inputElement={languageInputElement}
                     description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
                     placeholder="Search for a language..."
                     on:input={(e) => handleLanguageInput(e.detail)}
@@ -282,6 +362,15 @@
                     label="Language"
                     name="language-search"
                     value={languageSearchQuery}
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded={showLanguageDropdown && filteredLanguages.length > 0}
+                    aria-controls={languageListboxId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={showLanguageDropdown && languageHighlightedIndex >= 0
+                      ? `${languageListboxId}-${languageHighlightedIndex}`
+                      : undefined}
+                    bind:inputElement={languageInputElement}
                     description="Set the preferred language for this profile. Leave empty for &quot;Any&quot;. Radarr only. Sonarr uses custom formats for language filtering."
                     placeholder="Search for a language..."
                     on:input={(e) => handleLanguageInput(e.detail)}
@@ -292,13 +381,24 @@
 
                 {#if showLanguageDropdown && filteredLanguages.length > 0}
                   <div
+                    id={languageListboxId}
+                    role="listbox"
+                    aria-label="Language"
                     class="absolute top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-800"
                   >
-                    {#each filteredLanguages as language}
+                    {#each filteredLanguages as language, index}
                       <button
                         type="button"
+                        id={`${languageListboxId}-${index}`}
+                        tabindex="-1"
+                        role="option"
+                        aria-selected={language.name === selectedLanguageName}
+                        onmouseenter={() => (languageHighlightedIndex = index)}
                         onmousedown={() => selectLanguage(language)}
-                        class="w-full px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-700"
+                        class="w-full px-3 py-2 text-left text-sm text-neutral-900 transition-colors dark:text-neutral-100 {languageHighlightedIndex ===
+                        index
+                          ? 'bg-neutral-100 dark:bg-neutral-700'
+                          : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
                       >
                         {language.name}
                       </button>

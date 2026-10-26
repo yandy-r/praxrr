@@ -191,9 +191,10 @@ Variants and notes:
 
 ## Tooltip
 
-Hover tooltip that wraps any trigger content (default slot) and renders a fixed-position,
-viewport-clamped label on `mouseenter`. It positions above or below the trigger and flips
-if it would overflow.
+Tooltip that wraps any trigger content (default slot) and renders a fixed-position,
+viewport-clamped label on hover or keyboard focus. It positions above or below the trigger
+and flips if it would overflow. The label text is exposed to assistive technology through
+`aria-describedby` on the trigger.
 
 Import:
 
@@ -222,14 +223,24 @@ Usage:
 </Tooltip>
 ```
 
+Keyboard and accessibility:
+
+| Behavior            | Detail                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Show                | `mouseenter` or `focusin` on the wrapper, so tabbing to the trigger shows the tooltip.                                                                                                                                                                                         |
+| Hide                | `mouseleave`; `focusout` when focus leaves the wrapper (moves between elements inside it keep it open); Escape while visible. Escape is not prevented or stopped, so an enclosing modal or popup still receives it.                                                            |
+| Description         | The text is rendered in a visually hidden (`sr-only`) span with a generated id (`uniqueId('tooltip')`). The visible bubble has `role="tooltip"` and `aria-hidden="true"`, so it is not read a second time.                                                                     |
+| `aria-describedby`  | The span id is appended to `aria-describedby` on the first descendant matching `button, a[href], input, select, textarea, [tabindex]`, keeping any ids already present. The original value is restored when `text` changes, the target changes, or the component is destroyed. |
+| Duplicate-name skip | No `aria-describedby` is added when the trimmed `text` equals the target's `aria-label` or text content, because it would repeat the accessible name. `Button` with only `tooltip` set hits this case: its `aria-label` falls back to the tooltip text.                        |
+
 Variants and notes:
 
 - The default slot is the trigger element(s) the tooltip is attached to (wrapped in an
-  `inline-flex` div).
+  `inline-flex` div). Put a focusable element inside so keyboard users can reach it.
 - Two placements via `position` (top/bottom), each with automatic flip-on-overflow. Fixed
   `z-50` bubble, `pointer-events-none`, `rounded-xl`, light/dark styled.
-- No callback props. Internally handles `on:mouseenter` (show) and `on:mouseleave` (hide)
-  on the wrapper.
+- No callback props. Internally handles `on:mouseenter`/`on:focusin` (show),
+  `on:mouseleave`/`on:focusout` (hide), and `on:keydown` (Escape) on the wrapper.
 - Svelte 4 style. Computes position from the wrapper's `getBoundingClientRect`, renders,
   then awaits `tick()` and clamps horizontally within `PADDING=8px` of the viewport,
   flipping vertically if the preferred side overflows. Uses inline style plus a hardcoded

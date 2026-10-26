@@ -1,4 +1,7 @@
 <script lang="ts" generics="T">
+  import { tick } from 'svelte';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
+  import { moveItem } from './reorder';
   export let items: T[];
   export let onReorder: (items: T[]) => void;
   export let getKey: (item: T) => string | number;
@@ -8,6 +11,9 @@
 
   let draggedItemIndex: number | null = null;
   let lastTargetIndex: number | null = null;
+  let listEl: HTMLDivElement | undefined = undefined;
+  let announcement = '';
+  const instructionsId = uniqueId('reorder-help');
 
   function handleDragStart(index: number) {
     draggedItemIndex = index;
@@ -70,15 +76,14 @@
   function moveItemToPosition(targetIndex: number) {
     if (draggedItemIndex === null) return;
 
+    const from = draggedItemIndex;
     lastTargetIndex = targetIndex;
+    draggedItemIndex = targetIndex;
+    const next = moveItem(items, from, targetIndex);
+    if (next === items) return;
 
-    const newItems = [...items];
-    const [movedItem] = newItems.splice(draggedItemIndex, 1);
-    newItems.splice(targetIndex, 0, movedItem);
-
-    items = newItems;
-    onReorder(newItems);
-    draggedItemIndex = targetIndex; // Update the dragged index
+    items = next;
+    onReorder(next);
   }
 
   function handleItemDrop(e: DragEvent, targetIndex: number) {
@@ -92,28 +97,62 @@
     draggedItemIndex = null;
     lastTargetIndex = null;
   }
+
+  async function handleItemKeydown(event: KeyboardEvent, index: number) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    if (!event.altKey || event.shiftKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    const target = event.key === 'ArrowUp' ? index - 1 : index + 1;
+    if (target < 0 || target >= items.length) return;
+
+    const row = event.currentTarget as HTMLElement;
+    const label = (row.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const next = moveItem(items, index, target);
+    items = next;
+    onReorder(next);
+    // Clear first so an identical message in a row is still announced.
+    announcement = '';
+    await tick();
+    announcement = `${label ? `${label}: ` : ''}Moved item to position ${target + 1} of ${next.length}`;
+    await tick();
+    const moved = listEl?.querySelector<HTMLElement>(`[data-index="${target}"]`);
+    moved?.focus();
+  }
 </script>
 
-<div
-  class="{draggedItemIndex !== null ? dragGap : normalGap} transition-all duration-100"
-  on:dragover={handleDragOver}
-  role="list"
->
-  {#each items as item, index (getKey(item))}
-    <div
-      draggable={true}
-      on:dragstart={() => handleDragStart(index)}
-      on:dragover={(e) => handleItemDragOver(e, index)}
-      on:drop={(e) => handleItemDrop(e, index)}
-      on:dragend={handleDragEnd}
-      class="cursor-move rounded-lg border border-neutral-200 bg-neutral-50 p-3 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700 {draggedItemIndex ===
-      index
-        ? 'scale-95 opacity-50'
-        : ''}"
-      style="transition: opacity 100ms, transform 100ms;"
-      role="listitem"
-    >
-      <slot {item} {index} />
-    </div>
-  {/each}
+<div bind:this={listEl}>
+  <p id={instructionsId} class="sr-only">Press Alt+ArrowUp or Alt+ArrowDown to reorder.</p>
+  <div class="sr-only" role="status" aria-live="polite">{announcement}</div>
+  <div
+    class="{draggedItemIndex !== null ? dragGap : normalGap} transition-all duration-100"
+    on:dragover={handleDragOver}
+    role="list"
+  >
+    {#each items as item, index (getKey(item))}
+      <!-- Focusable listitem so keyboard users can reorder with Alt+Arrow keys. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+      <div
+        draggable={true}
+        tabindex="0"
+        data-index={index}
+        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+        aria-describedby={instructionsId}
+        on:dragstart={() => handleDragStart(index)}
+        on:dragover={(e) => handleItemDragOver(e, index)}
+        on:drop={(e) => handleItemDrop(e, index)}
+        on:dragend={handleDragEnd}
+        on:keydown={(event) => handleItemKeydown(event, index)}
+        class="cursor-move rounded-lg border border-neutral-200 bg-neutral-50 p-3 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700 {draggedItemIndex ===
+        index
+          ? 'scale-95 opacity-50'
+          : ''}"
+        style="transition: opacity 100ms, transform 100ms;"
+        role="listitem"
+      >
+        <slot {item} {index} />
+      </div>
+    {/each}
+  </div>
 </div>

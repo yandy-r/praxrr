@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Card from '$ui/card/Card.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
+  import { focusTrap } from '$lib/client/utils/focusTrap';
   import type {
     TimelineAnnotation,
     TimelineEvent,
@@ -46,6 +47,7 @@
   let requestId = 0;
 
   let selected: TimelineEvent | null = null;
+  let drawerTrigger: HTMLElement | null = null;
   let noteBody = '';
   let noteError: string | null = null;
   let savingNote = false;
@@ -87,7 +89,12 @@
       const next = (await response.json()) as TimelineListResponse;
       if (rid !== requestId) return;
       result = next;
-      if (selected) selected = next.items.find((item) => item.id === selected?.id) ?? null;
+      if (selected) {
+        const selectedId = selected.id;
+        const nextSelected = next.items.find((item) => item.id === selectedId) ?? null;
+        if (nextSelected) selected = nextSelected;
+        else closeDrawer();
+      }
     } catch (err) {
       if (rid !== requestId) return;
       loadError = err instanceof Error ? err.message : 'Failed to load timeline';
@@ -118,14 +125,25 @@
     load();
   }
 
-  function openDrawer(event: TimelineEvent) {
+  function openDrawer(event: TimelineEvent, trigger: HTMLElement | null = null) {
+    drawerTrigger = trigger;
     selected = event;
     noteBody = '';
     noteError = null;
   }
 
-  function closeDrawer() {
+  async function closeDrawer() {
+    const trigger = drawerTrigger;
+    drawerTrigger = null;
     selected = null;
+    await tick();
+    if (trigger?.isConnected) trigger.focus();
+  }
+
+  function handleDrawerKeydown(event: KeyboardEvent) {
+    if (!selected || event.key !== 'Escape') return;
+    event.preventDefault();
+    closeDrawer();
   }
 
   async function addNote() {
@@ -179,6 +197,8 @@
 </script>
 
 <svelte:head><title>Timeline · Praxrr</title></svelte:head>
+
+<svelte:window on:keydown={handleDrawerKeydown} />
 
 <div class="mx-auto max-w-6xl space-y-6 p-4">
   <header class="flex flex-wrap items-center justify-between gap-3">
@@ -308,7 +328,7 @@
         <button
           type="button"
           class="hover:border-accent-400 flex w-full flex-wrap items-center gap-3 rounded-lg border border-neutral-200 p-3 text-left transition dark:border-neutral-800"
-          on:click={() => openDrawer(event)}
+          on:click={(e) => openDrawer(event, e.currentTarget instanceof HTMLElement ? e.currentTarget : null)}
         >
           <Badge variant={event.badge}>{event.status}</Badge>
           <Badge variant="neutral">{SOURCE_LABEL[event.source]}</Badge>
@@ -341,6 +361,7 @@
       role="dialog"
       aria-modal="true"
       aria-label="Timeline event detail"
+      use:focusTrap
     >
       <div class="flex items-start justify-between gap-2">
         <div>

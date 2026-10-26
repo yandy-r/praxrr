@@ -9,9 +9,21 @@
   export let position: 'left' | 'right' | 'middle' = 'right';
 </script>
 
-<ActionButton icon={Eye} hasDropdown={true} dropdownPosition={position}>
-  <Dropdown slot="dropdown" {position}>
-    <DropdownItem icon={LayoutGrid} label="Cards" selected={value === 'cards'} on:click={() => (value = 'cards')} />
-    <DropdownItem icon={Table} label="Table" selected={value === 'table'} on:click={() => (value = 'table')} />
+<ActionButton icon={Eye} title="Choose view" hasDropdown={true} dropdownPosition={position}>
+  <Dropdown slot="dropdown" label="View" {position}>
+    <DropdownItem
+      role="menuitemradio"
+      icon={LayoutGrid}
+      label="Cards"
+      selected={value === 'cards'}
+      on:click={() => (value = 'cards')}
+    />
+    <DropdownItem
+      role="menuitemradio"
+      icon={Table}
+      label="Table"
+      selected={value === 'table'}
+      on:click={() => (value = 'table')}
+    />
   </Dropdown>
 </ActionButton>

@@ -29,7 +29,7 @@ Usage:
 
 Notes:
 
-- The hamburger button calls `mobileNavOpen.open()` (from `$stores/mobileNav`) to open the mobile page nav. There are no callback props.
+- The hamburger button calls `mobileNavOpen.open()` (from `$stores/mobileNav`) to open the mobile page nav. It sets `aria-expanded={$mobileNavOpen}` and `aria-controls="page-nav"`. There are no callback props.
 - Depends on `$stores/mobileNav`, `$alerts/store` (`$alertStore`), `$assets/logo.svg`, and the child components `AccentPicker` and `ThemeToggle`.
 - Reactively derives `latestAlert` from the last item in `$alertStore`. Uses Svelte 4 style (`$:` and `on:click`).
 
@@ -94,14 +94,15 @@ Usage:
 
 Notes:
 
-- The trigger button (`on:click|stopPropagation`) toggles `open`. Each color button calls `accentStore.set(accent)` via `select()`. A `svelte:window` `on:click` closes the dropdown when clicking outside `.accent-picker`. There are no callback props.
+- The trigger button (`on:click|stopPropagation`) toggles `open`. Each color button calls `accentStore.set(accent)` via `select()`, which closes the dropdown and refocuses the trigger. A `svelte:window` `on:click` closes the dropdown when clicking outside `.accent-picker`, and `use:focusOutside` closes it when focus leaves the wrapper. There are no callback props.
+- Keyboard and ARIA: the trigger (`aria-label="Select accent color"`) sets `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`. Swatches are `role="menuitemradio"` buttons with `aria-checked` and the color name as `aria-label`. Enter/Space opens the menu and focuses the first swatch; ArrowUp/ArrowDown/Home/End move between swatches (from `Dropdown`); Escape closes the menu and returns focus to the trigger.
 - Imports `accentStore`, `accentColors`, and the `AccentColor` type from `$stores/accent`; uses `$ui/dropdown/Dropdown.svelte` and `Check` from `lucide-svelte`.
 - `currentColor = accentColors.find(c => c.value === $accentStore) ?? accentColors[0]`. Internal state: `open` (boolean) and `triggerEl` (`HTMLElement`, bound and passed to `Dropdown`).
 
 Variants:
 
 - Open and closed states.
-- Renders `Dropdown` with `position="middle"`, `minWidth="auto"`, `fixed={true}`, anchored to the trigger element.
+- Renders `Dropdown` with `position="middle"`, `minWidth="auto"`, `fixed={true}`, `label="Accent colors"`, anchored to the trigger element.
 
 ## BottomNav
 
@@ -176,6 +177,7 @@ Notes:
 
 - Composes `Group`, `GroupItem`, `SectionHeader`, `NavScopeSelector`, and `Version`.
 - A `svelte:window` `on:keydown` closes the mobile nav on Escape. The mobile backdrop button and close (X) button call `mobileNavOpen.close()`. The mobile nav also closes reactively on route change. There are no callback props.
+- The `<nav>` has `id="page-nav"` (the Navbar hamburger's `aria-controls` target) and uses `focusTrap` while the mobile drawer is open on a viewport below 768px: focus moves to the first control, Tab/Shift+Tab cycle inside the drawer, and on close focus returns to the element focused before opening (normally the hamburger). The trap is off on desktop.
 - Scope filtering (`resolveScopeEntries`) — visible items pass through; unsupported leaf items are hidden; unsupported items with children render as disabled annotation cards.
 - `collapsedGroupIds = { settings, dev }` and `collapsedItemIds = { 'policies.media_management' }` start collapsed unless the current route matches.
 - Group labels prefix an emoji when `$navIconStore === 'emoji'`. `sectionLabel` is passed only to the first item of each group. Reads `$navScope`, `$navIconStore`, `$mobileNavOpen`, and `$page`.

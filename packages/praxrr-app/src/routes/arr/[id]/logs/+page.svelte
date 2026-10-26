@@ -154,12 +154,14 @@
     <SearchAction {searchStore} placeholder="Search logs..." />
 
     <!-- Level Filter -->
-    <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right">
+    <ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right" title="Filter by level">
       <svelte:fragment slot="dropdown" let:dropdownPosition>
-        <Dropdown position={dropdownPosition} minWidth="8rem">
+        <Dropdown position={dropdownPosition} minWidth="8rem" role="menu" label="Filter by level">
           {#each logLevels as level}
             <button
               type="button"
+              role="menuitemradio"
+              aria-checked={selectedLevel === level}
               on:click={() => changeLevel(level)}
               class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 px-4 py-2 text-left transition-colors first:rounded-t-lg last:rounded-b-lg last:border-b-0 dark:border-neutral-700
 								{selectedLevel === level ? 'bg-neutral-100 dark:bg-neutral-700' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}"
@@ -175,9 +177,9 @@
     </ActionButton>
 
     <!-- Page Size -->
-    <ActionButton icon={Rows3} hasDropdown={true} dropdownPosition="right">
+    <ActionButton icon={Rows3} hasDropdown={true} popupRole="dialog" dropdownPosition="right" title="Rows per page">
       <svelte:fragment slot="dropdown" let:dropdownPosition>
-        <Dropdown position={dropdownPosition} minWidth="10rem">
+        <Dropdown position={dropdownPosition} minWidth="10rem" role="dialog" label="Rows per page">
           <div class="p-3">
             <label for="pageSize" class="mb-2 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
               Rows per page
@@ -196,13 +198,8 @@
     </ActionButton>
 
     <!-- Refresh -->
-    <ActionButton hasDropdown={true} dropdownPosition="right" on:click={refreshLogs}>
+    <ActionButton title="Refresh logs" on:click={refreshLogs}>
       <RefreshCw size={20} class="text-neutral-700 dark:text-neutral-300 {isRefreshing ? 'animate-spin' : ''}" />
-      <svelte:fragment slot="dropdown" let:dropdownPosition>
-        <Dropdown position={dropdownPosition} minWidth="6rem">
-          <div class="px-3 py-2 text-sm text-neutral-600 dark:text-neutral-400">Refresh logs</div>
-        </Dropdown>
-      </svelte:fragment>
     </ActionButton>
   </ActionsBar>
 

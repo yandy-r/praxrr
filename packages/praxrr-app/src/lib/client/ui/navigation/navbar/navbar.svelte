@@ -21,6 +21,8 @@
         on:click={() => mobileNavOpen.open()}
         class="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 md:hidden dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
         aria-label="Open menu"
+        aria-expanded={$mobileNavOpen}
+        aria-controls="page-nav"
       >
         <Menu size={20} />
       </button>

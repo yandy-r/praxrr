@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher, tick } from 'svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import { ChevronDown } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import Dropdown from './Dropdown.svelte';
@@ -39,6 +41,29 @@
   let isSmallScreen = false;
   let mediaQuery: MediaQueryList | null = null;
   let triggerEl: HTMLElement;
+  const dropdownId = uniqueId('dropdown-select');
+
+  function closeDropdown() {
+    open = false;
+    triggerEl?.querySelector<HTMLButtonElement>('button')?.focus();
+  }
+
+  function handleTriggerKeydown(event: KeyboardEvent) {
+    if (open && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDropdown();
+    }
+  }
+
+  async function toggleDropdown(event: MouseEvent) {
+    if (disabled) return;
+    open = !open;
+    if (open && event.detail === 0) {
+      await tick();
+      document.getElementById(dropdownId)?.querySelector<HTMLElement>('[role="option"]')?.focus();
+    }
+  }
 
   onMount(() => {
     if (responsiveButton && typeof window !== 'undefined') {
@@ -76,7 +101,7 @@
 
   function select(optionValue: string) {
     dispatch('change', optionValue);
-    open = false;
+    closeDropdown();
   }
 </script>
 
@@ -84,7 +109,13 @@
   {#if label}
     <span class={labelClasses}>{label}</span>
   {/if}
-  <div class="relative" class:flex-1={fullWidth} bind:this={triggerEl} use:clickOutside={() => (open = false)}>
+  <div
+    class="relative"
+    class:flex-1={fullWidth}
+    bind:this={triggerEl}
+    use:clickOutside={() => (open = false)}
+    use:focusOutside={() => (open = false)}
+  >
     <Button
       text={currentLabel}
       icon={ChevronDown}
@@ -94,17 +125,35 @@
       {disabled}
       justify={resolvedJustify}
       textColor={isPlaceholder ? 'text-neutral-400 dark:text-neutral-500' : ''}
-      on:click={() => !disabled && (open = !open)}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-controls={dropdownId}
+      on:keydown={handleTriggerKeydown}
+      on:click={toggleDropdown}
     />
     {#if open}
-      <Dropdown {position} {mobilePosition} {minWidth} compact={isCompactDropdown} {fixed} {triggerEl}>
+      <Dropdown
+        id={dropdownId}
+        role="listbox"
+        label={label ?? placeholder}
+        onClose={closeDropdown}
+        {position}
+        {mobilePosition}
+        {minWidth}
+        compact={isCompactDropdown}
+        {fixed}
+        {triggerEl}
+      >
         {#each options as option}
           <DropdownItem
+            role="option"
             label={option.label}
             selected={value === option.value}
             compact={isCompactDropdown}
             on:click={() => select(option.value)}
           />
+        {:else}
+          <DropdownItem role="option" disabled label="No options" compact={isCompactDropdown} />
         {/each}
       </Dropdown>
     {/if}

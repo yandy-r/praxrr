@@ -12,6 +12,7 @@
   export let required: boolean = false;
   export let hideLabel: boolean = false;
   export let name: string = '';
+  export let id: string | undefined = undefined;
   export let autocomplete: string = '';
   export let private_: boolean = false;
   export let readonly: boolean = false;
@@ -74,7 +75,7 @@
 
 <div class={containerClass}>
   <label
-    for={name}
+    for={id ?? name}
     class="block text-sm font-medium text-neutral-900 dark:text-neutral-100 {hideLabel ? 'sr-only' : ''}"
   >
     {label}{#if required}<span class="text-red-500">*</span>{/if}
@@ -89,7 +90,7 @@
   {#if textarea}
     <div class={hasSuffix ? 'relative' : ''}>
       <textarea
-        id={name}
+        id={id ?? name}
         {name}
         {value}
         {placeholder}
@@ -97,6 +98,7 @@
         {disabled}
         {readonly}
         {rows}
+        {...$$restProps}
         bind:this={inputElement}
         oninput={handleInput}
         onfocus={handleFocus}
@@ -114,7 +116,7 @@
   {:else if private_}
     <div class="relative">
       <input
-        id={name}
+        id={id ?? name}
         {name}
         type={inputType}
         {value}
@@ -122,6 +124,7 @@
         {required}
         {disabled}
         {readonly}
+        {...$$restProps}
         bind:this={inputElement}
         oninput={handleInput}
         onfocus={handleFocus}
@@ -150,7 +153,7 @@
   {:else if wrap}
     <div class={hasSuffix ? 'relative' : ''}>
       <textarea
-        id={name}
+        id={id ?? name}
         {name}
         {value}
         {placeholder}
@@ -158,6 +161,7 @@
         {disabled}
         {readonly}
         rows={1}
+        {...$$restProps}
         bind:this={inputElement}
         oninput={handleInput}
         onfocus={handleFocus}
@@ -176,7 +180,7 @@
   {:else}
     <div class={hasSuffix ? 'relative' : ''}>
       <input
-        id={name}
+        id={id ?? name}
         {name}
         {type}
         {value}
@@ -184,6 +188,7 @@
         {required}
         {disabled}
         {readonly}
+        {...$$restProps}
         bind:this={inputElement}
         oninput={handleInput}
         onfocus={handleFocus}

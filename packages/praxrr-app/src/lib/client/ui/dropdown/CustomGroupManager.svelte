@@ -70,6 +70,7 @@
       >
         <button
           type="button"
+          aria-pressed={selectedGroups.has(group.key)}
           on:click={() => onToggle(group.key)}
           class="flex flex-1 items-center justify-between gap-3"
         >
@@ -81,10 +82,11 @@
               {group.tags.join(', ')}
             </div>
           </div>
-          <IconCheckbox checked={selectedGroups.has(group.key)} icon={Check} color="blue" shape="circle" />
+          <IconCheckbox decorative checked={selectedGroups.has(group.key)} icon={Check} color="blue" shape="circle" />
         </button>
         <button
           type="button"
+          aria-label={`Delete group ${group.name}`}
           on:click|stopPropagation={() => onDelete(group.key)}
           class="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
         >

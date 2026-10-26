@@ -162,20 +162,20 @@ import ExpandableTable from '$ui/table/ExpandableTable.svelte';
 
 ## ReorderableList
 
-A drag-and-drop reorderable vertical list (generic over `T`) that renders each item via a default slot and emits the reordered array live during dragging, with a sensitivity dead-zone to reduce flicker.
+A drag-and-drop reorderable vertical list (generic over `T`) that renders each item via a default slot and emits the reordered array live during dragging, with a sensitivity dead-zone to reduce flicker. Focused rows can also be moved with Alt+ArrowUp and Alt+ArrowDown.
 
 ```svelte
 import ReorderableList from '$ui/table/ReorderableList.svelte';
 ```
 
-| Prop          | Type                            | Default       | Required | Description                                                                                                            |
-| ------------- | ------------------------------- | ------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `items`       | `T[]`                           | —             | Yes      | The list items to render and reorder. Mutated in place during drag; parent should bind or update via `onReorder`.      |
-| `onReorder`   | `(items: T[]) => void`          | —             | Yes      | Callback fired with the new item order whenever an item moves position during dragging.                                |
-| `getKey`      | `(item: T) => string \| number` | —             | Yes      | Returns a stable unique key per item for the keyed `#each` block.                                                      |
-| `dragGap`     | `string`                        | `'space-y-6'` | No       | Tailwind spacing class applied to the container while a drag is in progress.                                           |
-| `normalGap`   | `string`                        | `'space-y-4'` | No       | Tailwind spacing class applied to the container when not dragging.                                                     |
-| `sensitivity` | `number`                        | `0.3`         | No       | Fraction (0-1) of an item's height the pointer must cross before swapping position; larger values widen the dead zone. |
+| Prop          | Type                            | Default       | Required | Description                                                                                                                 |
+| ------------- | ------------------------------- | ------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `items`       | `T[]`                           | —             | Yes      | The list items to render and reorder. Reassigned to a new array on each move; parent should bind or update via `onReorder`. |
+| `onReorder`   | `(items: T[]) => void`          | —             | Yes      | Callback fired with the new item order whenever an item moves position during dragging or a keyboard move.                  |
+| `getKey`      | `(item: T) => string \| number` | —             | Yes      | Returns a stable unique key per item for the keyed `#each` block.                                                           |
+| `dragGap`     | `string`                        | `'space-y-6'` | No       | Tailwind spacing class applied to the container while a drag is in progress.                                                |
+| `normalGap`   | `string`                        | `'space-y-4'` | No       | Tailwind spacing class applied to the container when not dragging.                                                          |
+| `sensitivity` | `number`                        | `0.3`         | No       | Fraction (0-1) of an item's height the pointer must cross before swapping position; larger values widen the dead zone.      |
 
 ### Usage
 
@@ -206,15 +206,27 @@ import ReorderableList from '$ui/table/ReorderableList.svelte';
 ### Slots & Events
 
 - Default slot with `let:item` and `let:index` for rendering each list item's content.
-- `onReorder(items)` is the only callback prop. Native HTML drag events (`dragstart`, `dragover`, `drop`, `dragend`) are used internally and are not re-exposed to the parent.
+- `onReorder(items)` is the only callback prop. Native HTML drag events (`dragstart`, `dragover`, `drop`, `dragend`) and the row `keydown` handler are used internally and are not re-exposed to the parent.
+
+### Keyboard Reordering
+
+| Key           | Behavior                                                        |
+| ------------- | --------------------------------------------------------------- |
+| Tab           | Moves focus between rows; each row wrapper has `tabindex="0"`.  |
+| Alt+ArrowUp   | Moves the focused row up one position. No-op on the first row.  |
+| Alt+ArrowDown | Moves the focused row down one position. No-op on the last row. |
+
+- The shortcut fires only when the row wrapper itself has focus (not a control inside the slot) and Shift, Ctrl, and Meta are not held. Plain arrow keys are not intercepted.
+- After a move, `items` is replaced, `onReorder` is called with the new array, and focus follows the moved row to its new index.
+- A visually hidden `role="status"` `aria-live="polite"` region announces `"<row text>: Moved item to position N of M"`. The row text is the row's whitespace-collapsed text content, truncated to 60 characters; the prefix is dropped when empty. The region is cleared before each update so repeated identical messages are still announced.
+- Rows have `role="listitem"` inside a `role="list"` container, `aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"`, and `aria-describedby` pointing at a visually hidden instruction: "Press Alt+ArrowUp or Alt+ArrowDown to reorder."
 
 ### Variants & Notes
 
 - Gap tightens/loosens between `dragGap` and `normalGap` during drag; the dragged item is styled with `scale-95 opacity-50`.
 - Each item wrapper is draggable with a `cursor-move` handle over the whole row.
 - Dragging near the top/bottom 50px of the container jumps the item to the first/last position.
-- Reordering happens continuously during `dragover` (not only on drop), so `onReorder` can fire multiple times per drag.
-- This file uses tab indentation.
+- Reordering happens continuously during `dragover` (not only on drop), so `onReorder` can fire multiple times per drag. Drag and keyboard moves share `moveItem` from `$ui/table/reorder.ts`, which returns the original array (and skips `onReorder`) for out-of-range or no-op moves.
 
 ## TableActionButton
 

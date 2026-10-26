@@ -11,7 +11,7 @@ Svelte 5 convention: plain props with `onclick`/`on:click` handlers and legacy s
 
 A positioned menu container that renders its children in a floating panel below a trigger. It supports
 absolute or fixed positioning (to escape overflow containers like tables), responsive position switching,
-and compact spacing.
+compact spacing, an ARIA `role` for the panel, and arrow-key navigation between menu items.
 
 Import:
 
@@ -19,26 +19,75 @@ Import:
 import Dropdown from '$ui/dropdown/Dropdown.svelte';
 ```
 
-| Prop             | Type                                    | Default   | Required | Description                                                                                                                                                                                                                                                            |
-| ---------------- | --------------------------------------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `position`       | `'left' \| 'right' \| 'middle'`         | `'left'`  | No       | Horizontal alignment of the panel relative to the trigger.                                                                                                                                                                                                             |
-| `mobilePosition` | `'left' \| 'right' \| 'middle' \| null` | `null`    | No       | Alternate position applied below the md breakpoint. When set and different from `position`, a responsive class (e.g. `middle-to-right`) is used; ignored when `fixed` is true. Falls back to `positionClasses[position]` if no matching responsive combination exists. |
-| `minWidth`       | `string`                                | `'12rem'` | No       | CSS min-width applied to the panel via inline style.                                                                                                                                                                                                                   |
-| `compact`        | `boolean`                               | `false`   | No       | Tighter layout: smaller top margin (mt-1 vs mt-3), 4px vs 12px trigger gap, and rounded-lg vs rounded-xl corners.                                                                                                                                                      |
-| `fixed`          | `boolean`                               | `false`   | No       | Use fixed positioning computed from the trigger's bounding rect (escapes overflow:hidden ancestors). Requires `triggerEl`. Recomputes on scroll (capture) and resize. When true, the hover-bridge div and absolute position classes are omitted.                       |
-| `triggerEl`      | `HTMLElement \| null`                   | `null`    | No       | The trigger element used to compute fixed positioning. Only used when `fixed` is true.                                                                                                                                                                                 |
+| Prop             | Type                                         | Default     | Required | Description                                                                                                                                                                                                                                                            |
+| ---------------- | -------------------------------------------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `position`       | `'left' \| 'right' \| 'middle'`              | `'left'`    | No       | Horizontal alignment of the panel relative to the trigger.                                                                                                                                                                                                             |
+| `mobilePosition` | `'left' \| 'right' \| 'middle' \| null`      | `null`      | No       | Alternate position applied below the md breakpoint. When set and different from `position`, a responsive class (e.g. `middle-to-right`) is used; ignored when `fixed` is true. Falls back to `positionClasses[position]` if no matching responsive combination exists. |
+| `minWidth`       | `string`                                     | `'12rem'`   | No       | CSS min-width applied to the panel via inline style.                                                                                                                                                                                                                   |
+| `compact`        | `boolean`                                    | `false`     | No       | Tighter layout: smaller top margin (mt-1 vs mt-3), 4px vs 12px trigger gap, and rounded-lg vs rounded-xl corners.                                                                                                                                                      |
+| `fixed`          | `boolean`                                    | `false`     | No       | Use fixed positioning computed from the trigger's bounding rect (escapes overflow:hidden ancestors). Requires `triggerEl`. Recomputes on scroll (capture) and resize. When true, the hover-bridge div and absolute position classes are omitted.                       |
+| `triggerEl`      | `HTMLElement \| null`                        | `null`      | No       | The trigger element used to compute fixed positioning. Only used when `fixed` is true.                                                                                                                                                                                 |
+| `role`           | `'menu' \| 'listbox' \| 'dialog' \| 'group'` | `'menu'`    | No       | ARIA role of the panel. Arrow/Home/End navigation is active only for `'menu'` and `'listbox'`; use `'dialog'` or `'group'` for panels holding form controls.                                                                                                           |
+| `label`          | `string \| undefined`                        | `undefined` | No       | Applied as the panel's `aria-label`.                                                                                                                                                                                                                                   |
+| `id`             | `string \| undefined`                        | `undefined` | No       | Panel id. Set it to the value of the trigger's `aria-controls`.                                                                                                                                                                                                        |
+| `onClose`        | `(() => void) \| null`                       | `null`      | No       | Called when Escape is pressed inside the panel (the event is prevented and stopped). Without it, Escape is not handled here. Typical handlers close the panel and refocus the trigger.                                                                                 |
 
 Usage:
 
 ```svelte
+<script>
+  import { tick } from 'svelte';
+  import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
+
+  let open = false;
+  let triggerEl;
+  let buttonEl;
+  const menuId = uniqueId('row-menu');
+
+  function close() {
+    open = false;
+    buttonEl?.focus();
+  }
+
+  async function toggle(event) {
+    open = !open;
+    // Keyboard activation (Enter/Space) reports event.detail === 0; move focus into the menu.
+    if (open && event.detail === 0) {
+      await tick();
+      document
+        .getElementById(menuId)
+        ?.querySelector('[role="menuitem"]')
+        ?.focus();
+    }
+  }
+</script>
+
 <div
   class="relative"
   bind:this={triggerEl}
   use:clickOutside={() => (open = false)}
+  use:focusOutside={() => (open = false)}
 >
-  <button onclick={() => (open = !open)}>Menu</button>
+  <button
+    bind:this={buttonEl}
+    aria-haspopup="menu"
+    aria-expanded={open}
+    aria-controls={menuId}
+    onclick={toggle}
+  >
+    Menu
+  </button>
   {#if open}
-    <Dropdown position="right" minWidth="12rem" {triggerEl}>
+    <Dropdown
+      id={menuId}
+      label="Row actions"
+      onClose={close}
+      position="right"
+      minWidth="12rem"
+      {triggerEl}
+    >
       <DropdownItem label="Rename" on:click={rename} />
       <DropdownItem label="Delete" danger on:click={remove} />
     </Dropdown>
@@ -48,21 +97,37 @@ Usage:
 
 Slot: default slot (unnamed) holds the menu contents, typically `DropdownItem` rows.
 
+Keyboard (handled on the panel):
+
+| Key       | Behavior                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| ArrowDown | Focuses the next item, wrapping from last to first. With no item focused, focuses the first item.    |
+| ArrowUp   | Focuses the previous item, wrapping from first to last. With no item focused, focuses the last item. |
+| Home      | Focuses the first item.                                                                              |
+| End       | Focuses the last item.                                                                               |
+| Escape    | Calls `onClose` when provided.                                                                       |
+
+Items are elements with role `menuitem`, `menuitemcheckbox`, `menuitemradio`, or `option`, excluding those
+with `disabled` or `aria-disabled="true"`. Arrow, Home, and End keys apply only when `role` is `'menu'` or
+`'listbox'`; handled keys call `preventDefault()` and `stopPropagation()`.
+
 Notes:
 
-- No events are dispatched. Open/close and click-outside are managed by the parent, commonly via the
-  `clickOutside` action on a wrapping `.relative` element.
+- No events are dispatched. Open/close, click-outside, and initial focus are managed by the parent, commonly
+  via the `clickOutside` and `focusOutside` actions on a wrapping `.relative` element. The trigger should
+  carry `aria-haspopup`, `aria-expanded`, and `aria-controls` (matching `id`).
 - Variants: position (left / right / middle), responsive `mobilePosition` switching at the md breakpoint,
   compact vs default spacing, and absolute (default) vs fixed positioning strategy.
 - Panel styling is hard-coded: z-50, border, white/neutral-800 surface, shadow-lg, rounded corners.
-- When not fixed it renders an invisible hover-bridge div (`absolute top-full h-3 w-full`) to keep the menu
-  open while moving the mouse down.
+- When not fixed it renders an invisible, `aria-hidden` hover-bridge div (`absolute top-full h-3 w-full`) to
+  keep the menu open while moving the mouse down.
 - Uses legacy Svelte slots and `$:` reactive statements (no runes), matching repo convention.
 
 ## DropdownItem
 
-A single selectable row inside a `Dropdown`, rendered as a full-width button with an optional leading icon,
-a label, and a trailing check when selected. It supports danger and disabled states plus compact sizing.
+A single selectable row inside a `Dropdown`, rendered as a full-width button with an ARIA role, an optional
+leading icon, a label, and a trailing check when selected. It supports danger and disabled states plus
+compact sizing.
 
 Import:
 
@@ -70,26 +135,35 @@ Import:
 import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
 ```
 
-| Prop       | Type                         | Default     | Required | Description                                                                                                           |
-| ---------- | ---------------------------- | ----------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `icon`     | `ComponentType \| undefined` | `undefined` | No       | Optional leading Lucide/Svelte icon component rendered via `<svelte:component>`. Sized 12px compact / 16px default.   |
-| `label`    | `string`                     | `—`         | Yes      | The row text (rendered in a flex-1 span).                                                                             |
-| `disabled` | `boolean`                    | `false`     | No       | Disables the button and applies muted, not-allowed styling. Takes visual precedence over `danger`.                    |
-| `danger`   | `boolean`                    | `false`     | No       | Red text with red hover background to signal destructive actions.                                                     |
-| `selected` | `boolean`                    | `false`     | No       | Shows a trailing accent-colored Check icon.                                                                           |
-| `compact`  | `boolean`                    | `false`     | No       | Smaller padding, text-xs, and lg corner rounding for first/last items; also shrinks icon size to 12px.                |
-| `onSelect` | `(() => void) \| null`       | `null`      | No       | Callback prop invoked on click (before the dispatched `click` event). Optional alternative to listening for on:click. |
+| Prop       | Type                                                              | Default      | Required | Description                                                                                                                       |
+| ---------- | ----------------------------------------------------------------- | ------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `icon`     | `ComponentType \| undefined`                                      | `undefined`  | No       | Optional leading Lucide/Svelte icon component rendered via `<svelte:component>`. Sized 12px compact / 16px default.               |
+| `label`    | `string`                                                          | `—`          | Yes      | The row text (rendered in a flex-1 span).                                                                                         |
+| `disabled` | `boolean`                                                         | `false`      | No       | Disables the button and applies muted, not-allowed styling. Takes visual precedence over `danger`.                                |
+| `danger`   | `boolean`                                                         | `false`      | No       | Red text with red hover background to signal destructive actions.                                                                 |
+| `selected` | `boolean`                                                         | `false`      | No       | Shows a trailing accent-colored Check icon and sets the ARIA state that matches `role` (see below).                               |
+| `compact`  | `boolean`                                                         | `false`      | No       | Smaller padding, text-xs, and lg corner rounding for first/last items; also shrinks icon size to 12px.                            |
+| `onSelect` | `(() => void) \| null`                                            | `null`       | No       | Callback prop invoked on click (before the dispatched `click` event). Optional alternative to listening for on:click.             |
+| `role`     | `'menuitem' \| 'menuitemcheckbox' \| 'menuitemradio' \| 'option'` | `'menuitem'` | No       | ARIA role of the button. Match it to the parent `Dropdown` role: `option` inside a `listbox`, a `menuitem*` role inside a `menu`. |
+
+`selected` maps to ARIA by role:
+
+| `role`                              | ARIA attribute from `selected`                         |
+| ----------------------------------- | ------------------------------------------------------ |
+| `menuitem`                          | `aria-current="true"` when selected; omitted otherwise |
+| `menuitemcheckbox`, `menuitemradio` | `aria-checked={selected}`                              |
+| `option`                            | `aria-selected={selected}`                             |
 
 Usage:
 
 ```svelte
 <DropdownItem
-  icon={Trash2}
-  label="Delete"
-  danger
-  selected={value === 'delete'}
+  role="menuitemradio"
+  icon={LayoutGrid}
+  label="Cards"
+  selected={view === 'cards'}
   compact
-  on:click={() => handleDelete()}
+  on:click={() => (view = 'cards')}
 />
 ```
 
@@ -106,9 +180,9 @@ Notes:
 ## DropdownSelect
 
 A select widget composing `Button` + `Dropdown` + `DropdownItem` into a labeled value picker. It renders the
-current option's label on a trigger button and a menu of options, then emits `change` with the chosen value.
-It supports independent compact controls for button and menu, responsive/auto compaction, full-width, fixed
-positioning, and a disabled state.
+current option's label on a trigger button and a `listbox` of options, then emits `change` with the chosen
+value. It supports independent compact controls for button and menu, responsive/auto compaction, full-width,
+fixed positioning, and a disabled state.
 
 Import:
 
@@ -160,8 +234,14 @@ Notes:
 - Variants: compaction (compact, compactButton, compactDropdown, compactDropdownThreshold, responsiveButton);
   layout (fullWidth, custom width, justify center/between); positioning (left/right/middle, mobilePosition,
   fixed); states (disabled, placeholder when no match).
-- Wraps in a `.relative` element with `use:clickOutside` to close. The trigger is a `Button` with
-  `icon={ChevronDown}` and `iconPosition="right"`.
+- Wraps in a `.relative` element with `use:clickOutside` and `use:focusOutside` to close. The trigger is a
+  `Button` with `icon={ChevronDown}` and `iconPosition="right"`.
+- Keyboard and ARIA: the trigger sets `aria-haspopup="listbox"`, `aria-expanded`, and `aria-controls`. The
+  panel is a `Dropdown` with `role="listbox"`, labelled by `label` (or `placeholder` when no label is set);
+  each option is a `DropdownItem` with `role="option"` and `aria-selected`. Opening with Enter/Space focuses
+  the first option; ArrowUp/ArrowDown/Home/End move between options. Escape (on the trigger or in the list)
+  and choosing an option close the list and return focus to the trigger. An empty `options` array renders a
+  disabled "No options" item.
 - Uses onMount/onDestroy to manage the responsiveButton media query. Legacy Svelte events/slots (no runes).
 
 ## CustomGroupManager
@@ -204,14 +284,16 @@ Notes:
   the Add button is disabled unless both fields are non-empty, and handleSubmit also filters to require at
   least one non-empty tag.
 - The group list only renders when customGroups.length > 0.
-- Uses IconCheckbox (color="blue", shape="circle", icon={Check}) for the selected indicator and Lucide
+- Each group row's toggle is a `<button>` with `aria-pressed` reflecting selection; the IconCheckbox inside
+  it (color="blue", shape="circle", icon={Check}) is `decorative`, so it renders as an `aria-hidden` span
+  rather than a nested button. The delete button has `aria-label="Delete group {name}"`. Uses Lucide
   X/Plus icons. Legacy Svelte (no runes); the form uses `on:submit|preventDefault` and delete uses
   `on:click|stopPropagation`.
 
 ## Tabs
 
 A responsive navigation tab bar with an active-state underline and optional per-tab icons. It can show a
-trailing breadcrumb or back button, and (when responsive) collapses to a `Dropdown` select on mobile.
+trailing breadcrumb or back button, and (when responsive) collapses to a `Dropdown` menu on mobile.
 Navigation happens via SvelteKit `goto`/anchor links.
 
 Import:
@@ -256,7 +338,21 @@ Notes:
 - Variants: desktop tab bar vs mobile dropdown (responsive); trailing region breadcrumb (priority) /
   backButton / none; hideWhenSingle spacer mode.
 - activeTab resolves to the tab with `active: true`, else the first tab.
-- Mobile mode builds a custom trigger button plus Dropdown (position="left", minWidth="100%") of
-  DropdownItems with tab icons; ChevronDown rotates 180deg when open.
-- Uses clickOutside to close the mobile dropdown and onMount/onDestroy to manage the media query. Legacy
-  Svelte (no runes).
+- Mobile mode builds a custom trigger button plus Dropdown (position="left", minWidth="100%", label "Tabs")
+  of DropdownItems with tab icons; ChevronDown rotates 180deg when open. The active tab's item is marked
+  with `aria-current="true"` (via `selected` on a `menuitem`).
+- Mobile keyboard and ARIA: the trigger sets `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`.
+  Opening with Enter/Space focuses the first menu item; ArrowUp/ArrowDown/Home/End move between tabs.
+  Escape (on the trigger or in the menu) and choosing a tab close the menu and return focus to the
+  trigger. Moving focus outside the wrapper closes the menu without moving focus.
+- Uses clickOutside and focusOutside to close the mobile dropdown and onMount/onDestroy to manage the media
+  query. Legacy Svelte (no runes).
+
+## AccentPicker keyboard behavior
+
+`AccentPicker` (documented under [Navigation Shell](/app/components/shell/#accentpicker)) follows the same
+trigger pattern: the swatch button sets `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`, and
+the `Dropdown` is labelled "Accent colors". Each swatch is a `role="menuitemradio"` button with
+`aria-checked` and the color name as `aria-label`. Opening with Enter/Space focuses the first swatch;
+ArrowUp/ArrowDown/Home/End move between swatches. Escape and choosing a color close the menu and return
+focus to the swatch button.

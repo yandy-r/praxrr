@@ -7,7 +7,7 @@ Modal and dialog components layer content above the page and manage backdrop, fo
 
 ## Modal
 
-Base confirm/cancel dialog with a header, a body slot (falling back to a plain message), and a two-button footer. Handles the backdrop, scale/fade transitions, Escape-to-cancel, size/height sizing, plus loading and danger states.
+Base confirm/cancel dialog with a header, a body slot (falling back to a plain message), and a two-button footer. Handles the backdrop, scale/fade transitions, focus trapping and restore, Escape-to-cancel, size/height sizing, plus loading and danger states.
 
 Import:
 
@@ -33,7 +33,7 @@ Props:
 Events:
 
 - `on:confirm` — fired by the confirm button.
-- `on:cancel` — fired by the cancel button, backdrop self-click, and the Escape key.
+- `on:cancel` — fired by the cancel button, backdrop self-click, and the Escape key (while focus is inside the dialog panel).
 
 Events are dispatched via `createEventDispatcher` with no detail payload.
 
@@ -56,17 +56,28 @@ Usage:
 />
 ```
 
+Keyboard and focus:
+
+| Behavior      | Detail                                                                                                                                                                                                                                                                      |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focus trap    | The panel uses the `focusTrap` action while `open`. Tab on the last tabbable element wraps to the first; Shift+Tab on the first wraps to the last. Tab combined with Alt, Ctrl, or Meta is not intercepted.                                                                 |
+| Initial focus | The first tabbable element in DOM order that is not the body scroll region: a control in the `body` slot if there is one, otherwise the Cancel button. If every button is disabled (for example while `loading`), the body region receives focus.                           |
+| Focus restore | When the dialog closes, focus returns to the element that was focused when it opened, if that element is still in the document.                                                                                                                                             |
+| Escape        | Handled by a `keydown` listener on the dialog panel, not on `window`. The event is prevented and stopped, so with nested modals only the innermost one cancels. Escape pressed while focus is outside the panel is ignored.                                                 |
+| Labelling     | The panel has `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` pointing at the header `<h2>` (id generated with `uniqueId('modal-title')`).                                                                                                                      |
+| Body region   | The body wrapper is `role="region"`, `tabindex="0"`, and labelled by the header, so keyboard users can focus it and scroll long content with the arrow keys. It carries `data-focus-trap-region`, which excludes it from initial-focus selection when other controls exist. |
+
 Variants and notes:
 
 - Variants: `size` (sm/md/lg/xl/2xl), `height` (auto/md/lg/xl/full), `confirmDanger` (primary vs danger confirm button), and `loading` (spinner + disabled).
 - Uses the Svelte 5 legacy API (`export let` props, `createEventDispatcher`, `on:click|self` backdrop) — not runes.
 - z-index 100 backdrop with blur; the body region is scrollable (`overflow-auto`).
-- Escape only cancels while open. A window `keydown` listener is registered on mount and cleaned up on destroy.
-- Footer layout is `justify-between` (Cancel left, Confirm right). Depends on `$ui/button/Button.svelte` and `lucide-svelte` icons (`X`, `Check`, `Loader2`).
+- Escape only cancels while open.
+- Footer layout is `justify-between` (Cancel left, Confirm right). Depends on `$ui/button/Button.svelte`, `lucide-svelte` icons (`X`, `Check`, `Loader2`), and `$lib/client/utils/focusTrap` / `uniqueId`.
 
 ## InfoModal
 
-Read-only informational dialog: a header with an `X` close button and a single default-slot body. It self-manages closing (sets `open = false` internally) and has no confirm/cancel actions.
+Read-only informational dialog: a header with an `X` close button and a single default-slot body. It self-manages closing (sets `open = false` internally), traps focus while open, and has no confirm/cancel actions.
 
 Import:
 
@@ -85,7 +96,7 @@ Props:
 
 Events:
 
-- No dispatched events. Closing is internal: the `X` button and Escape set `open = false` directly (surfaced via `bind:open`).
+- No dispatched events. Closing is internal: the `X` button, backdrop self-click, and Escape (while focus is inside the panel) set `open = false` directly (surfaced via `bind:open`).
 
 Slots:
 
@@ -104,10 +115,18 @@ Usage:
 </InfoModal>
 ```
 
+Keyboard and focus:
+
+- Same focus model as `Modal`: `focusTrap` keeps Tab/Shift+Tab inside the panel while open, and focus returns to the previously focused element on close.
+- Initial focus goes to the first tabbable element that is not the body region. The header `X` button (`aria-label="Close"`) precedes the body in DOM order, so it receives focus.
+- Escape is handled on the panel (prevented and stopped), so only the innermost open modal closes.
+- The panel has `role="dialog"`, `aria-modal="true"`, and `aria-labelledby` pointing at the header `<h2>`.
+- The body is a focusable `role="region"` (`tabindex="0"`, labelled by the header, `data-focus-trap-region`) so long content can be scrolled from the keyboard.
+
 Variants and notes:
 
 - Sizing is controlled purely via `maxWidth`/`maxHeight` CSS strings (no discrete size presets like `Modal`).
-- Uses the Svelte 5 legacy API (`export let`, reactive `$:` block to add/remove the `keydown` listener).
+- Uses the Svelte 5 legacy API (`export let` props and `on:` directives).
 - Shares Modal's backdrop styling, fade+scale transitions, and `z-[100]`. The header includes a dedicated icon close button (`lucide X`, size 20); backdrop self-click and Escape also close.
 - The body is scrollable (`flex-1 overflow-auto`).
 

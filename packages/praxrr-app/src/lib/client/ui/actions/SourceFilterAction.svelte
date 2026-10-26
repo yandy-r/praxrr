@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import type { ComponentType } from 'svelte';
   import { ChevronDown, Database, Filter, Trash2 } from 'lucide-svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
+  import { focusOutside } from '$lib/client/utils/focusOutside';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import Dropdown from '$ui/dropdown/Dropdown.svelte';
   import DropdownItem from '$ui/dropdown/DropdownItem.svelte';
   import type { SourceRef } from '$shared/sources/types.ts';
@@ -43,6 +45,21 @@
   let mediaQuery: MediaQueryList | null = null;
   let dropdownOpen = false;
   let triggerEl: HTMLElement;
+  const dropdownId = uniqueId('source-filter');
+
+  function closeDropdown() {
+    dropdownOpen = false;
+    triggerEl?.querySelector<HTMLButtonElement>('button')?.focus();
+  }
+
+  async function toggleDropdown(event: MouseEvent) {
+    if (disabled) return;
+    dropdownOpen = !dropdownOpen;
+    if (dropdownOpen && event.detail === 0) {
+      await tick();
+      document.getElementById(dropdownId)?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
+    }
+  }
 
   function toSourceKey(source: SourceRef): SourceFilterKey {
     return `${source.type}:${source.id}`;
@@ -120,7 +137,7 @@
 
     if (selectionMode === 'single') {
       emitChange([key]);
-      dropdownOpen = false;
+      closeDropdown();
       return;
     }
 
@@ -184,6 +201,7 @@
       class="relative flex"
       bind:this={triggerEl}
       use:clickOutside={() => (dropdownOpen = false)}
+      use:focusOutside={() => (dropdownOpen = false)}
       role="group"
       aria-label={ariaLabel}
     >
@@ -193,8 +211,16 @@
         class="flex h-10 items-center gap-2 border border-neutral-300 bg-white px-3 text-sm text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700/60 dark:bg-neutral-800/50 dark:text-neutral-200 dark:hover:bg-neutral-800"
         aria-haspopup="menu"
         aria-expanded={dropdownOpen}
+        aria-controls={dropdownId}
         aria-label={ariaLabel}
-        on:click={() => !disabled && (dropdownOpen = !dropdownOpen)}
+        on:click={toggleDropdown}
+        on:keydown={(event) => {
+          if (dropdownOpen && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeDropdown();
+          }
+        }}
         {disabled}
       >
         <Filter size={16} class={resolvedActive ? 'text-accent-600 dark:text-accent-400' : ''} />
@@ -210,9 +236,18 @@
       </button>
 
       {#if dropdownOpen}
-        <Dropdown {position} mobilePosition="middle" minWidth="14rem" {triggerEl}>
+        <Dropdown
+          id={dropdownId}
+          label={ariaLabel}
+          onClose={closeDropdown}
+          {position}
+          mobilePosition="middle"
+          minWidth="14rem"
+          {triggerEl}
+        >
           {#if selectionMode === 'multi'}
             <DropdownItem
+              role="menuitemcheckbox"
               icon={Filter}
               label="All sources"
               selected={normalizedSelectedKeys.length === sourceOptions.length}
@@ -221,6 +256,7 @@
           {/if}
           {#each sourceOptions as option (option.key)}
             <DropdownItem
+              role={selectionMode === 'multi' ? 'menuitemcheckbox' : 'menuitemradio'}
               icon={option.icon}
               label={option.source.name}
               selected={selectedSet.has(option.key)}

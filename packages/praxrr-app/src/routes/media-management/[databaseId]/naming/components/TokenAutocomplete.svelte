@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { clickOutside } from '$lib/client/utils/clickOutside';
   import FormInput from '$ui/form/FormInput.svelte';
+  import { uniqueId } from '$lib/client/utils/uniqueId';
   import type { TokenCategory } from '$shared/pcd/namingTokens.ts';
 
   export let label: string;
@@ -23,7 +24,7 @@
   let open = false;
   let highlightedIndex = -1;
   let triggerPos = -1;
-
+  const listboxId = uniqueId('token-options');
   $: flatTokens = categories.flatMap((cat) => cat.tokens.map((t) => ({ ...t, category: cat.name }))) as FlatToken[];
 
   $: query = '';
@@ -131,16 +132,32 @@
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="relative" use:clickOutside={close} on:keydown={handleKeyDown}>
-  <FormInput {label} {name} {value} {placeholder} mono wrap bind:inputElement on:input={handleInput} />
+  <FormInput
+    {label}
+    {name}
+    {value}
+    {placeholder}
+    mono
+    wrap
+    aria-controls={listboxId}
+    aria-autocomplete="list"
+    aria-activedescendant={open && highlightedIndex >= 0 ? `${listboxId}-${highlightedIndex}` : undefined}
+    bind:inputElement
+    on:input={handleInput}
+  />
 
   {#if open && filteredTokens.length > 0}
     <div
+      id={listboxId}
       role="listbox"
+      aria-label={label}
       class="absolute top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-neutral-300 bg-white p-1 shadow-sm dark:border-neutral-700/60 dark:bg-neutral-800"
     >
       {#each filteredTokens as token, index}
         <button
           type="button"
+          id={`${listboxId}-${index}`}
+          tabindex="-1"
           role="option"
           aria-selected={highlightedIndex === index}
           on:mouseenter={() => (highlightedIndex = index)}

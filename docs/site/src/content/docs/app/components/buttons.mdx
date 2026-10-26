@@ -62,6 +62,7 @@ The interactive island below reproduces the `variant` and `size` API against sta
 ### Events & Slots
 
 - `on:click` — forwarded from the underlying `<button>` or `<a>`.
+- `on:keydown` — forwarded from the underlying `<button>` or `<a>`; used by dropdown triggers such as `DropdownSelect` to close on Escape.
 - Default slot — rendered between the text and the right-position icon, for custom content such as dropdown chevrons.
 
 ### Variants & Notes
@@ -74,23 +75,24 @@ The interactive island below reproduces the `variant` and `size` API against sta
 
 ## ActionButton
 
-Bordered icon button sized for action bars, with an optional hover-activated dropdown region. Fixed 40px height; square by default.
+Bordered icon button sized for action bars, with an optional dropdown region. Fixed 40px height; square by default. Hovering previews the dropdown; a click, Enter, or Space pins it open.
 
 ```svelte
 import ActionButton from '$ui/actions/ActionButton.svelte';
 ```
 
-| Prop               | Type                            | Default     | Required | Description                                                                                |
-| ------------------ | ------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------------------ |
-| `icon`             | `ComponentType \| undefined`    | `undefined` | No       | Icon component rendered at size 20 inside the button.                                      |
-| `iconClass`        | `string`                        | `''`        | No       | Extra Tailwind class(es) appended to the icon.                                             |
-| `square`           | `boolean`                       | `true`      | No       | Fixed square size (`h-10 w-10`); when false, uses `h-10` with horizontal padding (`px-4`). |
-| `hasDropdown`      | `boolean`                       | `false`     | No       | Enables the hover-driven dropdown slot region.                                             |
-| `dropdownPosition` | `'left' \| 'right' \| 'middle'` | `'left'`    | No       | Passed through to the dropdown slot as a slot prop for positioning.                        |
-| `disabled`         | `boolean`                       | `false`     | No       | Disables the button; applies not-allowed cursor and 50% opacity, removes hover styles.     |
-| `title`            | `string`                        | `''`        | No       | Native title/tooltip attribute on the button.                                              |
-| `type`             | `'button' \| 'submit'`          | `'button'`  | No       | Native button type.                                                                        |
-| `variant`          | `'neutral' \| 'danger'`         | `'neutral'` | No       | Hover style; danger adds a red icon tint on group hover.                                   |
+| Prop               | Type                              | Default     | Required | Description                                                                                                                                    |
+| ------------------ | --------------------------------- | ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `icon`             | `ComponentType \| undefined`      | `undefined` | No       | Icon component rendered at size 20 inside the button.                                                                                          |
+| `iconClass`        | `string`                          | `''`        | No       | Extra Tailwind class(es) appended to the icon.                                                                                                 |
+| `square`           | `boolean`                         | `true`      | No       | Fixed square size (`h-10 w-10`); when false, uses `h-10` with horizontal padding (`px-4`).                                                     |
+| `hasDropdown`      | `boolean`                         | `false`     | No       | Enables the dropdown slot region and the trigger's popup ARIA attributes.                                                                      |
+| `dropdownPosition` | `'left' \| 'right' \| 'middle'`   | `'left'`    | No       | Passed through to the dropdown slot as a slot prop for positioning.                                                                            |
+| `disabled`         | `boolean`                         | `false`     | No       | Disables the button; applies not-allowed cursor and 50% opacity, removes hover styles.                                                         |
+| `title`            | `string`                          | `''`        | No       | Native title/tooltip attribute on the button.                                                                                                  |
+| `type`             | `'button' \| 'submit'`            | `'button'`  | No       | Native button type.                                                                                                                            |
+| `variant`          | `'neutral' \| 'danger'`           | `'neutral'` | No       | Hover style; danger adds a red icon tint on group hover.                                                                                       |
+| `popupRole`        | `'menu' \| 'listbox' \| 'dialog'` | `'menu'`    | No       | Value of the trigger's `aria-haspopup`. `'dialog'` focuses the first tabbable control on keyboard open and disables auto-close on item choice. |
 
 ### Usage
 
@@ -108,9 +110,9 @@ import ActionButton from '$ui/actions/ActionButton.svelte';
 
 <ActionButton icon={Plus} title="Add" on:click={add} />
 
-<ActionButton icon={Filter} hasDropdown={true} dropdownPosition="right">
-  <svelte:fragment slot="dropdown">
-    <Dropdown position="right">
+<ActionButton icon={Filter} title="Filter" hasDropdown={true} dropdownPosition="right">
+  <svelte:fragment slot="dropdown" let:dropdownPosition let:close>
+    <Dropdown position={dropdownPosition} role="menu" label="Filter" onClose={close}>
       <DropdownItem icon={FileText} label="Option A" />
     </Dropdown>
   </svelte:fragment>
@@ -121,14 +123,29 @@ import ActionButton from '$ui/actions/ActionButton.svelte';
 
 - `on:click` — forwarded from the inner `<button>`.
 - Default slot — rendered inside the button, after the icon.
-- `dropdown` slot — exposes slot props `dropdownPosition` and `open` (boolean); shown only while hovered and `hasDropdown` is true.
+- `dropdown` slot — exposes slot props `dropdownPosition`, `open` (boolean), and `close` (function that closes the dropdown and clears the pinned and hover state); rendered only while open and `hasDropdown` is true, inside a wrapper `div` whose id matches the trigger's `aria-controls`.
+
+### Keyboard & ARIA
+
+| Input                                     | Behavior                                                                                                                                                                                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hover                                     | Opens a preview; closes 100ms after the pointer leaves the wrapper.                                                                                                                                                               |
+| Click / Enter / Space                     | Pins the dropdown open; a second activation while pinned closes it. Keyboard activation (`event.detail === 0`) also moves focus into the dropdown.                                                                                |
+| ArrowDown on the trigger                  | Pins the dropdown open and moves focus into it.                                                                                                                                                                                   |
+| Escape inside the wrapper                 | Closes the dropdown and returns focus to the trigger. Handled in the capture phase, so it runs before an inner `Dropdown`'s `onClose`.                                                                                            |
+| Choosing an item                          | Clicking an element with role `menuitem`, `menuitemradio`, or `option` closes the dropdown after the item's own handlers run; keyboard choice refocuses the trigger. `menuitemcheckbox` items and `popupRole="dialog"` stay open. |
+| Pointer down or focus outside the wrapper | Closes the dropdown.                                                                                                                                                                                                              |
+
+- Focus target on open: for `popupRole="dialog"`, the first tabbable element; otherwise the first enabled `menuitem`/`menuitemcheckbox`/`menuitemradio`/`option`, falling back to the first tabbable element.
+- With `hasDropdown`, the trigger sets `aria-haspopup={popupRole}`, `aria-expanded` (open state), and `aria-controls` (generated dropdown id).
+- When `title` is set, it is also applied as the trigger's `aria-label`. Give icon-only triggers a `title`.
 
 ### Variants & Notes
 
 - `variant`: `neutral` or `danger`; `square` vs. padded (`square={false}`).
-- Hover state uses a 100ms leave delay so the pointer can travel into the dropdown.
+- The 100ms leave delay lets the pointer travel from the trigger into the dropdown.
 - The dropdown appears with a 150ms fade transition.
-- The outer wrapper is a `role="group"` div handling `mouseenter`/`mouseleave`.
+- The outer wrapper is a `role="group"` div handling `mouseenter`/`mouseleave`, `focusout`, item clicks, and capture-phase Escape.
 
 ## ActionsBar
 
@@ -173,7 +190,7 @@ import ActionsBar from '$ui/actions/ActionsBar.svelte';
 
 ## ViewToggle
 
-Action-bar control that toggles a data page between `'cards'` and `'table'` view via an `ActionButton` with a hover dropdown of the two options.
+Action-bar control that toggles a data page between `'cards'` and `'table'` view via an `ActionButton` dropdown of the two options. The dropdown opens on click, Enter, or Space (hover only previews it); see [ActionButton keyboard behavior](#keyboard--aria).
 
 ```svelte
 import ViewToggle from '$ui/actions/ViewToggle.svelte';
@@ -204,9 +221,9 @@ import ViewToggle from '$ui/actions/ViewToggle.svelte';
 
 ### Variants & Notes
 
-- Two options: Cards (`LayoutGrid` icon) and Table (`Table` icon); the `Eye` icon is the trigger.
-- Built on `ActionButton` (`icon={Eye}`, `hasDropdown`) with a `Dropdown` of two `DropdownItem`s.
-- Selection is reflected by the `selected` state on each item. Use with `bind:value` to observe changes.
+- Two options: Cards (`LayoutGrid` icon) and Table (`Table` icon); the `Eye` icon is the trigger, titled and labelled "Choose view".
+- Built on `ActionButton` (`icon={Eye}`, `hasDropdown`) with a `Dropdown` labelled "View" containing two `DropdownItem`s with `role="menuitemradio"`.
+- Selection is reflected by each item's `selected` state, exposed as `aria-checked`. Choosing an option closes the dropdown. Use with `bind:value` to observe changes.
 
 ## SearchAction
 
@@ -318,8 +335,9 @@ import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
 ### Variants & Notes
 
 - Inline segmented pills (`aria-pressed` toggles) vs. dropdown trigger with Filter icon, active count badge (`n/total`), and ChevronDown.
-- Multi mode adds an 'All sources' item; single mode closes the dropdown on select.
+- Multi mode adds an 'All sources' item; items use `role="menuitemcheckbox"` in multi mode and `role="menuitemradio"` in single mode. Single mode closes the dropdown on select and returns focus to the trigger.
 - Uses local types `SourceOption` and `SourceFilterChangeDetail`; keys are the template-literal type `${SourceRef['type']}:${number}`.
 - `normalizeSelection()` filters invalid keys and defaults empty multi-selection to all options / empty single-selection to the first option.
 - `computeActiveState()` marks the filter active when a strict subset is selected.
-- Dropdown uses `use:clickOutside` to close and also closes when the viewport crosses into mobile width; registers a `(max-width: 767px)` `matchMedia` listener when responsive.
+- Dropdown uses `use:clickOutside` and `use:focusOutside` to close and also closes when the viewport crosses into mobile width; registers a `(max-width: 767px)` `matchMedia` listener when responsive.
+- The dropdown trigger sets `aria-haspopup="menu"`, `aria-expanded`, and `aria-controls`. Keyboard activation focuses the first menu item; Escape (on the trigger or inside the menu) closes it and refocuses the trigger. Arrow-key navigation comes from `Dropdown`.
