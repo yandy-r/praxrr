@@ -270,6 +270,36 @@ Deno.test('JWKS: forced refreshes for unknown kids are rate limited', async () =
   }
 });
 
+Deno.test('JWKS: a failing forced refresh is still rate limited', async () => {
+  const key = await generateTestKey('RS256', 'known');
+  const stranger = await generateTestKey('RS256', 'stranger');
+  const idp = installTestIdp({ keys: [key] });
+  const stubFetch = globalThis.fetch;
+  try {
+    await verifyIdTokenSignature(await signJwt(key, validClaims()), TEST_JWKS_URI);
+    assertEquals(idp.count(TEST_JWKS_URI), 1);
+
+    // The provider now fails every JWKS request.
+    let failedFetches = 0;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url !== TEST_JWKS_URI) return stubFetch(input, init);
+      failedFetches++;
+      return Promise.resolve(new Response('unavailable', { status: 503 }));
+    }) as typeof fetch;
+
+    for (let i = 0; i < 5; i++) {
+      const token = await signJwt(stranger, validClaims(), { header: { kid: `unknown-${i}` } });
+      await assertRejects(() => verifyIdTokenSignature(token, TEST_JWKS_URI));
+    }
+    // Only the first forced refresh reached the failing provider.
+    assertEquals(failedFetches, 1);
+  } finally {
+    globalThis.fetch = stubFetch;
+    idp.restore();
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Discovery transport policy
 // ---------------------------------------------------------------------------

@@ -430,6 +430,8 @@ async function resolveSigningKeys(
     return candidates;
   }
 
+  // Count the attempt before fetching so a failing provider stays rate limited too.
+  entry.lastForcedRefresh = now;
   const refreshed: JwksCacheEntry = {
     keys: await fetchJwks(jwksUri),
     expires: now + JWKS_TTL_MS,
