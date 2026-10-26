@@ -764,7 +764,10 @@ Processing steps:
 2. Filter items by ignore tag.
 3. Request rename previews from Arr.
 4. If dry‑run: record results only.
-5. If live: trigger rename commands; optionally rename folders + refresh.
+5. If live: trigger rename commands; optionally rename folders + refresh. Sonarr folder
+   renames are batched by exact parent folder (`rename/folderGroups.ts`). A series path
+   with no usable parent is skipped. Sonarr moves every series in a batch into that
+   parent, so a prefix match would relocate series between sibling or nested roots.
 
 ### 15.2 Settings & History
 
@@ -821,7 +824,11 @@ Queries: `packages/praxrr-app/src/lib/server/db/queries/jobQueue.ts`,
 - `arr.rename` — per Arr instance.
 - `arr.upgrade` — per Arr instance; hard cooldown enforced.
 - `pcd.sync` — per database instance; respects `sync_strategy` and `auto_pull`.
-- `backup.create`, `backup.cleanup`, `logs.cleanup`.
+- `backup.create`, `backup.cleanup`, `logs.cleanup`. `backup.create` archives `data/` with a
+  `VACUUM INTO` snapshot of `praxrr.db` and omits the live database and its `-wal`, `-shm`,
+  and `-journal` files. Restore from Settings → Backups only stages the archive. The swap
+  runs on the next startup, before the database opens, and keeps the previous `data/`
+  directory as `data.pre-restore-*`.
 
 ### 16.4 Lifecycle
 
@@ -966,8 +973,12 @@ Details and flow diagrams live in `packages/praxrr-app/src/lib/server/utils/auth
 
 ### 19.2 Sessions & API Tokens
 
-- **Session cookie:** `session` (httpOnly, sameSite=lax).
-- **Sliding expiration:** sessions extend when past halfway.
+- **Session cookie:** `session` (httpOnly, sameSite=lax). The value is a 32-byte random
+  token. `sessions.id` stores only its SHA-256 hex. Migration `20261026` deletes rows whose
+  id is not already that digest, so cookies issued before the upgrade stop working.
+- **Sliding expiration:** when less than half the duration remains, the row is extended and
+  the same cookie value is re-issued with the new expiry. `GET`/`HEAD` `/api/v1/events` and
+  requests with `x-praxrr-live: 1` do not extend the session.
 - **API tokens:** `X-Api-Key` header or `apikey` query param, accepted only on `/api/v1/*`
   requests in every authenticating mode (`on`, `local` for remote clients, `oidc`). Each token
   is named, scoped (`read`, `mcp`, `sync:apply`, `admin`; `admin` implies all), revocable and
@@ -992,7 +1003,13 @@ OIDC flow lives in `packages/praxrr-app/src/routes/auth/oidc/*` and `auth/oidc.t
 
 - Discovery + token exchange
 - ID token decode + basic verification
-- Session created after successful login
+- Fail-closed sign-in allowlist (`auth/oidcAllowlist.ts`). With no list and without
+  `OIDC_ALLOW_ALL_USERS`, the callback returns 403 and creates no user or session.
+- Session created after a successful allowlist check
+- Password login returns 403 and `/auth/setup` redirects home. In other modes the OIDC
+  routes return 404. Sessions whose user kind does not match `AUTH` are removed at startup.
+  A changed allowlist fingerprint (including the first OIDC boot that records one) deletes
+  OIDC sessions.
 
 ### 19.4 Routes
 
@@ -1005,7 +1022,7 @@ Auth and security routes:
 ### 19.5 Data Model
 
 - `users` — single local admin (OIDC users stored as `oidc:<sub>`)
-- `sessions` — multi‑session support + metadata
+- `sessions` — multi-session support + metadata. `id` is the SHA-256 of the cookie token, not the token.
 - `auth_settings` — session duration (singleton; the old `api_key` column is always NULL)
 - `api_tokens` — named API tokens: hash, prefix, scopes, legacy flag, created/last-used/expiry/
   revoked timestamps

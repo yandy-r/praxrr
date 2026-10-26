@@ -133,7 +133,8 @@ more on the way.
 - `AUTH=oidc` - SSO via OpenID Connect provider
 - `AUTH=off` - No authentication (use with external auth like Authentik/Authelia)
 
-API access via `X-Api-Key` header or `?apikey=` query param. See
+API access uses a named token from **Settings → Security**, sent as the `X-Api-Key` header
+or `?apikey=` query param. See
 [auth docs](packages/praxrr-app/src/lib/server/utils/auth/README.md) for details.
 
 > [!IMPORTANT] Reverse proxies and `AUTH=local`: forwarded headers (`X-Forwarded-For`, `X-Real-IP`,

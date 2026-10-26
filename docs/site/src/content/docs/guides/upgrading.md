@@ -47,7 +47,7 @@ docker compose up -d
 ## Database migrations
 
 Praxrr runs SQLite migrations automatically during startup
-(`hooks.server.ts` sequence: config → database → migrations → PCD → jobs).
+(`hooks.server.ts` sequence: config → staged restore → database → migrations → PCD → jobs).
 
 - App schema changes live in `packages/praxrr-app/src/lib/server/db/migrations/`.
 - Do not downgrade to an older Praxrr version after migrations advance without
@@ -73,6 +73,28 @@ Praxrr release's schema manifest.
 
 Set `PRAXRR_SCHEMA_REF` to pin a known-good schema tag when running curated
 stacks (for example `latest` or a release tag).
+
+## Sessions after upgrade
+
+Migration `20261026` deletes every session whose stored id is not already a SHA-256 hex
+digest. Cookies issued before that migration no longer match, so everyone must sign in
+again. Later sliding renewals keep the same cookie value and only refresh its expiry.
+
+Before downgrading below that migration, run `DELETE FROM sessions`. Older builds treat
+`sessions.id` as the cookie value, so a stored hash would be a valid bearer.
+
+## OIDC sign-in
+
+`AUTH=oidc` refuses a new sign-in unless an allowlist is set or `OIDC_ALLOW_ALL_USERS` is
+enabled. See [Configuration](./configuration/). The first OIDC boot on this behavior, and
+any later change to the effective allowlist, signs out OIDC sessions. API tokens are
+separate; review them in **Settings → Security** before upgrading.
+
+## In-app backup restore
+
+**Settings → Backups** does not replace the live database immediately. It stages the
+archive. Restart Praxrr to apply it. The previous `data/` directory is kept as
+`data.pre-restore-*`. Copying a backup over the open SQLite files is not the in-app path.
 
 ## Rollback
 

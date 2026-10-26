@@ -102,6 +102,19 @@ Sync jobs run as `trashguide.sync` in the background job queue. The job handler:
 - Removes the source record, its sync configs, entity cache, TRaSH ID mappings, and the local git
   clone directory.
 
+## Namespace indexes
+
+Each Arr instance stores one namespace index per TRaSH source in `arr_trash_guide_namespaces`.
+That index builds the zero-width suffix on synced custom formats and quality profiles. The
+index stays with the Arr instance after the source is deleted, so a later source cannot reuse
+it. New sources that resolve at least one profile get `MAX + 1` in hydration order.
+
+There is no backfill. The first sync after upgrade follows the old positional order when every
+selected source resolves. If the instance already has TRaSH-synced items and a selected source
+does not resolve, the quality-profile sync writes no TRaSH batches for that pass. Skipped
+profiles record: `TRaSH sync blocked: source(s) … could not be resolved. Re-pull or disable them
+so TRaSH namespaces can be assigned safely.`
+
 ## Practical API examples
 
 ```bash

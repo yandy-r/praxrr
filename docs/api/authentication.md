@@ -29,12 +29,13 @@ with status `401`.
 - Cookie name: `session`
 - Created by interactive login flow (`/auth/login` or OIDC routes)
 - Used across UI and API requests
+- The cookie value is an opaque token. `sessions.id` stores only its SHA-256. Do not send the database id.
 
 Example:
 
 ```bash
 curl -sS \
-  -H 'Cookie: session=<session-id>' \
+  -H 'Cookie: session=<cookie-value>' \
   http://localhost:5173/api/v1/openapi.json | jq '.info.version'
 ```
 
@@ -145,10 +146,16 @@ Configured by server `AUTH` mode.
 ## `AUTH=oidc`
 
 - Uses OIDC-backed user sessions for the UI
+- Password login returns 403. `/auth/setup` redirects home. In every other mode the OIDC
+  routes return 404.
+- New sign-ins must match the allowlist (`OIDC_ALLOWED_SUBJECTS`, `OIDC_ALLOWED_EMAILS`,
+  `OIDC_ALLOWED_GROUPS`) or `OIDC_ALLOW_ALL_USERS`. Otherwise the callback returns 403.
 - API tokens authenticate `/api/v1/*` requests, so headless clients (Prometheus, MCP clients,
   scripts) work without a browser session
 
 ## Setup flow interaction
 
-- Before initial local-user setup is complete (except `AUTH=off`), app redirects to `/auth/setup`
+- Before initial local-user setup is complete, the app redirects to `/auth/setup`, except
+  `AUTH=off` and `AUTH=oidc`
+- Local usernames cannot start with `oidc:` (case-insensitive)
 - API integrations should be configured after setup is complete
