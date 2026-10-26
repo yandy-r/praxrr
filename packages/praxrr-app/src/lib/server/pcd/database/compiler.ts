@@ -11,7 +11,32 @@ import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { logger } from '$logger/logger.ts';
 
 const AUTO_OVERRIDE_MAX_ROUNDS = 10;
-const autoOverrideLocks = new Set<number>();
+/** Per-database count of active suppressors (auto-resolve runs and restore compiles). */
+const autoOverrideLocks = new Map<number, number>();
+
+function acquireAutoOverrideLock(databaseInstanceId: number): void {
+  autoOverrideLocks.set(databaseInstanceId, (autoOverrideLocks.get(databaseInstanceId) ?? 0) + 1);
+}
+
+function releaseAutoOverrideLock(databaseInstanceId: number): void {
+  const count = (autoOverrideLocks.get(databaseInstanceId) ?? 0) - 1;
+  if (count > 0) autoOverrideLocks.set(databaseInstanceId, count);
+  else autoOverrideLocks.delete(databaseInstanceId);
+}
+
+/**
+ * Run `fn` with strategy-driven auto-override suppressed for `databaseInstanceId`, so a compile
+ * inside it does not retry overrides. Reference-counted: concurrent or nested suppressors each
+ * hold the lock until their own `fn` settles.
+ */
+export async function withAutoOverrideSuppressed<T>(databaseInstanceId: number, fn: () => Promise<T>): Promise<T> {
+  acquireAutoOverrideLock(databaseInstanceId);
+  try {
+    return await fn();
+  } finally {
+    releaseAutoOverrideLock(databaseInstanceId);
+  }
+}
 
 function listPublishedUserConflicts(databaseInstanceId: number): number[] {
   const latestConflicts = pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseInstanceId);
@@ -36,7 +61,7 @@ async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise
   const initialConflicts = listPublishedUserConflicts(databaseInstanceId);
   if (initialConflicts.length === 0) return;
 
-  autoOverrideLocks.add(databaseInstanceId);
+  acquireAutoOverrideLock(databaseInstanceId);
 
   try {
     const { overrideConflict } = await import('$pcd/conflicts/override.ts');
@@ -105,7 +130,7 @@ async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise
       });
     }
   } finally {
-    autoOverrideLocks.delete(databaseInstanceId);
+    releaseAutoOverrideLock(databaseInstanceId);
   }
 }
 
