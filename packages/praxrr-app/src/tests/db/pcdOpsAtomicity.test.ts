@@ -196,3 +196,24 @@ migratedTest('restoreImportSnapshot never deletes ids belonging to another datab
   assertEquals(pcdOpsQueries.getById(aId), snapshot[0]);
   assertExists(pcdOpsQueries.getById(bId));
 });
+
+migratedTest('withOpCreationRecorder nests: child records its own ids and propagates to the parent', async () => {
+  const databaseId = createTestDatabase();
+  const outer: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
+  const inner: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
+
+  let outerOnlyId = 0;
+  let innerId = 0;
+  await withOpCreationRecorder(outer, async () => {
+    outerOnlyId = seedStaleBase(databaseId, 'outer-only', null, OLD);
+    await withOpCreationRecorder(inner, async () => {
+      innerId = seedStaleBase(databaseId, 'inner', null, OLD);
+      pcdOpsQueries.update(outerOnlyId, { sql: 'SELECT touched' });
+    });
+  });
+
+  assertEquals(inner.opIds, [innerId]);
+  assertEquals(inner.updatedOpIds, [outerOnlyId]);
+  assertEquals(outer.opIds, [outerOnlyId, innerId]);
+  assertEquals(outer.updatedOpIds, [outerOnlyId]);
+});

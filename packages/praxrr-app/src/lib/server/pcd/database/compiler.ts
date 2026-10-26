@@ -13,6 +13,20 @@ import { logger } from '$logger/logger.ts';
 const AUTO_OVERRIDE_MAX_ROUNDS = 10;
 const autoOverrideLocks = new Set<number>();
 
+/**
+ * Run `fn` with strategy-driven auto-override suppressed for `databaseInstanceId`, so a compile
+ * inside it does not retry overrides. Re-entrant: only the call that added the lock removes it.
+ */
+export async function withAutoOverrideSuppressed<T>(databaseInstanceId: number, fn: () => Promise<T>): Promise<T> {
+  const added = !autoOverrideLocks.has(databaseInstanceId);
+  if (added) autoOverrideLocks.add(databaseInstanceId);
+  try {
+    return await fn();
+  } finally {
+    if (added) autoOverrideLocks.delete(databaseInstanceId);
+  }
+}
+
 function listPublishedUserConflicts(databaseInstanceId: number): number[] {
   const latestConflicts = pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseInstanceId);
   const opIds: number[] = [];

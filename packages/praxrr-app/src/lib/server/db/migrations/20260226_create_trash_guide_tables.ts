@@ -97,7 +97,7 @@ export const migration: Migration = {
 			ON trash_id_mappings(arr_type, trash_id);
 
 		-- SQLite cannot alter CHECK constraints, so recreate pcd_ops with updated source taxonomy
-		PRAGMA foreign_keys = OFF;
+		-- (No PRAGMA foreign_keys toggling: the runner wraps up() in a transaction, which makes it a no-op.)
 
 		CREATE TABLE pcd_ops_new (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,6 +133,11 @@ export const migration: Migration = {
 			superseded_by_op_id, pushed_at, pushed_commit, created_at, updated_at
 		FROM pcd_ops;
 
+		-- Copy pcd_op_history aside: it references pcd_ops(id) ON DELETE CASCADE, and the migration
+		-- runner executes up() inside a transaction, where PRAGMA foreign_keys is a no-op. DROP TABLE
+		-- would therefore cascade-delete every history row.
+		CREATE TABLE pcd_op_history_migration_backup AS SELECT * FROM pcd_op_history;
+
 		DROP TABLE pcd_ops;
 		ALTER TABLE pcd_ops_new RENAME TO pcd_ops;
 
@@ -150,7 +155,15 @@ export const migration: Migration = {
 		CREATE INDEX idx_pcd_ops_hash
 			ON pcd_ops(database_id, origin, content_hash);
 
-		PRAGMA foreign_keys = ON;
+		-- Restore the pcd_op_history rows copied aside before pcd_ops was dropped
+		INSERT INTO pcd_op_history (
+			id, op_id, database_id, batch_id, status, rowcount, conflict_reason, error, details, applied_at
+		)
+		SELECT
+			id, op_id, database_id, batch_id, status, rowcount, conflict_reason, error, details, applied_at
+		FROM pcd_op_history_migration_backup;
+
+		DROP TABLE pcd_op_history_migration_backup;
 	`,
 
   down: `
@@ -161,7 +174,7 @@ export const migration: Migration = {
 		DROP TABLE IF EXISTS trash_guide_sources;
 
 		-- Revert pcd_ops source taxonomy to prior enum
-		PRAGMA foreign_keys = OFF;
+		-- (No PRAGMA foreign_keys toggling: the runner wraps down() in a transaction, which makes it a no-op.)
 
 		CREATE TABLE pcd_ops_old (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,6 +212,11 @@ export const migration: Migration = {
 			superseded_by_op_id, pushed_at, pushed_commit, created_at, updated_at
 		FROM pcd_ops;
 
+		-- Copy pcd_op_history aside: it references pcd_ops(id) ON DELETE CASCADE, and the migration
+		-- runner executes down() inside a transaction, where PRAGMA foreign_keys is a no-op. DROP TABLE
+		-- would therefore cascade-delete every history row.
+		CREATE TABLE pcd_op_history_migration_backup AS SELECT * FROM pcd_op_history;
+
 		DROP TABLE pcd_ops;
 		ALTER TABLE pcd_ops_old RENAME TO pcd_ops;
 
@@ -216,6 +234,14 @@ export const migration: Migration = {
 		CREATE INDEX idx_pcd_ops_hash
 			ON pcd_ops(database_id, origin, content_hash);
 
-		PRAGMA foreign_keys = ON;
+		-- Restore the pcd_op_history rows copied aside before pcd_ops was dropped
+		INSERT INTO pcd_op_history (
+			id, op_id, database_id, batch_id, status, rowcount, conflict_reason, error, details, applied_at
+		)
+		SELECT
+			id, op_id, database_id, batch_id, status, rowcount, conflict_reason, error, details, applied_at
+		FROM pcd_op_history_migration_backup;
+
+		DROP TABLE pcd_op_history_migration_backup;
 	`,
 };

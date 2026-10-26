@@ -55,6 +55,8 @@ Deno.test('overrideConflict routes lidarr entities to dedicated override handler
     try {
       restores.push(patch(pcdOpsQueries, 'getById', () => createPublishedUserOp(entity)));
       restores.push(patch(pcdOpsQueries, 'update', () => true));
+      restores.push(patch(pcdOpsQueries, 'listByDatabase', () => []));
+      restores.push(patch(pcdOpsQueries, 'restoreImportSnapshot', () => {}));
       restores.push(patch(pcdOpHistoryQueries, 'create', () => 1));
       restores.push(patch(databaseInstancesQueries, 'getById', () => undefined));
 
