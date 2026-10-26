@@ -6,7 +6,7 @@
 
 The Shield Check engine grades control-plane auth, Arr transport, key-at-rest, credential rotation, and log redaction, but does **not** yet assess whether the session cookie's `Secure` flag and the session-secret configuration match the deployment's transport and auth mode. Today `PostureInputs.sessionCookieSecure` is a hardcoded `false` (`gather.ts:124`) that drives a single static `session_cookie_secure` advisory (`engine.ts:47`).
 
-This change replaces that static boolean with a **request-derived, honest, unscored session posture** on the engine's existing advisory/assurance surface, and ships the real hardening deliverable: a `PRAXRR_COOKIE_SECURE=auto|on|off` config knob plus a shared cookie-options helper adopted by all four session-cookie set-sites, so the cookie is actually marked `Secure` when the request transport is observed to be secure.
+This change replaces that static boolean with a **request-derived, honest, unscored session posture** on the engine's existing advisory/assurance surface, and ships the real hardening deliverable: a `PRAXRR_COOKIE_SECURE=auto|on|off` config knob plus a shared cookie-options helper adopted by all four session-cookie set-sites (historical count; `middleware.ts` later added a fifth for sliding-expiry refresh), so the cookie is actually marked `Secure` when the request transport is observed to be secure.
 
 Nothing scored changes. `SecurityCheckId`, `CHECK_IDS`, the rollup, every weight, every contribution, and every pinned score (95/64/59/85, `recoverablePoints` 40) stay byte-identical by construction. The `SECURITY_POSTURE_ENGINE_VERSION` constant bumps `'1'→'2'` to version the report-surface change.
 

@@ -245,9 +245,11 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 ## Session Management
 
 - **Duration**: 7 days (configurable in Settings > Security)
-- **Sliding expiration**: Session extended when past halfway point
+- **Session storage**: `sessions.id` is the sha256 of the `session` cookie value; the cookie itself is a 32-byte random token and is never stored.
+- **Sliding expiration**: Session extended when past halfway point; the cookie is re-issued with the new expiry on each extension.
 - **Multiple sessions**: Users can be logged in from multiple devices
 - **Metadata tracked**: IP, user agent, browser, OS, device type, last active
+- **Downgrading**: before downgrading below migration 20261026, run `DELETE FROM sessions`, since stored hashes would act as cookie values on older versions.
 
 ## Files
 

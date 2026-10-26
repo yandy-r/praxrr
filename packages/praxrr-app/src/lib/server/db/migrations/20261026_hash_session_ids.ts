@@ -1,5 +1,6 @@
 import type { Migration } from '../migrations.ts';
 import { db } from '../db.ts';
+import { logger } from '$logger/logger.ts';
 
 /**
  * Migration 20261026: Stop storing session bearers in `sessions.id` (YAN-1264).
@@ -17,7 +18,9 @@ import { db } from '../db.ts';
  * boot. `afterUp` runs between runner transactions, so the PRAGMAs below execute outside a
  * transaction (required: `secure_delete` and `wal_checkpoint` are no-ops inside one).
  *
- * `down` has nothing to restore (plaintext ids are gone), so it deletes all sessions.
+ * `down` has nothing to restore (plaintext ids are gone), so it deletes all sessions. Before
+ * downgrading below this version, run `DELETE FROM sessions`: the stored hashes would otherwise
+ * act as cookie values on older versions that look sessions up by raw cookie.
  */
 export const migration: Migration = {
   version: 20261026,
@@ -53,7 +56,15 @@ export async function invalidateLegacySessions(): Promise<void> {
       }
     });
   } finally {
-    db.exec(`PRAGMA secure_delete = ${previous?.secure_delete ?? 0}`);
+    // The pragma reports FAST as 2 but only accepts the FAST keyword (a numeric 2 reads as boolean).
+    const prior = previous?.secure_delete ?? 0;
+    db.exec(`PRAGMA secure_delete = ${prior === 2 ? 'FAST' : prior}`);
   }
-  db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  const checkpoint = db.queryFirst<{ busy: number }>('PRAGMA wal_checkpoint(TRUNCATE)');
+  if (checkpoint && checkpoint.busy !== 0) {
+    await logger.warn('WAL checkpoint was blocked; legacy session ids may linger in the WAL file', {
+      source: 'DatabaseMigrations',
+      meta: { version: 20261026 },
+    });
+  }
 }

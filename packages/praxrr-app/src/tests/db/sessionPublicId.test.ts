@@ -58,7 +58,7 @@ type LegacyRow = {
 };
 
 dbTest(
-  'upgrade: public_id migration succeeds and later invalidation removes legacy bearers',
+  'upgrade: legacy sessions backfilled with distinct UUID-v4 public_id, other columns unchanged',
   async () => {
     const userId = insertUser('legacy-user');
     const future = new Date(Date.now() + 3600_000).toISOString();
@@ -79,11 +79,24 @@ dbTest(
         'Desktop'
       )
     );
-    await runMigrations();
+    const before = db.query<LegacyRow>('SELECT * FROM sessions ORDER BY id');
+    assertEquals(before.length, 3);
 
-    // 20261026 invalidates legacy rows (plaintext bearers must not survive in any form).
-    assertEquals(db.query('SELECT id FROM sessions').length, 0);
-    ids.forEach((id) => assertEquals(sessionsQueries.getByToken(id), undefined));
+    // Apply only up to (and including) the public_id migration; 20261026 would delete these rows.
+    await runMigrations(loadMigrations().filter((m) => m.version <= TARGET_VERSION));
+
+    const after = db.query<LegacyRow & { public_id: string | null }>('SELECT * FROM sessions ORDER BY id');
+    assertEquals(after.length, 3);
+    const seen = new Set<string>();
+    after.forEach((row, i) => {
+      const { public_id: publicId, ...rest } = row;
+      assertEquals(rest, before[i]);
+      assert(publicId !== null && UUID_V4.test(publicId), `public_id not UUID-v4: ${publicId}`);
+      assertNotEquals(publicId, row.id);
+      seen.add(publicId);
+    });
+    assertEquals(seen.size, 3);
+
     const applied = db.query<{ version: number }>('SELECT version FROM migrations WHERE version = ?', TARGET_VERSION);
     assertEquals(applied.length, 1);
   },

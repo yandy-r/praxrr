@@ -85,7 +85,7 @@ acceptance criterion #4 wants.
 
 ## Session cookie reality
 
-- 4 set-sites, all identical `{ path:'/', httpOnly:true, sameSite:'lax', secure:false, expires }`:
+- 4 set-sites (historical; the sliding-expiry refresh in `lib/server/utils/auth/middleware.ts` is now a 5th, also via `sessionCookieOptions`), all identical `{ path:'/', httpOnly:true, sameSite:'lax', secure:false, expires }`:
   - `routes/auth/login/+page.server.ts:91`
   - `routes/auth/oidc/callback/+server.ts:115`
   - `routes/api/v1/auth/webauthn/authentication/verify/+server.ts:129`

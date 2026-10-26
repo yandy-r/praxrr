@@ -97,6 +97,9 @@ dbTest('migration afterUp: deletes legacy raw ids, keeps hashed rows, rerun is a
   rawIds.forEach((id) => insertSessionRow(userId, id));
   insertSessionRow(userId, hashed);
 
+  db.exec('PRAGMA secure_delete = FAST');
+  assertEquals(db.queryFirst<{ secure_delete: number }>('PRAGMA secure_delete')!.secure_delete, 2);
+
   await invalidateLegacySessions();
   await invalidateLegacySessions(); // rerun must be a no-op
 
@@ -110,8 +113,8 @@ dbTest('migration afterUp: deletes legacy raw ids, keeps hashed rows, rerun is a
     assertEquals(sessionsQueries.getByToken(raw), undefined);
   }
   assertEquals(sessionsQueries.getValidByToken(hashedToken)?.id, hashed);
-  // Safety pragma restored to its prior value.
-  assertEquals(db.queryFirst<{ secure_delete: number }>('PRAGMA secure_delete')!.secure_delete, 0);
+  // Prior pragma value (FAST) restored, not forced off.
+  assertEquals(db.queryFirst<{ secure_delete: number }>('PRAGMA secure_delete')!.secure_delete, 2);
 });
 
 dbTest(
