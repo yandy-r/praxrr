@@ -2,10 +2,11 @@ import { assert, assertEquals, assertNotEquals, assertThrows } from '@std/assert
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { loadMigrations, runMigrations } from '$db/migrations.ts';
-import { sessionsQueries } from '$db/queries/sessions.ts';
+import { sessionsQueries, hashSessionToken } from '$db/queries/sessions.ts';
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const TARGET_VERSION = 20261006;
+const HASHED_ID = /^[0-9a-f]{64}$/;
 
 /** Real scratch SQLite DB per test; `legacy` stops migrations before the public_id migration. */
 function dbTest(name: string, fn: () => Promise<void> | void, opts: { legacy?: boolean } = {}): void {
@@ -57,7 +58,7 @@ type LegacyRow = {
 };
 
 dbTest(
-  'upgrade: legacy sessions backfilled with distinct UUID-v4 public_id, bearer still valid',
+  'upgrade: legacy sessions backfilled with distinct UUID-v4 public_id, other columns unchanged',
   async () => {
     const userId = insertUser('legacy-user');
     const future = new Date(Date.now() + 3600_000).toISOString();
@@ -81,7 +82,8 @@ dbTest(
     const before = db.query<LegacyRow>('SELECT * FROM sessions ORDER BY id');
     assertEquals(before.length, 3);
 
-    await runMigrations();
+    // Apply only up to (and including) the public_id migration; 20261026 would delete these rows.
+    await runMigrations(loadMigrations().filter((m) => m.version <= TARGET_VERSION));
 
     const after = db.query<LegacyRow & { public_id: string | null }>('SELECT * FROM sessions ORDER BY id');
     assertEquals(after.length, 3);
@@ -95,7 +97,6 @@ dbTest(
     });
     assertEquals(seen.size, 3);
 
-    assertEquals(sessionsQueries.getValidById(ids[0])?.id, ids[0]);
     const applied = db.query<{ version: number }>('SELECT version FROM migrations WHERE version = ?', TARGET_VERSION);
     assertEquals(applied.length, 1);
   },
@@ -115,11 +116,13 @@ dbTest('fresh DB: unique idx_sessions_public_id exists and rejects duplicates', 
   assertThrows(() => db.execute('UPDATE sessions SET public_id = ?', first));
 });
 
-dbTest('create: returns stored bearer, independent UUID-v4 public_id that cannot authenticate', () => {
+dbTest('create: returns raw bearer, id is its sha256, public_id is an independent UUID-v4', () => {
   const userId = insertUser('mint-user');
   const bearer = sessionsQueries.create(userId, 1);
   const row = db.queryFirst<{ id: string; public_id: string }>('SELECT id, public_id FROM sessions')!;
-  assertEquals(row.id, bearer);
+  assertNotEquals(row.id, bearer, 'stored id must never be the bearer token');
+  assertEquals(row.id, hashSessionToken(bearer));
+  assert(HASHED_ID.test(row.id));
   assertNotEquals(row.public_id, bearer);
   assert(UUID_V4.test(row.public_id));
   assertEquals(sessionsQueries.getValidById(row.public_id), undefined);
@@ -131,16 +134,24 @@ dbTest('listSummariesByUserId: own unexpired rows only, exact keys, correct isCu
   const a1 = sessionsQueries.create(userA, 1, { ipAddress: '1.1.1.1', browser: 'Firefox' });
   const a2 = sessionsQueries.create(userA, 1);
   const expired = sessionsQueries.create(userA, 1);
-  db.execute('UPDATE sessions SET expires_at = ? WHERE id = ?', new Date(Date.now() - 3600_000).toISOString(), expired);
+  db.execute(
+    'UPDATE sessions SET expires_at = ? WHERE id = ?',
+    new Date(Date.now() - 3600_000).toISOString(),
+    hashSessionToken(expired)
+  );
   sessionsQueries.create(userB, 1);
 
-  const list = sessionsQueries.listSummariesByUserId(userA, a1);
+  const list = sessionsQueries.listSummariesByUserId(userA, hashSessionToken(a1));
   assertEquals(list.length, 2);
   const publicIds = list.map((s) => s.public_id).sort();
   assertEquals(
     publicIds,
     db
-      .query<{ public_id: string }>('SELECT public_id FROM sessions WHERE id IN (?, ?)', a1, a2)
+      .query<{ public_id: string }>(
+        'SELECT public_id FROM sessions WHERE id IN (?, ?)',
+        hashSessionToken(a1),
+        hashSessionToken(a2)
+      )
       .map((r) => r.public_id)
       .sort()
   );
@@ -159,7 +170,7 @@ dbTest('listSummariesByUserId: own unexpired rows only, exact keys, correct isCu
   }
   const currentPublicId = db.queryFirst<{ public_id: string }>(
     'SELECT public_id FROM sessions WHERE id = ?',
-    a1
+    hashSessionToken(a1)
   )!.public_id;
   assertEquals(
     list.filter((s) => s.isCurrent).map((s) => s.public_id),
@@ -173,6 +184,7 @@ dbTest('deleteOtherByPublicId: foreign/unknown/current untouched, own other dele
   const current = sessionsQueries.create(userA, 1);
   const other = sessionsQueries.create(userA, 1);
   sessionsQueries.create(userB, 1);
+  const currentId = hashSessionToken(current);
   const publicOf = (id: string) =>
     db.queryFirst<{ public_id: string }>('SELECT public_id FROM sessions WHERE id = ?', id)!.public_id;
   const foreignPublic = db.queryFirst<{ public_id: string }>(
@@ -181,14 +193,14 @@ dbTest('deleteOtherByPublicId: foreign/unknown/current untouched, own other dele
   )!.public_id;
   const snapshot = sessionIds();
 
-  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, foreignPublic, current), false);
-  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, crypto.randomUUID(), current), false);
-  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, publicOf(current), current), false);
+  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, foreignPublic, currentId), false);
+  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, crypto.randomUUID(), currentId), false);
+  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, publicOf(currentId), currentId), false);
   assertEquals(sessionIds(), snapshot);
 
-  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, publicOf(other), current), true);
+  assertEquals(sessionsQueries.deleteOtherByPublicId(userA, publicOf(hashSessionToken(other)), currentId), true);
   assertEquals(
     sessionIds(),
-    snapshot.filter((id) => id !== other)
+    snapshot.filter((id) => id !== hashSessionToken(other))
   );
 });

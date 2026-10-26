@@ -13,11 +13,11 @@ import { logger } from '$logger/logger.ts';
  */
 export const GET: RequestHandler = async (event) => {
   const { cookies } = event;
-  const sessionId = cookies.get('session');
+  const sessionToken = cookies.get('session');
 
-  if (sessionId) {
+  if (sessionToken) {
     // Get session info before deleting for logging
-    const session = sessionsQueries.getById(sessionId);
+    const session = sessionsQueries.getByToken(sessionToken);
     if (session) {
       const user = usersQueries.getById(session.user_id);
       await logger.info(`User '${user?.username ?? 'unknown'}' logged out`, {
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async (event) => {
         meta: { userId: session.user_id, username: user?.username },
       });
     }
-    sessionsQueries.deleteById(sessionId);
+    sessionsQueries.deleteByToken(sessionToken);
   }
 
   clearSessionCookie(event, cookies);

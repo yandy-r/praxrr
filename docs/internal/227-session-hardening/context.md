@@ -85,12 +85,12 @@ acceptance criterion #4 wants.
 
 ## Session cookie reality
 
-- 4 set-sites, all identical `{ path:'/', httpOnly:true, sameSite:'lax', secure:false, expires }`:
+- 4 set-sites (historical; the sliding-expiry refresh in `lib/server/utils/auth/middleware.ts` is now a 5th, also via `sessionCookieOptions`), all identical `{ path:'/', httpOnly:true, sameSite:'lax', secure:false, expires }`:
   - `routes/auth/login/+page.server.ts:91`
   - `routes/auth/oidc/callback/+server.ts:115`
   - `routes/api/v1/auth/webauthn/authentication/verify/+server.ts:129`
   - `routes/auth/setup/+page.server.ts:87`
-- Session id = `crypto.randomUUID()` stored server-side in `sessions` table (opaque, ~122-bit entropy).
+- Session bearer = 32 random bytes (hex, 256-bit) generated with `crypto.getRandomValues`; only its sha256 is stored server-side as `sessions.id`, so the raw token exists only in the cookie.
   **No cookie-signing secret, no HMAC, no `SESSION_SECRET` env var exists** (verified by grep). SvelteKit
   cookies are unsigned. The only session-adjacent secrets in the app are the app API key
   (already graded by `app_key_at_rest`) and the OIDC client secret. `svelte.config.js` has a `csrf` block.

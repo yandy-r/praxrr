@@ -12,6 +12,7 @@ import { isLocalAddress, getClientIp } from './network.ts';
 import { resolveApiToken } from './apiTokens.ts';
 import type { AuthPrincipal } from './principal.ts';
 import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
+import { sessionCookieOptions } from './sessionCookie.ts';
 import { logger } from '$logger/logger.ts';
 
 /**
@@ -146,8 +147,8 @@ export function getAuthState(event: RequestEvent): AuthState {
   // Session cookie (oidc: no local user/password; on/local-remote: username/password).
   // Sessions only authenticate when the user kind matches the mode: oidc sessions exist only
   // under AUTH=oidc, local sessions only under AUTH=on/local.
-  const sessionId = event.cookies.get('session');
-  const session = sessionId ? (sessionsQueries.getValidById(sessionId) ?? null) : null;
+  const sessionToken = event.cookies.get('session');
+  const session = sessionToken ? (sessionsQueries.getValidByToken(sessionToken) ?? null) : null;
   const resolvedUser = session ? (usersQueries.getById(session.user_id) ?? null) : null;
   const user = resolvedUser && (config.authMode === 'oidc') === isOidcUser(resolvedUser) ? resolvedUser : null;
 
@@ -162,9 +163,10 @@ export function getAuthState(event: RequestEvent): AuthState {
 
 /**
  * Sliding expiration: extend session if past halfway point
- * Avoids DB write on every request while keeping active users logged in
+ * Avoids DB write on every request while keeping active users logged in.
+ * When the row is extended, the cookie is re-set so client and DB expiries agree.
  */
-export function maybeExtendSession(session: Session): void {
+export function maybeExtendSession(event: Pick<RequestEvent, 'cookies' | 'request' | 'url'>, session: Session): void {
   const durationHours = authSettingsQueries.getSessionDurationHours();
   const expiresAt = new Date(session.expires_at).getTime();
   const now = Date.now();
@@ -172,11 +174,18 @@ export function maybeExtendSession(session: Session): void {
 
   // Only extend if less than half the duration remains
   if (expiresAt - now < halfDuration) {
-    sessionsQueries.extendExpiration(session.id, durationHours);
-    void logger.debug('Session extended', {
-      source: 'Auth:Session',
-      meta: { userId: session.user_id },
-    });
+    const newExpiry = sessionsQueries.extendExpiration(session.id, durationHours);
+    if (newExpiry) {
+      // The cookie value never changes; only its expiry is refreshed.
+      const sessionToken = event.cookies.get('session');
+      if (sessionToken !== undefined) {
+        event.cookies.set('session', sessionToken, sessionCookieOptions(event, newExpiry));
+      }
+      void logger.debug('Session extended', {
+        source: 'Auth:Session',
+        meta: { userId: session.user_id },
+      });
+    }
   }
 }
 

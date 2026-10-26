@@ -1,11 +1,30 @@
+import { createHash } from 'node:crypto';
 import { db } from '../db.ts';
 import type { AuthMode } from '$config';
 import { OIDC_USER_SQL, OIDC_USER_SQL_PARAMS } from './users.ts';
+
+/** Random bytes per session bearer token (cookie value): 32 bytes → 64 hex chars. */
+const SESSION_TOKEN_BYTES = 32;
+
+/**
+ * SHA-256 hex of a raw session cookie value. `sessions.id` stores exactly this — never a bearer
+ * credential at rest (same style as `hashApiToken` in `$auth/apiTokens.ts`).
+ */
+export function hashSessionToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/** 64 lowercase hex characters from 32 random bytes; used as the raw `session` cookie value. */
+export function generateSessionToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(SESSION_TOKEN_BYTES));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * Types for sessions table
  */
 export interface Session {
+  /** Stored sha256 hex of the session cookie value; never a bearer credential. */
   id: string;
   user_id: number;
   expires_at: string;
@@ -53,20 +72,20 @@ export interface SessionMetadata {
  */
 export const sessionsQueries = {
   /**
-   * Create a new session with optional metadata
+   * Create a new session with optional metadata. Returns the RAW bearer token (the cookie value);
+   * only its sha256 is persisted as the row id.
    */
   create(userId: number, durationHours: number, metadata?: SessionMetadata): string {
-    const id = crypto.randomUUID();
+    const token = generateSessionToken();
     const publicId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
 
     db.execute(
       `INSERT INTO sessions (id, public_id, user_id, expires_at, ip_address, user_agent, browser, os, device_type, last_active_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      id,
+      hashSessionToken(token),
       publicId,
       userId,
-      expiresAt.toISOString(),
+      expiryFromDuration(durationHours).toISOString(),
       metadata?.ipAddress ?? null,
       metadata?.userAgent ?? null,
       metadata?.browser ?? null,
@@ -74,24 +93,35 @@ export const sessionsQueries = {
       metadata?.deviceType ?? null
     );
 
-    return id;
+    return token;
   },
 
   /**
-   * Get a session by ID (regardless of expiration)
+   * Get a session by the RAW cookie token (hashing internally), regardless of expiration
    */
-  getById(id: string): Session | undefined {
-    return db.queryFirst<Session>('SELECT * FROM sessions WHERE id = ?', id);
+  getByToken(token: string): Session | undefined {
+    return db.queryFirst<Session>('SELECT * FROM sessions WHERE id = ?', hashSessionToken(token));
   },
 
   /**
-   * Get a valid (non-expired) session by ID
+   * Get a valid (non-expired) session by ID (stored hash)
    */
   getValidById(id: string): Session | undefined {
     return db.queryFirst<Session>(
       `SELECT * FROM sessions
 			 WHERE id = ? AND datetime(expires_at) > datetime('now')`,
       id
+    );
+  },
+
+  /**
+   * Get a valid (non-expired) session by the RAW cookie token (hashing internally)
+   */
+  getValidByToken(token: string): Session | undefined {
+    return db.queryFirst<Session>(
+      `SELECT * FROM sessions
+			 WHERE id = ? AND datetime(expires_at) > datetime('now')`,
+      hashSessionToken(token)
     );
   },
 
@@ -132,10 +162,10 @@ export const sessionsQueries = {
   },
 
   /**
-   * Delete a specific session (logout)
+   * Delete a specific session by the RAW cookie token (logout)
    */
-  deleteById(id: string): boolean {
-    const affected = db.execute('DELETE FROM sessions WHERE id = ?', id);
+  deleteByToken(token: string): boolean {
+    const affected = db.execute('DELETE FROM sessions WHERE id = ?', hashSessionToken(token));
     return affected > 0;
   },
 
@@ -175,17 +205,17 @@ export const sessionsQueries = {
   },
 
   /**
-   * Extend session expiration (sliding expiration)
-   * Also updates last_active_at for activity tracking
+   * Extend session expiration (sliding expiration); also updates last_active_at.
+   * Returns the new expiry (null when no row was updated) so the cookie can match the DB exactly.
    */
-  extendExpiration(id: string, durationHours: number): boolean {
-    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+  extendExpiration(id: string, durationHours: number): Date | null {
+    const expiresAt = expiryFromDuration(durationHours);
     const affected = db.execute(
       'UPDATE sessions SET expires_at = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?',
       expiresAt.toISOString(),
       id
     );
-    return affected > 0;
+    return affected > 0 ? expiresAt : null;
   },
 
   /**
@@ -200,3 +230,8 @@ export const sessionsQueries = {
     return result?.count ?? 0;
   },
 };
+
+/** Expiry instant for a session created or extended right now with the given duration. */
+function expiryFromDuration(durationHours: number): Date {
+  return new Date(Date.now() + durationHours * 60 * 60 * 1000);
+}

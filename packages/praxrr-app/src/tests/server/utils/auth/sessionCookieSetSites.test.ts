@@ -10,12 +10,14 @@
 
 import { assert } from '@std/assert';
 
-/** The four routes that mint the `session` cookie (logout only deletes it — Secure-independent). */
+/** The routes/middleware that mint the `session` cookie (logout only deletes it — Secure-independent). */
 const SET_SITES = [
   '../../../../routes/auth/login/+page.server.ts',
   '../../../../routes/auth/setup/+page.server.ts',
   '../../../../routes/auth/oidc/callback/+server.ts',
   '../../../../routes/api/v1/auth/webauthn/authentication/verify/+server.ts',
+  // Sliding expiry re-sets the cookie (YAN-440)
+  '../../../../lib/server/utils/auth/middleware.ts',
 ] as const;
 
 for (const relative of SET_SITES) {
@@ -28,8 +30,8 @@ for (const relative of SET_SITES) {
       `${relative} no longer sets the 'session' cookie — update this guard if the flow moved`
     );
     assert(
-      source.includes('sessionCookieOptions(event, expires)'),
-      `${relative} must pass sessionCookieOptions(event, expires) to cookies.set('session', ...)`
+      /sessionCookieOptions\(event, \w+\)/.test(source),
+      `${relative} must pass sessionCookieOptions(event, <expiry>) to cookies.set('session', ...)`
     );
     // And never re-introduces a hardcoded transport flag that would bypass the helper.
     assert(
