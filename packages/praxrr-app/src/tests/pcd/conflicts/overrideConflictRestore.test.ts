@@ -216,3 +216,59 @@ overrideTest('overrideConflict undoes partial writes when a later override step 
     await Deno.remove(pcdPath, { recursive: true }).catch(() => {});
   }
 });
+
+overrideTest('overlapping overrideConflict calls on one database run serially', async () => {
+  const { databaseId, opId: firstOpId } = seedConflictedUserOp({ enabled: false, operation: 'update' });
+  const secondOpId = pcdOpsQueries.create({
+    databaseId,
+    origin: 'user',
+    state: 'published',
+    source: 'local',
+    sql: 'SELECT 2',
+    metadata: JSON.stringify({ operation: 'update', entity: 'regular_expression', name: 'Second Regex' }),
+    desiredState: JSON.stringify({ pattern: { from: 'a', to: 'b' } }),
+  });
+  pcdOpHistoryQueries.create({ opId: secondOpId, databaseId, batchId: 'batch-1', status: 'conflicted' });
+
+  // Record each attempt's drop (first write) and restore (last step). Serial execution means
+  // drop A, restore A, drop B, restore B; interleaving would show both drops before a restore.
+  const events: string[] = [];
+  const originalCreate = pcdOpHistoryQueries.create;
+  const originalRestore = pcdOpsQueries.restoreImportSnapshot;
+  pcdOpHistoryQueries.create = (input) => {
+    if (input.status === 'dropped') events.push(`drop:${input.opId}`);
+    return originalCreate.call(pcdOpHistoryQueries, input);
+  };
+  pcdOpsQueries.restoreImportSnapshot = (...args) => {
+    events.push('restore');
+    return originalRestore.apply(pcdOpsQueries, args);
+  };
+
+  try {
+    const [first, second] = await Promise.all([
+      overrideConflict({ databaseId, opId: firstOpId }),
+      overrideConflict({ databaseId, opId: secondOpId }),
+    ]);
+    assertEquals(first.success, false);
+    assertEquals(second.success, false);
+  } finally {
+    pcdOpHistoryQueries.create = originalCreate;
+    pcdOpsQueries.restoreImportSnapshot = originalRestore;
+  }
+
+  assertEquals(events, [`drop:${firstOpId}`, 'restore', `drop:${secondOpId}`, 'restore']);
+  for (const id of [firstOpId, secondOpId]) {
+    assertEquals(pcdOpsQueries.getById(id)?.state, 'published');
+    assertEquals(
+      pcdOpHistoryQueries.listByOp(id).filter((row) => row.status === 'dropped'),
+      []
+    );
+  }
+  assertEquals(
+    pcdOpHistoryQueries
+      .listLatestConflictsByDatabase(databaseId)
+      .map((c) => c.op.id)
+      .sort(),
+    [firstOpId, secondOpId]
+  );
+});

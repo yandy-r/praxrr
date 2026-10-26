@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { withOpCreationRecorder, type CreatedOpRecord } from '$db/opCreationRecorder.ts';
 import { databaseInstancesQueries, disableDatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
@@ -98,9 +99,48 @@ async function overrideEntity(
   }
 }
 
-export async function overrideConflict(input: { databaseId: number; opId: number }): Promise<OverrideConflictResult> {
+// ── Per-database serialization ──
+
+/** Database ids whose override lock the current async context already holds (re-entrancy). */
+const heldDatabaseLocks = new AsyncLocalStorage<ReadonlySet<number>>();
+/** Tail of each database's FIFO promise chain. */
+const databaseLockTails = new Map<number, Promise<void>>();
+
+/**
+ * Serialize overrides per database: an override snapshots and restores the whole op table, so two
+ * overlapping attempts would capture each other's writes. Re-entrant: a nested call from the same
+ * async context (e.g. via a compile's auto-override) passes straight through instead of
+ * deadlocking on itself.
+ */
+async function withDatabaseOverrideLock<T>(databaseId: number, fn: () => Promise<T>): Promise<T> {
+  const held = heldDatabaseLocks.getStore();
+  if (held?.has(databaseId)) return fn();
+
+  const previous = databaseLockTails.get(databaseId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => gate);
+  databaseLockTails.set(databaseId, tail);
+
+  await previous;
+  try {
+    return await heldDatabaseLocks.run(new Set([...(held ?? []), databaseId]), fn);
+  } finally {
+    release();
+    if (databaseLockTails.get(databaseId) === tail) databaseLockTails.delete(databaseId);
+  }
+}
+
+export function overrideConflict(input: { databaseId: number; opId: number }): Promise<OverrideConflictResult> {
+  return withDatabaseOverrideLock(input.databaseId, () => overrideConflictLocked(input));
+}
+
+async function overrideConflictLocked(input: { databaseId: number; opId: number }): Promise<OverrideConflictResult> {
   const { databaseId, opId } = input;
 
+  // Read inside the lock: a queued attempt may find the op already overridden by the one before it.
   const op = pcdOpsQueries.getById(opId);
   if (!op || op.database_id !== databaseId) {
     return { success: false, error: 'Conflict operation not found' };
@@ -132,14 +172,25 @@ export async function overrideConflict(input: { databaseId: number; opId: number
    * auto-override suppressed, otherwise the recompile would immediately retry this same override.
    */
   const restoreAfterFailure = async (reason: string): Promise<OverrideConflictResult> => {
+    const wroteNothing =
+      created.opIds.length === 0 && created.historyIds.length === 0 && created.updatedOpIds.length === 0;
+
+    // Restore is synchronous and runs before any await, so nothing can interleave with it.
+    let restoreError: unknown = null;
+    if (!wroteNothing) {
+      try {
+        pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, created);
+      } catch (error) {
+        restoreError = error;
+      }
+    }
+
     await logger.error('Conflict override failed; restoring operation', {
       source: 'PCDConflicts',
       meta: { databaseId, opId, error: reason },
     });
 
-    try {
-      pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, created);
-    } catch (restoreError) {
+    if (restoreError !== null) {
       // The rows may be a hybrid: disable the database (same signal as a failed cache build).
       let disabled = false;
       try {
@@ -155,15 +206,19 @@ export async function overrideConflict(input: { databaseId: number; opId: number
       return { success: false, error: reason };
     }
 
-    // The cache may reflect the aborted attempt; drop it, then rebuild if still enabled
-    // (cache.build can have disabled the instance during the attempt).
-    invalidate(databaseId);
+    if (wroteNothing) return { success: false, error: reason };
+
+    // Rebuild so the cache reflects the restored rows. compile() swaps caches atomically; drop the
+    // registered cache only when it cannot be rebuilt (instance disabled mid-attempt, or compile threw).
+    const current = databaseInstancesQueries.getById(databaseId);
+    if (!current?.enabled) {
+      invalidate(databaseId);
+      return { success: false, error: reason };
+    }
     try {
-      const current = databaseInstancesQueries.getById(databaseId);
-      if (current?.enabled) {
-        await withAutoOverrideSuppressed(databaseId, () => compile(current.local_path, databaseId));
-      }
+      await withAutoOverrideSuppressed(databaseId, () => compile(current.local_path, databaseId));
     } catch (compileError) {
+      invalidate(databaseId);
       await logger.error('Failed to recompile after restoring failed conflict override', {
         source: 'PCDConflicts',
         meta: { databaseId, opId, error: String(compileError) },
@@ -174,16 +229,21 @@ export async function overrideConflict(input: { databaseId: number; opId: number
 
   const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+  // Auto-override is suppressed for the whole attempt: the internal compiles and the writer's own
+  // compile must not auto-resolve OTHER conflicts, whose writes would land in this attempt's
+  // record and be rolled back with it. Remaining conflicts resolve on the next normal compile.
   if (operation === 'delete') {
     try {
-      const failure = await withOpCreationRecorder(created, async () => {
-        const dropped = await dropOp(databaseId, opId);
-        if (!dropped) return 'Failed to drop conflicting delete operation';
-        if (instance?.enabled) {
-          await compile(instance.local_path, databaseId);
-        }
-        return null;
-      });
+      const failure = await withAutoOverrideSuppressed(databaseId, () =>
+        withOpCreationRecorder(created, async () => {
+          const dropped = await dropOp(databaseId, opId);
+          if (!dropped) return 'Failed to drop conflicting delete operation';
+          if (instance?.enabled) {
+            await compile(instance.local_path, databaseId);
+          }
+          return null;
+        })
+      );
       if (failure) return restoreAfterFailure(failure);
     } catch (error) {
       return restoreAfterFailure(errorMessage(error));
@@ -204,16 +264,18 @@ export async function overrideConflict(input: { databaseId: number; opId: number
   // upstream state after recompilation.
   let result: WriteResult;
   try {
-    result = await withOpCreationRecorder(created, async () => {
-      const dropped = await dropOp(databaseId, opId);
-      if (!dropped) {
-        return { success: false, error: 'Failed to drop conflicting operation for override' };
-      }
-      if (instance?.enabled) {
-        await compile(instance.local_path, databaseId);
-      }
-      return overrideEntity(databaseId, metadata, desiredState, operation);
-    });
+    result = await withAutoOverrideSuppressed(databaseId, () =>
+      withOpCreationRecorder(created, async () => {
+        const dropped = await dropOp(databaseId, opId);
+        if (!dropped) {
+          return { success: false, error: 'Failed to drop conflicting operation for override' };
+        }
+        if (instance?.enabled) {
+          await compile(instance.local_path, databaseId);
+        }
+        return overrideEntity(databaseId, metadata, desiredState, operation);
+      })
+    );
   } catch (error) {
     return restoreAfterFailure(errorMessage(error));
   }

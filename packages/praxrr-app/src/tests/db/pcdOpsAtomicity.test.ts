@@ -217,3 +217,55 @@ migratedTest('withOpCreationRecorder nests: child records its own ids and propag
   assertEquals(outer.opIds, [outerOnlyId, innerId]);
   assertEquals(outer.updatedOpIds, [outerOnlyId]);
 });
+
+migratedTest(
+  'nested recorder scopes: inner restore then outer restore returns rows to the outer snapshot',
+  async () => {
+    const databaseId = createTestDatabase();
+    const keptId = seedStaleBase(databaseId, 'kept', null, OLD);
+    db.execute("UPDATE pcd_ops SET updated_at = '2020-01-01 00:00:00' WHERE database_id = ?", databaseId);
+    pcdOpHistoryQueries.create({ opId: keptId, databaseId, batchId: 'pre', status: 'applied' });
+
+    const outerSnapshot = pcdOpsQueries.listByDatabase(databaseId);
+    const outerHistoryBefore = pcdOpHistoryQueries.listByDatabase(databaseId);
+    const outer: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
+
+    await withOpCreationRecorder(outer, async () => {
+      await Promise.resolve();
+      const outerCreatedId = pcdOpsQueries.create({
+        databaseId,
+        origin: 'user',
+        state: 'published',
+        source: 'local',
+        sql: 'SELECT outer',
+      });
+      pcdOpHistoryQueries.create({ opId: outerCreatedId, databaseId, batchId: 'outer', status: 'applied' });
+
+      const innerSnapshot = pcdOpsQueries.listByDatabase(databaseId);
+      const inner: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
+      await withOpCreationRecorder(inner, async () => {
+        await Promise.resolve();
+        const innerCreatedId = pcdOpsQueries.create({
+          databaseId,
+          origin: 'user',
+          state: 'published',
+          source: 'local',
+          sql: 'SELECT inner',
+        });
+        pcdOpHistoryQueries.create({ opId: innerCreatedId, databaseId, batchId: 'inner', status: 'applied' });
+        pcdOpsQueries.update(keptId, { state: 'dropped', supersededByOpId: innerCreatedId });
+        pcdOpsQueries.update(outerCreatedId, { sql: 'SELECT outer mutated' });
+      });
+
+      // Inner rollback restores only the state at the inner snapshot (outer's op survives).
+      pcdOpsQueries.restoreImportSnapshot(databaseId, innerSnapshot, inner);
+      assertEquals(pcdOpsQueries.listByDatabase(databaseId), innerSnapshot);
+    });
+
+    // Outer rollback must still see everything the inner scope wrote (propagated ids).
+    pcdOpsQueries.restoreImportSnapshot(databaseId, outerSnapshot, outer);
+
+    assertEquals(pcdOpsQueries.listByDatabase(databaseId), outerSnapshot);
+    assertEquals(pcdOpHistoryQueries.listByDatabase(databaseId), outerHistoryBefore);
+  }
+);
