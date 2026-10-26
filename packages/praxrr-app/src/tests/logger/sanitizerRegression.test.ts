@@ -83,7 +83,7 @@ Deno.test('sanitizeLogMeta redacts embedded secrets from Error messages and stac
   assertEquals(sanitized.error.message, 'request failed [REDACTED]');
   assert(typeof stack === 'string');
   assert(!stack.includes(key), 'the Error stack must not retain the embedded key');
-  assert(stack.includes('[REDACTED]'));
+  assert(!stack.includes('request failed'), 'the stack carries frames only, not the message');
 });
 
 Deno.test('sanitizeLogMeta expands HttpError fields and redacts its nested credentials', () => {
@@ -310,4 +310,116 @@ Deno.test('sanitizeLogMeta sanitizes shared non-cyclic references normally', () 
   };
   assertEquals(sanitized.a, { label: 'shared', token: '[REDACTED]' });
   assertEquals(sanitized.b.inner, { label: 'shared', token: '[REDACTED]' });
+});
+
+Deno.test('sanitizeLogMeta redacts later JSON fields after a Bearer value inside a body', () => {
+  const sanitized = sanitizeLogMeta({
+    note: '{"authorization":"Bearer abc","password":"hunter2"}',
+    userinfo: '{"url":"https://user:pw@host","token":"t0k3n"}',
+  });
+  const serialized = JSON.stringify(sanitized);
+  assert(!serialized.includes('hunter2'), 'password after Bearer must not survive');
+  assert(!serialized.includes('t0k3n'), 'token after userinfo URL must not survive');
+  assert(!serialized.includes('abc'), 'Bearer value must not survive');
+});
+
+Deno.test('sanitizeLogMeta redacts sensitive JSON fields nested under non-sensitive keys', () => {
+  const sanitized = sanitizeLogMeta({
+    body: 'HTTP 400: Bad | {"error":{"token":"t0k"},"items":[{"password":"pw"}],"label":"keep"}',
+    container: '{"detail":"x","credentials":{"user":"u","pass":"p"},"after":"keep"}',
+    escaped: '{"body":"{\\"token\\":\\"esc-secret\\",\\"label\\":\\"keep\\"}"}',
+  }) as Record<string, string>;
+  const serialized = JSON.stringify(sanitized);
+  for (const leaked of ['t0k"', '"pw"', 'esc-secret', '"u"', '"p"']) {
+    assert(!serialized.includes(leaked), `${leaked} must not survive`);
+  }
+  assert(sanitized.body.includes('"label":"keep"'));
+  assert(sanitized.container.includes('"after":"keep"'));
+  assert(sanitized.escaped.includes('label'));
+});
+
+Deno.test('sanitizeLogMeta applies word boundaries to the identifier-key exemption', () => {
+  const sanitized = sanitizeLogMeta({
+    passwordValid: 'hunter2',
+    apiKeyAndroid: 'key-android',
+    secretId: 'vault-secret-id',
+    secret_id: 'vault-secret-id',
+    tokenName: 'deploy',
+    credentialId: 'cred-1',
+    client_name: 'web',
+    token_count: 2,
+    'api-key-prefix': 'prx_ab',
+  }) as Record<string, unknown>;
+  assertEquals(sanitized.passwordValid, '[REDACTED]');
+  assertEquals(sanitized.apiKeyAndroid, '[REDACTED]');
+  assertEquals(sanitized.secretId, '[REDACTED]');
+  assertEquals(sanitized.secret_id, '[REDACTED]');
+  assertEquals(sanitized.tokenName, 'deploy');
+  assertEquals(sanitized.credentialId, 'cred-1');
+  assertEquals(sanitized.client_name, 'web');
+  assertEquals(sanitized.token_count, 2);
+  assertEquals(sanitized['api-key-prefix'], 'prx_ab');
+});
+
+Deno.test('sanitizeLogMeta caps string length and emits only stack frames for Errors', () => {
+  const big = 'x '.repeat(20_000);
+  const capped = sanitizeLogMeta({ big }) as { big: string };
+  assert(capped.big.length < 9_000, 'long strings must be truncated');
+  assert(capped.big.endsWith('…[Truncated]'));
+
+  const error = new Error('boom {"token":"abc123"} detail');
+  const sanitized = sanitizeLogMeta({ error }) as {
+    error: { message: string; stack?: string };
+  };
+  assertEquals(sanitized.error.message, 'boom {"token":"[REDACTED]"} detail');
+  assert(!sanitized.error.stack?.includes('boom'), 'stack must not repeat the message');
+  assert(sanitized.error.stack?.includes('at '), 'stack frames are kept');
+  assert(!JSON.stringify(sanitized).includes('abc123'));
+});
+
+Deno.test('sanitizeLogMeta stays fast on adversarial large strings', () => {
+  const size = 200_000;
+  const inputs = [
+    'a'.repeat(size),
+    '"a":'.repeat(size / 4),
+    '{"a":'.repeat(size / 5),
+    '\\"a\\":'.repeat(size / 6),
+    '['.repeat(size),
+    '"token":{'.repeat(size / 9),
+    'Bearer '.repeat(size / 7),
+  ];
+  for (const input of inputs) {
+    const start = performance.now();
+    sanitizeLogMeta({ input });
+    const elapsed = performance.now() - start;
+    assert(elapsed < 200, `sanitizing took ${elapsed.toFixed(1)}ms`);
+  }
+});
+
+Deno.test('Logger writes sanitized HttpError meta to the log file', async () => {
+  const { Logger } = await import('$logger/logger.ts');
+  const dir = await Deno.makeTempDir({ prefix: 'praxrr-logger-' });
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    const logger = new Logger({ logsDir: dir, minLevel: 'DEBUG' });
+    const body = '{"error":{"token":"t0k-secret"},"password":"hunter2","message":"nope"}';
+    const error = new HttpError(`HTTP 400: ${body}`, 400, body);
+    await logger.error('request failed', { source: 'test', meta: { error } });
+    await logger.errorWithTrace('trace', error, { source: 'test' });
+
+    const files = [...Deno.readDirSync(dir)].filter((entry) => entry.name.endsWith('.log'));
+    assertEquals(files.length, 1);
+    const written = await Deno.readTextFile(`${dir}/${files[0].name}`);
+    assert(!written.includes('t0k-secret'), 'nested token must not be written');
+    assert(!written.includes('hunter2'), 'password must not be written');
+    assert(written.includes('HTTP 400'), 'error message must be written');
+    assert(written.includes('nope'), 'non-sensitive body content must be written');
+    for (const line of written.trim().split('\n')) {
+      JSON.parse(line);
+    }
+  } finally {
+    console.log = originalLog;
+    await Deno.remove(dir, { recursive: true });
+  }
 });

@@ -3,6 +3,8 @@ const CIRCULAR_VALUE = '[Circular]';
 const UNSERIALIZABLE_VALUE = '[Unserializable]';
 const TRUNCATED_VALUE = '[Truncated]';
 const MAX_DEPTH = 32;
+const MAX_STRING_LENGTH = 8192;
+const TRUNCATED_SUFFIX = '…[Truncated]';
 
 const SENSITIVE_KEY_PATTERNS = [
   /api[-_]?key/i,
@@ -15,11 +17,23 @@ const SENSITIVE_KEY_PATTERNS = [
   /client[-_]secret/i,
 ];
 
-const NON_SECRET_KEY_SUFFIX = /(?:name|id|fingerprint|prefix|count|version|revision)$/i;
+// Identifier-style suffixes need a word boundary (snake/kebab separator, or camelCase after a
+// lowercase letter/digit) so keys like `passwordValid` or `apiKeyAndroid` stay sensitive.
+const NON_SECRET_KEY_SEPARATED_SUFFIX = /[-_](?:name|id|fingerprint|prefix|count|version|revision)$/i;
+const NON_SECRET_KEY_CAMEL_SUFFIX = /[a-z0-9](?:Name|Id|ID|Fingerprint|Prefix|Count|Version|Revision)$/;
 const NON_SECRET_KEY_PREFIX = /^(?:has|is)[A-Z_]/;
+// A secret identifier (e.g. Vault AppRole `secret_id`) is itself a credential.
+const SECRET_ID_KEY = /secret[-_]?id$/i;
 
 function isSensitiveKey(key: string): boolean {
-  if (NON_SECRET_KEY_SUFFIX.test(key) || NON_SECRET_KEY_PREFIX.test(key)) {
+  if (SECRET_ID_KEY.test(key)) {
+    return true;
+  }
+  if (
+    NON_SECRET_KEY_SEPARATED_SUFFIX.test(key) ||
+    NON_SECRET_KEY_CAMEL_SUFFIX.test(key) ||
+    NON_SECRET_KEY_PREFIX.test(key)
+  ) {
     return false;
   }
   return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
@@ -37,28 +51,100 @@ const EMBEDDED_SECRET_PATTERNS = [
   /\beyJ[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\.[A-Za-z0-9-_]{5,}\b/g,
   /\bsk-[A-Za-z0-9]{20,}\b/g,
   /\bprx_[a-f0-9]{8,}\b/g,
-  /\bBearer\s+[^\s,;]+/gi,
+  /\bBearer\s+[^\s,;"']+/gi,
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g,
 ];
 
 const CREDENTIAL_QUERY_PATTERN = /([?&](?:api[-_]?key|token|access[-_]?token|password|secret)=)[^&#\s]+/gi;
 // The lookbehind anchors the scheme to the start of a token so long alphanumeric runs stay linear.
-const URL_USERINFO_PATTERN = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi;
-const EMBEDDED_JSON_FIELD_PATTERN = /"([^"\\]+)"(\s*:\s*)("(?:[^"\\]|\\.)*"|[^,}\]]+)/g;
+const URL_USERINFO_PATTERN = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/)[^\s/@:"]+(?::[^\s/@"]*)?@/gi;
+// Every match starts at a literal quote and the alternatives are disjoint, so scanning is linear.
+// A scalar value never starts with a bracket or quote: brackets are matched on their own so the
+// scan continues into nested objects/arrays, and sensitive containers are skipped as a whole.
+const EMBEDDED_JSON_FIELD_PATTERN = /"([^"\\]+)"(\s*:\s*)("(?:[^"\\]|\\.)*"?|[{[]|[^\s,{}[\]"][^,}\]]*)/g;
+const ESCAPED_JSON_FIELD_PATTERN = /\\"([^"\\]+)\\"(\s*:\s*)(\\"[^"\\]*\\"|[^\s,{}[\]"\\][^,}\]"\\]*)/g;
 
-function sanitizeStringValue(value: string): string {
+/** Index just past the container that opens at `openIndex`, or the string end if unterminated. */
+function findContainerEnd(value: string, openIndex: number): number {
+  let depth = 0;
+  let inString = false;
+  for (let i = openIndex; i < value.length; i++) {
+    const char = value[i];
+    if (inString) {
+      if (char === '\\') {
+        i++;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else if (char === '"') {
+      inString = true;
+    } else if (char === '{' || char === '[') {
+      depth++;
+    } else if (char === '}' || char === ']') {
+      depth--;
+      if (depth === 0) {
+        return i + 1;
+      }
+    }
+  }
+  return value.length;
+}
+
+function redactJsonFields(value: string): string {
+  const pattern = EMBEDDED_JSON_FIELD_PATTERN;
+  pattern.lastIndex = 0;
+  let out = '';
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(value)) !== null) {
+    const [whole, key, separator, rawValue] = match;
+    if (!isSensitiveKey(key)) {
+      continue;
+    }
+    let end = match.index + whole.length;
+    if (rawValue === '{' || rawValue === '[') {
+      end = findContainerEnd(value, end - 1);
+    }
+    out += `${value.slice(last, match.index)}"${key}"${separator}"${REDACTED_VALUE}"`;
+    last = end;
+    pattern.lastIndex = end;
+  }
+  const redacted = last === 0 ? value : out + value.slice(last);
+  return redacted.replace(ESCAPED_JSON_FIELD_PATTERN, (whole, key: string, separator: string) =>
+    isSensitiveKey(key) ? `\\"${key}\\"${separator}\\"${REDACTED_VALUE}\\"` : whole
+  );
+}
+
+const TOKEN_BOUNDARY = /[\s"',;{}[\]()]/;
+
+/** Cap length before any regex work, dropping a trailing partial token a pattern could miss. */
+function truncateString(value: string): string {
+  if (value.length <= MAX_STRING_LENGTH) {
+    return value;
+  }
+  let end = MAX_STRING_LENGTH;
+  const floor = MAX_STRING_LENGTH - 512;
+  while (end > floor && !TOKEN_BOUNDARY.test(value[end - 1])) {
+    end--;
+  }
+  if (end === floor) {
+    end = MAX_STRING_LENGTH;
+  }
+  return value.slice(0, end) + TRUNCATED_SUFFIX;
+}
+
+function sanitizeStringValue(input: string): string {
+  const value = truncateString(input);
   if (SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(value))) {
     return REDACTED_VALUE;
   }
 
-  let sanitized = value;
+  // JSON fields first: later token patterns must not disturb the quoting this pass relies on.
+  let sanitized = redactJsonFields(value);
   sanitized = sanitized.replace(URL_USERINFO_PATTERN, `$1${REDACTED_VALUE}@`);
   for (const pattern of EMBEDDED_SECRET_PATTERNS) {
     sanitized = sanitized.replace(pattern, REDACTED_VALUE);
   }
-  sanitized = sanitized.replace(EMBEDDED_JSON_FIELD_PATTERN, (match, key: string, separator: string) => {
-    return isSensitiveKey(key) ? `"${key}"${separator}"${REDACTED_VALUE}"` : match;
-  });
 
   return sanitized.replace(CREDENTIAL_QUERY_PATTERN, `$1${REDACTED_VALUE}`);
 }
@@ -106,6 +192,18 @@ function sanitizeRecord(value: object, ancestors: Set<object>, depth: number): R
 }
 
 /**
+ * V8 prefixes `stack` with `${name}: ${message}`, which is already emitted as `message`; keep only
+ * the frames so large messages (for example HTTP response bodies) are not logged twice.
+ */
+function stackFrames(error: Error, stack: unknown): unknown {
+  if (typeof stack !== 'string') {
+    return stack;
+  }
+  const header = error.message ? `${error.name}: ${error.message}` : error.name;
+  return stack.startsWith(header) ? stack.slice(header.length).replace(/^\r?\n/, '') : stack;
+}
+
+/**
  * Error properties such as message and stack are non-enumerable, so JSON serialization would
  * otherwise discard the diagnostic details and skip redaction of attached response data.
  */
@@ -126,12 +224,13 @@ function sanitizeError(error: Error, ancestors: Set<object>, depth: number): Rec
       continue;
     }
     const skipUndefined = key === 'stack' || key === 'cause';
-    setSanitizedField(sanitizedMeta, key, () => record[key], ancestors, depth, skipUndefined);
+    const read = key === 'stack' ? () => stackFrames(error, record[key]) : () => record[key];
+    setSanitizedField(sanitizedMeta, key, read, ancestors, depth, skipUndefined);
   }
 
   const hasOwn = (key: string) => Object.prototype.propertyIsEnumerable.call(error, key);
   if (!hasOwn('stack')) {
-    setSanitizedField(sanitizedMeta, 'stack', () => error.stack, ancestors, depth, true);
+    setSanitizedField(sanitizedMeta, 'stack', () => stackFrames(error, error.stack), ancestors, depth, true);
   }
   if (!hasOwn('cause') && 'cause' in error) {
     setSanitizedField(

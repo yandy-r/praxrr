@@ -844,7 +844,7 @@ export const actions: Actions = {
           instanceId: id,
           sourceId,
           queueId: queued.view.queueId,
-          runId: queued.runToken,
+          runCorrelationId: queued.runToken,
           jobStatus: queued.view.current?.status ?? null,
           runAt: queued.view.current?.runAt ?? null,
         },
