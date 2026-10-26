@@ -19,6 +19,13 @@ volume at `/config` and leave the default in place.
 | `logs/app.log`    | Structured application log  |
 | `backups/`        | Backup output               |
 
+`backup.create` puts a `VACUUM INTO` snapshot of `praxrr.db` in the archive and leaves out
+the live database file and its `-wal`, `-shm`, and `-journal` sidecars. **Settings → Backups**
+restore only stages that archive. The next process start swaps it in before opening the
+database and keeps the previous `data/` directory as `data.pre-restore-*`. If startup aborts
+because `data/` is missing, move that `data.pre-restore-*` directory back to `data/` and
+restart.
+
 When `APP_BASE_PATH` is unset, Praxrr uses the directory containing the
 executable.
 
@@ -175,7 +182,9 @@ password login and first-run setup are disabled and the OIDC endpoints are the o
 in; in other modes the OIDC endpoints return 404. Sessions created in the other mode are
 cleared at startup, and switching back to `AUTH=on` restores local (password) access.
 
-API automation uses the `X-Api-Key` header or `?apikey=` query parameter.
+API automation uses the `X-Api-Key` header or `?apikey=` query parameter. Create a named
+token under **Settings → Security**. The value is shown once and starts with `prx_`. Tokens
+authenticate `/api/v1/*` only.
 
 ## Trusted proxy
 

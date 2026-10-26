@@ -44,6 +44,14 @@ Defined in `queueTypes.ts`:
 | `config-health.snapshot`           | `{}`                                          |
 | `config-health.cleanup`            | `{}`                                          |
 
+## Backups
+
+`backup.create` archives `config.paths.data`. The `praxrr.db` entry in the archive is a
+`VACUUM INTO` snapshot. The live database and its `-wal`, `-shm`, and `-journal` files are
+not copied. Restore from **Settings → Backups** validates and stages the archive. The swap
+runs at the next startup, before the database opens. The previous `data/` directory is kept
+as `data.pre-restore-*`.
+
 ## Config Health Jobs
 
 `config-health.snapshot` runs a chunked, instance-ordered sweep of enabled sync-capable Arr

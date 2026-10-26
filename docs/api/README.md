@@ -20,11 +20,11 @@ Health endpoint (public):
 curl -sS http://localhost:5173/api/v1/health | jq
 ```
 
-Authenticated endpoint (API key example):
+Authenticated endpoint (API token example):
 
 ```bash
 curl -sS \
-  -H 'X-Api-Key: <your-api-key>' \
+  -H 'X-Api-Key: <token>' \
   'http://localhost:5173/api/v1/arr/library?instanceId=1&page=1&pageSize=50' | jq
 ```
 

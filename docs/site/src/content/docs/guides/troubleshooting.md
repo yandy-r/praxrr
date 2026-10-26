@@ -68,14 +68,17 @@ Re-run preview after resolving conflicts. Preview is read-only and safe to repea
 | Mode         | Common issue                                                         |
 | ------------ | -------------------------------------------------------------------- |
 | `AUTH=on`    | Reset password via admin flows; confirm session cookies reach the UI |
-| `AUTH=oidc`  | Verify `OIDC_*` variables and redirect URIs                          |
+| `AUTH=oidc`  | Verify `OIDC_*`, redirect URIs, and the sign-in allowlist            |
 | `AUTH=local` | Remember it skips auth only for local-network requests               |
 | `AUTH=off`   | **Insecure** — anyone with network access can use the UI             |
 
 > **Warning:** Do not run `AUTH=off` on the public internet. Pair with external
 > auth (Authentik, Authelia) if you disable built-in login.
 
-API clients need a valid API key header when auth is enabled.
+A 403 from the OIDC callback means that identity is not on the allowlist. API clients need
+a valid API token in the `X-Api-Key` header (or `?apikey=`) when auth is enabled. Create
+tokens in **Settings → Security**. A missing token is 401; a token without the required
+scope is 403.
 
 ## CSRF or origin errors behind a proxy
 
@@ -164,7 +167,8 @@ an old runtime from source.
 
 1. Disk space and write permissions on `APP_BASE_PATH`.
 2. Do not run older binaries against a database migrated by a newer version.
-3. Restore backup and upgrade again after reviewing release notes.
+3. Restore a backup and upgrade again after reviewing release notes. An in-app restore
+   from **Settings → Backups** applies on the next restart, not when you click restore.
 
 ## Live updates paused or not arriving
 

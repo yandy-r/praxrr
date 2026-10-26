@@ -124,9 +124,10 @@ Git.
 
 ## First login
 
-With `AUTH=on` (default), create the initial admin account on first launch. API
-access uses the `X-Api-Key` header or `?apikey=` query parameter after you
-generate a key in settings.
+With `AUTH=on` (default), create the initial admin account on first launch. Local
+usernames cannot start with `oidc:`. API access uses the `X-Api-Key` header or `?apikey=`
+query parameter after you create a token in **Settings → Security**. Under `AUTH=oidc`,
+first-run setup and password login are disabled.
 
 ## Next steps
 
