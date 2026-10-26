@@ -259,17 +259,17 @@ Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 4
 
 ## Files
 
-| File               | Purpose                                             |
-| ------------------ | --------------------------------------------------- |
-| `middleware.ts`    | Core auth logic (getAuthState, isPublicPath)        |
-| `password.ts`      | Bcrypt hash/verify                                  |
-| `network.ts`       | IP detection (getClientIp, isLocalAddress)          |
-| `userAgent.ts`     | Parse browser/OS/device from user agent             |
-| `apiTokens.ts`     | Token secret generation, hashing, create, resolve   |
-| `principal.ts`     | `AuthPrincipal` (session / bypass / token + scopes) |
-| `scopePolicy.ts`   | Route → required token scope (fail-closed)          |
-| `oidc.ts`          | OIDC discovery, token exchange, JWT parsing         |
-| `oidcAllowlist.ts` | Sign-in allowlist parse + evaluate (fail-closed)    |
+| File               | Purpose                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| `middleware.ts`    | Core auth logic (getAuthState, isPublicPath)                           |
+| `password.ts`      | Bcrypt hash/verify                                                     |
+| `network.ts`       | IP detection (getClientIp, isLocalAddress)                             |
+| `userAgent.ts`     | Parse browser/OS/device from user agent                                |
+| `apiTokens.ts`     | Token secret generation, hashing, create, resolve                      |
+| `principal.ts`     | `AuthPrincipal` (session / bypass / token + scopes)                    |
+| `scopePolicy.ts`   | Route → required token scope (fail-closed)                             |
+| `oidc.ts`          | OIDC discovery, PKCE/nonce, token exchange, JWKS ID-token verification |
+| `oidcAllowlist.ts` | Sign-in allowlist parse + evaluate (fail-closed)                       |
 
 ## Environment Variables
 

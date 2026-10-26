@@ -20,9 +20,9 @@ import type { NarrationLine } from '$shared/narration/index.ts';
  * can tell a report was produced by a different engine generation. Declared here ONCE.
  *
  * History: '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534)
- * → '6' OIDC allowlist (YAN-436).
+ * → '6' OIDC allowlist (YAN-436) → '7' OIDC endpoint transport (YAN-1601).
  */
-export const SECURITY_POSTURE_ENGINE_VERSION = '6';
+export const SECURITY_POSTURE_ENGINE_VERSION = '7';
 
 /**
  * Closed, versioned set of shield checks. Adding/removing/renaming a member is a breaking change —
@@ -231,6 +231,9 @@ export interface SessionPosture {
  */
 export type SessionRequestContext = { request?: Request; url?: URL };
 
+/** The OIDC provider endpoints Praxrr talks to; each must be `https` (loopback `http` excepted). */
+export type OidcEndpointKind = 'discovery' | 'token' | 'jwks';
+
 /** Fully-materialized engine input. Nothing is read lazily — the engine performs no I/O. */
 export interface PostureInputs {
   readonly authMode: 'on' | 'local' | 'off' | 'oidc';
@@ -248,6 +251,13 @@ export interface PostureInputs {
   readonly oidcAllowAllUsers: boolean;
   /** Raw `OIDC_ALLOWED_EMAILS` entries ignored as malformed (safe to echo — not secrets). */
   readonly oidcAllowlistInvalidEntries: readonly string[];
+  /**
+   * OIDC endpoints that fail the transport policy (`https`, or loopback `http`) — only populated in
+   * `oidc` mode with a configured provider. The token and JWKS endpoints are known once a discovery
+   * document has been parsed, including a document whose endpoints were then refused, so they can
+   * appear here after a failed sign-in attempt as well as a successful one.
+   */
+  readonly oidcInsecureEndpoints: readonly OidcEndpointKind[];
   /** `null` when the token table could not be read (the check is then not measurable). */
   readonly apiTokens: ApiTokenFacts | null;
   readonly instances: readonly InstanceFact[];

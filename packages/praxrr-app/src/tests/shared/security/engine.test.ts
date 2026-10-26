@@ -31,6 +31,7 @@ function makeInputs(overrides: Partial<PostureInputs> = {}): PostureInputs {
     oidcAllowlistConfigured: false,
     oidcAllowAllUsers: false,
     oidcAllowlistInvalidEntries: [],
+    oidcInsecureEndpoints: [],
     oidcAllowlistUsableEntryCount: 0,
     apiTokens: { activeCount: 1, legacyActive: true },
     instances: [
@@ -108,10 +109,10 @@ function instance(id: number, url: string, dns?: DnsTransportEvidence): Instance
 
 Deno.test('computeShieldReport: stamps the engine version and generatedAt from nowIso', () => {
   const report = computeShieldReport(makeInputs());
-  // '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534) → '6' OIDC allowlist (YAN-436).
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '6');
+  // '3' proxy trust (#228) → '4' DNS transport evidence (#229) → '5' API tokens (YAN-534) → '6' OIDC allowlist (YAN-436) → '7' OIDC endpoint transport (YAN-1601).
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '7');
   assertEquals(report.engineVersion, SECURITY_POSTURE_ENGINE_VERSION);
-  assertEquals(report.engineVersion, '6');
+  assertEquals(report.engineVersion, '7');
   assertEquals(report.generatedAt, '2026-07-09T02:00:00.000Z');
 });
 
@@ -569,9 +570,9 @@ Deno.test(
 );
 
 Deno.test('computeShieldReport: engineVersion is the pinned report-surface version 6 for every transport', () => {
-  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '6');
+  assertEquals(SECURITY_POSTURE_ENGINE_VERSION, '7');
   for (const session of ALL_SESSIONS) {
-    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '6');
+    assertEquals(computeShieldReport(makeInputs({ session })).engineVersion, '7');
   }
 });
 

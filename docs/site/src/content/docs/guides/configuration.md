@@ -114,6 +114,19 @@ returns 404. See [Metrics](./metrics/).
 
 OIDC requires `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET`.
 
+### OIDC endpoint transport
+
+The discovery URL (`OIDC_DISCOVERY_URL`) and the token and JWKS endpoints it
+advertises must use `https`. Plain `http` is accepted only for loopback hosts
+(`localhost`, `127.x.x.x`, `::1`); any other `http` endpoint is refused and sign-in
+fails. Shield Check reports an insecure endpoint.
+
+Praxrr sends a PKCE (`S256`) challenge and a per-login `nonce`, and verifies each ID
+token's signature against the provider's JWKS (`jwks_uri`) before trusting any claim.
+Supported algorithms are RS256/384/512, PS256/384/512, ES256/384/512 and EdDSA; tokens
+signed with `none`, HMAC (`HS*`) or any other algorithm are rejected, as are tokens
+whose `nonce` claim is missing or does not match the login that started the flow.
+
 ### Restricting which OIDC identities may sign in
 
 By default Praxrr now restricts OIDC sign-in to an operator-configured allowlist
@@ -131,8 +144,11 @@ Matching rules:
 
 - **Subject** — exact, case-sensitive match against the ID token's `sub` claim.
 - **Email** — the provider must mark the email `email_verified: true` (boolean) or
-  `email_verified: 'true'` (string); addresses match case-insensitively,
-  `@domain.com` entries match the domain part exactly (no subdomain matching).
+  `email_verified: 'true'` (string). Addresses match case-insensitively for ASCII
+  letters only (no Unicode case folding in the local part), and the domain is
+  compared in punycode form, so `@bücher.example` matches `xn--bcher-kva.example`
+  and vice versa. `@domain.com` entries match the domain part exactly (no
+  subdomain matching).
 - **Groups** — the groups claim may be a single string or an array; any overlap
   with the configured list allows sign-in.
 - When any list is set, the lists alone decide (the opt-out is ignored).

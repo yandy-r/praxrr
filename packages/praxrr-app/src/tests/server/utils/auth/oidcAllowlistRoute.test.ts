@@ -1,7 +1,8 @@
 /**
  * OIDC sign-in allowlist route tests (YAN-436): the callback only provisions users for
  * identities the operator allowlisted. Drives `oidcCallbackGet` under AUTH=oidc with a
- * stubbed IdP (discovery + token endpoints) and a decodable unsigned id_token.
+ * stubbed IdP (discovery, JWKS, and token endpoints) and an id_token signed by a generated key.
+ * Also covers the callback's PKCE / nonce / signature hardening (YAN-1601).
  */
 
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SvelteKit app ambient types for route tests
@@ -9,13 +10,24 @@
 import { assert, assertEquals } from '@std/assert';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { config, type AuthMode } from '$config';
+import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { sessionsQueries } from '$db/queries/sessions.ts';
 import { usersQueries } from '$db/queries/users.ts';
-import { clearDiscoveryCache } from '$auth/oidc.ts';
-import { parseOidcAllowlist } from '$auth/oidcAllowlist.ts';
+import { oidcFlowCookieOptions } from '$auth/oidcFlowCookie.ts';
+import {
+  TEST_CODE_VERIFIER,
+  TEST_NONCE,
+  generateTestKey,
+  installTestIdp,
+  signJwt,
+  validClaims,
+  withAuthMode,
+  withOidcConfig,
+  type TestIdp,
+  type TestKey,
+} from './oidcTestIdp.ts';
 import { GET as oidcCallbackGet } from '../../../../routes/auth/oidc/callback/+server.ts';
 
 /** Real scratch SQLite DB per test with the full migration chain. */
@@ -45,17 +57,6 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
   });
 }
 
-/** `config.authMode` is readonly; tests swap it and always restore. */
-async function withAuthMode(mode: AuthMode, fn: () => Promise<void> | void): Promise<void> {
-  const original = config.authMode;
-  Object.defineProperty(config, 'authMode', { value: mode, configurable: true, writable: true });
-  try {
-    await fn();
-  } finally {
-    Object.defineProperty(config, 'authMode', { value: original, configurable: true, writable: true });
-  }
-}
-
 function userCount(): number {
   return db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM users')!.count;
 }
@@ -64,42 +65,68 @@ function sessionCount(): number {
   return db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM sessions')!.count;
 }
 
-/** GET callback RequestEvent with matching state cookie and a non-local client IP. */
-function callbackEvent(state = 'abc123', code = 'stub-code'): RequestEvent {
-  const url = new URL(`http://praxrr.test/auth/oidc/callback?state=${state}&code=${code}`);
-  const jar: Record<string, string> = { oidc_state: state };
+interface CallbackCookieState {
+  values: Map<string, string>;
+  setOptions: Map<string, Record<string, unknown>>;
+  deleteCalls: Array<{ name: string; options: Record<string, unknown> }>;
+}
+
+/**
+ * GET callback RequestEvent with the cookies set at login (state, nonce, PKCE verifier by default;
+ * pass `cookies` to override or `undefined` to omit one) and a non-local client IP.
+ */
+function callbackEvent(
+  state = 'abc123',
+  code = 'stub-code',
+  cookies: Record<string, string | undefined> = {},
+  opts: { protocol?: 'http' | 'https'; cookieState?: CallbackCookieState; urlState?: string } = {}
+): RequestEvent {
+  const protocol = opts.protocol ?? 'http';
+  const queryState = opts.urlState ?? state;
+  const url = new URL(
+    `${protocol}://praxrr.test/auth/oidc/callback?state=${encodeURIComponent(queryState)}&code=${encodeURIComponent(code)}`
+  );
+  const cookieState: CallbackCookieState = opts.cookieState ?? {
+    values: new Map<string, string>(),
+    setOptions: new Map<string, Record<string, unknown>>(),
+    deleteCalls: [],
+  };
+  for (const [name, value] of Object.entries({
+    oidc_state: state,
+    oidc_nonce: TEST_NONCE,
+    oidc_code_verifier: TEST_CODE_VERIFIER,
+    ...cookies,
+  })) {
+    if (value === undefined) cookieState.values.delete(name);
+    else cookieState.values.set(name, value);
+  }
   return {
     url,
     request: new Request(url, { headers: { 'user-agent': 'Deno-test' } }),
     locals: { user: null, session: null, authBypass: false, principal: null },
     cookies: {
-      get: (name: string) => jar[name],
-      set: (name: string, value: string) => void (jar[name] = value),
-      delete: (name: string) => void delete jar[name],
-      getAll: () => Object.entries(jar).map(([name, value]) => ({ name, value })),
+      get: (name: string) => cookieState.values.get(name),
+      set: (name: string, value: string, options: Record<string, unknown> = {}) => {
+        cookieState.values.set(name, value);
+        cookieState.setOptions.set(name, options);
+      },
+      delete: (name: string, options: Record<string, unknown> = {}) => {
+        cookieState.deleteCalls.push({ name, options });
+        cookieState.values.delete(name);
+      },
+      getAll: () => [...cookieState.values].map(([name, value]) => ({ name, value })),
     },
     getClientAddress: () => '203.0.113.9',
   } as unknown as RequestEvent;
 }
 
-const ISSUER = 'https://idp.test';
-const DISCOVERY_URL = `${ISSUER}/.well-known/openid-configuration`;
-
-/** Base64url-encode a JWT segment. */
-function b64url(input: string): string {
-  return btoa(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-/** Unsigned-but-decodable JWT carrying `claims` (the callback trusts the code exchange). */
-function idToken(claims: Record<string, unknown>): string {
-  return `${b64url('{"alg":"none","typ":"JWT"}')}.${b64url(JSON.stringify(claims))}.sig`;
-}
+let signingKey: TestKey | null = null;
 
 /**
- * Stub the global fetch to serve the discovery doc + token endpoint, and swap `config.oidc`
- * (readonly via defineProperty) for well-formed client credentials plus an allowlist policy
- * parsed by the real `parseOidcAllowlist`. The discovery cache is cleared before `fn` and
- * again in `finally` so no test inherits a cached document. Restores everything in `finally`.
+ * Stand up the stub IdP (discovery + JWKS + token endpoint) serving an id_token signed by a generated
+ * key, and swap `config.oidc` for well-formed client credentials plus an allowlist policy parsed by the
+ * real `parseOidcAllowlist`. Discovery/JWKS caches are cleared before `fn` and again afterwards. The
+ * token carries the nonce the callback event's cookie holds unless `claims` overrides it.
  */
 async function withStubbedIdp(
   claims: Record<string, unknown>,
@@ -110,63 +137,16 @@ async function withStubbedIdp(
     groupsClaim?: string;
     allowAll?: string;
   },
-  fn: () => Promise<void> | void
+  fn: (idp: TestIdp) => Promise<void> | void,
+  opts: { signWith?: TestKey } = {}
 ): Promise<void> {
-  const now = Math.floor(Date.now() / 1000);
-  const token = idToken({
-    iss: ISSUER,
-    aud: 'praxrr-client',
-    exp: now + 600,
-    iat: now,
-    ...claims,
-  });
-
-  const discoveryDoc = {
-    issuer: ISSUER,
-    authorization_endpoint: `${ISSUER}/authorize`,
-    token_endpoint: `${ISSUER}/token`,
-    jwks_uri: `${ISSUER}/jwks`,
-  };
-
-  const originalFetch = globalThis.fetch;
-  const originalOidc = config.oidc;
-  globalThis.fetch = ((input: RequestInfo | URL): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    if (url === DISCOVERY_URL) {
-      return Promise.resolve(new Response(JSON.stringify(discoveryDoc), { status: 200 }));
-    }
-    if (url === `${ISSUER}/token`) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ access_token: 'at', id_token: token, token_type: 'Bearer' }), {
-          status: 200,
-        })
-      );
-    }
-    return Promise.reject(new Error(`Unexpected fetch in test: ${url}`));
-  }) as typeof fetch;
-
-  Object.defineProperty(config, 'oidc', {
-    value: {
-      discoveryUrl: DISCOVERY_URL,
-      clientId: 'praxrr-client',
-      clientSecret: 'praxrr-secret',
-      allowlist: parseOidcAllowlist(allowlistEnv),
-    },
-    configurable: true,
-    writable: true,
-  });
-
-  clearDiscoveryCache();
+  signingKey ??= await generateTestKey('RS256', 'route-test-key');
+  const token = await signJwt(opts.signWith ?? signingKey, validClaims(claims));
+  const idp = installTestIdp({ keys: [signingKey], idToken: token });
   try {
-    await fn();
+    await withOidcConfig(allowlistEnv, () => fn(idp));
   } finally {
-    clearDiscoveryCache();
-    globalThis.fetch = originalFetch;
-    Object.defineProperty(config, 'oidc', {
-      value: originalOidc,
-      configurable: true,
-      writable: true,
-    });
+    idp.restore();
   }
 }
 
@@ -339,5 +319,226 @@ migratedTest('oidc callback denial revokes existing sessions of the pre-existing
         assertEquals(userCount(), 1);
       }
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token verification hardening (YAN-1601)
+// ---------------------------------------------------------------------------
+
+/** Run the callback with `event` and return the thrown HttpError/Redirect (or undefined). */
+async function runCallbackWith(event: RequestEvent): Promise<unknown> {
+  try {
+    await oidcCallbackGet(event);
+  } catch (err) {
+    return err;
+  }
+  return undefined;
+}
+
+function assertNoUserOrSession(): void {
+  assertEquals({ users: userCount(), sessions: sessionCount() }, { users: 0, sessions: 0 });
+}
+
+migratedTest('oidc callback sends the PKCE code_verifier in the token request', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async (idp) => {
+      const thrown = await runCallbackWith(callbackEvent());
+      assert(isRedirect(thrown), 'must be a SvelteKit Redirect');
+      assertEquals(idp.tokenRequests.length, 1);
+      assertEquals(idp.tokenRequests[0].get('code_verifier'), TEST_CODE_VERIFIER);
+      assertEquals(idp.tokenRequests[0].get('grant_type'), 'authorization_code');
+    });
+  });
+});
+
+migratedTest('oidc callback clears the state, nonce, and verifier cookies', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async () => {
+      const event = callbackEvent();
+      await runCallbackWith(event);
+      for (const name of ['oidc_state', 'oidc_nonce', 'oidc_code_verifier']) {
+        assertEquals(event.cookies.get(name), undefined, name);
+      }
+    });
+  });
+});
+
+migratedTest('oidc callback rejects a missing PKCE verifier cookie (400) and still clears the cookies', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async (idp) => {
+      const event = callbackEvent('abc123', 'stub-code', { oidc_code_verifier: undefined });
+      const thrown = await runCallbackWith(event);
+      assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+      assertEquals(thrown.status, 400);
+      assertEquals(idp.tokenRequests.length, 0);
+      assertEquals(event.cookies.get('oidc_state'), undefined);
+      assertEquals(event.cookies.get('oidc_nonce'), undefined);
+      assertNoUserOrSession();
+    });
+  });
+});
+
+migratedTest('oidc callback rejects a missing nonce cookie (400)', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async (idp) => {
+      const thrown = await runCallbackWith(callbackEvent('abc123', 'stub-code', { oidc_nonce: undefined }));
+      assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+      assertEquals(thrown.status, 400);
+      assertEquals(idp.tokenRequests.length, 0);
+      assertNoUserOrSession();
+    });
+  });
+});
+
+migratedTest('oidc callback rejects an ID token without a nonce claim (500, no user, no session)', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub', nonce: undefined }, { subjects: 'admin-sub' }, async () => {
+      const event = callbackEvent();
+      const thrown = await runCallbackWith(event);
+      assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+      assertEquals(thrown.status, 500);
+      assertEquals(event.cookies.get('session'), undefined);
+      assertNoUserOrSession();
+    });
+  });
+});
+
+migratedTest('oidc callback rejects an ID token with a mismatched nonce claim (500, no user, no session)', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub', nonce: 'someone-elses-nonce' }, { subjects: 'admin-sub' }, async () => {
+      const event = callbackEvent();
+      const thrown = await runCallbackWith(event);
+      assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+      assertEquals(thrown.status, 500);
+      assertEquals(event.cookies.get('session'), undefined);
+      assertNoUserOrSession();
+    });
+  });
+});
+
+migratedTest('oidc callback rejects an ID token signed by a key the IdP does not publish (500)', async () => {
+  await withAuthMode('oidc', async () => {
+    const rogue = await generateTestKey('RS256', 'route-test-key');
+    await withStubbedIdp(
+      { sub: 'admin-sub' },
+      { subjects: 'admin-sub' },
+      async () => {
+        const event = callbackEvent();
+        const thrown = await runCallbackWith(event);
+        assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+        assertEquals(thrown.status, 500);
+        assertEquals(event.cookies.get('session'), undefined);
+        assertNoUserOrSession();
+      },
+      { signWith: rogue }
+    );
+  });
+});
+
+migratedTest('oidc callback rejects an unsigned (alg none) ID token (500)', async () => {
+  await withAuthMode('oidc', async () => {
+    const key = await generateTestKey('RS256', 'route-test-key');
+    const unsigned = await signJwt(key, validClaims({ sub: 'admin-sub' }), {
+      header: { alg: 'none' },
+      signature: '',
+    });
+    const idp = installTestIdp({ keys: [key], idToken: unsigned });
+    try {
+      await withOidcConfig({ subjects: 'admin-sub' }, async () => {
+        const thrown = await runCallbackWith(callbackEvent());
+        assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+        assertEquals(thrown.status, 500);
+        assertNoUserOrSession();
+      });
+    } finally {
+      idp.restore();
+    }
+  });
+});
+
+function makeSharedCookieState(): CallbackCookieState {
+  return { values: new Map(), setOptions: new Map(), deleteCalls: [] };
+}
+
+migratedTest('oidc callback leaves the flow cookies untouched when the state does not match', async () => {
+  await withAuthMode('oidc', async () => {
+    await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async (idp) => {
+      const shared = makeSharedCookieState();
+      // Second login overwrites the first attempt's cookies.
+      const second = callbackEvent('state-second', 'stub-code', {}, { cookieState: shared });
+      void second;
+      const stale = callbackEvent('state-second', 'stub-code', {}, { cookieState: shared, urlState: 'state-first' });
+      const thrownStale = await runCallbackWith(stale);
+      assert(isHttpError(thrownStale), 'must be a SvelteKit HttpError');
+      assertEquals(thrownStale.status, 400);
+      assertEquals(shared.deleteCalls, []);
+      assertEquals(shared.values.get('oidc_state'), 'state-second');
+      assertEquals(shared.values.get('oidc_nonce'), TEST_NONCE);
+      assertEquals(shared.values.get('oidc_code_verifier'), TEST_CODE_VERIFIER);
+      assertEquals(idp.tokenRequests.length, 0);
+      assertNoUserOrSession();
+
+      const good = callbackEvent('state-second', 'stub-code', {}, { cookieState: shared });
+      const thrownGood = await runCallbackWith(good);
+      assert(isRedirect(thrownGood), 'second attempt must succeed');
+      assertEquals(
+        shared.deleteCalls.map((call) => call.name),
+        ['oidc_state', 'oidc_nonce', 'oidc_code_verifier']
+      );
+      assertEquals(idp.tokenRequests.length, 1);
+    });
+  });
+});
+
+migratedTest('oidc callback deletes flow cookies with the login cookie options', async () => {
+  await withAuthMode('oidc', async () => {
+    for (const protocol of ['http', 'https'] as const) {
+      await withStubbedIdp({ sub: 'admin-sub' }, { subjects: 'admin-sub' }, async () => {
+        const shared = makeSharedCookieState();
+        const event = callbackEvent('abc123', 'stub-code', {}, { cookieState: shared, protocol });
+        const expected = oidcFlowCookieOptions(event);
+        const thrown = await runCallbackWith(event);
+        assert(isRedirect(thrown), 'must redirect on success');
+        assertEquals(
+          shared.deleteCalls.map((call) => call.name),
+          ['oidc_state', 'oidc_nonce', 'oidc_code_verifier']
+        );
+        for (const call of shared.deleteCalls) {
+          assertEquals(call.options, expected, `${protocol} ${call.name}`);
+        }
+      });
+    }
+  });
+});
+
+migratedTest('oidc callback returns 500 without a token request when the discovery URL is insecure', async () => {
+  await withAuthMode('oidc', async () => {
+    signingKey ??= await generateTestKey('RS256', 'route-test-key');
+    const token = await signJwt(signingKey, validClaims({ sub: 'admin-sub' }));
+    const idp = installTestIdp({ keys: [signingKey], idToken: token });
+    try {
+      await withOidcConfig(
+        { subjects: 'admin-sub' },
+        async () => {
+          const shared = makeSharedCookieState();
+          const event = callbackEvent('abc123', 'stub-code', {}, { cookieState: shared });
+          const thrown = await runCallbackWith(event);
+          assert(isHttpError(thrown), 'must be a SvelteKit HttpError');
+          assertEquals(thrown.status, 500);
+          assertEquals(idp.tokenRequests.length, 0);
+          assertEquals(idp.calls, []);
+          assertEquals(event.cookies.get('session'), undefined);
+          assertEquals(
+            shared.deleteCalls.map((call) => call.name),
+            ['oidc_state', 'oidc_nonce', 'oidc_code_verifier']
+          );
+          assertNoUserOrSession();
+        },
+        'http://idp.example.com/.well-known/openid-configuration'
+      );
+    } finally {
+      idp.restore();
+    }
   });
 });

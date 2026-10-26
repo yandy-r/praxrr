@@ -63,7 +63,7 @@ Four **scored** checks (fixed code weights, sum 100) + one registered **assuranc
 
 ## 3. Scoring & bands
 
-- **Engine version const:** `SECURITY_POSTURE_ENGINE_VERSION = '6'` (declared once in `$shared/security/types.ts`; bump on any check/threshold/formula change). History: `'3'` proxy trust (#228) → `'4'` DNS transport evidence (#229) → `'5'` API tokens (YAN-534) → `'6'` OIDC allowlist (YAN-436).
+- **Engine version const:** `SECURITY_POSTURE_ENGINE_VERSION = '7'` (declared once in `$shared/security/types.ts`; bump on any check/threshold/formula change). History: `'3'` proxy trust (#228) → `'4'` DNS transport evidence (#229) → `'5'` API tokens (YAN-534) → `'6'` OIDC allowlist (YAN-436) → `'7'` OIDC endpoint transport (YAN-1601).
 - **`clamp0100(n)`** and **`rollUp(scored)`** are imported from the **new generic `$shared/scoring/rollup.ts`** (see §4 DRY). `clamp0100` = integer 0–100.
 - **Rollup invariant (unchanged from #22):** `overall = round(Σ score·w / Σ w)` over **non-null** checks; each `contribution = round(score·w / Σw)`; the rounding **residual is assigned to the largest-weight check** so **contributions sum EXACTLY to `overall`** (test-pinned). Zero-weight fallback → equal weighting.
 - **`null` handling:** `null` = "cannot evaluate / not applicable" → **filtered out before rollup, NEVER treated as 0**. Nulls re-normalize the remaining weights.
@@ -146,7 +146,7 @@ MODIFY
 Mirrors `$shared/health` naming (`SubScore`, `CheckResult`, `ScoredUnit`-shaped report, `nowIso` passed in).
 
 ```ts
-export const SECURITY_POSTURE_ENGINE_VERSION = '6';
+export const SECURITY_POSTURE_ENGINE_VERSION = '7';
 
 export type SecurityCheckId =
   | 'control_plane_auth'
@@ -255,6 +255,7 @@ export interface PostureInputs {
   readonly oidcAllowlistUsableEntryCount: number; // valid subject/email/domain/group entries
   readonly oidcAllowAllUsers: boolean;
   readonly oidcAllowlistInvalidEntries: readonly string[];
+  readonly oidcInsecureEndpoints: readonly ('discovery' | 'token' | 'jwks')[]; // YAN-1601: endpoints failing https/loopback policy
   readonly apiTokens: ApiTokenFacts; // { activeCount, legacyActive } — YAN-534; no secret/hash carried
   readonly instances: readonly InstanceFact[];
   readonly rotation: RotationFacts;

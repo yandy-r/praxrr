@@ -18,6 +18,8 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { apiTokensQueries } from '$db/queries/apiTokens.ts';
 import { getActiveArrCredentialKeyVersion, getAllArrCredentialKeyVersions } from '$utils/encryption/keys.ts';
+import { getLastDiscoveryEndpoints } from '$auth/oidc.ts';
+import { isSecureOidcEndpoint } from '$shared/security/oidcEndpoint.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import { resolveCookieSecure, resolveSessionTransport } from './sessionTransport.ts';
 import { getDnsTransportResolver, type DnsTransportResolver } from './dnsTransport.ts';
@@ -26,6 +28,7 @@ import {
   type DnsOutcome,
   type DnsTransportEvidence,
   type InstanceFact,
+  type OidcEndpointKind,
   type PostureInputs,
   type ApiTokenFacts,
   type RotationFacts,
@@ -69,6 +72,24 @@ function gatherOidcState(): { configured: boolean; partiallyConfigured: boolean 
     (value) => value !== null && value.trim().length > 0
   ).length;
   return { configured: present === 3, partiallyConfigured: present > 0 && present < 3 };
+}
+
+/**
+ * OIDC endpoints that fail the transport policy. The discovery URL comes from config; the token and
+ * JWKS endpoints come from the most recently parsed discovery document, including a document whose
+ * endpoints were then refused. Only evaluated for a fully configured `oidc` deployment, and only
+ * when the recorded document was fetched from the currently configured discovery URL.
+ */
+function gatherOidcInsecureEndpoints(oidcConfigured: boolean): OidcEndpointKind[] {
+  if (config.authMode !== 'oidc' || !oidcConfigured) return [];
+  const insecure: OidcEndpointKind[] = [];
+  if (!isSecureOidcEndpoint(config.oidc.discoveryUrl)) insecure.push('discovery');
+  const last = getLastDiscoveryEndpoints();
+  if (last && last.url === config.oidc.discoveryUrl) {
+    if (!isSecureOidcEndpoint(last.tokenEndpoint)) insecure.push('token');
+    if (!isSecureOidcEndpoint(last.jwksUri)) insecure.push('jwks');
+  }
+  return insecure;
 }
 
 /**
@@ -222,6 +243,7 @@ export async function buildPostureInputs(
     oidcAllowlistUsableEntryCount: allowlist.usableEntryCount,
     oidcAllowAllUsers: allowlist.allowAll,
     oidcAllowlistInvalidEntries: allowlist.invalidEntries,
+    oidcInsecureEndpoints: gatherOidcInsecureEndpoints(oidc.configured),
     apiTokens: gatherApiTokenFacts(),
     instances,
     rotation: gatherRotation(instances),
