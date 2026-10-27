@@ -31,10 +31,25 @@ interface RepoImportWriteContext {
   maxOperations: number;
 }
 
+/**
+ * A repo-import base op captured in memory by `withBaseOpCapture` instead of being persisted
+ * to `pcd_ops`. Filename and sequence are the deterministic values the persisting import would
+ * have assigned.
+ */
+export interface CapturedBaseOp {
+  filename: string;
+  sequence: number;
+  sql: string;
+  metadataJson: string | null;
+  desiredStateJson: string | null;
+}
+
 interface WriteContextFrame {
   source?: PcdOpSource;
   allowBaseImport?: boolean;
   repoImport?: RepoImportWriteContext;
+  /** When set, repo-import base writes are captured here and never persisted. */
+  capture?: CapturedBaseOp[];
 }
 
 const writeContextStorage = new AsyncLocalStorage<WriteContextFrame[]>();
@@ -76,6 +91,16 @@ function consumeRepoImportIdentity(layer: OperationLayer, source: PcdOpSource): 
   };
 }
 
+/**
+ * Whether a write inside capture mode would take a repo-import identity, WITHOUT consuming the
+ * import's index (the real `consumeRepoImportIdentity` below advances it exactly once per op).
+ */
+function consumeRepoImportIdentityPreview(_operation: MigrationSqlOperation): { filename: string } | null {
+  const repoImport = currentWriteContext()?.repoImport;
+  if (!repoImport) return null;
+  return { filename: `${repoImport.filenamePrefix}#00000.sql` };
+}
+
 export async function withRepoImportWriteContext<T>(
   options: {
     filenamePrefix: string;
@@ -100,6 +125,29 @@ export async function withRepoImportWriteContext<T>(
   const nextStack: WriteContextFrame[] = [...parent, nextContext];
 
   return writeContextStorage.run(nextStack, callback);
+}
+
+/**
+ * Run `callback` in capture mode inside an active `withRepoImportWriteContext`: repo-import
+ * base writes are NOT persisted (no `pcd_ops` create/update, no cancel-out, no compile). Their
+ * SQL is still applied to the scoped cache (same fast path as a persisting import) and
+ * returned as `captured`, so a caller can materialize what an import would write against an
+ * ephemeral cache without touching the app database. Outside capture mode the writer behaves
+ * exactly as before.
+ */
+export async function withBaseOpCapture<T>(
+  callback: () => Promise<T>
+): Promise<{ result: T; captured: CapturedBaseOp[] }> {
+  const parent = writeContextStorage.getStore() ?? [];
+  const top = parent.length > 0 ? parent[parent.length - 1] : undefined;
+  if (!top?.repoImport) {
+    throw new Error('withBaseOpCapture must run inside withRepoImportWriteContext');
+  }
+
+  const captured: CapturedBaseOp[] = [];
+  const frame: WriteContextFrame = { ...top, capture: captured };
+  const result = await writeContextStorage.run([...parent, frame], callback);
+  return { result, captured };
 }
 
 function buildMetadataJson(
@@ -714,10 +762,46 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     }
 
     let lastOpId: number | null = null;
+    const captureTarget = context?.capture;
+    if (captureTarget) {
+      // Capture mode accepts exactly repo-import base writes with an import identity and a
+      // built scoped cache; anything else would fall through to the persisting paths, so refuse
+      // it before the loop touches the app DB.
+      const cacheRawDb = cache?.getRawDb();
+      const captureEligible =
+        layer === 'base' &&
+        source === 'repo' &&
+        operations.every((operation) => consumeRepoImportIdentityPreview(operation) !== null) &&
+        !!cacheRawDb;
+      if (!captureEligible) {
+        await logger.error('Refusing non-capturable write inside withBaseOpCapture', {
+          source: 'PCDWriter',
+          meta: { databaseId, layer, source, operationCount: operations.length },
+        });
+        throw new Error(
+          `writeOperationsFromSqlOperations: capture mode only supports repo-import base writes (layer=${layer}, source=${String(source)})`
+        );
+      }
+    }
 
     for (const operation of operations) {
       const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation, actionId);
       const importIdentity = consumeRepoImportIdentity(layer, source);
+
+      if (captureTarget && layer === 'base' && source === 'repo' && importIdentity) {
+        // Capture mode: keep the op in memory only (no pcd_ops write, no cancel-out, no logging)
+        // and apply it to the scoped cache exactly as the persisting fast path would. The scoped
+        // cache was validated before the loop; getRawDb() only returns null before bootstrap.
+        captureTarget.push({
+          filename: importIdentity.filename,
+          sequence: importIdentity.sequence,
+          sql,
+          metadataJson,
+          desiredStateJson,
+        });
+        cache!.getRawDb()!.exec(sql);
+        continue;
+      }
 
       if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
         continue;

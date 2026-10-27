@@ -716,6 +716,31 @@ curl -sS -X DELETE \
 { "success": true }
 ```
 
+## PCD Incoming Preview
+
+### `GET /pcd/{databaseId}/incoming/preview`
+
+Requires a session or a token with `read` scope. Read-only preview of what pulling the upstream
+branch would change per entity and which published local user ops would conflict (or be
+auto-aligned) under the database's conflict strategy. It fetches only `origin/<branch>` (never
+HEAD, the index, the working tree, or tags), builds the incoming state in a temporary directory,
+and never writes `pcd_ops` or `pcd_op_history`. Accepts no ref or URL parameter.
+
+Returns `{databaseId, available, unavailableReason, branch, hasUpdates, commitsBehind,
+commitsAhead, commits, conflictStrategy, sections, summary, predictedConflicts, predictedErrors,
+currentStateHash, currentHead, incomingHead}`. `sections`/`summary` have the rollback-preview shape
+(`current` = today's base state, `desired` = base state after the pull; user ops are excluded).
+`predictedConflicts` match the conflicts the pull's cache build records: `kind: "conflict"` with
+`predictedStatus` `conflicted` (`override`/`align`) or `conflicted_pending` (`ask`), or
+`kind: "aligned"` / `dropped` when the local op is redundant or force-aligned. SQL-error conflicts
+(`duplicate_key`, `missing_target`) stay `conflicted` under every strategy and still need a
+decision; only `override` auto-overrides guard-mismatch conflicts after the build. Local-path sources return `available: false`
+(`unavailableReason: "local_source"`). When `commitsAhead > 0` the pull may not fast-forward.
+
+Errors: `400` invalid id, `404` unknown database, `409` with `code` `sync_in_progress` or
+`preview_stale` (local state changed mid-build; re-run), `502` with `code` `fetch_failed` or
+`incoming_unavailable` (fetch, archive, dependency, or entity-file failure — no partial preview).
+
 ## PCD Local Overrides
 
 Review and remove published user-layer operations without changing upstream base data. Revert and

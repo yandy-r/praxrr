@@ -1,8 +1,7 @@
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { publishJobQueued } from '$lib/server/events/publish.ts';
-
-const PCD_SYNC_DEDUPE_KEY_PREFIX = 'pcd.sync:';
+import { getPcdSyncDedupeKey } from './pcdSyncDedupeKey.ts';
 
 export interface PcdSyncQueuedJob {
   id: number;
@@ -22,10 +21,6 @@ export type EnqueueManualPcdSyncResult =
       job: PcdSyncQueuedJob;
     };
 
-function getDedupeKey(databaseId: number): string {
-  return `${PCD_SYNC_DEDUPE_KEY_PREFIX}${databaseId}`;
-}
-
 function toQueuedJob(queueId: number): PcdSyncQueuedJob {
   const queue = jobQueueQueries.getById(queueId);
   if (!queue) {
@@ -42,7 +37,7 @@ function toQueuedJob(queueId: number): PcdSyncQueuedJob {
 }
 
 export function enqueueManualPcdSync(databaseId: number): EnqueueManualPcdSyncResult {
-  const dedupeKey = getDedupeKey(databaseId);
+  const dedupeKey = getPcdSyncDedupeKey(databaseId);
   const existing = jobQueueQueries.getByDedupeKey(dedupeKey);
   if (existing?.status === 'running') {
     return {

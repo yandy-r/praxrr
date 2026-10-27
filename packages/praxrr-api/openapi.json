@@ -45,6 +45,10 @@
       "description": "PCD entity export and portable format endpoints"
     },
     {
+      "name": "PCD Databases",
+      "description": "Linked PCD database upstream state, including incoming change previews"
+    },
+    {
       "name": "PCD Snapshots",
       "description": "PCD state snapshot management endpoints"
     },
@@ -2859,6 +2863,88 @@
           },
           "500": {
             "description": "Rollback execution failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pcd/{databaseId}/incoming/preview": {
+      "get": {
+        "operationId": "previewIncomingPcdChanges",
+        "summary": "Preview incoming upstream PCD changes",
+        "description": "Read-only preview of what pulling the upstream branch would change per entity, and which\npublished local user ops would conflict (or be auto-aligned) under the database's\nconflict strategy. Fetches only the remote-tracking ref `origin/<branch>`; never changes\npcd_ops, pcd_op_history, the clone's HEAD, or its working tree. Does not contact any Arr\ninstance. Local-path sources return available=false. Fails closed: no partial preview.\n",
+        "tags": ["PCD Databases"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incoming preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomingPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A sync is running (code sync_in_progress) or local state changed while building the preview (code preview_stale)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to generate the incoming preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream fetch or extraction failed (code fetch_failed or incoming_unavailable)",
             "content": {
               "application/json": {
                 "schema": {
@@ -13442,6 +13528,10 @@
         "properties": {
           "error": {
             "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Optional machine-readable error code, for example sync_in_progress or preview_stale"
           }
         }
       },
@@ -14897,6 +14987,210 @@
               "$ref": "#/components/schemas/EntityChange"
             },
             "description": "Desired-vs-actual field changes; an empty array means the entity is in sync"
+          }
+        }
+      },
+      "ConflictStrategy": {
+        "type": "string",
+        "description": "Per-database strategy applied to conflicting local user ops when upstream changes are pulled",
+        "enum": ["override", "align", "ask"]
+      },
+      "IncomingCommit": {
+        "type": "object",
+        "description": "One upstream commit that a pull would bring in",
+        "required": ["hash", "shortHash", "message", "author", "authorEmail", "date", "files"],
+        "properties": {
+          "hash": {
+            "type": "string"
+          },
+          "shortHash": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorEmail": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PredictedConflict": {
+        "type": "object",
+        "description": "Predicted fate of one published local user op when replayed over the incoming base.\nPredictions match the conflicts the pull's cache build records in the op history\n(not the later automatic override resolution).\n",
+        "required": [
+          "opId",
+          "entityType",
+          "entityName",
+          "operation",
+          "kind",
+          "predictedStatus",
+          "conflictReason",
+          "decision",
+          "autoAlignRule",
+          "strategy"
+        ],
+        "properties": {
+          "opId": {
+            "type": "integer"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entity type from the op metadata, when recorded"
+          },
+          "entityName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entity name from the op metadata, when recorded"
+          },
+          "operation": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["create", "update", "delete", null]
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["conflict", "aligned"],
+            "description": "conflict = the op will be recorded as conflicted; aligned = the op is redundant upstream and will be dropped"
+          },
+          "predictedStatus": {
+            "type": "string",
+            "enum": ["conflicted", "conflicted_pending", "dropped"]
+          },
+          "conflictReason": {
+            "type": "string",
+            "description": "guard_mismatch, duplicate_key, missing_target, or aligned"
+          },
+          "decision": {
+            "type": "string",
+            "nullable": true,
+            "description": "Value-guard decision, for example rowcount_zero_conflict"
+          },
+          "autoAlignRule": {
+            "type": "string",
+            "nullable": true
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/ConflictStrategy"
+          }
+        }
+      },
+      "PredictedError": {
+        "type": "object",
+        "description": "A published local user op that would fail with a non-conflict error against the incoming base",
+        "required": ["opId", "error"],
+        "properties": {
+          "opId": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "IncomingPreview": {
+        "type": "object",
+        "description": "Read-only preview of what pulling the upstream changes would do to the PCD, per entity,\nwith the predicted fate of local user ops. Never modifies pcd_ops, pcd_op_history, the\nclone's HEAD, or its working tree. sections diff the current base state against the\nincoming base state (user ops excluded); predictedConflicts come from a dry replay of\npublished user ops over the incoming state.\n",
+        "required": [
+          "databaseId",
+          "available",
+          "unavailableReason",
+          "branch",
+          "hasUpdates",
+          "commitsBehind",
+          "commitsAhead",
+          "commits",
+          "conflictStrategy",
+          "sections",
+          "summary",
+          "predictedConflicts",
+          "predictedErrors",
+          "currentStateHash",
+          "currentHead",
+          "incomingHead"
+        ],
+        "properties": {
+          "databaseId": {
+            "type": "integer"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "False when the database source cannot be previewed (for example a local-path source)"
+          },
+          "unavailableReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["local_source", null],
+            "description": "local_source when available is false, otherwise null"
+          },
+          "branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasUpdates": {
+            "type": "boolean"
+          },
+          "commitsBehind": {
+            "type": "integer"
+          },
+          "commitsAhead": {
+            "type": "integer",
+            "description": "Local commits not on the remote branch; when above zero the pull may not fast-forward"
+          },
+          "commits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncomingCommit"
+            }
+          },
+          "conflictStrategy": {
+            "$ref": "#/components/schemas/ConflictStrategy"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RollbackSection"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RollbackSummary"
+          },
+          "predictedConflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PredictedConflict"
+            }
+          },
+          "predictedErrors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PredictedError"
+            }
+          },
+          "currentStateHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Published-op fingerprint at preview time"
+          },
+          "currentHead": {
+            "type": "string",
+            "nullable": true
+          },
+          "incomingHead": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

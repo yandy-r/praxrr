@@ -20,7 +20,7 @@ import type { RollbackPreview, RollbackSection } from './types.ts';
 const EMPTY_SUMMARY = { totalCreates: 0, totalUpdates: 0, totalDeletes: 0, totalUnchanged: 0 };
 
 /** Diff every entity family sequentially (one SQLite connection per cache — avoid interleaving). */
-async function diffAllFamilies(currentCache: PCDCache, snapshotCache: PCDCache): Promise<RollbackSection[]> {
+export async function diffAllFamilies(currentCache: PCDCache, snapshotCache: PCDCache): Promise<RollbackSection[]> {
   const sections: RollbackSection[] = [];
   for (const target of rollbackEntityTargets()) {
     sections.push(await diffEntityFamily(currentCache, snapshotCache, target));

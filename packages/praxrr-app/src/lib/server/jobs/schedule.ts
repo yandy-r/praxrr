@@ -1,4 +1,5 @@
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { getPcdSyncDedupeKey } from './helpers/pcdSyncDedupeKey.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { upgradeConfigsQueries } from '$db/queries/upgradeConfigs.ts';
@@ -102,7 +103,7 @@ export function scheduleRenameForInstance(instanceId: number): void {
 export function schedulePcdSyncForDatabase(databaseId: number): void {
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance || instance.enabled === 0 || instance.sync_strategy <= 0) {
-    publishJobsCancelled(jobQueueQueries.unscheduleByDedupeKey(`pcd.sync:${databaseId}`));
+    publishJobsCancelled(jobQueueQueries.unscheduleByDedupeKey(getPcdSyncDedupeKey(databaseId)));
     return;
   }
 
@@ -114,7 +115,7 @@ export function schedulePcdSyncForDatabase(databaseId: number): void {
     runAt,
     payload: { databaseId },
     source: 'schedule',
-    dedupeKey: `pcd.sync:${databaseId}`,
+    dedupeKey: getPcdSyncDedupeKey(databaseId),
   });
 }
 
