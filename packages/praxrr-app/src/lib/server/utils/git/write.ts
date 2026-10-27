@@ -482,11 +482,17 @@ export async function resetToRemoteBranch(repoPath: string, branch: string): Pro
   await execGit(['clean', '-fdx'], repoPath);
 }
 
+const COMMIT_ID_PATTERN = /^[0-9a-f]{40}([0-9a-f]{24})?$/i;
+
 /**
- * Hard-reset the working tree and current branch to a specific commit (discards local changes)
+ * Hard-reset the working tree and current branch to a specific commit (discards local changes).
+ * Only full object ids are accepted so a stored value can never be interpreted as an option or ref.
  */
 export async function resetToCommit(repoPath: string, commit: string): Promise<void> {
-  await execGit(['reset', '--hard', commit], repoPath);
+  if (!COMMIT_ID_PATTERN.test(commit)) {
+    throw new Error('Refusing to reset: not a full commit id');
+  }
+  await execGit(['reset', '--hard', '--end-of-options', commit], repoPath);
   await execGit(['clean', '-fdx'], repoPath);
 }
 

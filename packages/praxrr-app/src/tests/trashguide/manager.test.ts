@@ -11,6 +11,7 @@ import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { logger } from '$logger/logger.ts';
 import { config } from '$config';
+import { resetToCommit } from '$utils/git/index.ts';
 import {
   asTrashGuideId,
   type TrashGuideCustomFormatEntity,
@@ -1499,13 +1500,40 @@ Deno.test('persistSourceSyncData drops undecodable or identity-mismatched cache 
     trashId: 'dddddddddddddddddddddddddddddddd',
     jsonData: JSON.stringify({ ...good, trash_id: 'dddddddddddddddddddddddddddddddd', file_path: 'cf/elsewhere.json' }),
   };
-  const { cacheTrashIds, warns } = await runPersist(true, [garbage, idMismatch, arrMismatch, pathMismatch]);
+  const shapeMismatch = {
+    ...makeCacheRow(12, good, 'cf/bad.json', 5),
+    trashId: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+    jsonData: JSON.stringify({
+      ...good,
+      trash_id: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+      specifications: 'not-an-array',
+    }),
+  };
+  const missingArray = {
+    ...makeCacheRow(12, good, 'cf/bad.json', 6),
+    trashId: 'ffffffffffffffffffffffffffffffff',
+    jsonData: JSON.stringify(
+      Object.fromEntries(
+        Object.entries({ ...good, trash_id: 'ffffffffffffffffffffffffffffffff' }).filter(
+          ([key]) => key !== 'specifications'
+        )
+      )
+    ),
+  };
+  const { cacheTrashIds, warns } = await runPersist(true, [
+    garbage,
+    idMismatch,
+    arrMismatch,
+    pathMismatch,
+    shapeMismatch,
+    missingArray,
+  ]);
 
   assertEquals(cacheTrashIds, [AAAA]);
   const decodeWarn = warns.find(
     (entry) => entry.message === 'TRaSH source parse partial; failed to decode retained cache entities'
   );
-  assertEquals((decodeWarn?.meta as { undecodableRows?: number }).undecodableRows, 4);
+  assertEquals((decodeWarn?.meta as { undecodableRows?: number }).undecodableRows, 6);
 });
 
 Deno.test({
@@ -1638,89 +1666,289 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
   return new TextDecoder().decode(output.stdout).trim();
 }
 
+interface GitSyncFixture {
+  root: string;
+  clonePath: string;
+  firstCommit: string;
+  secondCommit: string;
+}
+
+/** Offline git origin with two commits and a clone that only has the first one. */
+async function buildGitSyncFixture(options: { validSecondCommit: boolean }): Promise<GitSyncFixture> {
+  const root = await Deno.makeTempDir();
+  const origin = `${root}/origin`;
+  const clonePath = `${root}/clone`;
+  await Deno.mkdir(`${origin}/cf`, { recursive: true });
+  await Deno.writeTextFile(
+    `${origin}/metadata.json`,
+    JSON.stringify({
+      json_paths: {
+        radarr: { custom_formats: ['cf'], quality_profiles: ['qp'], qualities: ['qs'], naming: ['nm'] },
+      },
+    })
+  );
+  for (const dir of ['qp', 'qs', 'nm']) {
+    await Deno.mkdir(`${origin}/${dir}`);
+    await Deno.writeTextFile(`${origin}/${dir}/.keep`, '');
+  }
+  await Deno.writeTextFile(`${origin}/cf/one.json`, '{ broken one');
+  await git(origin, 'init', '-q', '-b', 'master');
+  await git(origin, 'add', '-A');
+  await git(origin, 'commit', '-q', '-m', 'c1');
+  const firstCommit = await git(origin, 'rev-parse', 'HEAD');
+  await git(root, 'clone', '-q', origin, clonePath);
+
+  if (options.validSecondCommit) {
+    await Deno.writeTextFile(
+      `${origin}/cf/two.json`,
+      JSON.stringify({
+        trash_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        name: 'Two',
+        includeCustomFormatWhenRenaming: false,
+        specifications: [],
+      })
+    );
+  } else {
+    await Deno.writeTextFile(`${origin}/cf/two.json`, '{ broken two');
+  }
+  await git(origin, 'add', '-A');
+  await git(origin, 'commit', '-q', '-m', 'c2');
+  const secondCommit = await git(origin, 'rev-parse', 'HEAD');
+  assertEquals(firstCommit === secondCommit, false);
+  return { root, clonePath, firstCommit, secondCommit };
+}
+
+/**
+ * Hermetic git: a developer's global/system config (e.g. fetch.prune) must not alter the
+ * fetch/reset flow under test.
+ */
+async function withHermeticGit<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = {
+    global: Deno.env.get('GIT_CONFIG_GLOBAL'),
+    noSystem: Deno.env.get('GIT_CONFIG_NOSYSTEM'),
+  };
+  Deno.env.set('GIT_CONFIG_GLOBAL', '/dev/null');
+  Deno.env.set('GIT_CONFIG_NOSYSTEM', '1');
+  try {
+    return await fn();
+  } finally {
+    for (const [name, value] of [
+      ['GIT_CONFIG_GLOBAL', previous.global],
+      ['GIT_CONFIG_NOSYSTEM', previous.noSystem],
+    ] as const) {
+      if (value === undefined) {
+        Deno.env.delete(name);
+      } else {
+        Deno.env.set(name, value);
+      }
+    }
+  }
+}
+
+function patchGitSource(restores: Restore[], fixture: GitSyncFixture, lastCommitHash: string | null): void {
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() =>
+      makeSource({
+        id: 13,
+        local_path: fixture.clonePath,
+        repository_url: 'https://example.invalid/x.git',
+        branch: 'master',
+        last_commit_hash: lastCommitHash,
+        arr_type: 'radarr',
+      })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+}
+
 Deno.test({
   name: 'sync with failed parse resets a git clone back to last_commit_hash',
   sanitizeResources: false,
   fn: async () => {
-    const root = await Deno.makeTempDir();
-    const origin = `${root}/origin`;
-    const clonePath = `${root}/clone`;
     const restores: Restore[] = [];
-    const warns: string[] = [];
-    // Hermetic git: a developer's global config (e.g. fetch.prune) must not alter the fetch/reset flow.
-    const previousGlobalConfig = Deno.env.get('GIT_CONFIG_GLOBAL');
-    Deno.env.set('GIT_CONFIG_GLOBAL', '/dev/null');
+    const errors: string[] = [];
+    let fixture: GitSyncFixture | null = null;
 
     try {
-      await Deno.mkdir(`${origin}/cf`, { recursive: true });
-      await Deno.writeTextFile(
-        `${origin}/metadata.json`,
-        JSON.stringify({
-          json_paths: {
-            radarr: { custom_formats: ['cf'], quality_profiles: ['qp'], qualities: ['qs'], naming: ['nm'] },
-          },
-        })
-      );
-      for (const dir of ['qp', 'qs', 'nm']) {
-        await Deno.mkdir(`${origin}/${dir}`);
-        await Deno.writeTextFile(`${origin}/${dir}/.keep`, '');
-      }
-      await Deno.writeTextFile(`${origin}/cf/one.json`, '{ broken one');
-      await git(origin, 'init', '-q', '-b', 'master');
-      await git(origin, 'add', '-A');
-      await git(origin, 'commit', '-q', '-m', 'c1');
-      const firstCommit = await git(origin, 'rev-parse', 'HEAD');
-      await git(root, 'clone', '-q', origin, clonePath);
+      await withHermeticGit(async () => {
+        fixture = await buildGitSyncFixture({ validSecondCommit: false });
+        patchGitSource(restores, fixture, fixture.firstCommit);
+        patchTarget(logger, 'warn', (() => Promise.resolve()) as typeof logger.warn, restores);
+        patchTarget(
+          logger,
+          'error',
+          ((message: string) => {
+            errors.push(message);
+            return Promise.resolve();
+          }) as typeof logger.error,
+          restores
+        );
 
-      await Deno.writeTextFile(`${origin}/cf/two.json`, '{ broken two');
-      await git(origin, 'add', '-A');
-      await git(origin, 'commit', '-q', '-m', 'c2');
-      const secondCommit = await git(origin, 'rev-parse', 'HEAD');
-      assertEquals(firstCommit === secondCommit, false);
+        const result = await trashGuideManager.sync(13);
 
-      patchTarget(
-        trashGuideSourcesQueries,
-        'getById',
-        (() =>
-          makeSource({
-            id: 13,
-            local_path: clonePath,
-            repository_url: 'https://example.invalid/x.git',
-            branch: 'master',
-            last_commit_hash: firstCommit,
-            arr_type: 'radarr',
-          })) as typeof trashGuideSourcesQueries.getById,
-        restores
-      );
-      patchTarget(
-        logger,
-        'warn',
-        ((message: string) => {
-          warns.push(message);
-          return Promise.resolve();
-        }) as typeof logger.warn,
-        restores
-      );
-      patchTarget(logger, 'error', (() => Promise.resolve()) as typeof logger.error, restores);
-
-      const result = await trashGuideManager.sync(13);
-
-      assertEquals(result.success, false);
-      assertEquals(result.failureKind, 'parse');
-      // Clone is back on the last synced commit, so the next update check still sees commitsBehind > 0.
-      assertEquals(await git(clonePath, 'rev-parse', 'HEAD'), firstCommit);
-      assertEquals(await git(clonePath, 'rev-list', '--count', 'HEAD..origin/master'), '1');
-      assertEquals(warns.includes('Failed to reset TRaSH clone to last synced commit after parse failure'), false);
+        assertEquals(result.success, false);
+        assertEquals(result.failureKind, 'parse');
+        // Clone is back on the last synced commit, so the next update check still sees commitsBehind > 0.
+        assertEquals(await git(fixture.clonePath, 'rev-parse', 'HEAD'), fixture.firstCommit);
+        assertEquals(await git(fixture.clonePath, 'rev-list', '--count', 'HEAD..origin/master'), '1');
+        assertEquals(
+          errors.includes('Failed to reset TRaSH clone to last synced commit after unpersisted sync'),
+          false
+        );
+      });
     } finally {
-      if (previousGlobalConfig === undefined) {
-        Deno.env.delete('GIT_CONFIG_GLOBAL');
-      } else {
-        Deno.env.set('GIT_CONFIG_GLOBAL', previousGlobalConfig);
-      }
       for (const restore of restores.reverse()) {
         restore();
       }
-      await removeQuietly(root);
+      await removeQuietly((fixture as GitSyncFixture | null)?.root ?? null);
     }
   },
+});
+
+Deno.test({
+  name: 'sync with failed parse and no last_commit_hash leaves the clone and still reports a parse failure',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const errors: string[] = [];
+    let fixture: GitSyncFixture | null = null;
+
+    try {
+      await withHermeticGit(async () => {
+        fixture = await buildGitSyncFixture({ validSecondCommit: false });
+        patchGitSource(restores, fixture, null);
+        patchTarget(logger, 'warn', (() => Promise.resolve()) as typeof logger.warn, restores);
+        patchTarget(
+          logger,
+          'error',
+          ((message: string) => {
+            errors.push(message);
+            return Promise.resolve();
+          }) as typeof logger.error,
+          restores
+        );
+
+        const result = await trashGuideManager.sync(13);
+
+        assertEquals(result.success, false);
+        assertEquals(result.failureKind, 'parse');
+        // Nothing to reset to: the clone stays at the fetched head (the handler retries because
+        // last_commit_hash is unset), and no reset error is logged.
+        assertEquals(await git(fixture.clonePath, 'rev-parse', 'HEAD'), fixture.secondCommit);
+        assertEquals(
+          errors.includes('Failed to reset TRaSH clone to last synced commit after unpersisted sync'),
+          false
+        );
+      });
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await removeQuietly((fixture as GitSyncFixture | null)?.root ?? null);
+    }
+  },
+});
+
+Deno.test({
+  name: 'sync with failed parse logs an error and still returns the parse failure when the reset fails',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    const errors: string[] = [];
+    let fixture: GitSyncFixture | null = null;
+
+    try {
+      await withHermeticGit(async () => {
+        fixture = await buildGitSyncFixture({ validSecondCommit: false });
+        // Not a full commit id: resetToCommit refuses it.
+        patchGitSource(restores, fixture, '--not-a-commit');
+        patchTarget(logger, 'warn', (() => Promise.resolve()) as typeof logger.warn, restores);
+        patchTarget(
+          logger,
+          'error',
+          ((message: string) => {
+            errors.push(message);
+            return Promise.resolve();
+          }) as typeof logger.error,
+          restores
+        );
+
+        const result = await trashGuideManager.sync(13);
+
+        assertEquals(result.success, false);
+        assertEquals(result.failureKind, 'parse');
+        assertEquals(await git(fixture.clonePath, 'rev-parse', 'HEAD'), fixture.secondCommit);
+        assertEquals(errors.includes('Failed to reset TRaSH clone to last synced commit after unpersisted sync'), true);
+      });
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await removeQuietly((fixture as GitSyncFixture | null)?.root ?? null);
+    }
+  },
+});
+
+Deno.test({
+  name: 'sync resets a git clone to last_commit_hash when persistence throws after the fetch',
+  sanitizeResources: false,
+  fn: async () => {
+    const restores: Restore[] = [];
+    let fixture: GitSyncFixture | null = null;
+
+    try {
+      await withHermeticGit(async () => {
+        fixture = await buildGitSyncFixture({ validSecondCommit: true });
+        patchGitSource(restores, fixture, fixture.firstCommit);
+        patchTarget(
+          trashIdMappingsQueries,
+          'getBySource',
+          (() => []) as typeof trashIdMappingsQueries.getBySource,
+          restores
+        );
+        patchTarget(
+          trashGuideEntityCacheQueries,
+          'getBySource',
+          (() => []) as typeof trashGuideEntityCacheQueries.getBySource,
+          restores
+        );
+        patchTarget(
+          trashGuideEntityCacheQueries,
+          'replaceSourceCache',
+          (() => {
+            throw new Error('disk full');
+          }) as typeof trashGuideEntityCacheQueries.replaceSourceCache,
+          restores
+        );
+        patchTarget(logger, 'warn', (() => Promise.resolve()) as typeof logger.warn, restores);
+        patchTarget(logger, 'error', (() => Promise.resolve()) as typeof logger.error, restores);
+
+        const result = await trashGuideManager.sync(13);
+
+        if (result.success) {
+          throw new Error('expected sync to fail');
+        }
+        assertEquals(result.failureKind, 'run');
+        assertStringIncludes(result.error, 'disk full');
+        assertEquals(await git(fixture.clonePath, 'rev-parse', 'HEAD'), fixture.firstCommit);
+      });
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+      await removeQuietly((fixture as GitSyncFixture | null)?.root ?? null);
+    }
+  },
+});
+
+Deno.test('resetToCommit only accepts full commit ids and never treats input as an option', async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    for (const bad of ['', 'HEAD', '--hard', 'abc123', '--output=/tmp/x', 'g'.repeat(40), 'a'.repeat(41)]) {
+      await assertRejects(() => resetToCommit(dir, bad), Error, 'not a full commit id');
+    }
+  } finally {
+    await removeQuietly(dir);
+  }
 });

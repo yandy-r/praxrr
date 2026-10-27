@@ -1,5 +1,6 @@
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { logger } from '$logger/logger.ts';
+import { isLocalRepositorySource } from '$utils/git/index.ts';
 import { trashGuideManager, type TrashGuideSyncResult } from '$trashguide/index.ts';
 import { coerceTrashGuideSourceArrType, type TrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
@@ -284,7 +285,13 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       return resolveRunFailure(message);
     }
 
-    if (!updates.hasUpdates && trigger !== 'manual') {
+    // A failed/unpersisted sync can leave the clone at a commit other than the last one whose content
+    // reached the cache. hasUpdates only compares against the remote, so also retry whenever a git
+    // clone's HEAD differs from the last synced commit (currentLocalCommit is `git rev-parse HEAD`).
+    const behindSynced =
+      !isLocalRepositorySource(source.repository_url) && updates.currentLocalCommit !== source.last_commit_hash;
+
+    if (!updates.hasUpdates && !behindSynced && trigger !== 'manual') {
       trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
       return finalize(
         buildEvidence({
@@ -351,7 +358,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     }
 
     if (!syncResult.success) {
-      const message = syncResult.error ?? 'TRaSH sync failed';
+      const message = syncResult.error;
       await logger.error('TRaSH source sync failed', {
         source: 'TrashGuideSyncJob',
         meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },

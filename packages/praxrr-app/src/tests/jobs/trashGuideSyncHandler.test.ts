@@ -66,7 +66,8 @@ function makeSource(overrides: Record<string, unknown> = {}) {
     auto_pull: true,
     enabled: true,
     last_synced_at: null,
-    last_commit_hash: null,
+    // Matches updateInfo().currentLocalCommit: the clone is in sync with the cache by default.
+    last_commit_hash: 'local-commit',
     created_at: '2026-02-26T00:00:00.000Z',
     updated_at: '2026-02-26T00:00:00.000Z',
     ...overrides,
@@ -238,6 +239,7 @@ Deno.test('trashGuideSync handler reports parser failures with counts', async ()
       activeOperations: 0,
       removedEntities: 0,
       renamedEntities: 0,
+      error: 'TRaSH parse failed for every discovered file (2)',
     })) as typeof trashGuideManager.sync,
     restores
   );
@@ -484,6 +486,112 @@ Deno.test('trashGuideSync handler never leaks secrets from an unexpected crash',
     assert(!error.includes('user:pass'));
 
     assert(errorCalls.some((call) => call.source === 'TrashGuideSyncJob'));
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+function patchNoUpdateSource(
+  restores: Restore[],
+  sourceOverrides: Record<string, unknown>,
+  currentLocalCommit: string
+): { syncCalls: () => number } {
+  let syncCalls = 0;
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() => makeSource(sourceOverrides)) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideSourcesQueries,
+    'updateSyncMetadata',
+    (() => true) as typeof trashGuideSourcesQueries.updateSyncMetadata,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (async () => ({ ...updateInfo(false, 0), currentLocalCommit })) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (async () => {
+      syncCalls += 1;
+      return {
+        success: true,
+        parseStatus: 'success',
+        commitsBehind: 0,
+        parsedFiles: 1,
+        failedFiles: 0,
+        activeOperations: 0,
+        removedEntities: 0,
+        renamedEntities: 0,
+      };
+    }) as typeof trashGuideManager.sync,
+    restores
+  );
+  return { syncCalls: () => syncCalls };
+}
+
+Deno.test('trashGuideSync handler does not skip when the git clone HEAD differs from last_commit_hash', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: 'synced-commit' }, 'ahead-commit');
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(probe.syncCalls(), 1);
+    assertEquals(result.status, 'success');
+    assertEquals(evidence.status, 'success');
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler does not skip when last_commit_hash was never recorded', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: null }, 'local-commit');
+
+  try {
+    await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    assertEquals(probe.syncCalls(), 1);
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler still skips when HEAD equals last_commit_hash and there are no updates', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: 'same-commit' }, 'same-commit');
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(probe.syncCalls(), 0);
+    assertEquals(result.status, 'skipped');
+    assertEquals(evidence.status, 'skipped');
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler skips a local-path source regardless of commit mismatch', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(
+    restores,
+    { repository_url: '/srv/local/trash-repo', last_commit_hash: 'other' },
+    'local'
+  );
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    assertEquals(probe.syncCalls(), 0);
+    assertEquals(result.status, 'skipped');
   } finally {
     restoreAll(restores);
   }
