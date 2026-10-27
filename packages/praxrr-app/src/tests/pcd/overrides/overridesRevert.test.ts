@@ -19,6 +19,8 @@ import type { ResolvedEntityType } from '$pcd/resolved/types.ts';
 import * as customFormats from '$pcd/entities/customFormats/index.ts';
 import * as qualityProfiles from '$pcd/entities/qualityProfiles/index.ts';
 import * as regularExpressions from '$pcd/entities/regularExpressions/index.ts';
+import { createTest } from '$pcd/entities/customFormats/tests/create.ts';
+import { overrideConflict } from '$pcd/conflicts/override.ts';
 import {
   BASE_CUSTOM_FORMAT_NAME,
   BASE_DELAY_PROFILE_NAME,
@@ -421,6 +423,73 @@ overridesTest('revert: remaining ops depending on a created entity block the rev
   assertEquals(pcdOpsQueries.listByDatabase(fixture.databaseId), before);
 });
 
+overridesTest('revert: CF test creation does not remove the format used by profile score ops', async (fixture) => {
+  await fixture.writeUserEdit((_, databaseId) =>
+    createTest({
+      databaseId,
+      layer: 'user',
+      formatName: BASE_CUSTOM_FORMAT_NAME,
+      input: { title: 'Local movie test', type: 'movie', should_match: true, description: null },
+    })
+  );
+  const testOps = await entityOpIds(fixture, 'customFormat', BASE_CUSTOM_FORMAT_NAME);
+  const scoreId = fixture.insertUserOp({
+    metadata: {
+      operation: 'update',
+      entity: 'quality_profile',
+      name: BASE_QUALITY_PROFILE_NAME,
+      stable_key: { key: 'quality_profile_name', value: BASE_QUALITY_PROFILE_NAME },
+      changed_fields: ['custom_format_scores'],
+      depends_on: [{ entity: 'custom_format', key: 'custom_format_name', value: BASE_CUSTOM_FORMAT_NAME }],
+    },
+    sql: `INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score) VALUES ('${BASE_QUALITY_PROFILE_NAME}', '${BASE_CUSTOM_FORMAT_NAME}', 'radarr', 200);`,
+  });
+  await compile(fixture.pcdPath, fixture.databaseId);
+
+  const result = await revertEntityOverrides({
+    databaseId: fixture.databaseId,
+    entityType: 'customFormat',
+    name: BASE_CUSTOM_FORMAT_NAME,
+  });
+  assertEquals(result.revertedOpIds, testOps);
+  assertEquals(result.resolvedMatchesBase, true);
+  assertEquals(publishedUserOpIds(fixture), [scoreId]);
+  assertEquals(
+    (await fixture.cache().kb.selectFrom('quality_profile_custom_formats').selectAll().execute())[0].score,
+    200
+  );
+});
+
+overridesTest('revert: selecting a CF test does not block a later format field edit', async (fixture) => {
+  await fixture.writeUserEdit((_, databaseId) =>
+    createTest({
+      databaseId,
+      layer: 'user',
+      formatName: BASE_CUSTOM_FORMAT_NAME,
+      input: { title: 'Local test', type: 'movie', should_match: true, description: null },
+    })
+  );
+  const testOps = await entityOpIds(fixture, 'customFormat', BASE_CUSTOM_FORMAT_NAME);
+  const editId = fixture.insertUserOp({
+    metadata: {
+      operation: 'update',
+      entity: 'custom_format',
+      name: BASE_CUSTOM_FORMAT_NAME,
+      stable_key: { key: 'custom_format_name', value: BASE_CUSTOM_FORMAT_NAME },
+      changed_fields: ['description'],
+    },
+    sql: `UPDATE custom_formats SET description = 'edited' WHERE name = '${BASE_CUSTOM_FORMAT_NAME}';`,
+  });
+  await compile(fixture.pcdPath, fixture.databaseId);
+  const result = await revertEntityOverrides({
+    databaseId: fixture.databaseId,
+    entityType: 'customFormat',
+    name: BASE_CUSTOM_FORMAT_NAME,
+    opIds: testOps,
+  });
+  assertEquals(result.remainingOpIds, [editId]);
+});
+
 overridesTest('revert: post-recompile conflict rolls pcd_ops back unchanged (fail-closed)', async (fixture) => {
   const regexMetadata = (changedFields: string[]) => ({
     operation: 'update',
@@ -585,6 +654,53 @@ overridesTest('undo: does not reactivate an op superseded within the undone acti
   assertEquals(result.reactivatedOpIds, []);
   assertEquals(pcdOpsQueries.getById(superseded[0].id)?.state, 'superseded');
   assertEquals(publishedUserOpIds(fixture), []);
+});
+
+overridesTest('undo: manual conflict override restores its original pending conflict', async (fixture) => {
+  databaseInstancesQueries.update(fixture.databaseId, { conflictStrategy: 'ask' });
+  const originalId = pcdOpsQueries.create({
+    databaseId: fixture.databaseId,
+    origin: 'user',
+    state: 'published',
+    source: 'local',
+    sql: `UPDATE regular_expressions SET pattern = 'local-pattern' WHERE name = '${BASE_REGEX_NAME}' AND pattern = 'old-upstream';`,
+    metadata: JSON.stringify({
+      operation: 'update',
+      entity: 'regular_expression',
+      name: BASE_REGEX_NAME,
+      stable_key: { key: 'regular_expression_name', value: BASE_REGEX_NAME },
+      changed_fields: ['pattern'],
+    }),
+    desiredState: JSON.stringify({ pattern: { from: 'old-upstream', to: 'local-pattern' } }),
+  });
+  await compile(fixture.pcdPath, fixture.databaseId);
+  assert(['conflicted', 'conflicted_pending'].includes(pcdOpHistoryQueries.listByOp(originalId)[0].status));
+
+  const overridden = await withUserOpAction(() =>
+    overrideConflict({ databaseId: fixture.databaseId, opId: originalId })
+  );
+  assertEquals(overridden.success, true);
+  assertEquals(pcdOpsQueries.getById(originalId)?.state, 'superseded');
+  const replacementIds = publishedUserOpIds(fixture);
+  assert(replacementIds.length > 0);
+  assertEquals(
+    patternOf(await readResolvedEntity(fixture.cache(), 'regularExpression', undefined, BASE_REGEX_NAME)),
+    'local-pattern'
+  );
+
+  const undone = await undoLastAction({ databaseId: fixture.databaseId });
+  assertEquals(undone.revertedOpIds, replacementIds);
+  assertEquals(undone.reactivatedOpIds, [originalId]);
+  assertEquals(pcdOpsQueries.getById(originalId)?.state, 'published');
+  assertEquals(pcdOpsQueries.getById(originalId)?.superseded_by_op_id, null);
+  assertEquals(
+    pcdOpHistoryQueries.listLatestConflictsByDatabase(fixture.databaseId).map((row) => row.op.id),
+    [originalId]
+  );
+  assertEquals(
+    patternOf(await readResolvedEntity(fixture.cache(), 'regularExpression', undefined, BASE_REGEX_NAME)),
+    BASE_REGEX_PATTERN
+  );
 });
 
 overridesTest('undo: unbuilt/disabled database is the typed not-found error (400 contract)', async (fixture) => {

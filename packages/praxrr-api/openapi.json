@@ -2975,7 +2975,7 @@
       "post": {
         "operationId": "undoPcdOverride",
         "summary": "Undo the latest local PCD change",
-        "description": "Soft-drops exactly the latest published user-action unit and recompiles the PCD.\nNew ops use action_id; legacy ops fall back to group_id, then a single op. Previously\napplied edits superseded by this action are reactivated when undoing it. No automatic\nsnapshot is created. API tokens require admin scope. The request body is limited to 8 KB.\n",
+        "description": "Soft-drops exactly the latest published user-action unit and recompiles the PCD.\nEvery mutating HTTP request is one action_id unit; a scheduled or manual job run is\nits own unit, and each automatic conflict override applied during recompilation is\na separate unit. Legacy ops fall back to group_id, then a single op. Previously\napplied edits superseded by this action are reactivated when undoing it; undoing a\nmanual or automatic conflict override reactivates the original published op it\nreplaced, and its previously pending conflict may return after the recompile. No\nautomatic snapshot is created. API tokens require admin scope. The request body is\nlimited to 8 KB.\nsnapshot is created. API tokens require admin scope. The request body is limited to 8 KB.\n",
         "tags": ["Local Overrides"],
         "parameters": [
           {
@@ -3113,7 +3113,7 @@
             "name": "name",
             "in": "path",
             "required": true,
-            "description": "Current resolved entity name, not an earlier name before a rename. Preserved\nexactly without trimming; empty names are rejected. Names containing a slash\ncannot be addressed through this path segment.\n",
+            "description": "Current resolved entity name, not an earlier name before a rename. Preserved\nexactly without trimming; empty names are rejected. Names containing a slash\nare supported when it is URL-encoded as %2F.\n",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -15151,6 +15151,7 @@
           "expectedActionId": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 64,
             "description": "LastAction.actionId from the last read; mismatch is rejected as stale_action"
           }
         }
@@ -15172,8 +15173,8 @@
             }
           },
           "reactivatedOpIds": {
+            "description": "Previously applied edits superseded by the undone action and now restored, including the original published op behind an undone manual or automatic conflict override",
             "type": "array",
-            "description": "Previously applied edits superseded by the undone action and now restored",
             "items": {
               "type": "integer"
             }

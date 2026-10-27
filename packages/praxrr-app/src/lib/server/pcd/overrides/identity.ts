@@ -125,6 +125,17 @@ export function actionKeyOf(op: PcdOp): string {
   return `op:${op.id}`;
 }
 
+/**
+ * CF test writers use the format's entity metadata. Use their SQL target, not display text,
+ * to classify existing persisted ops without changing the metadata contract.
+ */
+export function isCustomFormatTestOp(op: PcdOp): boolean {
+  return (
+    parseUserOpMetadata(op.metadata).entity === 'custom_format' &&
+    /^\s*(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+["`[]?custom_format_tests["`\]]?(?:\s|\()/i.test(op.sql)
+  );
+}
+
 interface MutableEntity {
   entityMeta: string;
   entityType: ResolvedEntityType;
@@ -204,14 +215,14 @@ export function resolveUserOpEntities(ops: readonly PcdOp[]): {
       return undefined;
     };
 
-    if (metadata.operation === 'create') {
+    if (metadata.operation === 'create' && !isCustomFormatTestOp(op)) {
       const entity = createEntity(name);
       entity.hasCreate = true;
       entity.ops.push(op);
       continue;
     }
 
-    if (metadata.operation === 'delete') {
+    if (metadata.operation === 'delete' && !isCustomFormatTestOp(op)) {
       const entity = find(target, name, previousName) ?? createEntity(target);
       alias.delete(aliasKey(entityMeta, entity.currentName));
       alias.delete(aliasKey(entityMeta, target));

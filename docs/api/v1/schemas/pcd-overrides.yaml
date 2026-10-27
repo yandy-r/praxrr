@@ -218,6 +218,7 @@ PcdOverrideUndoRequest:
     expectedActionId:
       type: string
       minLength: 1
+      maxLength: 64
       description: LastAction.actionId from the last read; mismatch is rejected as stale_action
 
 PcdOverrideUndoResult:
@@ -238,8 +239,9 @@ PcdOverrideUndoResult:
       items:
         type: integer
     reactivatedOpIds:
+      description: Previously applied edits superseded by the undone action and now restored,
+        including the original published op behind an undone manual or automatic conflict override
       type: array
-      description: Previously applied edits superseded by the undone action and now restored
       items:
         type: integer
     entities:

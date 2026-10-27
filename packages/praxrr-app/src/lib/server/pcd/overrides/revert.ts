@@ -31,6 +31,7 @@ import { isResolvedEntityNotFoundError } from '../resolved/readers.ts';
 import type { ResolvedEntityType } from '../resolved/types.ts';
 import {
   actionKeyOf,
+  isCustomFormatTestOp,
   entityKeyOf,
   parseUserOpMetadata,
   resolveUserOpEntities,
@@ -161,6 +162,7 @@ interface AttemptInput {
   instance: DatabaseInstance;
   dropIds: readonly number[];
   reactivateIds: readonly number[];
+  previouslyConflictedIds?: ReadonlySet<number>;
   batchId: string;
 }
 
@@ -291,9 +293,15 @@ async function runAttempt(input: AttemptInput): Promise<void> {
         { blockingOpIds: sortedUnique([...unexpected, ...missing]) }
       );
     } else {
-      const newlyConflicted = [...latestConflictedOpIds(databaseId)].filter(
-        (id) => expectedPublished.has(id) && !beforeConflicted.has(id)
-      );
+      const newlyConflicted = pcdOpHistoryQueries
+        .listLatestByDatabaseWithOps(databaseId, ['conflicted', 'conflicted_pending', 'error'])
+        .filter(
+          ({ history }) =>
+            expectedPublished.has(history.op_id) &&
+            !beforeConflicted.has(history.op_id) &&
+            !(history.status !== 'error' && input.previouslyConflictedIds?.has(history.op_id))
+        )
+        .map(({ history }) => history.op_id);
       if (newlyConflicted.length > 0) {
         failure = new OverrideRevertError(
           409,
@@ -384,17 +392,20 @@ function planRevert(databaseId: number, input: RevertEntityOverridesInput, userO
     const blocking = new Set<number>();
     for (const selected of group.ops.filter((op) => selectedIds.has(op.id))) {
       const selectedMeta = parseUserOpMetadata(selected.metadata);
+      const selectedIsTest = isCustomFormatTestOp(selected);
       const structural =
-        selectedMeta.operation === 'create' || selectedMeta.operation === 'delete' || isRenameMetadata(selectedMeta);
-      const selectedFields = new Set(selectedMeta.changedFields);
+        !selectedIsTest &&
+        (selectedMeta.operation === 'create' || selectedMeta.operation === 'delete' || isRenameMetadata(selectedMeta));
+      const selectedFields = new Set(selectedIsTest ? ['tests'] : selectedMeta.changedFields);
       for (const later of remainingInGroup) {
         if (later.id <= selected.id) continue;
         const laterMeta = parseUserOpMetadata(later.metadata);
+        const laterFields = isCustomFormatTestOp(later) ? ['tests'] : laterMeta.changedFields;
         if (
           structural ||
-          selectedMeta.changedFields.length === 0 ||
-          laterMeta.changedFields.length === 0 ||
-          laterMeta.changedFields.some((field) => selectedFields.has(field))
+          selectedFields.size === 0 ||
+          laterFields.length === 0 ||
+          laterFields.some((field) => selectedFields.has(field))
         ) {
           blocking.add(later.id);
         }
@@ -452,7 +463,7 @@ function planRevert(databaseId: number, input: RevertEntityOverridesInput, userO
   for (const op of userOps) {
     if (!dropIds.has(op.id)) continue;
     const metadata = parseUserOpMetadata(op.metadata);
-    if (!metadata.entity || !metadata.name) continue;
+    if (!metadata.entity || !metadata.name || isCustomFormatTestOp(op)) continue;
     if (metadata.operation !== 'create' && !isRenameMetadata(metadata)) continue;
     const names = droppedNames.get(metadata.entity) ?? new Set<string>();
     names.add(metadata.name);
@@ -555,22 +566,36 @@ export function revertEntityOverrides(input: RevertEntityOverridesInput): Promis
 
 // ── Undo ──
 
-/**
- * Ops the writer superseded on behalf of `dropIds` whose last pre-supersede state was `applied`
- * (excludes ops the conflict-override flow superseded after dropping them, and ops written by
- * the undone action itself).
- */
-function findReactivatableOps(databaseId: number, dropIds: ReadonlySet<number>, undoneKey: string): number[] {
+/** Restore applied edits and originals dropped immediately before a conflict override superseded them. */
+function findReactivatableOps(
+  databaseId: number,
+  dropIds: ReadonlySet<number>,
+  undoneKey: string
+): {
+  reactivateIds: number[];
+  previouslyConflictedIds: ReadonlySet<number>;
+} {
   const superseded = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'user', { states: ['superseded'] });
   const reactivate: number[] = [];
+  const previouslyConflictedIds = new Set<number>();
   for (const op of superseded) {
     if (op.superseded_by_op_id === null || !dropIds.has(op.superseded_by_op_id)) continue;
     // Superseded within the undone action itself: the pre-action state never included it.
     if (actionKeyOf(op) === undoneKey) continue;
-    const lastState = pcdOpHistoryQueries.listByOp(op.id).find((row) => row.status !== 'superseded');
-    if (lastState?.status === 'applied') reactivate.push(op.id);
+    const history = pcdOpHistoryQueries.listByOp(op.id).filter((row) => row.status !== 'superseded');
+    const lastState = history[0];
+    if (lastState?.status === 'applied') {
+      reactivate.push(op.id);
+    } else if (
+      lastState?.status === 'dropped' &&
+      (history[1]?.status === 'conflicted' || history[1]?.status === 'conflicted_pending')
+    ) {
+      // Manual override first drops the published conflict, then links it to its replacement.
+      reactivate.push(op.id);
+      previouslyConflictedIds.add(op.id);
+    }
   }
-  return sortedUnique(reactivate);
+  return { reactivateIds: sortedUnique(reactivate), previouslyConflictedIds };
 }
 
 /**
@@ -605,7 +630,7 @@ export function undoLastAction(input: UndoLastActionInput): Promise<UndoResult> 
     }
 
     const dropIds = sortedUnique(userOps.filter((op) => actionKeyOf(op) === key).map((op) => op.id));
-    const reactivateIds = findReactivatableOps(databaseId, new Set(dropIds), key);
+    const { reactivateIds, previouslyConflictedIds } = findReactivatableOps(databaseId, new Set(dropIds), key);
 
     const { entities } = resolveUserOpEntities(userOps);
     const dropSet = new Set(dropIds);
@@ -613,7 +638,7 @@ export function undoLastAction(input: UndoLastActionInput): Promise<UndoResult> 
       .filter((group) => group.ops.some((op) => dropSet.has(op.id)))
       .map((group) => group.ref);
 
-    await runAttempt({ databaseId, instance, dropIds, reactivateIds, batchId: uuid() });
+    await runAttempt({ databaseId, instance, dropIds, reactivateIds, previouslyConflictedIds, batchId: uuid() });
 
     await logger.info('Undid last local action', {
       source: 'PCDOverrides',

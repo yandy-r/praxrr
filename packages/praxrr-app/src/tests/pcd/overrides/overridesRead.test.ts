@@ -3,6 +3,9 @@ import { buildLocallyModifiedLookup, listLocallyModifiedEntities, listOverrides 
 import * as delayProfiles from '$pcd/entities/delayProfiles/index.ts';
 import * as regularExpressions from '$pcd/entities/regularExpressions/index.ts';
 import * as customFormats from '$pcd/entities/customFormats/index.ts';
+import { createTest } from '$pcd/entities/customFormats/tests/create.ts';
+import { resolveUserOpEntities } from '$pcd/overrides/identity.ts';
+import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import {
   BASE_CUSTOM_FORMAT_NAME,
   BASE_DELAY_PROFILE_NAME,
@@ -128,6 +131,59 @@ overridesTest('listOverrides: user-created custom format is kind=created', async
   assertEquals(created.existsInBase, false);
   assert(created.overrides.length > 0);
   assert(created.ops.some((op) => op.operation === 'create'));
+});
+
+overridesTest('listOverrides: adding a test to a renamed upstream CF remains modified', async (fixture) => {
+  const renamed = 'Renamed CF';
+  await fixture.writeUserEdit(async (cache, databaseId) => {
+    const row = await cache.kb
+      .selectFrom('custom_formats')
+      .select('id')
+      .where('name', '=', BASE_CUSTOM_FORMAT_NAME)
+      .executeTakeFirstOrThrow();
+    const current = await customFormats.general(cache, row.id);
+    assertExists(current);
+    return customFormats.updateGeneral({
+      databaseId,
+      cache,
+      layer: 'user',
+      current,
+      input: { name: renamed, description: current.description, includeInRename: current.include_in_rename, tags: [] },
+    });
+  });
+  await fixture.writeUserEdit((_, databaseId) =>
+    createTest({
+      databaseId,
+      layer: 'user',
+      formatName: renamed,
+      input: { title: 'Movie test', type: 'movie', should_match: true, description: null },
+    })
+  );
+  const [entity] = (await listOverrides(fixture.databaseId)).entities;
+  assertEquals(entity.name, renamed);
+  assertEquals(entity.kind, 'modified');
+  assertEquals(entity.existsInBase, true);
+  assertEquals(entity.present, true);
+  assertEquals(entity.ops.length, 2);
+});
+
+overridesTest('identity: CF test deletion does not end its format identity', async (fixture) => {
+  const id = fixture.insertUserOp({
+    metadata: {
+      operation: 'delete',
+      entity: 'custom_format',
+      name: BASE_CUSTOM_FORMAT_NAME,
+      stable_key: { key: 'custom_format_name', value: BASE_CUSTOM_FORMAT_NAME },
+      changed_fields: ['deleted'],
+    },
+    sql: `DELETE FROM custom_format_tests WHERE custom_format_name = '${BASE_CUSTOM_FORMAT_NAME}';`,
+  });
+  const op = pcdOpsQueries.getById(id);
+  assertExists(op);
+  const [entity] = resolveUserOpEntities([op]).entities.values();
+  assertEquals(entity.hasDelete, false);
+  assertEquals(entity.hasCreate, false);
+  assertEquals(entity.ref.name, BASE_CUSTOM_FORMAT_NAME);
 });
 
 overridesTest('listOverrides: user-deleted base regex is kind=deleted and not present', async (fixture) => {

@@ -71,12 +71,14 @@ export const load: ServerLoad = async ({ params }) => {
           return [] as SourcedNamingListItem[];
         }
 
-        const isLocallyModified = buildLocallyModifiedLookup(database.id);
-        const rows = (await list(cache)).map((row) => ({
-          ...row,
-          locallyModified: isLocallyModified('naming', row.arr_type, row.name),
-        }));
-        return withPcdSource(rows, database);
+        const rows = await list(cache);
+        const locallyModified = database.id === currentDatabaseId ? buildLocallyModifiedLookup(database.id) : null;
+        const flaggedRows = locallyModified
+          ? rows.map((row) =>
+              locallyModified('naming', row.arr_type, row.name) ? { ...row, locallyModified: true } : row
+            )
+          : rows;
+        return withPcdSource(flaggedRows, database);
       })
     )
   ).flat();

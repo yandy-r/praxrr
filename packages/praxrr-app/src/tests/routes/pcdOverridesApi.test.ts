@@ -33,6 +33,36 @@ type ResolvedEntityState = components['schemas']['ResolvedEntityState'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
 const SCORING_BASE_OP = `INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score) VALUES ('${BASE_QUALITY_PROFILE_NAME}', '${BASE_CUSTOM_FORMAT_NAME}', 'radarr', 100);`;
+const SLASH_REGEX_NAME = 'Group/Sub Regex';
+const SLASH_REGEX_BASE_OP = `INSERT INTO regular_expressions (name, pattern) VALUES ('${SLASH_REGEX_NAME}', 'slash-base-pattern');`;
+const REVERT_ROUTE_ID = '/api/v1/pcd/[databaseId]/overrides/[entityType]/[name]/revert';
+
+interface KitRouting {
+  parse_route_id: (id: string) => { pattern: RegExp; params: unknown[] };
+  find_route: <Route extends { pattern: RegExp; params: unknown[] }>(
+    path: string,
+    routes: Route[],
+    matchers: Record<string, (param: string) => boolean>
+  ) => { route: Route; params: Record<string, string> } | null;
+}
+
+interface KitUrl {
+  decode_pathname: (pathname: string) => string;
+}
+
+/**
+ * Loads SvelteKit's own (non-exported) routing utilities from the installed package so the test
+ * exercises the same matcher/decoder `respond.js` uses, without touching shared Deno config.
+ * Layout: packages/praxrr-app/src/tests/routes -> repository root `node_modules`.
+ */
+async function loadKitRouting(): Promise<{ routing: KitRouting; url: KitUrl }> {
+  const base = new URL('../../../../../node_modules/@sveltejs/kit/src/utils/', import.meta.url);
+  // Dynamic import: `utils/*.js` are internal files absent from the package `exports` map, so
+  // they cannot be imported by package specifier or mapped without changing shared Deno config.
+  const routing = (await import(new URL('routing.js', base).href)) as KitRouting;
+  const url = (await import(new URL('url.js', base).href)) as KitUrl;
+  return { routing, url };
+}
 
 function buildLocals(authenticated: boolean): App.Locals {
   return authenticated
@@ -390,4 +420,34 @@ overridesTest(
       [BASE_REGEX_NAME]
     );
   }
+);
+
+overridesTest(
+  'POST revert resolves a %2F-encoded entity name via the real SvelteKit route matcher',
+  async (fixture) => {
+    const id = String(fixture.databaseId);
+    await updateRegex(fixture, SLASH_REGEX_NAME, 'edited-slash-pattern');
+
+    // Build the request exactly as a client would: the name segment is percent-encoded (%2F).
+    const event = revertEvent(id, 'regularExpression', SLASH_REGEX_NAME, '', {});
+    assert(event.url.pathname.includes('Group%2FSub%20Regex'), `unexpected pathname ${event.url.pathname}`);
+
+    // Resolve params with SvelteKit's installed matcher and decoder (as `respond.js` does):
+    // decode_pathname leaves %2F untouched, `[name]` matches a single segment, then
+    // find_route -> decode_params decodes the param to the real name.
+    const { routing, url } = await loadKitRouting();
+    const route = routing.parse_route_id(REVERT_ROUTE_ID);
+    const matched = routing.find_route(url.decode_pathname(event.url.pathname), [route], {});
+    assertExists(matched);
+    assertEquals(matched.params, { databaseId: id, entityType: 'regularExpression', name: SLASH_REGEX_NAME });
+
+    const response = await POST_REVERT({ ...event, params: matched.params } as RevertEvent);
+    assertEquals(response.status, 200);
+    const result = (await response.json()) as PcdOverrideRevertResult;
+    assertEquals(result.name, SLASH_REGEX_NAME);
+    assertEquals(result.revertedOpIds.length, 1);
+    assertEquals(result.remainingOpIds, []);
+    assertEquals((await getOverrides(fixture)).entities, []);
+  },
+  { baseOps: [...DEFAULT_BASE_OPS, SLASH_REGEX_BASE_OP] }
 );

@@ -749,7 +749,7 @@ curl -sS -H 'X-Api-Key: <token>' \
 
 Requires a session or a token with `admin` scope. Use the same `entityType`/`arrType` rules as GET.
 The name is the current resolved name after a rename, URL-encoded and preserved without trimming.
-Empty names and names containing `/` cannot be addressed by this path.
+Empty names are rejected; names containing `/` are supported when the slash is encoded as `%2F`.
 
 Optional JSON body (maximum 8 KB):
 
@@ -782,8 +782,13 @@ curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
 ```
 
 Undo covers the latest published user operation's entire `action_id` unit, including other entities.
-Historical operations fall back to `group_id`, then one operation; historical save boundaries are
-not backfilled. Previously applied edits superseded by the undone action can be reactivated.
+Every mutating HTTP request is one action; a scheduled or manual job run is its own action, and each
+automatic conflict override applied during recompilation is a separate action. Outside these
+contexts, a single writer call falls back to one action. Historical operations fall back to
+`group_id`, then one operation; historical save boundaries are not backfilled. Previously applied
+edits superseded by the undone action can be reactivated. Undoing a manual or automatic conflict
+override reactivates the original published operation it replaced; its previously pending conflict
+may return after the recompile.
 
 Returns `{databaseId, undoneActionId, revertedOpIds, reactivatedOpIds, entities}`. This is not redo;
 reapplying a reverted change requires editing again.

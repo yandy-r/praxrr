@@ -89,16 +89,21 @@ shown. Resolve the reported dependency or conflict before retrying.
 not the last row you selected or the last search result. Review the listed entity names and confirm.
 A single action can include several operations and several entities.
 
-For new writes, the undo unit is `action_id`: one mutating HTTP request shares an action ID across
-its user operations. Outside a request context, one writer call is one action. Historical operations
-are not backfilled because their original save boundaries cannot be reconstructed; they fall back
-to `group_id`, then to a single operation. Undoing an older multi-operation save may therefore
-require more than one undo.
+Every mutating HTTP request is one action: it shares an `action_id` across all its user operations.
+A scheduled or manual job run is its own action, and each automatic conflict override applied during
+recompilation is a separate action rather than part of the save that triggered it. Outside these
+contexts, a single writer call falls back to one action of its own. Historical operations are not
+backfilled because their original save boundaries cannot be reconstructed; they fall back to
+`group_id`, then to a single operation. Undoing an older multi-operation save may therefore require
+more than one undo.
 
 Undo can reactivate previously applied edits that the undone action superseded, so undoing a delete
-can restore the local edits that preceded it. The UI sends the action ID it displayed: if another
-change has since become the latest action, undo is rejected as stale and the page refreshes instead
-of undoing a different action. With no published user operations, the button is disabled.
+can restore the local edits that preceded it. This includes conflict overrides: undoing a manual or
+automatic override reactivates the original published operation it replaced, and the conflict that
+was pending on that operation may return after the recompile. The UI sends the action ID it
+displayed: if another change has since become the latest action, undo is rejected as stale and the
+page refreshes instead of undoing a different action. With no published user operations, the button
+is disabled.
 
 There is no redo button. To reapply a reverted change, edit the entity again.
 
@@ -114,8 +119,8 @@ API tokens need **read** for GET and **admin** for both POST endpoints.
 | POST   | `/pcd/{databaseId}/overrides/undo`                       | Undo the latest local action                                         |
 
 Use the current resolved name after a rename, URL-encoded as a path segment. Names are preserved
-exactly, including whitespace; empty names are rejected. Names containing `/` cannot be addressed
-through the revert path.
+exactly, including whitespace; empty names are rejected. Names containing `/` are supported: encode
+the slash as `%2F` so the name resolves as a single path segment.
 
 The `entityType` values are `delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`,
 `naming`, `mediaSettings`, `qualityDefinitions`, and `lidarrMetadataProfile`.

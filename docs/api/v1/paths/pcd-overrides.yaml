@@ -119,7 +119,7 @@ revert:
         description: |
           Current resolved entity name, not an earlier name before a rename. Preserved
           exactly without trimming; empty names are rejected. Names containing a slash
-          cannot be addressed through this path segment.
+          are supported when it is URL-encoded as %2F.
         schema:
           type: string
           minLength: 1
@@ -201,8 +201,14 @@ undo:
     summary: Undo the latest local PCD change
     description: |
       Soft-drops exactly the latest published user-action unit and recompiles the PCD.
-      New ops use action_id; legacy ops fall back to group_id, then a single op. Previously
-      applied edits superseded by this action are reactivated when undoing it. No automatic
+      Every mutating HTTP request is one action_id unit; a scheduled or manual job run is
+      its own unit, and each automatic conflict override applied during recompilation is
+      a separate unit. Legacy ops fall back to group_id, then a single op. Previously
+      applied edits superseded by this action are reactivated when undoing it; undoing a
+      manual or automatic conflict override reactivates the original published op it
+      replaced, and its previously pending conflict may return after the recompile. No
+      automatic snapshot is created. API tokens require admin scope. The request body is
+      limited to 8 KB.
       snapshot is created. API tokens require admin scope. The request body is limited to 8 KB.
     tags:
       - Local Overrides
