@@ -886,6 +886,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/pcd/{databaseId}/incoming/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Preview incoming upstream PCD changes
+     * @description Read-only preview of what pulling the upstream branch would change per entity, and which
+     *     published local user ops would conflict (or be auto-aligned) under the database's
+     *     conflict strategy. Fetches only the remote-tracking ref `origin/<branch>`; never changes
+     *     pcd_ops, pcd_op_history, the clone's HEAD, or its working tree. Does not contact any Arr
+     *     instance. Local-path sources return available=false. Fails closed: no partial preview.
+     */
+    get: operations['previewIncomingPcdChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/pcd/{databaseId}/overrides': {
     parameters: {
       query?: never;
@@ -4320,6 +4344,8 @@ export interface components {
     };
     PcdErrorResponse: {
       error: string;
+      /** @description Optional machine-readable error code, for example sync_in_progress or preview_stale */
+      code?: string;
     };
     /** @description Canonical progressive disclosure section key */
     UiSectionKey: string;
@@ -5207,6 +5233,92 @@ export interface components {
       arrType: 'radarr' | 'sonarr' | 'lidarr';
       /** @description Desired-vs-actual field changes; an empty array means the entity is in sync */
       changes: components['schemas']['EntityChange'][];
+    };
+    /**
+     * @description Per-database strategy applied to conflicting local user ops when upstream changes are pulled
+     * @enum {string}
+     */
+    ConflictStrategy: 'override' | 'align' | 'ask';
+    /** @description One upstream commit that a pull would bring in */
+    IncomingCommit: {
+      hash: string;
+      shortHash: string;
+      message: string;
+      author: string;
+      authorEmail: string;
+      date: string;
+      files: string[];
+    };
+    /**
+     * @description Predicted fate of one published local user op when replayed over the incoming base.
+     *     Predictions match the conflicts the pull's cache build records in the op history
+     *     (not the later automatic override resolution).
+     */
+    PredictedConflict: {
+      opId: number;
+      /** @description Entity type from the op metadata, when recorded */
+      entityType: string | null;
+      /** @description Entity name from the op metadata, when recorded */
+      entityName: string | null;
+      /** @enum {string|null} */
+      operation: 'create' | 'update' | 'delete' | null;
+      /**
+       * @description conflict = the op will be recorded as conflicted; aligned = the op is redundant upstream and will be dropped
+       * @enum {string}
+       */
+      kind: 'conflict' | 'aligned';
+      /** @enum {string} */
+      predictedStatus: 'conflicted' | 'conflicted_pending' | 'dropped';
+      /** @description guard_mismatch, duplicate_key, missing_target, or aligned */
+      conflictReason: string;
+      /** @description Value-guard decision, for example rowcount_zero_conflict */
+      decision: string | null;
+      autoAlignRule: string | null;
+      strategy: components['schemas']['ConflictStrategy'];
+      /**
+       * @description True only when the pull's automatic override will resolve this conflict itself: strategy
+       *     override, predictedStatus conflicted, an enabled database, and an override handler for the
+       *     op (delete ops, or an entity type with an override handler). False for aligned entries and
+       *     for conflicts that need a user decision.
+       */
+      autoResolvable: boolean;
+    };
+    /** @description A published local user op that would fail with a non-conflict error against the incoming base */
+    PredictedError: {
+      opId: number;
+      error: string;
+    };
+    /**
+     * @description Read-only preview of what pulling the upstream changes would do to the PCD, per entity,
+     *     with the predicted fate of local user ops. Never modifies pcd_ops, pcd_op_history, the
+     *     clone's HEAD, or its working tree. sections diff the current base state against the
+     *     incoming base state (user ops excluded); predictedConflicts come from a dry replay of
+     *     published user ops over the incoming state.
+     */
+    IncomingPreview: {
+      databaseId: number;
+      /** @description False when the database source cannot be previewed (for example a local-path source) */
+      available: boolean;
+      /**
+       * @description local_source when available is false, otherwise null
+       * @enum {string|null}
+       */
+      unavailableReason: 'local_source' | null;
+      branch: string | null;
+      hasUpdates: boolean;
+      commitsBehind: number;
+      /** @description Local commits not on the remote branch; when above zero the pull may not fast-forward */
+      commitsAhead: number;
+      commits: components['schemas']['IncomingCommit'][];
+      conflictStrategy: components['schemas']['ConflictStrategy'];
+      sections: components['schemas']['RollbackSection'][];
+      summary: components['schemas']['RollbackSummary'];
+      predictedConflicts: components['schemas']['PredictedConflict'][];
+      predictedErrors: components['schemas']['PredictedError'][];
+      /** @description Published-op fingerprint at preview time */
+      currentStateHash: string | null;
+      currentHead: string | null;
+      incomingHead: string | null;
     };
     PcdOverrideEntityRef: {
       /**
@@ -8432,6 +8544,74 @@ export interface operations {
       };
       /** @description Rollback execution failed */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  previewIncomingPcdChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Incoming preview */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IncomingPreview'];
+        };
+      };
+      /** @description Invalid parameters */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Database not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description A sync is running (code sync_in_progress) or local state changed while building the preview (code preview_stale) */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Failed to generate the incoming preview */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Upstream fetch or extraction failed (code fetch_failed or incoming_unavailable) */
+      502: {
         headers: {
           [name: string]: unknown;
         };

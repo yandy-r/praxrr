@@ -1,0 +1,196 @@
+ConflictStrategy:
+  type: string
+  description: Per-database strategy applied to conflicting local user ops when upstream changes are pulled
+  enum:
+    - override
+    - align
+    - ask
+
+IncomingCommit:
+  type: object
+  description: One upstream commit that a pull would bring in
+  required:
+    - hash
+    - shortHash
+    - message
+    - author
+    - authorEmail
+    - date
+    - files
+  properties:
+    hash:
+      type: string
+    shortHash:
+      type: string
+    message:
+      type: string
+    author:
+      type: string
+    authorEmail:
+      type: string
+    date:
+      type: string
+    files:
+      type: array
+      items:
+        type: string
+
+PredictedConflict:
+  type: object
+  description: |
+    Predicted fate of one published local user op when replayed over the incoming base.
+    Predictions match the conflicts the pull's cache build records in the op history
+    (not the later automatic override resolution).
+  required:
+    - opId
+    - entityType
+    - entityName
+    - operation
+    - kind
+    - predictedStatus
+    - conflictReason
+    - decision
+    - autoAlignRule
+    - strategy
+    - autoResolvable
+  properties:
+    opId:
+      type: integer
+    entityType:
+      type: string
+      nullable: true
+      description: Entity type from the op metadata, when recorded
+    entityName:
+      type: string
+      nullable: true
+      description: Entity name from the op metadata, when recorded
+    operation:
+      type: string
+      nullable: true
+      enum:
+        - create
+        - update
+        - delete
+        - null
+    kind:
+      type: string
+      enum:
+        - conflict
+        - aligned
+      description: conflict = the op will be recorded as conflicted; aligned = the op is redundant upstream and will be dropped
+    predictedStatus:
+      type: string
+      enum:
+        - conflicted
+        - conflicted_pending
+        - dropped
+    conflictReason:
+      type: string
+      description: guard_mismatch, duplicate_key, missing_target, or aligned
+    decision:
+      type: string
+      nullable: true
+      description: Value-guard decision, for example rowcount_zero_conflict
+    autoAlignRule:
+      type: string
+      nullable: true
+    strategy:
+      $ref: '#/ConflictStrategy'
+    autoResolvable:
+      type: boolean
+      description: |
+        True only when the pull's automatic override will resolve this conflict itself: strategy
+        override, predictedStatus conflicted, an enabled database, and an override handler for the
+        op (delete ops, or an entity type with an override handler). False for aligned entries and
+        for conflicts that need a user decision.
+
+PredictedError:
+  type: object
+  description: A published local user op that would fail with a non-conflict error against the incoming base
+  required:
+    - opId
+    - error
+  properties:
+    opId:
+      type: integer
+    error:
+      type: string
+
+IncomingPreview:
+  type: object
+  description: |
+    Read-only preview of what pulling the upstream changes would do to the PCD, per entity,
+    with the predicted fate of local user ops. Never modifies pcd_ops, pcd_op_history, the
+    clone's HEAD, or its working tree. sections diff the current base state against the
+    incoming base state (user ops excluded); predictedConflicts come from a dry replay of
+    published user ops over the incoming state.
+  required:
+    - databaseId
+    - available
+    - unavailableReason
+    - branch
+    - hasUpdates
+    - commitsBehind
+    - commitsAhead
+    - commits
+    - conflictStrategy
+    - sections
+    - summary
+    - predictedConflicts
+    - predictedErrors
+    - currentStateHash
+    - currentHead
+    - incomingHead
+  properties:
+    databaseId:
+      type: integer
+    available:
+      type: boolean
+      description: False when the database source cannot be previewed (for example a local-path source)
+    unavailableReason:
+      type: string
+      nullable: true
+      enum:
+        - local_source
+        - null
+      description: local_source when available is false, otherwise null
+    branch:
+      type: string
+      nullable: true
+    hasUpdates:
+      type: boolean
+    commitsBehind:
+      type: integer
+    commitsAhead:
+      type: integer
+      description: Local commits not on the remote branch; when above zero the pull may not fast-forward
+    commits:
+      type: array
+      items:
+        $ref: '#/IncomingCommit'
+    conflictStrategy:
+      $ref: '#/ConflictStrategy'
+    sections:
+      type: array
+      items:
+        $ref: './pcd-snapshots.yaml#/RollbackSection'
+    summary:
+      $ref: './pcd-snapshots.yaml#/RollbackSummary'
+    predictedConflicts:
+      type: array
+      items:
+        $ref: '#/PredictedConflict'
+    predictedErrors:
+      type: array
+      items:
+        $ref: '#/PredictedError'
+    currentStateHash:
+      type: string
+      nullable: true
+      description: Published-op fingerprint at preview time
+    currentHead:
+      type: string
+      nullable: true
+    incomingHead:
+      type: string
+      nullable: true

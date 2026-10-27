@@ -7,7 +7,16 @@ export type { GetStatusOptions } from './read.ts';
 export * from './errors.ts';
 
 // Read helpers
-export { checkForUpdates, getBranch, getBranches, getCommits, getDiff, getIncomingChanges, getStatus } from './read.ts';
+export {
+  checkForUpdates,
+  getBranch,
+  getBranches,
+  getCommits,
+  getDiff,
+  getIncomingChanges,
+  getStatus,
+  readIncomingChanges,
+} from './read.ts';
 
 // Write helpers
 export {

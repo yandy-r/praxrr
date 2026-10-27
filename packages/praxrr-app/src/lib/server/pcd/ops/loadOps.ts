@@ -44,6 +44,14 @@ function loadDbOps(databaseId: number, origin: 'base' | 'user', states: PcdOpSta
 }
 
 /**
+ * Published user-layer ops of a database in exact replay order (the order `loadAllOperations`
+ * returns them). Used by the incoming-pull preview's dry replay (YAN-570).
+ */
+export function loadPublishedUserOperations(databaseId: number): Operation[] {
+  return loadDbOps(databaseId, 'user', ['published']);
+}
+
+/**
  * Load exactly the ops whose raw `pcd_ops.id` is in `ids`, regardless of their CURRENT
  * state. Used by point-in-time snapshot replay (rollback, issue #16): membership is the
  * reconstructed published-op set for a snapshot, so every member is mapped as a published
@@ -104,6 +112,13 @@ export interface LoadOperationsOptions {
    * export-batch repair to replay one orphaned op. Ignored with `snapshotOpIds`.
    */
   replayBaseOpIds?: ReadonlySet<number>;
+  /**
+   * In-memory base operations merged into the published base group (sorted with it, before
+   * drafts) as if they were published `pcd_ops` rows. Used by the incoming-pull preview to
+   * place captured repo-import ops exactly where the real pull's compile would run them
+   * (YAN-570). Ignored with `snapshotOpIds`.
+   */
+  extraPublishedBaseOps?: ReadonlyArray<Operation>;
 }
 
 /**
@@ -138,7 +153,10 @@ export async function loadAllOperations(
     const basePublished = loadDbOps(databaseInstanceId, 'base', ['published']).filter(
       (operation) => !excludeBaseOpIds?.has(parseOpIdFromFilepath(operation.filepath))
     );
-    allOperations.push(...basePublished);
+    const extraPublished = options?.extraPublishedBaseOps;
+    allOperations.push(
+      ...(extraPublished?.length ? [...basePublished, ...extraPublished].sort(compareOperations) : basePublished)
+    );
     const replayBaseOpIds = options?.replayBaseOpIds;
     const baseDrafts = replayBaseOpIds
       ? pcdOpsQueries

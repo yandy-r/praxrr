@@ -56,7 +56,7 @@ let withRepoImportWriteContextForTests: RepoImportWriteContextRunner =
 let readMigrationEntitySourcesForTests = readMigrationEntitySources;
 let buildPublishedRepoBaseOpIndexForTests = buildPublishedRepoBaseOpIndex;
 
-const ENTITY_OP_FILENAME_PREFIX = 'entities/';
+export const ENTITY_OP_FILENAME_PREFIX = 'entities/';
 const ENTITY_TABLE_BY_STABLE_KEY = {
   regular_expression_name: 'regular_expressions',
   custom_format_name: 'custom_formats',
@@ -75,9 +75,9 @@ const ENTITY_TABLE_BY_STABLE_KEY = {
 } as const;
 const ENTITY_KEY_SEPARATOR = '::';
 // Entity ops are emitted as synthetic SQL ops and occupy a later sequence band.
-const YAML_SEQUENCE_BASE = 4_000_000_000;
+export const YAML_SEQUENCE_BASE = 4_000_000_000;
 // Keep YAML entity filenames and op ordering deterministic even when entity counts are large.
-const YAML_SEQUENCE_STRIDE = 10_000;
+export const YAML_SEQUENCE_STRIDE = 10_000;
 
 type SourceConflictRef = string;
 
@@ -91,7 +91,7 @@ type ParsedPcdOpMetadata = {
   name?: string;
 };
 
-type RepoOpIndex = {
+export type RepoOpIndex = {
   stableIdentityToOpIds: Map<string, number[]>;
   legacyIdentityToOpIds: Map<string, number[]>;
   filenamePrefixToOpIds: Map<string, number[]>;
@@ -127,7 +127,7 @@ function parsePcdOpMetadata(rawMetadata: string | null): ParsedPcdOpMetadata | n
   }
 }
 
-function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
+export function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
   const ops = pcdOpsQueries.listByDatabaseAndOrigin(databaseId, 'base', {
     states: ['published'],
   });
@@ -179,7 +179,7 @@ function buildPublishedRepoBaseOpIndex(databaseId: number): RepoOpIndex {
   return { stableIdentityToOpIds, legacyIdentityToOpIds, filenamePrefixToOpIds };
 }
 
-function matchingPublishedRepoBaseOpIds(index: RepoOpIndex, candidate: MigrationEntityCandidate): number[] {
+export function matchingPublishedRepoBaseOpIds(index: RepoOpIndex, candidate: MigrationEntityCandidate): number[] {
   const stableKey = stableIdentityLookupKey(candidate.stableIdentity);
   const legacyKey = legacyIdentityLookupKey(candidate.entityType, candidate.stableIdentity.value);
   const filenamePrefix = repoEntityFilenamePrefix(candidate.relativePath);
@@ -228,7 +228,7 @@ function resolveEntityTableForStableKey(stableKey: string): string | null {
   return null;
 }
 
-function hasBaseEntityByStableIdentity(cache: PCDCache, stableIdentity: MigrationEntityStableIdentity): boolean {
+export function hasBaseEntityByStableIdentity(cache: PCDCache, stableIdentity: MigrationEntityStableIdentity): boolean {
   const table = resolveEntityTableForStableKey(stableIdentity.key);
   if (!table) {
     return false;
@@ -293,7 +293,7 @@ function formatMigrationIssueList(issues: ReadonlyArray<MigrationReaderIssue>): 
   return issues.map((issue) => `${issue.relativePath}: ${issue.kind} - ${issue.message}`).join('\n');
 }
 
-function validateStableIdentityConflicts(
+export function validateStableIdentityConflicts(
   migrationEntries: ReadonlyArray<{
     readonly stableIdentity: MigrationEntityStableIdentity;
     readonly sourcePath: string;

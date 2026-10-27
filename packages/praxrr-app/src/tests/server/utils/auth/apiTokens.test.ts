@@ -268,6 +268,7 @@ Deno.test('requiredScopeFor maps routes to scopes and fails closed', () => {
     ['POST', '/api/v1/goals/apply', 'sync:apply'],
     ['POST', '/api/v1/pcd/1/snapshots/9/rollback', 'sync:apply'],
     ['GET', '/api/v1/pcd/1/overrides', 'read'],
+    ['GET', '/api/v1/pcd/1/incoming/preview', 'read'],
     ['POST', '/api/v1/pcd/1/overrides/undo', 'admin'],
     ['POST', '/api/v1/pcd/1/overrides/customFormat/Foo/revert', 'admin'],
     ['POST', '/api/v1/canary/rollouts', 'sync:apply'],

@@ -237,9 +237,16 @@ export async function getCommits(repoPath: string, limit: number = 50, ref?: str
  */
 export async function getIncomingChanges(repoPath: string): Promise<IncomingChanges> {
   await fetch(repoPath);
+  return await readIncomingChanges(repoPath);
+}
 
+/**
+ * List the commits `HEAD` is missing from `origin/<current branch>` using the remote-tracking
+ * ref as it currently is (no fetch). Callers that need freshness fetch first.
+ */
+export async function readIncomingChanges(repoPath: string, remoteRef?: string): Promise<IncomingChanges> {
   const branch = await getBranch(repoPath);
-  const remoteBranch = `origin/${branch}`;
+  const remoteBranch = remoteRef ?? `origin/${branch}`;
 
   // Count commits behind
   const countOutput = await execGitSafe(['rev-list', '--count', `HEAD..${remoteBranch}`], repoPath);

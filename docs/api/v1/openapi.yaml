@@ -26,6 +26,8 @@ tags:
     description: TRaSH Guide cached entity and source management
   - name: PCD
     description: PCD entity export and portable format endpoints
+  - name: PCD Databases
+    description: Linked PCD database upstream state, including incoming change previews
   - name: PCD Snapshots
     description: PCD state snapshot management endpoints
   - name: Resolved Config
@@ -403,6 +405,8 @@ paths:
     $ref: './paths/pcd-snapshots.yaml#/snapshotRollbackPreview'
   /pcd/{databaseId}/snapshots/{snapshotId}/rollback:
     $ref: './paths/pcd-snapshots.yaml#/snapshotRollback'
+  /pcd/{databaseId}/incoming/preview:
+    $ref: './paths/pcd-incoming.yaml#/preview'
   /pcd/{databaseId}/overrides:
     $ref: './paths/pcd-overrides.yaml#/list'
   /pcd/{databaseId}/overrides/undo:
@@ -1846,6 +1850,17 @@ components:
       $ref: './schemas/resolved-config.yaml#/CrossInstanceComparisonResponse'
     ResolvedLiveDiffResponse:
       $ref: './schemas/resolved-config.yaml#/ResolvedLiveDiffResponse'
+    # Incoming Preview
+    ConflictStrategy:
+      $ref: './schemas/pcd-incoming.yaml#/ConflictStrategy'
+    IncomingCommit:
+      $ref: './schemas/pcd-incoming.yaml#/IncomingCommit'
+    PredictedConflict:
+      $ref: './schemas/pcd-incoming.yaml#/PredictedConflict'
+    PredictedError:
+      $ref: './schemas/pcd-incoming.yaml#/PredictedError'
+    IncomingPreview:
+      $ref: './schemas/pcd-incoming.yaml#/IncomingPreview'
     # Local Overrides
     PcdOverrideEntityRef:
       $ref: './schemas/pcd-overrides.yaml#/PcdOverrideEntityRef'

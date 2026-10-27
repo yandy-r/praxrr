@@ -159,6 +159,9 @@ PcdErrorResponse:
   properties:
     error:
       type: string
+    code:
+      type: string
+      description: Optional machine-readable error code, for example sync_in_progress or preview_stale
 
 # --- Portable entity schemas ---
 

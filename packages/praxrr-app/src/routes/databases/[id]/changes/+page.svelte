@@ -18,6 +18,10 @@
   import type { Column } from '$ui/table/types';
   import type { DraftEntityChange } from './components/types';
   import { parseUTC } from '$shared/utils/dates';
+  import type { components } from '$api/v1.d.ts';
+  import SnapshotDiff from '$ui/snapshots/SnapshotDiff.svelte';
+
+  type IncomingPreview = components['schemas']['IncomingPreview'];
 
   export let data: PageData;
 
@@ -99,6 +103,11 @@
   let previewMessageMismatch = false;
   let previewConfirmDisabled = true;
   let previewOpCount = 0;
+  let incomingPreview: IncomingPreview | null = null;
+  let previewLoading = false;
+  let previewStale = false;
+  let previewGeneration = 0;
+  let previewedDatabaseId = data.database.id;
 
   $: isDeveloper = data.isDeveloper;
   $: hasIncomingChanges = incomingChanges?.hasUpdates ?? false;
@@ -118,7 +127,10 @@
     previewing || committing || !previewData?.ok || previewSelectionMismatch || previewMessageMismatch;
   $: previewOpCount = previewData?.opCount ?? previewData?.opIds?.length ?? 0;
   $: selectedOpCount = collectOpIds().length;
-
+  $: if (data.database.id !== previewedDatabaseId) {
+    previewedDatabaseId = data.database.id;
+    resetIncomingPreview();
+  }
   $: changeByKey = new Map(draftChanges.map((change) => [change.key, change]));
   $: groupMap = buildGroupMap(draftChanges);
   $: dependencyMap = buildDependencyMap(draftChanges);
@@ -126,6 +138,7 @@
   $: autoSelectedKeys = buildAutoSelectedKeys(selected, primarySelected);
 
   async function fetchChanges() {
+    resetIncomingPreview();
     loading = true;
     try {
       const response = await fetch(`/api/databases/${data.database.id}/changes`);
@@ -143,6 +156,7 @@
   }
 
   afterNavigate(() => {
+    resetIncomingPreview();
     fetchChanges();
   });
 
@@ -532,6 +546,8 @@
       const queuedJobId = result?.data?.job?.id ?? result?.job?.id;
 
       if (isSuccess && !errorMsg) {
+        incomingPreview = null;
+        previewStale = false;
         if (alreadyRunning) {
           alertStore.add('info', 'Sync already running in background');
         } else if (queued) {
@@ -543,10 +559,88 @@
         alertStore.add('error', `Pull failed: ${errorMsg || 'Unknown error'}`);
       }
 
+      resetIncomingPreview();
       await fetchChanges();
     } finally {
       pulling = false;
     }
+  }
+
+  function resetIncomingPreview() {
+    previewGeneration++;
+    incomingPreview = null;
+    previewStale = false;
+    previewLoading = false;
+  }
+
+  async function handlePreviewIncoming() {
+    const generation = ++previewGeneration;
+    previewLoading = true;
+    previewStale = false;
+    try {
+      const response = await fetch(`/api/v1/pcd/${data.database.id}/incoming/preview`, {
+        headers: { Accept: 'application/json' },
+      });
+
+      let body: { error?: string; code?: string } | null = null;
+      if (response.ok) {
+        body = await response.json();
+      } else {
+        try {
+          body = await response.json();
+        } catch {
+          body = null;
+        }
+      }
+
+      if (generation !== previewGeneration) {
+        return;
+      }
+
+      if (response.ok) {
+        incomingPreview = body as IncomingPreview;
+        return;
+      }
+
+      const code = body?.code;
+      const detail = body?.error || `HTTP ${response.status}`;
+      incomingPreview = null;
+
+      if (response.status === 409 && code === 'preview_stale') {
+        previewStale = true;
+        alertStore.add('warning', 'Incoming preview was stale. Retry to get a current preview.');
+      } else if (response.status === 409 && code === 'sync_in_progress') {
+        alertStore.add('warning', 'A sync is already running. Try the preview again once it finishes.');
+      } else if (response.status === 502 && code === 'incoming_unavailable') {
+        alertStore.add('error', "Upstream content can't be previewed (it may fail to apply on pull).");
+      } else if (response.status === 502 && code === 'fetch_failed') {
+        alertStore.add('error', "Couldn't fetch from the remote.");
+      } else {
+        alertStore.add('error', `Preview failed: ${detail}`);
+      }
+    } catch (error) {
+      if (generation === previewGeneration) {
+        incomingPreview = null;
+        alertStore.add('error', `Preview failed: ${error instanceof Error ? error.message : 'Network error'}`);
+      }
+    } finally {
+      if (generation === previewGeneration) {
+        previewLoading = false;
+      }
+    }
+  }
+
+  function getConflictOutcome(conflict: IncomingPreview['predictedConflicts'][number]): {
+    label: string;
+    variant: 'warning' | 'danger' | 'info';
+  } {
+    if (conflict.kind === 'aligned') {
+      return { label: 'Will auto-align (local change dropped)', variant: 'info' };
+    }
+    if (conflict.autoResolvable) {
+      return { label: 'Will conflict — auto-overridden on pull', variant: 'warning' };
+    }
+    return { label: 'Will conflict — needs your decision', variant: 'danger' };
   }
 
   async function handleRepair() {
@@ -711,19 +805,35 @@
         Incoming Changes
       </h2>
       {#if incomingChanges?.hasUpdates}
-        <button
-          type="button"
-          on:click={handlePull}
-          disabled={pulling}
-          class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-        >
-          {#if pulling}
-            <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-            Pulling...
-          {:else}
-            Pull {incomingChanges.commitsBehind} commit{incomingChanges.commitsBehind === 1 ? '' : 's'}
-          {/if}
-        </button>
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            on:click={handlePreviewIncoming}
+            disabled={previewLoading || pulling}
+            aria-busy={previewLoading}
+            class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            {#if previewLoading}
+              <Loader2 size={16} class="animate-spin" />
+              Previewing…
+            {:else}
+              Preview changes
+            {/if}
+          </button>
+          <button
+            type="button"
+            on:click={handlePull}
+            disabled={pulling || previewLoading}
+            class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            {#if pulling}
+              <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              Pulling...
+            {:else}
+              Pull {incomingChanges.commitsBehind} commit{incomingChanges.commitsBehind === 1 ? '' : 's'}
+            {/if}
+          </button>
+        </div>
       {/if}
     </div>
 
@@ -800,6 +910,138 @@
           </div>
         </svelte:fragment>
       </ExpandableTable>
+
+      {#if previewLoading}
+        <p class="sr-only" aria-live="polite">Building incoming preview…</p>
+      {:else if incomingPreview}
+        <p class="sr-only" aria-live="polite">
+          Preview ready: {incomingPreview.summary.totalCreates +
+            incomingPreview.summary.totalUpdates +
+            incomingPreview.summary.totalDeletes}
+          changes, {incomingPreview.predictedConflicts.length} predicted conflicts
+        </p>
+      {/if}
+      <div class="mt-4 space-y-4">
+        {#if previewLoading}
+          <div
+            class="flex items-center gap-2 rounded-lg border border-neutral-200 p-4 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-400"
+            role="status"
+          >
+            <Loader2 size={16} class="animate-spin" />
+            Building incoming preview…
+          </div>
+        {:else if previewStale}
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+          >
+            <span>The repository changed while the preview was being built. Retry to get a current preview.</span>
+            <button
+              type="button"
+              on:click={handlePreviewIncoming}
+              class="rounded-md border border-amber-400 px-3 py-1 text-sm font-medium transition-colors hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/40"
+            >
+              Retry preview
+            </button>
+          </div>
+        {:else if incomingPreview}
+          <div class="space-y-4">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Incoming preview</h3>
+
+            {#if !incomingPreview.available}
+              <div
+                class="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+              >
+                Preview is not available for this database{incomingPreview.unavailableReason === 'local_source'
+                  ? ' because it uses a local source with no upstream to compare against'
+                  : ''}.
+              </div>
+            {:else}
+              {#if incomingPreview.commitsAhead > 0}
+                <div
+                  class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+                  role="alert"
+                >
+                  The local branch has diverged from upstream ({incomingPreview.commitsAhead} local commit{incomingPreview.commitsAhead ===
+                  1
+                    ? ''
+                    : 's'} ahead). The pull itself may not fast-forward.
+                </div>
+              {/if}
+
+              <SnapshotDiff
+                sections={incomingPreview.sections}
+                summary={incomingPreview.summary}
+                desiredLabel="After pull"
+                emptyMessage="Pulling would make no entity changes."
+              />
+
+              <div class="space-y-2">
+                <h4 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Predicted conflicts</h4>
+                {#if incomingPreview.predictedConflicts.length === 0}
+                  <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                    No conflicts predicted for your local changes.
+                  </p>
+                {:else}
+                  <div class="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">
+                    <table class="w-full text-sm">
+                      <caption class="sr-only">Predicted conflicts between local changes and incoming commits</caption>
+                      <thead class="bg-neutral-50 dark:bg-neutral-900">
+                        <tr
+                          class="text-left text-xs font-medium tracking-wide text-neutral-500 uppercase dark:text-neutral-400"
+                        >
+                          <th scope="col" class="px-4 py-2">Entity</th>
+                          <th scope="col" class="px-4 py-2">Op</th>
+                          <th scope="col" class="px-4 py-2">Operation</th>
+                          <th scope="col" class="px-4 py-2">Reason</th>
+                          <th scope="col" class="px-4 py-2">Outcome</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each incomingPreview.predictedConflicts as conflict (conflict.opId)}
+                          {@const outcome = getConflictOutcome(conflict)}
+                          <tr class="border-t border-neutral-200 align-top dark:border-neutral-800">
+                            <td class="px-4 py-2">
+                              <span class="text-neutral-900 dark:text-neutral-100"
+                                >{conflict.entityName ?? 'Unknown'}</span
+                              >
+                              {#if conflict.entityType}
+                                <span class="ml-1 font-mono text-xs text-neutral-400 dark:text-neutral-500">
+                                  {conflict.entityType}
+                                </span>
+                              {/if}
+                            </td>
+                            <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400"
+                              >#{conflict.opId}</td
+                            >
+                            <td class="px-4 py-2 text-neutral-700 dark:text-neutral-300">{conflict.operation ?? '—'}</td
+                            >
+                            <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                              {conflict.conflictReason}
+                            </td>
+                            <td class="px-4 py-2">
+                              <Badge variant={outcome.variant} size="md">{outcome.label}</Badge>
+                            </td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                {/if}
+
+                {#each incomingPreview.predictedErrors as predictedError (predictedError.opId)}
+                  <div
+                    class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+                    role="alert"
+                  >
+                    <span class="font-mono text-xs">Op #{predictedError.opId}</span>
+                    could not be evaluated: {predictedError.error}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
     {/if}
   </section>
 

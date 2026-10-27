@@ -1,0 +1,57 @@
+preview:
+  get:
+    operationId: previewIncomingPcdChanges
+    summary: Preview incoming upstream PCD changes
+    description: |
+      Read-only preview of what pulling the upstream branch would change per entity, and which
+      published local user ops would conflict (or be auto-aligned) under the database's
+      conflict strategy. Fetches only the remote-tracking ref `origin/<branch>`; never changes
+      pcd_ops, pcd_op_history, the clone's HEAD, or its working tree. Does not contact any Arr
+      instance. Local-path sources return available=false. Fails closed: no partial preview.
+    tags:
+      - PCD Databases
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+          minimum: 1
+    responses:
+      '200':
+        description: Incoming preview
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-incoming.yaml#/IncomingPreview'
+      '400':
+        description: Invalid parameters
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Database not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '409':
+        description: A sync is running (code sync_in_progress) or local state changed while building the preview (code preview_stale)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Failed to generate the incoming preview
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '502':
+        description: Upstream fetch or extraction failed (code fetch_failed or incoming_unavailable)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'

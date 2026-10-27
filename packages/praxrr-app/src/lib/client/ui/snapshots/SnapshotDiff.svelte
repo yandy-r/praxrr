@@ -19,6 +19,10 @@
    */
   export let sections: RollbackSection[];
   export let summary: RollbackSummary;
+  /** Header for the desired-state column; defaults to the rollback wording. */
+  export let desiredLabel: string = 'After restore';
+  /** Message shown when the diff contains no create/update/delete changes. */
+  export let emptyMessage: string = 'This snapshot matches the current PCD state — restoring it would make no changes.';
 
   interface VisibleSection {
     title: string;
@@ -84,7 +88,7 @@
     <div
       class="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
     >
-      This snapshot matches the current PCD state — restoring it would make no changes.
+      {emptyMessage}
     </div>
   {:else}
     {#each visibleSections as section (section.key)}
@@ -124,7 +128,7 @@
                     <th class="px-4 py-2">Field</th>
                     <th class="px-4 py-2">Change</th>
                     <th class="px-4 py-2">Current</th>
-                    <th class="px-4 py-2">After restore</th>
+                    <th class="px-4 py-2">{desiredLabel}</th>
                   </tr>
                 </thead>
                 <tbody>

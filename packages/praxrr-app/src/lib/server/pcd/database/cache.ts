@@ -324,6 +324,13 @@ export class PCDCache {
       snapshotOpIds?: ReadonlySet<number>;
       excludeBaseOpIds?: ReadonlySet<number>;
       replayBaseOpIds?: ReadonlySet<number>;
+      extraPublishedBaseOps?: ReadonlyArray<Operation>;
+      /**
+       * Fail closed on ANY operation failure instead of warn-skipping non-schema ops. Used by
+       * the incoming-pull preview, where every op of the replayed base set is upstream-owned:
+       * a skipped op there would silently misreport the post-pull state (YAN-570).
+       */
+      failOnError?: boolean;
     },
     hooks?: BuildReadOnlyHooks
   ): Promise<void> {
@@ -340,6 +347,7 @@ export class PCDCache {
       snapshotOpIds: options.snapshotOpIds,
       excludeBaseOpIds: options.excludeBaseOpIds,
       replayBaseOpIds: options.replayBaseOpIds,
+      extraPublishedBaseOps: options.extraPublishedBaseOps,
     });
     const operations = allOperations.filter((operation) => options.layers.has(operation.layer));
     validateOperations(operations);
@@ -357,6 +365,12 @@ export class PCDCache {
         if (operation.layer === 'schema') {
           throw new Error(
             `buildReadOnly: schema op failed to apply (filename=${operation.filename}, layer=${operation.layer}): ${error}`
+          );
+        }
+
+        if (options.failOnError) {
+          throw new Error(
+            `buildReadOnly: operation failed to apply (filename=${operation.filename}, layer=${operation.layer}): ${error}`
           );
         }
 

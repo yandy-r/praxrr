@@ -48,6 +48,52 @@ type OverrideConflictResult = {
   error?: string;
 };
 
+type OverrideHandler = (
+  databaseId: number,
+  metadata: StoredOpMetadata | null,
+  desiredState: StoredDesiredState | null
+) => Promise<WriteResult>;
+
+interface EntityOverrideHandlers {
+  create: OverrideHandler;
+  update: OverrideHandler;
+}
+
+const namingHandlers: EntityOverrideHandlers = { create: namingOverrideCreate, update: namingOverrideUpdate };
+const mediaSettingsHandlers: EntityOverrideHandlers = { create: msOverrideCreate, update: msOverrideUpdate };
+const qualityDefinitionsHandlers: EntityOverrideHandlers = { create: qdOverrideCreate, update: qdOverrideUpdate };
+
+/** The single dispatch table for conflict overrides, keyed by `metadata.entity`. */
+const OVERRIDE_HANDLERS: Readonly<Record<string, EntityOverrideHandlers>> = {
+  custom_format: { create: cfOverrideCreate, update: cfOverrideUpdate },
+  quality_profile: { create: qpOverrideCreate, update: qpOverrideUpdate },
+  regular_expression: { create: reOverrideCreate, update: reOverrideUpdate },
+  delay_profile: { create: dpOverrideCreate, update: dpOverrideUpdate },
+  radarr_naming: namingHandlers,
+  sonarr_naming: namingHandlers,
+  lidarr_naming: namingHandlers,
+  radarr_media_settings: mediaSettingsHandlers,
+  sonarr_media_settings: mediaSettingsHandlers,
+  lidarr_media_settings: mediaSettingsHandlers,
+  radarr_quality_definitions: qualityDefinitionsHandlers,
+  sonarr_quality_definitions: qualityDefinitionsHandlers,
+  lidarr_quality_definitions: qualityDefinitionsHandlers,
+};
+
+function findOverrideHandlers(entity: string | undefined): EntityOverrideHandlers | undefined {
+  return entity !== undefined && Object.hasOwn(OVERRIDE_HANDLERS, entity) ? OVERRIDE_HANDLERS[entity] : undefined;
+}
+
+/**
+ * Whether `overrideConflict` can resolve a conflicted user op described by `metadata`: delete ops
+ * are resolved by dropping the op, every other operation needs an entity override handler. Uses
+ * the same dispatch as `overrideEntity`, so the incoming-pull preview cannot drift from it.
+ */
+export function canOverrideConflict(metadata: StoredOpMetadata | null): boolean {
+  if ((metadata?.operation ?? 'update') === 'delete') return true;
+  return findOverrideHandlers(metadata?.entity) !== undefined;
+}
+
 async function overrideEntity(
   databaseId: number,
   metadata: StoredOpMetadata | null,
@@ -55,48 +101,17 @@ async function overrideEntity(
   operation: string
 ): Promise<WriteResult> {
   const entity = metadata?.entity;
-
-  switch (entity) {
-    case 'custom_format':
-      return operation === 'create'
-        ? cfOverrideCreate(databaseId, metadata, desiredState)
-        : cfOverrideUpdate(databaseId, metadata, desiredState);
-    case 'quality_profile':
-      return operation === 'create'
-        ? qpOverrideCreate(databaseId, metadata, desiredState)
-        : qpOverrideUpdate(databaseId, metadata, desiredState);
-    case 'regular_expression':
-      return operation === 'create'
-        ? reOverrideCreate(databaseId, metadata, desiredState)
-        : reOverrideUpdate(databaseId, metadata, desiredState);
-    case 'delay_profile':
-      return operation === 'create'
-        ? dpOverrideCreate(databaseId, metadata, desiredState)
-        : dpOverrideUpdate(databaseId, metadata, desiredState);
-    case 'radarr_naming':
-    case 'sonarr_naming':
-    case 'lidarr_naming':
-      return operation === 'create'
-        ? namingOverrideCreate(databaseId, metadata, desiredState)
-        : namingOverrideUpdate(databaseId, metadata, desiredState);
-    case 'radarr_media_settings':
-    case 'sonarr_media_settings':
-    case 'lidarr_media_settings':
-      return operation === 'create'
-        ? msOverrideCreate(databaseId, metadata, desiredState)
-        : msOverrideUpdate(databaseId, metadata, desiredState);
-    case 'radarr_quality_definitions':
-    case 'sonarr_quality_definitions':
-    case 'lidarr_quality_definitions':
-      return operation === 'create'
-        ? qdOverrideCreate(databaseId, metadata, desiredState)
-        : qdOverrideUpdate(databaseId, metadata, desiredState);
-    default:
-      return {
-        success: false,
-        error: `Override not yet implemented for entity: ${entity}`,
-      };
+  const handlers = findOverrideHandlers(entity);
+  if (!handlers) {
+    return {
+      success: false,
+      error: `Override not yet implemented for entity: ${entity}`,
+    };
   }
+
+  return operation === 'create'
+    ? handlers.create(databaseId, metadata, desiredState)
+    : handlers.update(databaseId, metadata, desiredState);
 }
 
 // ── Per-database serialization ──
