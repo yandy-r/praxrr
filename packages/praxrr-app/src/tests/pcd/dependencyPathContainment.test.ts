@@ -115,11 +115,10 @@ Deno.test('manifest validation rejects option-like refs and colliding dependency
 });
 
 Deno.test('dependency errors do not echo URL credentials', () => {
-  const error = assertThrows(
-    () => getDependencyDirName('https://ghp_secret@github.com/org/..'),
-    ManifestValidationError
-  );
-  assertEquals(error.message.includes('ghp_secret'), false);
+  for (const key of ['https://ghp_secret@github.com/org/..', 'https://user:pa@ss_secret@github.com/org/..']) {
+    const error = assertThrows(() => getDependencyDirName(key), ManifestValidationError);
+    assertEquals(/secret/.test(error.message), false, error.message);
+  }
 });
 
 Deno.test('legitimate https dependency keys keep their directory names', () => {

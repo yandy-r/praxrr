@@ -53,7 +53,7 @@ const DEPENDENCY_KEY_PROTOCOL = 'https:';
 
 /** Remove URL credentials so dependency keys can be echoed in errors and logs. */
 function redactDependencyKey(repoUrl: string): string {
-  return repoUrl.replace(/\/\/[^/@]*@/, '//');
+  return repoUrl.replace(/\/\/[^/?#]*@/, '//');
 }
 
 /**
