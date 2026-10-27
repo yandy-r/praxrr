@@ -1,4 +1,5 @@
-import { assertEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
+import { HttpError } from '$http/types.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 
@@ -138,3 +139,37 @@ Deno.test('ordinary quality profile sync treats a missing create response id as 
   assertEquals(result.outcomes[0].status, 'failed');
   assertEquals(result.outcomes[0].remoteId, null);
 });
+
+Deno.test(
+  'quality profile sync stores only the closed sanitized reason when the Arr client throws an HttpError',
+  async () => {
+    const SECRET = 'apikey=sk_live_SECRET123';
+    const raw = new HttpError('HTTP 400: Bad Request | ' + JSON.stringify({ message: SECRET }), 400, {
+      message: SECRET,
+    });
+    const client = {
+      getCustomFormats: () => {
+        throw raw;
+      },
+      getQualityProfiles: () => Promise.resolve([]),
+      updateQualityProfile: () => Promise.resolve({}),
+      createQualityProfile: () => Promise.resolve({ id: 42, name: 'ok', cutoff: 0, qualityProfile: {} }),
+    };
+
+    const syncer = new QualityProfileSyncer(client as never, 13, 'Test', 'radarr');
+    const syncerAny = syncer as unknown as {
+      fetchSyncBatches: () => Promise<ReturnType<typeof createBatch>[]>;
+      getQualityMappings: () => Promise<Map<string, string>>;
+    };
+    syncerAny.fetchSyncBatches = () => Promise.resolve([createBatch(1, '-x', ['leaky-profile'])]);
+    syncerAny.getQualityMappings = () => Promise.resolve(new Map());
+
+    const result = await syncer.sync();
+
+    assertEquals(result.success, false);
+    assertEquals(result.error, 'The Arr instance rejected the request (HTTP 400).');
+    const serialized = JSON.stringify(result);
+    assert(!serialized.includes('SECRET123'), 'sync result must not carry the raw Arr body');
+    assert(!serialized.includes('HTTP 400:'), 'sync result must not carry the raw HttpError message');
+  }
+);

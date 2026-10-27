@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import type { components } from '$api/v1.d.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { LidarrClient } from '$utils/arr/clients/lidarr.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
@@ -14,6 +15,11 @@ import {
   type GroupedRelease,
 } from '$utils/arr/releaseImport.ts';
 import type { ArrType, LidarrRelease } from '$utils/arr/types.ts';
+import { logger } from '$logger/logger.ts';
+
+type ErrorResponse = components['schemas']['ErrorResponse'];
+
+const RELEASES_FETCH_FAILED_MESSAGE = 'Failed to fetch releases. Check the server logs for details.';
 
 function union<T>(arr1: T[], arr2: T[]): T[] {
   return [...new Set([...arr1, ...arr2])];
@@ -144,7 +150,12 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({ error: `Unsupported instance type: ${instance.type}` }, { status: 400 });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch releases';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Failed to fetch releases', {
+      source: 'arr/releases',
+      meta: { instanceId: instanceIdNum, error: err },
+    });
+    return json({ error: RELEASES_FETCH_FAILED_MESSAGE, code: 'releases_fetch_failed' } satisfies ErrorResponse, {
+      status: 500,
+    });
   }
 };

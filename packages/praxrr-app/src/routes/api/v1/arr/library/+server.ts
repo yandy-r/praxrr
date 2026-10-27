@@ -21,6 +21,8 @@ type LibraryResponse = components['schemas']['LibraryResponse'];
 type ProfileByDatabase = components['schemas']['ProfileByDatabase'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
+const LIBRARY_FETCH_FAILED_MESSAGE = 'Failed to fetch library. Check the server logs for details.';
+
 type SortDirection = 'asc' | 'desc';
 
 type LibraryItem = RuntimeRadarrLibraryItem | RuntimeSonarrLibraryItem | RuntimeLidarrLibraryItem;
@@ -487,14 +489,14 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({ error: `Unsupported instance type: ${instance.type}` } satisfies ErrorResponse, { status: 400 });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch library';
-
     await logger.error(`Failed to fetch library for ${instance.name}`, {
       source: 'arr/library',
-      meta: { instanceId: id, error: message },
+      meta: { instanceId: id, error: err },
     });
 
-    return json({ error: message } satisfies ErrorResponse, { status: 500 });
+    return json({ error: LIBRARY_FETCH_FAILED_MESSAGE, code: 'library_fetch_failed' } satisfies ErrorResponse, {
+      status: 500,
+    });
   }
 };
 

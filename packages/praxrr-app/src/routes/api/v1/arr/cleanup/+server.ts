@@ -1,11 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import type { components } from '$api/v1.d.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
 import type { BaseArrClient } from '$utils/arr/base.ts';
 import { executeCleanup, scanForStaleItems } from '$lib/server/sync/cleanup.ts';
 import { parseCleanupRequest } from '$lib/server/sync/cleanupRequest.ts';
 import type { ArrType } from '$utils/arr/types.ts';
+import { logger } from '$logger/logger.ts';
+
+type ErrorResponse = components['schemas']['ErrorResponse'];
+
+const CLEANUP_FAILED_MESSAGE = 'Cleanup failed. Check the server logs for details.';
 
 /**
  * POST /api/v1/arr/cleanup
@@ -59,8 +65,11 @@ export const POST: RequestHandler = async ({ request }) => {
       )
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Cleanup failed';
-    return json({ error: message }, { status: 500 });
+    await logger.error('Arr cleanup failed', {
+      source: 'arr/cleanup',
+      meta: { instanceId: cleanupRequest.instanceId, action: cleanupRequest.action, error: err },
+    });
+    return json({ error: CLEANUP_FAILED_MESSAGE, code: 'cleanup_failed' } satisfies ErrorResponse, { status: 500 });
   } finally {
     if (client) {
       client.close();

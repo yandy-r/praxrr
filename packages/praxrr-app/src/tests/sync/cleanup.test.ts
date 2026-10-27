@@ -344,7 +344,7 @@ Deno.test('deleteStaleItems: skips assigned quality profiles and keeps successfu
     assertEquals(result.failedCustomFormats, [
       {
         item: { id: 901, name: 'Custom 1', strippedName: 'Custom 1' },
-        reason: 'failed custom format delete',
+        reason: 'The delete failed unexpectedly.',
       },
     ]);
     assertEquals(result.skippedQualityProfiles, [
@@ -354,13 +354,51 @@ Deno.test('deleteStaleItems: skips assigned quality profiles and keeps successfu
       },
       {
         item: { id: 1002, name: 'QP 2', strippedName: 'QP 2' },
-        reason: 'failed quality profile delete',
+        reason: 'The delete failed unexpectedly.',
       },
     ]);
   } finally {
     restoreLogger();
   }
 });
+
+Deno.test(
+  'deleteStaleItems: upstream HttpError body with credential-looking string never reaches reasons',
+  async () => {
+    const restoreLogger = withNoopLogger();
+    const upstreamBody = '{"message":"apikey=sk_live_SECRET123"}';
+    const client = {
+      deleteCustomFormat: async () => {
+        throw new HttpError(`HTTP 400: Bad Request | ${upstreamBody}`, 400, JSON.parse(upstreamBody));
+      },
+      deleteQualityProfile: async (id: number) => {
+        if (id === 1001) {
+          throw new HttpError(`HTTP 500: Internal Server Error | ${upstreamBody}`, 500, JSON.parse(upstreamBody));
+        }
+        throw new HttpError(`HTTP 400: Bad Request | ${upstreamBody}`, 400, JSON.parse(upstreamBody));
+      },
+    } as unknown as BaseArrClient;
+
+    try {
+      const result = await deleteStaleItems(client, {
+        staleCustomFormats: [{ id: 901, name: 'Custom 1', strippedName: 'Custom 1' }],
+        staleQualityProfiles: [
+          { id: 1001, name: 'QP 1', strippedName: 'QP 1' },
+          { id: 1002, name: 'QP 2', strippedName: 'QP 2' },
+        ],
+      });
+
+      assertEquals(result.failedCustomFormats[0].reason, 'The Arr instance rejected the request (HTTP 400).');
+      assertEquals(
+        result.skippedQualityProfiles.map((entry) => entry.reason),
+        ['Profile is assigned to media', 'The Arr instance rejected the request (HTTP 400).']
+      );
+      assertEquals(JSON.stringify(result).includes('SECRET123'), false);
+    } finally {
+      restoreLogger();
+    }
+  }
+);
 
 // --- YAN-471 / YAN-444 regressions: cleanup must never delete live configs ---
 

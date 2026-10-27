@@ -6,6 +6,8 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrManagedEntitiesQueries } from '$db/queries/arrManagedEntities.ts';
 import { syncHistorySettingsQueries } from '$db/queries/syncHistorySettings.ts';
 import { logger } from '$logger/logger.ts';
+import type { LogOptions } from '$logger/types.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 import { RadarrClient } from '$arr/clients/radarr.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrCustomFormat } from '$arr/types.ts';
@@ -452,11 +454,23 @@ migratedTest('prune guard mismatch aborts the run before any DELETE', async () =
   tampered.currentGuards.customFormats = tampered.currentGuards.customFormats.filter((f) => f.id !== 10);
   const syncer = new QualityProfileSyncer(client, instanceId, 'Prune', 'radarr');
   syncer.setPreparedExecutionContext(tampered as unknown as SyncPreviewPreparedExecutionContext);
-  const result = await syncer.sync();
+  const errorLogs: Array<{ message: string; options?: LogOptions }> = [];
+  const originalError = logger.error;
+  logger.error = (message: string, options?: LogOptions) => {
+    errorLogs.push({ message, options });
+    return Promise.resolve();
+  };
+  try {
+    const result = await syncer.sync();
 
-  assertEquals(result.success, false);
-  assertStringIncludes(result.error ?? '', 'Prune guard mismatch');
-  assertEquals(state.deletedCustomFormats, []);
+    assertEquals(result.success, false);
+    assertEquals(result.error, GENERIC_SYNC_ERROR_TEXT);
+    assertEquals(state.deletedCustomFormats, []);
+    const meta = errorLogs.at(-1)?.options?.meta as Record<string, unknown> | undefined;
+    assertEquals(meta?.error, 'Prune guard mismatch for customFormat "Old CF\u200B" (id=10)');
+  } finally {
+    logger.error = originalError;
+  }
 });
 
 migratedTest('hasConfig: policy on with a ledger row keeps the section reviewable with empty selections', () => {

@@ -48,6 +48,7 @@ import type {
   SyncPreviewSection,
   SyncSectionResult,
 } from '$sync/syncHistory/types.ts';
+import { classifySyncFailure, GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
 
 /**
@@ -685,19 +686,24 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
             section,
             status: 'failed',
             itemsSynced: result.itemsSynced,
-            error: result.error ?? 'Unknown error',
+            error: result.error ?? GENERIC_SYNC_ERROR_TEXT,
             failedProfiles: result.failedProfiles,
           });
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const failure = classifySyncFailure(error);
         failures += 1;
         results.push(`${section}: failed`);
         sectionResults.push({
           section,
           status: 'failed',
           itemsSynced: 0,
-          error: message,
+          error: failure.message,
+          errorCode: failure.code,
+        });
+        await logger.error('Reviewed sync section failed', {
+          source: 'ArrSyncJob',
+          meta: { instanceId: instance.id, section, ...failure.protectedDetails },
         });
       } finally {
         syncer.clearPreparedExecutionContext();
@@ -761,7 +767,11 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       },
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Reviewed sync execution failed';
+    const failure = classifySyncFailure(error);
+    await logger.error('Reviewed sync execution failed', {
+      source: 'ArrSyncJob',
+      meta: { instanceId: instance.id, sections, ...failure.protectedDetails },
+    });
     if (sideEffectsStarted) {
       deps.failSections(claim, 'Reviewed sync execution failed');
     } else {
@@ -772,7 +782,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       result: {
         status: 'failure',
         failureCode: 'upstream',
-        output: message,
+        output: failure.message,
         outcomes: allOutcomes,
         syncHistoryId: null,
       },
@@ -941,7 +951,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
       },
     });
     const syncHistoryId = recordHistory('failed', {
-      error: message,
+      error: classifySyncFailure(error).message,
       sectionsAttempted: sectionsToRun,
       failureCount: sectionsToRun.length,
     });
@@ -1113,27 +1123,28 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
           failedProfiles: result.failedProfiles,
         });
       } else {
-        handler.failSync(instanceId, result.error ?? 'Unknown error');
+        handler.failSync(instanceId, result.error ?? GENERIC_SYNC_ERROR_TEXT);
         results.push(`${section}: failed`);
         failures++;
         sectionResults.push({
           section,
           status: 'failed',
           itemsSynced: result.itemsSynced,
-          error: result.error ?? 'Unknown error',
+          error: result.error ?? GENERIC_SYNC_ERROR_TEXT,
           failedProfiles: result.failedProfiles,
         });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      handler.failSync(instanceId, message);
+      const failure = classifySyncFailure(error);
+      handler.failSync(instanceId, failure.message);
       results.push(`${section}: failed`);
       failures++;
       sectionResults.push({
         section,
         status: 'failed',
         itemsSynced: 0,
-        error: message,
+        error: failure.message,
+        errorCode: failure.code,
       });
       await logger.error('Arr sync failed', {
         source: 'ArrSyncJob',
@@ -1142,7 +1153,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
           instanceId,
           instanceName: instance.name,
           section,
-          error: message,
+          ...failure.protectedDetails,
         },
       });
     } finally {

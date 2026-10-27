@@ -14,6 +14,7 @@
 
 import type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
+import type { SyncFailureCode } from '../syncHistoryFailure.ts';
 
 export type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection };
 export type { SyncEntityOutcome };
@@ -36,6 +37,8 @@ export interface SyncSectionResult {
   status: 'success' | 'failed' | 'skipped';
   itemsSynced: number;
   error: string | null;
+  /** Closed failure classification for `error`; null/absent when not failed. */
+  errorCode?: SyncFailureCode | null;
   failedProfiles?: string[];
 }
 

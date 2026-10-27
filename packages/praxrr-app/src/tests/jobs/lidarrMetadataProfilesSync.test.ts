@@ -20,6 +20,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import { metadataProfilesHandler } from '$sync/metadataProfiles/handler.ts';
 import { MetadataProfileSyncer } from '$sync/metadataProfiles/syncer.ts';
 import { getNamespaceSuffix } from '$sync/namespace.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 import type {
   SyncPreviewEvidenceClass,
@@ -745,7 +746,7 @@ Deno.test({
       row = getMetadataProfileRow(401);
       assertEquals(row.sync_status, 'failed');
       assertEquals(row.should_sync, 0);
-      assertEquals(row.last_error, 'metadata profile sync failed');
+      assertEquals(row.last_error, GENERIC_SYNC_ERROR_TEXT);
     } finally {
       db.close();
       config.setBasePath(originalBasePath);
@@ -865,7 +866,7 @@ Deno.test({
         const failedRow = getMetadataProfileRow(501);
         assertEquals(failedRow.sync_status, 'failed');
         assertEquals(failedRow.should_sync, 0);
-        assertEquals(failedRow.last_error, 'Metadata profile sync failed for reporting test');
+        assertEquals(failedRow.last_error, GENERIC_SYNC_ERROR_TEXT);
       } finally {
         metadataProfilesHandler.setStatusPending = originalSetStatusPending;
         metadataProfilesHandler.claimSync = originalClaimSync;

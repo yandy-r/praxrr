@@ -31,6 +31,7 @@ import './mediaManagement/handler.ts';
 import './metadataProfiles/handler.ts';
 
 import { getAllSections, getSection } from './registry.ts';
+import { classifySyncFailure, GENERIC_SYNC_ERROR_TEXT } from './syncHistoryFailure.ts';
 import { generatePreview, type GeneratePreviewResult } from './preview/orchestrator.ts';
 
 // Concurrency limit for parallel instance processing
@@ -225,16 +226,16 @@ async function processInstanceSections(
       if (syncResult.success) {
         handler.completeSync(instance.id);
       } else {
-        handler.failSync(instance.id, syncResult.error ?? 'Unknown error');
+        handler.failSync(instance.id, syncResult.error ?? GENERIC_SYNC_ERROR_TEXT);
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      handler.failSync(instance.id, errorMsg);
+      const failure = classifySyncFailure(error);
+      handler.failSync(instance.id, failure.message);
       await logger.error(`Failed to sync ${sectionType} for "${instance.name}"`, {
         source: 'SyncProcessor',
-        meta: { instanceId: instance.id, section: sectionType, error: errorMsg },
+        meta: { instanceId: instance.id, section: sectionType, ...failure.protectedDetails },
       });
-      instanceResult[sectionType] = { success: false, itemsSynced: 0, error: errorMsg, outcomes: [] };
+      instanceResult[sectionType] = { success: false, itemsSynced: 0, error: failure.message, outcomes: [] };
     }
   }
 

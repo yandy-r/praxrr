@@ -2506,6 +2506,11 @@ export interface components {
     ErrorResponse: {
       /** @description Error message */
       error: string;
+      /**
+       * @description Stable machine-readable code present on 5xx responses; `error` is a fixed user-safe message, raw detail is logged server-side only
+       * @enum {string}
+       */
+      code?: 'cleanup_failed' | 'library_fetch_failed' | 'episodes_fetch_failed' | 'releases_fetch_failed';
     };
     RadarrLibraryItem: {
       /** @description Radarr movie ID */
@@ -3247,7 +3252,10 @@ export interface components {
       /** @enum {string} */
       status: 'success' | 'failed' | 'skipped';
       itemsSynced: number;
+      /** @description Closed, user-safe failure reason or static sync summary. Unknown legacy text is replaced with a generic message; existing stored errors are scrubbed on upgrade. Raw Arr response bodies are never returned. */
       error: string | null;
+      /** @description Closed history failure classification for `error`; null/absent when not failed. Unlike preview recovery codes, authorization and not-found failures are grouped under rejected. */
+      errorCode?: ('unreachable' | 'timeout' | 'rejected' | 'serverError' | 'internal') | null;
       failedProfiles?: string[];
     };
     SyncEntityChange: {
@@ -3284,6 +3292,7 @@ export interface components {
       entityOutcomeCount: number;
       /** @description The reviewed sync preview this run applied, when known (plan↔run correlation). */
       previewId: string | null;
+      /** @description Sanitized, user-safe failure summary. Raw Arr response bodies are never returned. */
       error: string | null;
       /** Format: date-time */
       startedAt: string;
@@ -6005,7 +6014,7 @@ export interface components {
     };
     SkippedItem: {
       item: components['schemas']['StaleItem'];
-      /** @description Why the item was not deleted (e.g. "Profile is assigned to media", "No longer stale; not deleted", or the Arr delete error message) */
+      /** @description Closed user-safe reason the item was not deleted (e.g. "Profile is assigned to media", "No longer stale; not deleted", "The Arr instance rejected the request (HTTP 400).", "The delete failed unexpectedly."); the raw Arr error is logged server-side only */
       reason: string;
     };
     /**
@@ -7478,7 +7487,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Failed to fetch library */
+      /** @description Failed to fetch library (fixed message with code `library_fetch_failed`; raw error logged server-side) */
       500: {
         headers: {
           [name: string]: unknown;
@@ -7562,7 +7571,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Failed to fetch episode details */
+      /** @description Failed to fetch episode details (fixed message with code `episodes_fetch_failed`; raw error logged server-side) */
       500: {
         headers: {
           [name: string]: unknown;
@@ -7616,7 +7625,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Failed to fetch releases */
+      /** @description Failed to fetch releases (fixed message with code `releases_fetch_failed`; raw error logged server-side) */
       500: {
         headers: {
           [name: string]: unknown;
@@ -7668,7 +7677,7 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description Failed to perform cleanup */
+      /** @description Failed to perform cleanup (fixed message with code `cleanup_failed`; raw error logged server-side) */
       500: {
         headers: {
           [name: string]: unknown;

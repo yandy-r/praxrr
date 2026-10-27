@@ -26,6 +26,7 @@ import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange } from '$sync/preview/types.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
 import type { SyncEntityChange, SyncHistoryInput, SyncOperationStatus, SyncSectionResult } from './types.ts';
+import { sanitizeSyncHistoryInput } from '../syncHistoryFailure.ts';
 
 const SOURCE = 'SyncHistoryRecord';
 const MAX_EMBED_CHANGE_LINES = 10;
@@ -195,9 +196,10 @@ export function recordSyncHistory(input: SyncHistoryInput): number | null {
     if (!isSyncHistoryEnabled()) {
       return null;
     }
-    const id = syncHistoryQueries.insert(input);
-    fireNotification(id, input);
-    publishSyncRecorded(id, input);
+    const safe = sanitizeSyncHistoryInput(input);
+    const id = syncHistoryQueries.insert(safe);
+    fireNotification(id, safe);
+    publishSyncRecorded(id, safe);
     return id;
   } catch (error) {
     // A silently-dropped audit record is bad, but breaking the sync is worse.

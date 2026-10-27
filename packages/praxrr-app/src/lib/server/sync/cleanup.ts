@@ -20,6 +20,7 @@ import { resolveExpectedArrConfig } from './ownership/expectedConfig.ts';
 import type { SyncArrType } from './mappings.ts';
 import { HttpError } from '$http/types.ts';
 import { logger } from '$logger/logger.ts';
+import { sanitizeArrWriteError } from './sanitizeArrWriteError.ts';
 
 const SOURCE = 'Cleanup';
 
@@ -239,6 +240,11 @@ async function dropDeletedFromLedger(instanceId: number, result: CleanupDeleteRe
   }
 }
 
+/** Closed-vocabulary, user-safe reason for a failed delete; never the raw upstream message. */
+function safeDeleteFailureReason(err: unknown): string {
+  return err instanceof HttpError ? sanitizeArrWriteError(err).reason : 'The delete failed unexpectedly.';
+}
+
 /**
  * Delete stale items from an Arr instance. Deletes CFs first, then QPs.
  * QPs that are assigned to media (HTTP 500) are skipped with a warning.
@@ -259,11 +265,10 @@ export async function deleteStaleItems(
       await client.deleteCustomFormat(cf.id);
       deletedCustomFormats.push(cf);
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      failedCustomFormats.push({ item: cf, reason });
+      failedCustomFormats.push({ item: cf, reason: safeDeleteFailureReason(err) });
       await logger.warn(`Failed to delete CF "${cf.strippedName}" (id=${cf.id})`, {
         source: SOURCE,
-        meta: { error: err instanceof Error ? err.message : String(err) },
+        meta: { error: err },
       });
     }
   }
@@ -275,12 +280,12 @@ export async function deleteStaleItems(
       deletedQualityProfiles.push(qp);
     } catch (err) {
       const reason =
-        err instanceof HttpError && err.status === 500
-          ? 'Profile is assigned to media'
-          : err instanceof Error
-            ? err.message
-            : String(err);
+        err instanceof HttpError && err.status === 500 ? 'Profile is assigned to media' : safeDeleteFailureReason(err);
       skippedQualityProfiles.push({ item: qp, reason });
+      await logger.warn(`Failed to delete QP "${qp.strippedName}" (id=${qp.id})`, {
+        source: SOURCE,
+        meta: { error: err },
+      });
     }
   }
 

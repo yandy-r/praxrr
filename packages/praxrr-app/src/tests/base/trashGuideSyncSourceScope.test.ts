@@ -1,5 +1,6 @@
-import { assertEquals, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { db } from '../../lib/server/db/db.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '../../lib/server/sync/syncHistoryFailure.ts';
 import {
   type TrashGuideSyncConfig,
   trashGuideSyncQueries,
@@ -280,6 +281,135 @@ Deno.test('trashGuideSyncQueries saveState fails fast on scope mismatch before t
   } finally {
     for (const restore of restores.reverse()) {
       restore();
+    }
+  }
+});
+
+Deno.test('trashGuideSyncQueries failSync sanitizes a raw upstream error before persisting last_error', () => {
+  const SECRET = 'apikey=sk_live_SECRET123';
+  const rawMessage = 'HTTP 400: Bad Request | ' + JSON.stringify({ message: SECRET });
+  const executes: Array<{ sql: string; params: unknown[] }> = [];
+  const restores: Restore[] = [];
+
+  patchTarget(
+    db,
+    'execute',
+    ((sql: string, ...params: unknown[]) => {
+      executes.push({ sql, params });
+      return 1;
+    }) as typeof db.execute,
+    restores
+  );
+  patchTarget(
+    db,
+    'queryFirst',
+    ((sql: string) =>
+      sql.includes('FROM trash_guide_sync_config')
+        ? {
+            instance_id: 1,
+            source_id: 2,
+            trigger: 'manual',
+            cron: null,
+            next_run_at: null,
+            sync_status: 'failed',
+            last_error: rawMessage,
+            last_synced_at: null,
+            should_sync: 0,
+            instance_type: 'radarr',
+            source_arr_type: 'radarr',
+          }
+        : { instance_type: 'radarr', source_arr_type: 'radarr' }) as typeof db.queryFirst,
+    restores
+  );
+
+  try {
+    trashGuideSyncQueries.failSync(1, 2, rawMessage);
+
+    const fail = executes.find((call) => call.sql.includes("sync_status = 'failed'"));
+    assert(fail !== undefined, 'failSync must issue the failure UPDATE');
+    assertEquals(fail.params[0], 'The Arr instance rejected the request (HTTP 400).');
+
+    const config = trashGuideSyncQueries.getConfig(1, 2);
+    assert(config !== undefined);
+    assertEquals(config.lastError, 'The Arr instance rejected the request (HTTP 400).');
+    assert(!String(config.lastError).includes('SECRET123'), 'mapped lastError must not carry the raw body');
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trashGuideSyncQueries failSync persists generic text for plain credential errors', () => {
+  for (const legacyError of ['apikey sk_live_SECRET123', 'Bearer SECRET123', 'Invalid API key sk_live_SECRET123']) {
+    const executes: Array<{ sql: string; params: unknown[] }> = [];
+    const restores: Restore[] = [];
+
+    patchTarget(
+      db,
+      'execute',
+      ((sql: string, ...params: unknown[]) => {
+        executes.push({ sql, params });
+        return 1;
+      }) as typeof db.execute,
+      restores
+    );
+    patchTarget(
+      db,
+      'queryFirst',
+      (() => ({
+        instance_type: 'radarr',
+        source_arr_type: 'radarr',
+      })) as typeof db.queryFirst,
+      restores
+    );
+
+    try {
+      trashGuideSyncQueries.failSync(1, 2, legacyError);
+
+      const fail = executes.find((call) => call.sql.includes("sync_status = 'failed'"));
+      assert(fail !== undefined, 'failSync must issue the failure UPDATE');
+      assertEquals(fail.params[0], GENERIC_SYNC_ERROR_TEXT);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  }
+});
+
+Deno.test('trashGuideSyncQueries getConfig sanitizes legacy plain credential last_error values', () => {
+  for (const legacyError of ['apikey sk_live_SECRET123', 'Bearer SECRET123', 'Invalid API key sk_live_SECRET123']) {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      db,
+      'queryFirst',
+      (() => ({
+        instance_id: 1,
+        source_id: 2,
+        trigger: 'manual',
+        cron: null,
+        next_run_at: null,
+        sync_status: 'failed',
+        last_error: legacyError,
+        last_synced_at: null,
+        should_sync: 0,
+        instance_type: 'radarr',
+        source_arr_type: 'radarr',
+      })) as unknown as typeof db.queryFirst,
+      restores
+    );
+
+    try {
+      const config = trashGuideSyncQueries.getConfig(1, 2);
+      assert(config !== undefined);
+      assertEquals(config.lastError, GENERIC_SYNC_ERROR_TEXT);
+      assert(!String(config.lastError).includes('SECRET123'), 'mapped lastError must not carry the raw credential');
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
     }
   }
 });

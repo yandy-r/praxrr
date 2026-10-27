@@ -84,7 +84,7 @@ library:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
-        description: Failed to fetch library
+        description: Failed to fetch library (fixed message with code `library_fetch_failed`; raw error logged server-side)
         content:
           application/json:
             schema:
@@ -165,7 +165,7 @@ episodes:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
-        description: Failed to fetch episode details
+        description: Failed to fetch episode details (fixed message with code `episodes_fetch_failed`; raw error logged server-side)
         content:
           application/json:
             schema:
@@ -225,7 +225,7 @@ releases:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
-        description: Failed to fetch releases
+        description: Failed to fetch releases (fixed message with code `releases_fetch_failed`; raw error logged server-side)
         content:
           application/json:
             schema:
@@ -284,7 +284,7 @@ cleanup:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
-        description: Failed to perform cleanup
+        description: Failed to perform cleanup (fixed message with code `cleanup_failed`; raw error logged server-side)
         content:
           application/json:
             schema:

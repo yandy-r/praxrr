@@ -46,7 +46,7 @@ const aliases: Record<string, string> = {
   'setup-wizard':
     'packages/praxrr-app/src/tests/routes/setupWizard.test.ts,packages/praxrr-app/src/tests/base/setupProgress.test.ts,packages/praxrr-app/src/tests/routes/instanceFormSectionModes.test.ts',
   'sync-history':
-    'packages/praxrr-app/src/tests/db/syncHistoryQueries.test.ts,packages/praxrr-app/src/tests/db/syncHistoryRetention.test.ts,packages/praxrr-app/src/tests/sync/syncHistoryRecord.test.ts,packages/praxrr-app/src/tests/routes/syncHistory.test.ts,packages/praxrr-app/src/tests/jobs/syncHistoryCleanup.test.ts',
+    'packages/praxrr-app/src/tests/db/syncHistoryQueries.test.ts,packages/praxrr-app/src/tests/db/syncHistoryRetention.test.ts,packages/praxrr-app/src/tests/sync/syncHistoryRecord.test.ts,packages/praxrr-app/src/tests/sync/syncHistoryFailure.test.ts,packages/praxrr-app/src/tests/routes/syncHistory.test.ts,packages/praxrr-app/src/tests/jobs/syncHistoryCleanup.test.ts,packages/praxrr-app/src/tests/jobs/arrSyncSanitizedErrors.test.ts',
   'trusted-proxy':
     'packages/praxrr-app/src/tests/shared/security/trustedProxy.test.ts,packages/praxrr-app/src/tests/base/trustedProxyConfig.test.ts,packages/praxrr-app/src/tests/base/networkTrust.test.ts,packages/praxrr-app/src/tests/routes/securityPosture.test.ts',
   timeline:

@@ -1,4 +1,5 @@
 import { db } from '../db.ts';
+import { GENERIC_SYNC_ERROR_TEXT, toSafeSyncErrorText } from '$sync/syncHistoryFailure.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import type { SectionType } from '$lib/server/sync/types.ts';
 
@@ -341,7 +342,7 @@ SET sync_status = CASE WHEN should_sync = 1 THEN 'pending' ELSE 'failed' END,
     should_sync = CASE WHEN should_sync = 1 THEN 1 ELSE 0 END,
     last_error = ?
 WHERE ${sectionConfig.instanceScopeSql} AND sync_status = 'in_progress'`,
-            errorMessage ?? 'Reviewed sync failed',
+            toSafeSyncErrorText(errorMessage) ?? GENERIC_SYNC_ERROR_TEXT,
             record.instanceId
           );
         }
@@ -1400,7 +1401,7 @@ export const arrSyncQueries = {
     if (isReviewedSyncRowOwned(instanceId, 'qualityProfiles')) return;
     db.execute(
       "UPDATE arr_sync_quality_profiles_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
-      error,
+      toSafeSyncErrorText(error) ?? GENERIC_SYNC_ERROR_TEXT,
       instanceId
     );
   },
@@ -1409,7 +1410,7 @@ export const arrSyncQueries = {
     if (isReviewedSyncRowOwned(instanceId, 'delayProfiles')) return;
     db.execute(
       "UPDATE arr_sync_delay_profiles_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
-      error,
+      toSafeSyncErrorText(error) ?? GENERIC_SYNC_ERROR_TEXT,
       instanceId
     );
   },
@@ -1418,7 +1419,7 @@ export const arrSyncQueries = {
     if (isReviewedSyncRowOwned(instanceId, 'mediaManagement')) return;
     db.execute(
       "UPDATE arr_sync_media_management SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ?",
-      error,
+      toSafeSyncErrorText(error) ?? GENERIC_SYNC_ERROR_TEXT,
       instanceId
     );
   },
@@ -1430,7 +1431,7 @@ export const arrSyncQueries = {
 			 SET sync_status = 'failed', should_sync = 0, last_error = ?
 			 WHERE instance_id = ?
 			 AND instance_id IN (SELECT id FROM arr_instances WHERE type = 'lidarr')`,
-      error,
+      toSafeSyncErrorText(error) ?? GENERIC_SYNC_ERROR_TEXT,
       instanceId
     );
   },

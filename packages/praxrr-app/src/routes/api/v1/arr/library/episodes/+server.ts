@@ -10,6 +10,8 @@ import { logger } from '$logger/logger.ts';
 type EpisodesResponse = components['schemas']['EpisodesResponse'];
 type ErrorResponse = components['schemas']['ErrorResponse'];
 
+const EPISODES_FETCH_FAILED_MESSAGE = 'Failed to fetch episode details. Check the server logs for details.';
+
 const EPISODE_CACHE_TTL = 300; // 5 minutes
 
 /**
@@ -70,12 +72,13 @@ export const GET: RequestHandler = async ({ url }) => {
       const profile = profiles.find((p) => p.id === series.qualityProfileId);
 
       if (!profile) {
-        return json(
-          {
-            error: `Quality profile not found for series ${seriesId}`,
-          } satisfies ErrorResponse,
-          { status: 500 }
-        );
+        await logger.error(`Quality profile not found for series ${seriesId}`, {
+          source: 'arr/library/episodes',
+          meta: { instanceId: id, seriesId },
+        });
+        return json({ error: EPISODES_FETCH_FAILED_MESSAGE, code: 'episodes_fetch_failed' } satisfies ErrorResponse, {
+          status: 500,
+        });
       }
 
       const episodes = await client.getSeriesEpisodeDetails(seriesId, profile);
@@ -91,13 +94,13 @@ export const GET: RequestHandler = async ({ url }) => {
       client.close();
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch episode details';
-
     await logger.error(`Failed to fetch episode details for series ${seriesId}`, {
       source: 'arr/library/episodes',
-      meta: { instanceId: id, seriesId, error: message },
+      meta: { instanceId: id, seriesId, error: err },
     });
 
-    return json({ error: message } satisfies ErrorResponse, { status: 500 });
+    return json({ error: EPISODES_FETCH_FAILED_MESSAGE, code: 'episodes_fetch_failed' } satisfies ErrorResponse, {
+      status: 500,
+    });
   }
 };
