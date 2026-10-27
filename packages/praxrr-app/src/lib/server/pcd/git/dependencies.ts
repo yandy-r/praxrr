@@ -5,36 +5,64 @@
 
 import { checkout, clone, fetch, fetchTags, getBranch } from '$utils/git/index.ts';
 import { execGit, execGitSafe } from '$utils/git/exec.ts';
-import { loadManifest, resolveSchemaDependencyUrl } from '../manifest/manifest.ts';
+import { getDependencyDirName, loadManifest, resolveSchemaDependencyUrl } from '../manifest/manifest.ts';
+import { DependencyError } from '../core/errors.ts';
 import { logger } from '$logger/logger.ts';
 
 const SCHEMA_REF_OVERRIDE_ENV = 'PRAXRR_SCHEMA_REF';
 const SCHEMA_PATH_OVERRIDE_ENV = 'PRAXRR_SCHEMA_LOCAL_PATH';
 
 /**
- * Extract repository name from GitHub URL
- * https://github.com/yandy-r/praxrr-schema -> schema
- */
-function getRepoName(repoUrl: string): string {
-  const trimmed = repoUrl
-    .trim()
-    .replace(/\/+$/, '')
-    .replace(/\.git$/i, '');
-  try {
-    const parsed = new URL(trimmed);
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    return parts[parts.length - 1] ?? '';
-  } catch {
-    const parts = trimmed.split('/').filter(Boolean);
-    return parts[parts.length - 1] ?? '';
-  }
-}
-
-/**
  * Get dependency path
  */
 function getDependencyPath(pcdPath: string, repoName: string): string {
   return `${pcdPath}/deps/${repoName}`;
+}
+
+interface DependencyTarget {
+  repoUrl: string;
+  manifestRef: string;
+  repoName: string;
+  depPath: string;
+}
+
+async function lstatOrNull(path: string): Promise<Deno.FileInfo | null> {
+  try {
+    return await Deno.lstat(path);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) return null;
+    throw error;
+  }
+}
+
+/**
+ * Resolve every manifest dependency to a directory confined to `<pcdPath>/deps`.
+ * Runs before any filesystem or git mutation so an untrusted upstream manifest fails the
+ * whole operation closed: names must be a single plain path segment (enforced by
+ * getDependencyDirName), and neither `deps/` nor an existing dependency entry may be a
+ * symlink that could redirect writes elsewhere.
+ */
+async function resolveDependencyTargets(
+  pcdPath: string,
+  dependencies: Record<string, string>
+): Promise<DependencyTarget[]> {
+  const targets: DependencyTarget[] = [];
+  for (const [repoUrl, manifestRef] of Object.entries(dependencies)) {
+    const repoName = getDependencyDirName(repoUrl);
+    targets.push({ repoUrl, manifestRef, repoName, depPath: getDependencyPath(pcdPath, repoName) });
+  }
+
+  const depsInfo = await lstatOrNull(`${pcdPath}/deps`);
+  if (depsInfo && (depsInfo.isSymlink || !depsInfo.isDirectory)) {
+    throw new DependencyError('Dependency directory deps/ must be a real directory inside the database');
+  }
+  for (const target of targets) {
+    if ((await lstatOrNull(target.depPath))?.isSymlink) {
+      throw new DependencyError(`Dependency directory deps/${target.repoName} must not be a symlink`, target.repoUrl);
+    }
+  }
+
+  return targets;
 }
 
 /**
@@ -69,14 +97,7 @@ async function copyPathRecursive(sourcePath: string, targetPath: string): Promis
   }
 }
 
-async function installLocalDependency(
-  pcdPath: string,
-  repoName: string,
-  localSourcePath: string,
-  scope: 'schema'
-): Promise<void> {
-  const depPath = getDependencyPath(pcdPath, repoName);
-
+async function installLocalDependency(depPath: string, localSourcePath: string, scope: 'schema'): Promise<void> {
   const sourceStat = await Deno.stat(localSourcePath).catch(() => null);
   if (!sourceStat?.isDirectory) {
     throw new Error(`Configured local ${scope} dependency path is not a directory: ${localSourcePath}`);
@@ -109,14 +130,11 @@ async function installLocalDependency(
  * Keeps .git, ops, and pcd.json - removes everything else
  */
 async function cloneDependency(
-  pcdPath: string,
+  depPath: string,
   repoUrl: string,
   version: string,
   personalAccessToken?: string
 ): Promise<void> {
-  const repoName = getRepoName(repoUrl);
-  const depPath = getDependencyPath(pcdPath, repoName);
-
   // Clone the dependency repository
   await clone(repoUrl, depPath, undefined, personalAccessToken);
 
@@ -138,15 +156,17 @@ async function cloneDependency(
  * Get the installed ref of a dependency.
  * Prefers current branch name, falls back to dependency manifest version.
  */
-async function getInstalledVersion(pcdPath: string, repoName: string): Promise<string | null> {
-  const depPath = `${pcdPath}/deps/${repoName}`;
-  try {
-    const currentBranch = await getBranch(depPath);
-    if (currentBranch && currentBranch !== 'HEAD') {
-      return currentBranch;
+async function getInstalledVersion(depPath: string): Promise<string | null> {
+  // Without its own .git, git would walk up and report the database clone's branch.
+  if (await dirExists(`${depPath}/.git`)) {
+    try {
+      const currentBranch = await getBranch(depPath);
+      if (currentBranch && currentBranch !== 'HEAD') {
+        return currentBranch;
+      }
+    } catch {
+      // Unreadable dependency repository; fall back to manifest check.
     }
-  } catch {
-    // Dependency repository may not exist yet; fall back to manifest check.
   }
 
   const depManifestPath = `${depPath}/pcd.json`;
@@ -219,18 +239,15 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
     return;
   }
 
-  // Create deps directory
-  const depsDir = `${pcdPath}/deps`;
-  await Deno.mkdir(depsDir, { recursive: true });
+  const targets = await resolveDependencyTargets(pcdPath, manifest.dependencies);
+  await Deno.mkdir(`${pcdPath}/deps`, { recursive: true });
 
-  for (const [repoUrl, version] of Object.entries(manifest.dependencies)) {
+  for (const { repoUrl, manifestRef: version, repoName, depPath } of targets) {
     const requiredRef = getRequiredDependencyRef(repoUrl, version, schemaDependencyUrl);
-    const repoName = getRepoName(repoUrl);
-    const depPath = getDependencyPath(pcdPath, repoName);
     const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
 
     if (schemaLocalPathOverride) {
-      await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+      await installLocalDependency(depPath, schemaLocalPathOverride, 'schema');
       await loadManifest(depPath);
 
       await logger.debug(`Installed dependency ${repoName} from local path override`, {
@@ -248,7 +265,7 @@ export async function processDependencies(pcdPath: string, personalAccessToken?:
     }
 
     // Clone and checkout the dependency
-    await cloneDependency(pcdPath, repoUrl, requiredRef, personalAccessToken);
+    await cloneDependency(depPath, repoUrl, requiredRef, personalAccessToken);
 
     // Validate the dependency's manifest
     await loadManifest(depPath);
@@ -272,17 +289,15 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
     return;
   }
 
-  const depsDir = `${pcdPath}/deps`;
-  await Deno.mkdir(depsDir, { recursive: true });
+  const targets = await resolveDependencyTargets(pcdPath, manifest.dependencies);
+  await Deno.mkdir(`${pcdPath}/deps`, { recursive: true });
 
-  for (const [repoUrl, manifestRef] of Object.entries(manifest.dependencies)) {
+  for (const { repoUrl, manifestRef, repoName, depPath } of targets) {
     const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
-    const repoName = getRepoName(repoUrl);
-    const depPath = getDependencyPath(pcdPath, repoName);
     const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
 
     if (schemaLocalPathOverride) {
-      await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+      await installLocalDependency(depPath, schemaLocalPathOverride, 'schema');
       await loadManifest(depPath);
 
       await logger.info(`Refreshed dependency ${repoName} from local path override`, {
@@ -299,7 +314,7 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
       continue;
     }
 
-    const installedVersion = await getInstalledVersion(pcdPath, repoName);
+    const installedVersion = await getInstalledVersion(depPath);
 
     // Already at correct version
     if (installedVersion === requiredRef) {
@@ -323,7 +338,7 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
       } catch {
         // Didn't exist
       }
-      await cloneDependency(pcdPath, repoUrl, requiredRef, personalAccessToken);
+      await cloneDependency(depPath, repoUrl, requiredRef, personalAccessToken);
       await logger.info(`Re-cloned dependency ${repoName}@${requiredRef}`, {
         source: 'PCDDependencies',
         meta: { pcdPath, repoName, manifestRef, resolvedRef: requiredRef },
@@ -348,16 +363,15 @@ export async function validateDependencies(pcdPath: string, personalAccessToken?
       return true;
     }
 
+    const targets = await resolveDependencyTargets(pcdPath, manifest.dependencies);
     let allValid = true;
 
-    for (const [repoUrl, manifestRef] of Object.entries(manifest.dependencies)) {
+    for (const { repoUrl, manifestRef, repoName, depPath } of targets) {
       const requiredRef = getRequiredDependencyRef(repoUrl, manifestRef, schemaDependencyUrl);
-      const repoName = getRepoName(repoUrl);
-      const depPath = getDependencyPath(pcdPath, repoName);
       const schemaLocalPathOverride = getSchemaLocalPathOverride(repoUrl, schemaDependencyUrl);
 
       if (schemaLocalPathOverride) {
-        await installLocalDependency(pcdPath, repoName, schemaLocalPathOverride, 'schema');
+        await installLocalDependency(depPath, schemaLocalPathOverride, 'schema');
         await loadManifest(depPath);
         await logger.debug(`Validated dependency ${repoName} via local path override`, {
           source: 'PCDDependencies',
@@ -383,7 +397,7 @@ export async function validateDependencies(pcdPath: string, personalAccessToken?
       }
 
       // Check version
-      const installedVersion = await getInstalledVersion(pcdPath, repoName);
+      const installedVersion = await getInstalledVersion(depPath);
       if (installedVersion !== requiredRef) {
         await logger.warn(`Dependency ${repoName} ref mismatch: ${installedVersion} != ${requiredRef}`, {
           source: 'PCDDependencies',
