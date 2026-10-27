@@ -48,6 +48,60 @@ function isSchemaDependencyUrl(repoUrl: string): boolean {
   return SCHEMA_DEPENDENCY_PATTERN.test(normalizeDependencyUrlForSchemaMatch(repoUrl));
 }
 
+const DEPENDENCY_DIR_NAME_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+const DEPENDENCY_KEY_PROTOCOL = 'https:';
+
+/** Remove URL credentials so dependency keys can be echoed in errors and logs. */
+function redactDependencyKey(repoUrl: string): string {
+  return repoUrl.replace(/\/\/[^/?#]*@/, '//');
+}
+
+/**
+ * Derive the `deps/<name>` directory for a dependency key, e.g.
+ * https://github.com/yandy-r/praxrr-schema -> praxrr-schema.
+ * Manifests come from upstream repositories, so keys must be https URLs (local sources are
+ * configured via PRAXRR_SCHEMA_LOCAL_PATH, never by the manifest) and the name must be one
+ * plain path segment: anything that could resolve to `.`, `..`, another directory or a
+ * platform-special name is rejected.
+ */
+export function getDependencyDirName(repoUrl: string): string {
+  const invalid = (reason: string) =>
+    new ManifestValidationError(`Invalid dependency ${JSON.stringify(redactDependencyKey(repoUrl))}: ${reason}`);
+  let parsed: URL;
+  try {
+    parsed = new URL(repoUrl.trim());
+  } catch {
+    throw invalid('it must be an https repository URL');
+  }
+  if (parsed.protocol !== DEPENDENCY_KEY_PROTOCOL) {
+    throw invalid('it must be an https repository URL');
+  }
+  const parts = parsed.pathname
+    .replace(/\.git\/*$/i, '')
+    .split('/')
+    .filter(Boolean);
+  const name = parts[parts.length - 1] ?? '';
+  if (!DEPENDENCY_DIR_NAME_PATTERN.test(name) || name.endsWith('.')) {
+    throw invalid('it must end in a plain repository name');
+  }
+  return name;
+}
+
+function validateDependencyEntries(dependencies: Record<string, unknown>): void {
+  const seen = new Set<string>();
+  for (const [repoUrl, ref] of Object.entries(dependencies)) {
+    const key = JSON.stringify(redactDependencyKey(repoUrl));
+    if (typeof ref !== 'string' || ref.trim() === '' || ref.startsWith('-')) {
+      throw new ManifestValidationError(`Invalid ref for dependency ${key}`);
+    }
+    const name = getDependencyDirName(repoUrl).toLowerCase();
+    if (seen.has(name)) {
+      throw new ManifestValidationError(`Dependency ${key} shares its directory name with another dependency`);
+    }
+    seen.add(name);
+  }
+}
+
 export function resolveSchemaDependencyUrl(dependencies: Record<string, string> | undefined): string {
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return SCHEMA_DEPENDENCY_URL;
@@ -130,6 +184,7 @@ export function validateManifest(manifest: unknown): asserts manifest is Manifes
     // Validate dependencies includes schema (only check for non-empty dependencies)
     const deps = m.dependencies as Record<string, unknown>;
     if (Object.keys(deps).length > 0) {
+      validateDependencyEntries(deps);
       resolveSchemaDependencyUrl(deps as Record<string, string>);
     }
   }
