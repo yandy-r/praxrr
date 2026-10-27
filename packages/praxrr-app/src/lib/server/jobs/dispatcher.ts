@@ -5,6 +5,7 @@ import { buildSafeJobEvidence, classifyJobFailure } from './evidence.ts';
 import { jobQueueRegistry } from './queueRegistry.ts';
 import type { JobHandlerResult, JobQueueRecord, JobStatus } from './queueTypes.ts';
 import { logger } from '$logger/logger.ts';
+import { runOutsideUserOpAction, withNewUserOpAction } from '$pcd/ops/actionContext.ts';
 import { publishJobFinished, publishJobRunning } from '$lib/server/events/publish.ts';
 import './handlers/index.ts';
 
@@ -54,8 +55,10 @@ class JobDispatcher {
       clearTimeout(this.timerId);
     }
 
+    // Timers inherit the async context of whoever armed them (e.g. a POST handler's undo action);
+    // exit it so background jobs never write under a stale request action.
     this.timerId = setTimeout(() => {
-      void this.runDueJobs();
+      runOutsideUserOpAction(() => void this.runDueJobs());
     }, delay) as unknown as number;
   }
 
@@ -125,7 +128,8 @@ class JobDispatcher {
 
     let result: JobHandlerResult;
     try {
-      result = await handler(job);
+      // One job run is one undo unit for any user-layer ops it writes.
+      result = await withNewUserOpAction(async () => await handler(job));
     } catch (error) {
       // Redaction by construction: the raw exception is logged through the sanitized
       // boundary; only a typed, safe failure code reaches the durable evidence.

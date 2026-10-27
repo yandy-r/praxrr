@@ -10,6 +10,7 @@
   import { Tag, FileText, Layers, BookOpenText, Gauge, Earth, Database, Copy, Download } from 'lucide-svelte';
   import { page } from '$app/stores';
   import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
+  import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
   import { sanitizeHtml } from '$shared/markdown/markdown.ts';
 
   export let profiles: QualityProfileTableRow[];
@@ -106,7 +107,9 @@
       cell: (row: QualityProfileTableRow) => ({
         html: `
 					<div>
-						<div class="font-medium">${escapeHtml(row.name)}</div>
+						<div class="font-medium">${escapeHtml(row.name)}${
+              row.locallyModified ? ` <span class="ml-1 align-middle">${locallyModifiedBadgeHtml()}</span>` : ''
+            }</div>
 						${
               row.tags.length > 0
                 ? `

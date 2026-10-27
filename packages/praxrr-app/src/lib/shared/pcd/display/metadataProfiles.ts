@@ -4,6 +4,7 @@ import type {
   LidarrMetadataProfileSecondaryTypesRow,
   LidarrMetadataProfilesRow,
 } from '../types.ts';
+import type { LocallyModifiable } from './common.ts';
 
 export interface MetadataProfileTypeToggle {
   id: number;
@@ -11,10 +12,8 @@ export interface MetadataProfileTypeToggle {
   allowed: boolean;
 }
 
-export interface LidarrMetadataProfileListItem extends Pick<
-  LidarrMetadataProfilesRow,
-  'id' | 'name' | 'description' | 'updated_at'
-> {
+export interface LidarrMetadataProfileListItem
+  extends Pick<LidarrMetadataProfilesRow, 'id' | 'name' | 'description' | 'updated_at'>, LocallyModifiable {
   primaryTypeCount: number;
   secondaryTypeCount: number;
   releaseStatusCount: number;

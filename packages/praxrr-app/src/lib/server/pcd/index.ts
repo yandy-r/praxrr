@@ -145,6 +145,40 @@ export type {
 } from './resolved/compare.ts';
 
 // ============================================================================
+// OVERRIDES
+// ============================================================================
+
+export {
+  actionKeyOf,
+  buildLocallyModifiedLookup,
+  isOverrideRevertError,
+  listLocallyModifiedEntities,
+  listOverrides,
+  OverrideRevertError,
+  resolveUserOpEntities,
+  revertEntityOverrides,
+  undoLastAction,
+  USER_OP_ACTION_ID_KEY,
+} from './overrides/index.ts';
+export type {
+  OverrideRevertErrorReason,
+  RevertEntityOverridesInput,
+  RevertResult,
+  UndoLastActionInput,
+  UndoResult,
+} from './overrides/index.ts';
+export type {
+  EntityGroup,
+  EntityRef,
+  LastAction,
+  LocallyModifiedLookup,
+  OverrideEntity,
+  OverrideKind,
+  OverrideOp,
+  OverridesSnapshot,
+} from './overrides/index.ts';
+
+// ============================================================================
 // DEPENDENCY GRAPH
 // ============================================================================
 

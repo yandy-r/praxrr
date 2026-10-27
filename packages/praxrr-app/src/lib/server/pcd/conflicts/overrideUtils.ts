@@ -55,13 +55,13 @@ export async function supersedeOp(databaseId: number, oldOpId: number, newOpId: 
   return true;
 }
 
-export async function dropOp(databaseId: number, opId: number): Promise<boolean> {
+export async function dropOp(databaseId: number, opId: number, batchId: string = uuid()): Promise<boolean> {
   const updated = pcdOpsQueries.update(opId, { state: 'dropped' });
   if (!updated) return false;
   pcdOpHistoryQueries.create({
     opId,
     databaseId,
-    batchId: uuid(),
+    batchId,
     status: 'dropped',
   });
   return true;

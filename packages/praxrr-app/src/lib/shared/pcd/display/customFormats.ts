@@ -1,7 +1,7 @@
 import type { ArrConditionTargetType } from '../../arr/capabilities.ts';
 import type { CustomFormatsRow, CustomFormatTestsRow } from '../types.ts';
 import type { SourcedDisplayRow } from '../../sources/types.ts';
-import type { Tag } from './common.ts';
+import type { LocallyModifiable, Tag } from './common.ts';
 import type { ConditionRef } from './conditions.ts';
 
 /** Custom format basic info */
@@ -16,7 +16,8 @@ export type CustomFormatTableRow = Omit<CustomFormatsRow, 'include_in_rename' | 
   conditions: ConditionRef[];
   arrTargets: ArrConditionTargetType[];
   testCount: number;
-} & SourcedDisplayRow;
+} & SourcedDisplayRow &
+  LocallyModifiable;
 
 /** Custom format general information (for general tab) */
 export type CustomFormatGeneral = Omit<CustomFormatsRow, 'description' | 'created_at' | 'updated_at'> & {

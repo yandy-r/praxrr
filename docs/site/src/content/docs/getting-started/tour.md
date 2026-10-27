@@ -48,6 +48,14 @@ fine-tune with sliders. Praxrr shows the generated scores and thresholds before 
 
 ![Quality goals](../../../assets/screenshots/quality-goals.png)
 
+### Local overrides
+
+Spot local PCD edits with the **Locally modified** badge and filter, then open a database's
+**Local overrides** tab to compare values with upstream. Revert selected operations, discard an
+entity's overrides, or undo the latest local action with dependency checks before changes apply.
+See the [Local Overrides guide](https://github.com/yandy-r/praxrr/blob/main/docs/features/local-overrides.md)
+for the workflow, legacy undo behavior, and snapshot limitations.
+
 ## Sync
 
 ### Connect your Arr instances

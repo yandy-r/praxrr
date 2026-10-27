@@ -10,6 +10,7 @@
   import CodeBlock from '$ui/display/CodeBlock.svelte';
   import Markdown from '$ui/display/Markdown.svelte';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
 
   export let expressions: RegularExpressionWithTags[];
 
@@ -35,6 +36,9 @@
             <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               {expression.name}
             </h3>
+            {#if expression.locallyModified}
+              <LocallyModifiedBadge />
+            {/if}
             {#each expression.tags as tag}
               <Label variant="info" size="sm" rounded="md">{tag.name}</Label>
             {/each}

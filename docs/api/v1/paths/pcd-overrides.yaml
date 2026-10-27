@@ -1,0 +1,275 @@
+list:
+  get:
+    operationId: listPcdOverrides
+    summary: List local PCD overrides
+    description: |
+      Lists entities with published user ops and their upstream-base-to-resolved field
+      differences. Net-zero edits remain listed until their user ops are reverted.
+      Builds the base-only cache once per request. lastAction always describes the latest
+      action across the whole database, independent of filters. API tokens require read scope.
+    tags:
+      - Local Overrides
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+          minimum: 1
+      - name: entityType
+        in: query
+        required: false
+        description: Optional resolved entity family filter
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: arrType
+        in: query
+        required: false
+        description: |
+          Explicit Arr app filter. Required when entityType is naming, mediaSettings, or
+          qualityDefinitions. Required and must be lidarr for lidarrMetadataProfile.
+          Rejected when entityType is delayProfile, regularExpression, customFormat, or
+          qualityProfile. Never inferred from a sibling Arr app.
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+    responses:
+      '200':
+        description: Local override entities and the latest undoable action
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverridesResponse'
+      '400':
+        description: Invalid filters or databaseId, unavailable database, or unbuilt cache
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `read` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '500':
+        description: Failed to list local overrides
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+revert:
+  post:
+    operationId: revertPcdOverride
+    summary: Revert an entity's local PCD overrides
+    description: |
+      Soft-drops all or selected published user ops for the entity and recompiles the PCD.
+      Operation rows are retained; no automatic snapshot is created. Revert is fail-closed:
+      dependent or conflicting changes are not silently dropped. Only cascadeGroup explicitly
+      permits including other entities in a required group. API tokens require admin scope.
+      The request body is limited to 8 KB.
+    tags:
+      - Local Overrides
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+          minimum: 1
+      - name: entityType
+        in: path
+        required: true
+        description: Resolved entity family
+        schema:
+          type: string
+          enum:
+            - delayProfile
+            - regularExpression
+            - customFormat
+            - qualityProfile
+            - naming
+            - mediaSettings
+            - qualityDefinitions
+            - lidarrMetadataProfile
+      - name: name
+        in: path
+        required: true
+        description: |
+          Current resolved entity name, not an earlier name before a rename. Preserved
+          exactly without trimming; empty names are rejected. Names containing a slash
+          are supported when it is URL-encoded as %2F.
+        schema:
+          type: string
+          minLength: 1
+      - name: arrType
+        in: query
+        required: false
+        description: |
+          Required for naming, mediaSettings, and qualityDefinitions. Required and must be
+          lidarr for lidarrMetadataProfile. Rejected for delayProfile, regularExpression,
+          customFormat, and qualityProfile. Never inferred from a sibling Arr app.
+        schema:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+            - lidarr
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideRevertRequest'
+    responses:
+      '200':
+        description: User ops reverted and cache recompiled
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideRevertResult'
+      '400':
+        description: Invalid parameters or JSON body, oversized body, disabled database, or unbuilt cache
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '404':
+        description: |
+          entity_not_found means no local overrides map to the entity's current name.
+          op_not_found means a selected op does not belong to this entity.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideErrorResponse'
+      '409':
+        description: |
+          Revert rejected without changing the published-op set:
+          - group_dependency: a required group includes unselected ops; use cascadeGroup to opt in.
+          - dependent_ops: remaining user ops depend on the selected create or rename.
+          - selection_blocked: a partial selection is not closed over overlapping fields or renames.
+          - op_not_revertible: a selected op is no longer published and cannot be reverted.
+          - conflict_after_revert: recompilation would introduce a new conflict on a remaining op.
+          - collateral_ops: recompilation would change ops outside the explicitly planned set.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideErrorResponse'
+      '500':
+        description: Failed to revert local overrides
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+undo:
+  post:
+    operationId: undoPcdOverride
+    summary: Undo the latest local PCD change
+    description: |
+      Soft-drops exactly the latest published user-action unit and recompiles the PCD.
+      Every mutating HTTP request is one action_id unit; a scheduled or manual job run is
+      its own unit, and each automatic conflict override applied during recompilation is
+      a separate unit. Legacy ops fall back to group_id, then a single op. Previously
+      applied edits superseded by this action are reactivated when undoing it; undoing a
+      manual or automatic conflict override reactivates the original published op it
+      replaced, and its previously pending conflict may return after the recompile. No
+      automatic snapshot is created. API tokens require admin scope. The request body is
+      limited to 8 KB.
+      snapshot is created. API tokens require admin scope. The request body is limited to 8 KB.
+    tags:
+      - Local Overrides
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+          minimum: 1
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideUndoRequest'
+    responses:
+      '200':
+        description: Latest user action undone and cache recompiled
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideUndoResult'
+      '400':
+        description: Invalid databaseId or JSON body, oversized body, disabled database, or unbuilt cache
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '404':
+        description: nothing_to_undo means there are no published user ops to undo
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideErrorResponse'
+      '409':
+        description: |
+          Undo rejected without changing the published-op set:
+          - stale_action: expectedActionId no longer identifies the latest undoable action.
+          - conflict_after_revert: recompilation would introduce a new conflict on a remaining op.
+          - collateral_ops: recompilation would change ops outside the explicitly planned set.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd-overrides.yaml#/PcdOverrideErrorResponse'
+      '500':
+        description: Failed to undo the latest local change
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

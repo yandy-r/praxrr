@@ -3,11 +3,18 @@
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import PageTitle from '$ui/meta/PageTitle.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
   import CloneModal from '$ui/modal/CloneModal.svelte';
   import TableView from './views/TableView.svelte';
   import CardView from './views/CardView.svelte';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { alertStore } from '$alerts/store';
@@ -104,6 +111,24 @@
 
   // Update items when data changes
   $: setItems(data.mediaSettingsConfigs);
+
+  const LOCAL_ONLY_STORAGE_PREFIX = 'mediaSettingsLocalOnly';
+  let localOnly = false;
+  let initializedLocalOnlyKey = '';
+
+  function toggleLocalOnly() {
+    localOnly = !localOnly;
+    saveLocalOnly(localOnlyStorageKey, localOnly);
+  }
+
+  $: localOnlyStorageKey = `${LOCAL_ONLY_STORAGE_PREFIX}:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    localOnly = loadLocalOnly(localOnlyStorageKey);
+  }
+  $: localModifiedCount = countLocallyModified(data.mediaSettingsConfigs);
+
+  $: localFiltered = filterLocallyModified($filtered, localOnly);
 </script>
 
 <PageTitle parts={['Media Settings', data.currentDatabase.name]} />
@@ -111,6 +136,7 @@
 <!-- Actions Bar -->
 <ActionsBar>
   <SearchAction searchStore={search} placeholder="Search media settings..." responsive />
+  <LocalOnlyFilterAction active={localOnly} count={localModifiedCount} on:toggle={toggleLocalOnly} />
   <ActionButton
     icon={Plus}
     label="Add media settings config"
@@ -134,22 +160,26 @@
         No media settings configs found for {data.currentDatabase.name}
       </p>
     </div>
-  {:else if $filtered.length === 0}
+  {:else if localFiltered.length === 0}
     <div
       class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <p class="text-neutral-600 dark:text-neutral-400">No media settings configs match your search</p>
+      <p class="text-neutral-600 dark:text-neutral-400">
+        {localOnly
+          ? 'No locally modified media settings configs match your search'
+          : 'No media settings configs match your search'}
+      </p>
     </div>
   {:else if $view === 'table'}
     <TableView
-      configs={$filtered}
+      configs={localFiltered}
       databaseId={data.currentDatabase.id}
       on:clone={handleClone}
       on:export={handleExport}
     />
   {:else}
     <CardView
-      configs={$filtered}
+      configs={localFiltered}
       databaseId={data.currentDatabase.id}
       on:clone={handleClone}
       on:export={handleExport}

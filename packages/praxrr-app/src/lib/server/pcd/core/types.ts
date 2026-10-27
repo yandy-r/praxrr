@@ -51,6 +51,8 @@ export interface OperationMetadata {
   stableKey?: { key: string; value: string };
   /** Group id for operations created as part of a single action */
   groupId?: string;
+  /** user-layer undo unit */
+  actionId?: string;
   /** Whether this operation was generated as a dependency */
   generated?: boolean;
   /** Dependencies required for this operation */

@@ -1,14 +1,15 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { DelayProfilesRow } from '$shared/pcd/display.ts';
+  import type { DelayProfileListItem } from '$shared/pcd/display.ts';
   import { page } from '$app/stores';
   import { Clock, Zap, Shield, Copy, Download } from 'lucide-svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
   import Button from '$ui/button/Button.svelte';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
 
-  export let profiles: DelayProfilesRow[];
+  export let profiles: DelayProfileListItem[];
 
   const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
 
@@ -49,7 +50,12 @@
     <Card href="/delay-profiles/{databaseId}/{encodeURIComponent(profile.name)}" hoverable>
       <svelte:fragment slot="header">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+            {#if profile.locallyModified}
+              <LocallyModifiedBadge />
+            {/if}
+          </div>
           <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
           <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
             <Button

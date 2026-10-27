@@ -1,5 +1,5 @@
 import { error, type ServerLoad } from '@sveltejs/kit';
-import { pcdManager } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, pcdManager } from '$pcd/index.ts';
 import { list } from '$pcd/entities/mediaManagement/quality-definitions/read.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -74,7 +74,13 @@ export const load: ServerLoad = async ({ params }) => {
         }
 
         const rows = await list(cache);
-        return withPcdSource(rows, database);
+        const locallyModified = database.id === currentDatabaseId ? buildLocallyModifiedLookup(database.id) : null;
+        const flaggedRows = locallyModified
+          ? rows.map((row) =>
+              locallyModified('qualityDefinitions', row.arr_type, row.name) ? { ...row, locallyModified: true } : row
+            )
+          : rows;
+        return withPcdSource(flaggedRows, database);
       })
     )
   ).flat();

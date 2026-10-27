@@ -112,7 +112,7 @@ const databaseLockTails = new Map<number, Promise<void>>();
  * async context (e.g. via a compile's auto-override) passes straight through instead of
  * deadlocking on itself.
  */
-async function withDatabaseOverrideLock<T>(databaseId: number, fn: () => Promise<T>): Promise<T> {
+export async function withDatabaseOverrideLock<T>(databaseId: number, fn: () => Promise<T>): Promise<T> {
   const held = heldDatabaseLocks.getStore();
   if (held?.has(databaseId)) return fn();
 
