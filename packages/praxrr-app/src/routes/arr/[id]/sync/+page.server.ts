@@ -47,8 +47,9 @@ const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
 const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
 const SYNC_ENQUEUE_FAILED_ERROR = 'Failed to queue the sync. Check the server logs for details.';
-const SAVE_METADATA_PROFILES_FAILED_ERROR = 'Failed to save metadata profiles sync config. Check server logs details.';
-const TRASH_GUIDE_ACTION_FAILED_ERROR = 'TRaSH source sync request failed. Check server logs details.';
+const SAVE_METADATA_PROFILES_FAILED_ERROR =
+  'Failed to save metadata profiles sync config. Check the server logs for details.';
+const TRASH_GUIDE_ACTION_FAILED_ERROR = 'TRaSH source sync request failed. Check the server logs for details.';
 const VALID_TRASH_GUIDE_SYNC_TRIGGERS: ReadonlySet<string> = new Set<TrashGuideSyncTrigger>([
   'none',
   'manual',
@@ -558,7 +559,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save quality profiles sync config. Check server logs details.' });
+      return fail(500, { error: 'Failed to save quality profiles sync config. Check the server logs for details.' });
     }
   },
 
@@ -599,7 +600,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save delay profile sync config. Check server logs details.' });
+      return fail(500, { error: 'Failed to save delay profile sync config. Check the server logs for details.' });
     }
   },
 
@@ -648,7 +649,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save media management sync config. Check server logs details.' });
+      return fail(500, { error: 'Failed to save media management sync config. Check the server logs for details.' });
     }
   },
 

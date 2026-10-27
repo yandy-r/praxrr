@@ -24,8 +24,9 @@ type ActionFailure = { status: number; data?: { error?: string } };
 const SECRET = 'apikey=sk_live_SECRET123';
 const RAW_DB_ERROR = 'HTTP 500: Internal Server Error | ' + SECRET;
 const SYNC_ENQUEUE_FAILED = 'Failed to queue the sync. Check the server logs for details.';
-const SAVE_METADATA_PROFILES_FAILED = 'Failed to save metadata profiles sync config. Check server logs details.';
-const TRASH_GUIDE_ACTION_FAILED = 'TRaSH source sync request failed. Check server logs details.';
+const SAVE_METADATA_PROFILES_FAILED =
+  'Failed to save metadata profiles sync config. Check the server logs for details.';
+const TRASH_GUIDE_ACTION_FAILED = 'TRaSH source sync request failed. Check the server logs for details.';
 
 /** Real scratch SQLite DB per test with the full migration chain (mirrors arrSyncLiveStatus.test.ts). */
 function migratedTest(name: string, fn: () => Promise<void> | void): void {

@@ -78,7 +78,7 @@ const STATIC_PATTERNS = [
   /^TRaSH source \d+ is no longer available\.$/,
 ];
 const ENTITY_STATIC_REASON =
-  /^(?:Prepared media-management identity guard is inconsistent\.|Prepared quality-definition identity guards are inconsistent\.|Media settings are not supported for this arr instance type\.|Naming is not supported for this arr instance type\.|Quality definitions are not supported for this arr instance type\.|TRaSH source \d+ is no longer available\.)$/;
+  /^(?:Prepared media-management identity guard is inconsistent\.|Prepared quality-definition identity guards are inconsistent\.|Media settings are not supported for this arr instance type\.|Naming is not supported for this arr instance type\.|Quality definitions are not supported for this arr instance type\.|TRaSH source \d+ is no longer available\.|TRaSH naming entity is not in the local cache\.|TRaSH quality definition is not in the local cache\.)$/;
 
 function isSafeLabel(text: string): boolean {
   return (

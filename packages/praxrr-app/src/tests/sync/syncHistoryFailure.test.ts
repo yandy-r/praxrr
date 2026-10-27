@@ -148,6 +148,8 @@ Deno.test('toSafeSyncErrorText preserves only closed writer labels and joins', (
     'Arr credentials are not readable. Arr credentials are not readable. Check Arr credential key configuration and recreate the API key. The instance has been disabled.',
     'Arr credentials are not readable. Arr master key configuration is invalid or incomplete. Update ARR_CREDENTIAL_MASTER_KEY settings and retry. The instance has been disabled.',
     'naming: The Arr instance timed out.; mediaSettings: Sync write failed.',
+    'naming: TRaSH naming entity is not in the local cache.',
+    'qualityDefinitions: TRaSH quality definition is not in the local cache.',
   ]) {
     assertEquals(toSafeSyncErrorText(text), text);
     assertEquals(toSafeSyncErrorText(toSafeSyncErrorText(text)), text);
