@@ -201,6 +201,7 @@ Steps:
    - Base-layer writes must not gain `action_id`.
    - Do not alter `supersedePriorUserOps`/`cancelOutCreate` logic, and do not touch `group_id`.
 4. `hooks.server.ts`: add a third `Handle` `userActionHandle` after `authHandle`:
+
    ```ts
    const userActionHandle: Handle = ({ event, resolve }) =>
      ['GET', 'HEAD', 'OPTIONS'].includes(event.request.method)
@@ -208,7 +209,9 @@ Steps:
        : withUserOpAction(() => resolve(event));
    export const handle = sequence(csrfGuard, authHandle, userActionHandle);
    ```
+
    Import `withUserOpAction` from `$pcd/ops/actionContext.ts`. One mutating request = one user action.
+
 5. Tests (`writerActionId.test.ts`, pure and self-contained so it does not depend on Task 3's helper):
    - Export `__testOnly_buildMetadataJson` from `writer.ts` (mirrors the existing `__testOnly_*` exports at `writer.ts:275-284`). Assert: `action_id` appears when the metadata carries `actionId`; it is absent when unset.
    - Assert `withUserOpAction` scoping: two calls to `currentUserOpActionId()` inside one scope return the same id; outside any scope it is `undefined`; a nested scope keeps the outer id.
