@@ -46,6 +46,10 @@ import type { ArrSyncSection, JobQueueRecord, JobType } from '$jobs/queueTypes.t
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
 const METADATA_PROFILES_SECTION = 'metadataProfiles';
 const METADATA_PROFILE_UNSUPPORTED_ERROR = 'Metadata profile sync is supported only for Lidarr instances';
+const SYNC_ENQUEUE_FAILED_ERROR = 'Failed to queue the sync. Check the server logs for details.';
+const SAVE_METADATA_PROFILES_FAILED_ERROR =
+  'Failed to save metadata profiles sync config. Check the server logs for details.';
+const TRASH_GUIDE_ACTION_FAILED_ERROR = 'TRaSH source sync request failed. Check the server logs for details.';
 const VALID_TRASH_GUIDE_SYNC_TRIGGERS: ReadonlySet<string> = new Set<TrashGuideSyncTrigger>([
   'none',
   'manual',
@@ -241,11 +245,7 @@ function mapTrashGuideActionError(error: unknown): { status: number; message: st
     return { status: 404, message: error.message };
   }
 
-  if (error instanceof Error) {
-    return { status: 500, message: error.message };
-  }
-
-  return { status: 500, message: 'TRaSH source sync request failed' };
+  return { status: 500, message: TRASH_GUIDE_ACTION_FAILED_ERROR };
 }
 
 const ARR_SYNC_SECTIONS: readonly ArrSyncSection[] = [
@@ -559,7 +559,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save quality profiles sync config' });
+      return fail(500, { error: 'Failed to save quality profiles sync config. Check the server logs for details.' });
     }
   },
 
@@ -600,7 +600,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save delay profile sync config' });
+      return fail(500, { error: 'Failed to save delay profile sync config. Check the server logs for details.' });
     }
   },
 
@@ -649,7 +649,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: e },
       });
-      return fail(500, { error: 'Failed to save media management sync config' });
+      return fail(500, { error: 'Failed to save media management sync config. Check the server logs for details.' });
     }
   },
 
@@ -699,7 +699,7 @@ export const actions: Actions = {
         meta: { instanceId: id, error: errorMsg },
       });
 
-      return fail(500, { error: `Failed to save metadata profiles sync config: ${errorMsg}` });
+      return fail(500, { error: SAVE_METADATA_PROFILES_FAILED_ERROR });
     }
   },
 
@@ -750,7 +750,7 @@ export const actions: Actions = {
         if (mapped.status >= 500) {
           await logger.error('Failed to merge TRaSH media management selections', {
             source: 'sync',
-            meta: { instanceId: id, sourceId: sourceIdResult.value, error: mapped.message },
+            meta: { instanceId: id, sourceId: sourceIdResult.value, error },
           });
         }
         return fail(mapped.status, { error: mapped.message });
@@ -798,7 +798,7 @@ export const actions: Actions = {
       if (mapped.status >= 500) {
         await logger.error('Failed to save TRaSH source sync config', {
           source: 'sync',
-          meta: { instanceId: id, sourceId: sourceIdResult.value, error: mapped.message },
+          meta: { instanceId: id, sourceId: sourceIdResult.value, error },
         });
       }
       return fail(mapped.status, { error: mapped.message });
@@ -862,7 +862,7 @@ export const actions: Actions = {
       if (mapped.status >= 500) {
         await logger.error(`TRaSH source sync enqueue failed for "${instance.name}"`, {
           source: 'sync',
-          meta: { instanceId: id, sourceId, error: mapped.message },
+          meta: { instanceId: id, sourceId, error },
         });
       }
       return fail(mapped.status, { error: mapped.message });
@@ -906,7 +906,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
-      return fail(500, { error: `Sync failed: ${errorMsg}` });
+      return fail(500, { error: SYNC_ENQUEUE_FAILED_ERROR });
     }
   },
 
@@ -947,7 +947,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
-      return fail(500, { error: `Sync failed: ${errorMsg}` });
+      return fail(500, { error: SYNC_ENQUEUE_FAILED_ERROR });
     }
   },
 
@@ -988,7 +988,7 @@ export const actions: Actions = {
         source: 'sync',
         meta: { instanceId: id, error: errorMsg },
       });
-      return fail(500, { error: `Sync failed: ${errorMsg}` });
+      return fail(500, { error: SYNC_ENQUEUE_FAILED_ERROR });
     }
   },
 
@@ -1035,7 +1035,7 @@ export const actions: Actions = {
         meta: { instanceId: id, error: errorMsg },
       });
 
-      return fail(500, { error: `Sync failed: ${errorMsg}` });
+      return fail(500, { error: SYNC_ENQUEUE_FAILED_ERROR });
     }
   },
 };

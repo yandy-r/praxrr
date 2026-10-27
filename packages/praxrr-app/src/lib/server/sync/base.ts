@@ -5,6 +5,7 @@
 
 import type { BaseArrClient } from '$arr/base.ts';
 import { logger } from '$logger/logger.ts';
+import { classifySyncFailure } from './syncHistoryFailure.ts';
 import type { SyncResult } from './types.ts';
 import { omitUndefinedReviewProperties } from './preview/reviewBinding.ts';
 import type {
@@ -90,14 +91,14 @@ export abstract class BaseSyncer {
 
       return { success: true, itemsSynced: arrData.length, outcomes: [] };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const failure = classifySyncFailure(error);
 
       await logger.error(`Failed ${this.syncType} sync for "${this.instanceName}"`, {
         source: 'Syncer',
-        meta: { instanceId: this.instanceId, error: errorMsg },
+        meta: { instanceId: this.instanceId, ...failure.protectedDetails },
       });
 
-      return { success: false, itemsSynced: 0, error: errorMsg, outcomes: [] };
+      return { success: false, itemsSynced: 0, error: failure.message, outcomes: [] };
     }
   }
 

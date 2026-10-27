@@ -96,6 +96,7 @@ import { migration as migration20261024BoundScheduleIntervals } from './migratio
 import { migration as migration20261025CreateArrManagedEntities } from './migrations/20261025_create_arr_managed_entities.ts';
 import { migration as migration20261026HashSessionIds } from './migrations/20261026_hash_session_ids.ts';
 import { migration as migration20261027CreateOidcAllowlistState } from './migrations/20261027_create_oidc_allowlist_state.ts';
+import { migration as migration20261028ScrubSyncErrorText } from './migrations/20261028_scrub_sync_error_text.ts';
 
 export interface Migration {
   version: number;
@@ -426,6 +427,7 @@ export function loadMigrations(): Migration[] {
     migration20261025CreateArrManagedEntities,
     migration20261026HashSessionIds,
     migration20261027CreateOidcAllowlistState,
+    migration20261028ScrubSyncErrorText,
   ];
 
   // Sort by version number

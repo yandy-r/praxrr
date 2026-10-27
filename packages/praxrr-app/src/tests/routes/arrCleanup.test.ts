@@ -3,8 +3,15 @@
 
 import { assert, assertEquals } from '@std/assert';
 import { POST } from '../../routes/api/v1/arr/cleanup/+server.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
+import { logger } from '$logger/logger.ts';
+import type { LogOptions } from '$logger/types.ts';
 import { MAX_CLEANUP_ITEMS, parseCleanupRequest } from '$lib/server/sync/cleanupRequest.ts';
+import { HttpError } from '$http/types.ts';
+import { RadarrClient } from '$utils/arr/clients/radarr.ts';
+import { arrSyncQueries } from '$db/queries/arrSync.ts';
+import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 
 type PostEvent = Parameters<typeof POST>[0];
 
@@ -162,3 +169,67 @@ Deno.test('parseCleanupRequest: includeUnmanaged defaults to false, accepts bool
     });
   }
 });
+
+Deno.test('POST /api/v1/arr/cleanup: 5xx returns a fixed message and logs the raw error', async () => {
+  const secret = 'apikey=sk_live_SECRET123';
+  const upstreamBody = JSON.stringify({ message: secret });
+  const originalGetById = arrInstancesQueries.getById;
+  const originalGetCredentials = arrInstanceCredentialsQueries.getByInstanceId;
+  const originalGetQualityProfilesSync = arrSyncQueries.getQualityProfilesSync;
+  const originalGetTrashSources = trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance;
+  const originalGetCustomFormats = RadarrClient.prototype.getCustomFormats;
+  const originalGetQualityProfiles = RadarrClient.prototype.getQualityProfiles;
+  const originalLoggerError = logger.error;
+  const logged: { message: string; options?: LogOptions }[] = [];
+  arrInstancesQueries.getById = () => ({
+    id: 1,
+    name: 'Test',
+    type: 'radarr',
+    url: 'http://127.0.0.1:9',
+    external_url: null,
+    api_key_fingerprint: null,
+    api_key: 'key',
+    tags: null,
+    enabled: 1,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  });
+  arrInstanceCredentialsQueries.getByInstanceId = () => undefined;
+  arrSyncQueries.getQualityProfilesSync = () => ({
+    selections: [],
+    config: { trigger: 'manual', cron: null, lastSyncedAt: null },
+  });
+  trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = () => [];
+  RadarrClient.prototype.getCustomFormats = async () => {
+    throw new HttpError(`HTTP 500: Internal Server Error | ${upstreamBody}`, 500, JSON.parse(upstreamBody));
+  };
+  RadarrClient.prototype.getQualityProfiles = async () => [];
+  logger.error = async (message: string, options?: LogOptions) => {
+    logged.push({ message, options });
+  };
+  try {
+    const response = await POST(buildPostEvent(JSON.stringify({ instanceId: 1, action: 'scan' })));
+    assertEquals(response.status, 500);
+    const text = await response.text();
+    assertEquals(JSON.parse(text), {
+      error: 'Cleanup failed. Check the server logs for details.',
+      code: 'cleanup_failed',
+    });
+    assert(!text.includes('SECRET123'), 'response must not contain the raw error text');
+    assertEquals(logged.length, 1);
+    assertEquals(logged[0].options?.source, 'arr/cleanup');
+    assert(JSON.stringify(logged[0].options?.meta, errorReplacer).includes('SECRET123'), 'raw error must be logged');
+  } finally {
+    arrInstancesQueries.getById = originalGetById;
+    arrInstanceCredentialsQueries.getByInstanceId = originalGetCredentials;
+    arrSyncQueries.getQualityProfilesSync = originalGetQualityProfilesSync;
+    trashGuideSyncQueries.getQualityProfileSourceHydrationByInstance = originalGetTrashSources;
+    RadarrClient.prototype.getCustomFormats = originalGetCustomFormats;
+    RadarrClient.prototype.getQualityProfiles = originalGetQualityProfiles;
+    logger.error = originalLoggerError;
+  }
+});
+
+function errorReplacer(_key: string, value: unknown): unknown {
+  return value instanceof Error ? { name: value.name, message: value.message } : value;
+}

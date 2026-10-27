@@ -4,6 +4,7 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { syncHistoryQueries, type SyncHistoryFilters } from '$db/queries/syncHistory.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 import type { SyncEntityChange, SyncHistoryInput, SyncSectionResult } from '$sync/syncHistory/types.ts';
 
 /**
@@ -196,8 +197,15 @@ migratedTest('insert then getById round-trips changes, sectionResults, and secti
     },
   ];
   const sectionResults: SyncSectionResult[] = [
-    { section: 'qualityProfiles', status: 'success', itemsSynced: 2, error: null },
-    { section: 'mediaManagement', status: 'failed', itemsSynced: 0, error: 'boom', failedProfiles: ['Bad'] },
+    { section: 'qualityProfiles', status: 'success', itemsSynced: 2, error: null, errorCode: null },
+    {
+      section: 'mediaManagement',
+      status: 'failed',
+      itemsSynced: 0,
+      error: GENERIC_SYNC_ERROR_TEXT,
+      errorCode: 'internal',
+      failedProfiles: ['Bad'],
+    },
   ];
   const sectionsAttempted: SyncHistoryInput['sectionsAttempted'] = ['qualityProfiles', 'mediaManagement'];
 
@@ -210,7 +218,7 @@ migratedTest('insert then getById round-trips changes, sectionResults, and secti
       itemsSynced: 2,
       changes,
       sectionResults,
-      error: 'partial failure',
+      error: GENERIC_SYNC_ERROR_TEXT,
     })
   );
   assert(id > 0);
@@ -230,7 +238,7 @@ migratedTest('insert then getById round-trips changes, sectionResults, and secti
   assertEquals(detail.failureCount, 1);
   // entity_change_count is derived from changes.length by insert().
   assertEquals(detail.entityChangeCount, 2);
-  assertEquals(detail.error, 'partial failure');
+  assertEquals(detail.error, GENERIC_SYNC_ERROR_TEXT);
   assertEquals(detail.startedAt, '2026-07-08T10:00:00.000Z');
   assertEquals(detail.finishedAt, '2026-07-08T10:00:05.000Z');
   assertEquals(detail.durationMs, 5000);
@@ -284,7 +292,7 @@ migratedTest('search filters each dimension independently and combined; per-arr_
       trigger: 'schedule',
       status: 'failed',
       sectionsAttempted: ['mediaManagement'],
-      error: 'network unreachable',
+      error: GENERIC_SYNC_ERROR_TEXT,
       startedAt: '2026-07-05T10:00:00.000Z',
     })
   );
@@ -317,7 +325,7 @@ migratedTest('search filters each dimension independently and combined; per-arr_
   assertEquals(idsOf({ section: 'metadataProfiles' }), [lidarrId]);
   // q matches instance_name and error
   assertEquals(idsOf({ q: 'Films' }), [radarrId]);
-  assertEquals(idsOf({ q: 'unreachable' }), [sonarrId]);
+  assertEquals(idsOf({ q: 'Sync failed' }), [sonarrId]);
 
   // from/to date range (inclusive bounds around the sonarr row only).
   assertEquals(idsOf({ from: '2026-07-03T00:00:00.000Z', to: '2026-07-07T00:00:00.000Z' }), [sonarrId]);

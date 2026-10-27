@@ -524,6 +524,16 @@ ErrorResponse:
     error:
       type: string
       description: Error message
+    code:
+      type: string
+      enum:
+        - cleanup_failed
+        - library_fetch_failed
+        - episodes_fetch_failed
+        - releases_fetch_failed
+      description: >-
+        Stable machine-readable code present on 5xx responses; `error` is a fixed user-safe message, raw detail
+        is logged server-side only
 
 # Cleanup endpoint types
 StaleItem:
@@ -608,8 +618,9 @@ SkippedItem:
     reason:
       type: string
       description: >-
-        Why the item was not deleted (e.g. "Profile is assigned to media", "No longer stale; not deleted",
-        or the Arr delete error message)
+        Closed user-safe reason the item was not deleted (e.g. "Profile is assigned to media",
+        "No longer stale; not deleted", "The Arr instance rejected the request (HTTP 400).",
+        "The delete failed unexpectedly."); the raw Arr error is logged server-side only
 
 CleanupDeleteResult:
   type: object

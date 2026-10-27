@@ -500,8 +500,9 @@ class LidarrApiParityTest extends BaseTest {
       } as Parameters<typeof libraryGet>[0]);
 
       assertEquals(response.status, 500);
-      assertEquals((await response.json()) as ErrorEnvelope, {
-        error: 'lidarr library failed',
+      assertEquals(await response.json(), {
+        error: 'Failed to fetch library. Check the server logs for details.',
+        code: 'library_fetch_failed',
       });
     });
 
@@ -671,8 +672,9 @@ class LidarrApiParityTest extends BaseTest {
       } as Parameters<typeof releasesGet>[0]);
 
       assertEquals(response.status, 500);
-      assertEquals((await response.json()) as ErrorEnvelope, {
-        error: 'lidarr releases failed',
+      assertEquals(await response.json(), {
+        error: 'Failed to fetch releases. Check the server logs for details.',
+        code: 'releases_fetch_failed',
       });
     });
 

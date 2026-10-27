@@ -11,6 +11,7 @@ import {
   isSyncHistoryEnabled,
   recordSyncHistory,
 } from '$sync/syncHistory/record.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 import type {
   SyncEntityChange,
   SyncEntityOutcome,
@@ -153,7 +154,7 @@ migratedTest('recordSyncHistory persists status/trigger/snapshot/error/sectionRe
       status: 'success',
       trigger: 'manual',
       error: null,
-      sectionResults: [{ section: 'qualityProfiles', status: 'success', itemsSynced: 2, error: null }],
+      sectionResults: [{ section: 'qualityProfiles', status: 'success', itemsSynced: 2, error: null, errorCode: null }],
       changes: [makeChange('qualityProfiles', 'customFormats', 'Radarr-CF')],
     },
     {
@@ -161,10 +162,17 @@ migratedTest('recordSyncHistory persists status/trigger/snapshot/error/sectionRe
       arrType: 'sonarr',
       status: 'partial',
       trigger: 'schedule',
-      error: '1 section(s) failed',
+      error: GENERIC_SYNC_ERROR_TEXT,
       sectionResults: [
-        { section: 'qualityProfiles', status: 'success', itemsSynced: 1, error: null },
-        { section: 'mediaManagement', status: 'failed', itemsSynced: 0, error: 'boom', failedProfiles: ['HD'] },
+        { section: 'qualityProfiles', status: 'success', itemsSynced: 1, error: null, errorCode: null },
+        {
+          section: 'mediaManagement',
+          status: 'failed',
+          itemsSynced: 0,
+          error: GENERIC_SYNC_ERROR_TEXT,
+          errorCode: 'internal',
+          failedProfiles: ['HD'],
+        },
       ],
       changes: [makeChange('qualityProfiles', 'qualityProfiles', 'Sonarr-QP')],
     },
@@ -173,8 +181,16 @@ migratedTest('recordSyncHistory persists status/trigger/snapshot/error/sectionRe
       arrType: 'lidarr',
       status: 'failed',
       trigger: 'system',
-      error: 'connection refused',
-      sectionResults: [{ section: 'metadataProfiles', status: 'failed', itemsSynced: 0, error: 'connection refused' }],
+      error: 'Could not reach the Arr instance.',
+      sectionResults: [
+        {
+          section: 'metadataProfiles',
+          status: 'failed',
+          itemsSynced: 0,
+          error: 'Could not reach the Arr instance.',
+          errorCode: 'unreachable',
+        },
+      ],
       changes: [],
     },
     {
@@ -183,7 +199,7 @@ migratedTest('recordSyncHistory persists status/trigger/snapshot/error/sectionRe
       status: 'skipped',
       trigger: 'manual',
       error: null,
-      sectionResults: [{ section: 'qualityProfiles', status: 'skipped', itemsSynced: 0, error: null }],
+      sectionResults: [{ section: 'qualityProfiles', status: 'skipped', itemsSynced: 0, error: null, errorCode: null }],
       changes: [],
     },
   ];
@@ -275,7 +291,12 @@ migratedTest('recordSyncHistory records nothing when disabled and isSyncHistoryE
 });
 
 function section(status: SyncSectionResult['status'], itemsSynced: number): SyncSectionResult {
-  return { section: 'qualityProfiles', status, itemsSynced, error: status === 'failed' ? 'boom' : null };
+  return {
+    section: 'qualityProfiles',
+    status,
+    itemsSynced,
+    error: status === 'failed' ? GENERIC_SYNC_ERROR_TEXT : null,
+  };
 }
 
 Deno.test('deriveSyncHistoryStatus discriminates partial vs failed on section success, not item count', () => {

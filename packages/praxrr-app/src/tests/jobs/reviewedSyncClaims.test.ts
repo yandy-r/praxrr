@@ -322,9 +322,9 @@ Deno.test({
         setStatus(1, 'mediaManagement', 'idle');
         const failClaim = arrSyncQueries.claimReviewedSyncSections(1, ['qualityProfiles', 'delayProfiles']);
         assertExists(failClaim);
-        assertEquals(arrSyncQueries.failReviewedSyncSections(failClaim, 'review invalidated'), true);
+        assertEquals(arrSyncQueries.failReviewedSyncSections(failClaim, 'Reviewed sync failed'), true);
         assertEquals(getStatus(1, 'qualityProfiles').sync_status, 'failed');
-        assertEquals(getStatus(1, 'qualityProfiles').last_error, 'review invalidated');
+        assertEquals(getStatus(1, 'qualityProfiles').last_error, 'Reviewed sync failed');
         assertEquals(getStatus(1, 'delayProfiles').sync_status, 'failed');
         assertEquals(getStatus(1, 'mediaManagement').sync_status, 'idle');
       });
@@ -357,12 +357,12 @@ Deno.test({
         assertExists(claim);
 
         arrSyncQueries.markForSync('on_change');
-        assertEquals(arrSyncQueries.failReviewedSyncSections(claim, 'review invalidated'), true);
+        assertEquals(arrSyncQueries.failReviewedSyncSections(claim, 'Reviewed sync failed'), true);
         for (const section of SECTIONS) {
           const status = getStatus(1, section);
           assertEquals(status.sync_status, 'pending', section);
           assertEquals(status.should_sync, 1, section);
-          assertEquals(status.last_error, 'review invalidated', section);
+          assertEquals(status.last_error, 'Reviewed sync failed', section);
         }
       });
 

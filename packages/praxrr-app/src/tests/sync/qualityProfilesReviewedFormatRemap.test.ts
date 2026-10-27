@@ -1,6 +1,6 @@
 /**
  * Reviewed (preview → apply) quality-profile sync must resolve formatItems by the planned
- * custom-format id, never by bare name (YAN-445 / GitHub #343).
+ * custom-format id, never by bare name.
  */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from '@std/assert';
 import { config } from '$config';
@@ -8,12 +8,15 @@ import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { ArrCustomFormat, ArrQualityProfilePayload, QualityProfileFormatItem } from '$arr/types.ts';
+import { logger } from '$logger/logger.ts';
+import type { LogOptions } from '$logger/types.ts';
 import { previewCustomFormats } from '$sync/customFormats/syncer.ts';
 import type { PcdCustomFormat } from '$sync/customFormats/transformer.ts';
 import type { SyncArrType } from '$sync/mappings.ts';
 import type { SyncPreviewPreparedExecutionContext } from '$sync/preview/types.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
+import { GENERIC_SYNC_ERROR_TEXT } from '$sync/syncHistoryFailure.ts';
 
 /** Preview reads the instance prune policy, so every test here needs a migrated app DB. */
 function dbTest(name: string, fn: () => Promise<void> | void): void {
@@ -342,11 +345,23 @@ dbTest('reviewed QP apply rejects a plan that reuses a synthetic CF id before an
   };
   syncer.setPreparedExecutionContext(context);
 
-  const result = await syncer.sync();
+  const errorLogs: Array<{ message: string; options?: LogOptions }> = [];
+  const originalError = logger.error;
+  logger.error = (message: string, options?: LogOptions) => {
+    errorLogs.push({ message, options });
+    return Promise.resolve();
+  };
+  try {
+    const result = await syncer.sync();
 
-  assertEquals(result.success, false);
-  assertStringIncludes(result.error ?? '', 'reuses synthetic custom format id -1');
-  assertEquals(recorded, emptyRecorded());
+    assertEquals(result.success, false);
+    assertEquals(result.error, GENERIC_SYNC_ERROR_TEXT);
+    assertEquals(recorded, emptyRecorded());
+    const meta = errorLogs.at(-1)?.options?.meta as Record<string, unknown> | undefined;
+    assertEquals(meta?.error, 'Reviewed quality profile plan reuses synthetic custom format id -1');
+  } finally {
+    logger.error = originalError;
+  }
 });
 
 dbTest('previewCustomFormats rejects a non-negative first synthetic id', async () => {

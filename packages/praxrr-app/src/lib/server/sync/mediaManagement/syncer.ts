@@ -2098,7 +2098,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           itemName: selection.itemName,
         },
       });
-      return subFail(`TRaSH naming entity "${selection.itemName}" is not in the local cache.`);
+      return subFail('TRaSH naming entity is not in the local cache.');
     }
 
     const entity = JSON.parse(cached.jsonData) as TrashGuideNamingEntity;
@@ -2187,7 +2187,7 @@ export class MediaManagementSyncer extends BaseSyncer {
           itemName: selection.itemName,
         },
       });
-      return subFail(`TRaSH quality definition "${selection.itemName}" is not in the local cache.`);
+      return subFail('TRaSH quality definition is not in the local cache.');
     }
 
     const entity = JSON.parse(cached.jsonData) as TrashGuideQualitySizeEntity;

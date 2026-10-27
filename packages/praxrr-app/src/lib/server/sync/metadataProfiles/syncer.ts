@@ -653,7 +653,7 @@ export class MetadataProfileSyncer extends BaseSyncer {
       return {
         success: false,
         itemsSynced: 0,
-        error: errorMsg,
+        error: reason,
         outcomes: [outcome('failed', target ? 'update' : 'create', target ? String(target.id) : null, reason)],
       };
     }

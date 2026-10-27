@@ -10,6 +10,7 @@ import type {
   SyncTrigger,
   SyncTriggerEvent,
 } from '$sync/syncHistory/types.ts';
+import { sanitizeSectionResult, sanitizeSyncHistoryInput, toSafeSyncErrorText } from '$sync/syncHistoryFailure.ts';
 
 /**
  * Row shape for sync_history (byte-aligned to the migration columns).
@@ -127,7 +128,7 @@ function rowToSummary(row: SyncHistoryRow): SyncHistorySummary {
     entityChangeCount: row.entity_change_count,
     entityOutcomeCount: row.entity_outcome_count,
     previewId: row.preview_id,
-    error: row.error,
+    error: toSafeSyncErrorText(row.error),
     startedAt: row.started_at,
     finishedAt: row.finished_at,
     durationMs: row.duration_ms,
@@ -138,7 +139,7 @@ function rowToSummary(row: SyncHistoryRow): SyncHistorySummary {
 function rowToDetail(row: SyncHistoryRow): SyncHistoryDetail {
   return {
     ...rowToSummary(row),
-    sectionResults: parseJsonArray<SyncSectionResult>(row.section_results),
+    sectionResults: parseJsonArray<SyncSectionResult>(row.section_results).map(sanitizeSectionResult),
     changes: parseJsonArray<SyncEntityChange>(row.changes),
     entityOutcomes: parseJsonArray<SyncEntityOutcome>(row.entity_outcomes),
   };
@@ -206,6 +207,7 @@ export const syncHistoryQueries = {
    * hold a transaction — a nested bare `BEGIN` is not re-entrancy-safe.
    */
   insert(input: SyncHistoryInput): number {
+    const safe = sanitizeSyncHistoryInput(input);
     db.execute(
       `INSERT INTO sync_history (
 				arr_instance_id, instance_name, arr_type, job_id, trigger, trigger_event,
@@ -213,27 +215,27 @@ export const syncHistoryQueries = {
 				entity_change_count, entity_outcome_count, section_results, changes, entity_outcomes,
 				preview_id, error, started_at, finished_at, duration_ms
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      input.arrInstanceId,
-      input.instanceName,
-      input.arrType,
-      input.jobId,
-      input.trigger,
-      input.triggerEvent,
-      JSON.stringify(input.sectionsAttempted),
-      input.status,
-      input.sectionsRun,
-      input.itemsSynced,
-      input.failureCount,
-      input.changes.length,
-      input.entityOutcomes.length,
-      JSON.stringify(input.sectionResults),
-      JSON.stringify(input.changes),
-      JSON.stringify(input.entityOutcomes),
-      input.previewId,
-      input.error,
-      input.startedAt,
-      input.finishedAt,
-      input.durationMs
+      safe.arrInstanceId,
+      safe.instanceName,
+      safe.arrType,
+      safe.jobId,
+      safe.trigger,
+      safe.triggerEvent,
+      JSON.stringify(safe.sectionsAttempted),
+      safe.status,
+      safe.sectionsRun,
+      safe.itemsSynced,
+      safe.failureCount,
+      safe.changes.length,
+      safe.entityOutcomes.length,
+      JSON.stringify(safe.sectionResults),
+      JSON.stringify(safe.changes),
+      JSON.stringify(safe.entityOutcomes),
+      safe.previewId,
+      safe.error,
+      safe.startedAt,
+      safe.finishedAt,
+      safe.durationMs
     );
     const row = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() AS id');
     return row?.id ?? 0;

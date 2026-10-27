@@ -19,6 +19,7 @@ import { BaseSyncer, type SyncResult } from '../base.ts';
 import type { BaseArrClient } from '$arr/base.ts';
 import type { SyncEntityOutcome } from '../types.ts';
 import { sanitizeArrWriteError } from '../sanitizeArrWriteError.ts';
+import { classifySyncFailure } from '../syncHistoryFailure.ts';
 import { arrSyncQueries, type ProfileSelection } from '$db/queries/arrSync.ts';
 import { arrNamespaceQueries } from '$db/queries/arrNamespaces.ts';
 import { type TrashGuideSyncQualityProfileSourceHydration, trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
@@ -454,14 +455,14 @@ export class QualityProfileSyncer extends BaseSyncer {
 
       return { success: true, itemsSynced: allSyncedProfiles.length, outcomes };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const failure = classifySyncFailure(error);
 
       await logger.error(`Failed quality profile sync for "${this.instanceName}"`, {
         source: 'Sync:QualityProfiles',
-        meta: { instanceId: this.instanceId, error: errorMsg },
+        meta: { instanceId: this.instanceId, ...failure.protectedDetails },
       });
 
-      return { success: false, itemsSynced: 0, error: errorMsg, outcomes };
+      return { success: false, itemsSynced: 0, error: failure.message, outcomes };
     }
   }
 
@@ -946,15 +947,15 @@ export class QualityProfileSyncer extends BaseSyncer {
           }
         : { success: true, itemsSynced: syncedProfiles, outcomes };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const failure = classifySyncFailure(error);
       await logger.error(`Failed reviewed quality profile sync for "${this.instanceName}"`, {
         source: 'Sync:QualityProfiles',
-        meta: { instanceId: this.instanceId, error: errorMsg },
+        meta: { instanceId: this.instanceId, ...failure.protectedDetails },
       });
       return {
         success: false,
         itemsSynced: syncedProfiles,
-        error: errorMsg,
+        error: failure.message,
         outcomes,
       };
     }

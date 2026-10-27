@@ -1,6 +1,7 @@
 import { db } from '../db.ts';
 import type { ArrType } from '$shared/pcd/types.ts';
 import { parseTrashGuideSourceArrType, type TrashGuideSourceArrType } from '$lib/server/trashguide/types.ts';
+import { GENERIC_SYNC_ERROR_TEXT, toSafeSyncErrorText } from '$sync/syncHistoryFailure.ts';
 
 export type TrashGuideSyncTrigger = 'none' | 'manual' | 'on_pull' | 'on_change' | 'schedule';
 export type TrashGuideSyncStatus = 'idle' | 'pending' | 'in_progress' | 'failed';
@@ -189,7 +190,7 @@ function rowToConfig(row: TrashGuideSyncConfigRow): TrashGuideSyncConfig {
     cron: row.cron,
     nextRunAt: row.next_run_at,
     syncStatus: parseTrashGuideSyncStatus(row.sync_status),
-    lastError: row.last_error,
+    lastError: toSafeSyncErrorText(row.last_error),
     lastSyncedAt: row.last_synced_at,
     shouldSync: row.should_sync === 1,
     instanceType: parseInstanceArrType(row.instance_type),
@@ -595,7 +596,7 @@ export const trashGuideSyncQueries = {
 
     db.execute(
       "UPDATE trash_guide_sync_config SET sync_status = 'failed', should_sync = 0, last_error = ? WHERE instance_id = ? AND source_id = ?",
-      error,
+      toSafeSyncErrorText(error) ?? GENERIC_SYNC_ERROR_TEXT,
       instanceId,
       sourceId
     );

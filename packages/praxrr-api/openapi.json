@@ -1615,7 +1615,7 @@
             }
           },
           "500": {
-            "description": "Failed to fetch library",
+            "description": "Failed to fetch library (fixed message with code `library_fetch_failed`; raw error logged server-side)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1724,7 +1724,7 @@
             }
           },
           "500": {
-            "description": "Failed to fetch episode details",
+            "description": "Failed to fetch episode details (fixed message with code `episodes_fetch_failed`; raw error logged server-side)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1804,7 +1804,7 @@
             }
           },
           "500": {
-            "description": "Failed to fetch releases",
+            "description": "Failed to fetch releases (fixed message with code `releases_fetch_failed`; raw error logged server-side)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1878,7 +1878,7 @@
             }
           },
           "500": {
-            "description": "Failed to perform cleanup",
+            "description": "Failed to perform cleanup (fixed message with code `cleanup_failed`; raw error logged server-side)",
             "content": {
               "application/json": {
                 "schema": {
@@ -8981,6 +8981,11 @@
           "error": {
             "type": "string",
             "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "enum": ["cleanup_failed", "library_fetch_failed", "episodes_fetch_failed", "releases_fetch_failed"],
+            "description": "Stable machine-readable code present on 5xx responses; `error` is a fixed user-safe message, raw detail is logged server-side only"
           }
         }
       },
@@ -9070,7 +9075,7 @@
           },
           "reason": {
             "type": "string",
-            "description": "Why the item was not deleted (e.g. \"Profile is assigned to media\", \"No longer stale; not deleted\", or the Arr delete error message)"
+            "description": "Closed user-safe reason the item was not deleted (e.g. \"Profile is assigned to media\", \"No longer stale; not deleted\", \"The Arr instance rejected the request (HTTP 400).\", \"The delete failed unexpectedly.\"); the raw Arr error is logged server-side only"
           }
         }
       },
@@ -10443,7 +10448,20 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Closed, user-safe failure reason or static sync summary. Unknown legacy text is replaced with a generic message; existing stored errors are scrubbed on upgrade. Raw Arr response bodies are never returned."
+          },
+          "errorCode": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": ["unreachable", "timeout", "rejected", "serverError", "internal"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Closed history failure classification for `error`; null/absent when not failed. Unlike preview recovery codes, authorization and not-found failures are grouped under rejected."
           },
           "failedProfiles": {
             "type": "array",
@@ -10609,7 +10627,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Sanitized, user-safe failure summary. Raw Arr response bodies are never returned."
           },
           "startedAt": {
             "type": "string",
