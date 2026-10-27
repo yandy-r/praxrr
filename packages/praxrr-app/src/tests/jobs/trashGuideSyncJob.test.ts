@@ -1062,7 +1062,15 @@ Deno.test('trashGuideSync handler treats sync parseStatus failed as a terminal f
     'sync',
     (() =>
       Promise.resolve(
-        createSyncResult({ parseStatus: 'failed', commitsBehind: 1, parsedFiles: 0, failedFiles: 3 })
+        createSyncResult({
+          success: false,
+          parseStatus: 'failed',
+          failureKind: 'parse',
+          error: 'TRaSH parse failed for every discovered file (3)',
+          commitsBehind: 1,
+          parsedFiles: 0,
+          failedFiles: 3,
+        })
       )) as typeof trashGuideManager.sync,
     restores
   );
@@ -1127,7 +1135,14 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
     'sync',
     (() =>
       Promise.resolve(
-        createSyncResult({ success: false, error: message, parseStatus: 'failed', commitsBehind: 1, parsedFiles: 0 })
+        createSyncResult({
+          success: false,
+          error: message,
+          parseStatus: 'failed',
+          failureKind: 'run',
+          commitsBehind: 1,
+          parsedFiles: 0,
+        })
       )) as typeof trashGuideManager.sync,
     restores
   );
@@ -1146,7 +1161,7 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
 
     const evidence = parseEvidence(result.output);
     assertEquals(result.status, 'failure');
-    // success:false short-circuits before parseStatus, classifying the raw message (non-transient here).
+    // failureKind 'run' (not 'parse') classifies the raw message (non-transient here).
     assertEquals(evidence.failure?.code, 'sync_failed');
     assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('sync_failed').message);
     assertFalse(result.output?.includes(message) ?? false);

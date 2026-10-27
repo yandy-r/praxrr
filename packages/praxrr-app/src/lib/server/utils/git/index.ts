@@ -30,5 +30,6 @@ export {
   pull,
   push,
   refreshLocalRepositoryClone,
+  resetToCommit,
   resetToRemoteBranch,
 } from './write.ts';

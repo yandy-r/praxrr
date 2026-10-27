@@ -483,6 +483,14 @@ export async function resetToRemoteBranch(repoPath: string, branch: string): Pro
 }
 
 /**
+ * Hard-reset the working tree and current branch to a specific commit (discards local changes)
+ */
+export async function resetToCommit(repoPath: string, commit: string): Promise<void> {
+  await execGit(['reset', '--hard', commit], repoPath);
+  await execGit(['clean', '-fdx'], repoPath);
+}
+
+/**
  * Stage files
  */
 export async function stage(repoPath: string, filepaths: string[]): Promise<void> {

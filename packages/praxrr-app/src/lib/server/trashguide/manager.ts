@@ -1,7 +1,11 @@
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 import { type TrashGuideSource, trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
-import { type TrashGuideEntityCacheInput, trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
+import {
+  type TrashGuideEntityCache,
+  type TrashGuideEntityCacheInput,
+  trashGuideEntityCacheQueries,
+} from '$db/queries/trashGuideEntityCache.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { trashIdMappingsQueries } from '$db/queries/trashIdMappings.ts';
@@ -11,12 +15,14 @@ import {
   checkForUpdates as checkGitForUpdates,
   getCommits,
   isLocalRepositorySource,
+  resetToCommit,
   type UpdateInfo,
 } from '$utils/git/index.ts';
 import { discoverTrashGuideFiles, fetchTrashGuideSource } from './fetcher.ts';
 import { parseTrashGuideEntities } from './parser.ts';
-import { transformTrashGuideEntities } from './transformer.ts';
+import { transformTrashGuideEntities, type TrashGuideTransformResult } from './transformer.ts';
 import type {
+  TrashGuideParsedEntities,
   TrashGuideParsedEntity,
   TrashGuideParseResult,
   TrashGuideParseStatus,
@@ -48,6 +54,11 @@ export interface TrashGuideSyncResult {
   removedEntities: number;
   renamedEntities: number;
   error?: string;
+  /**
+   * Set only on `success: false`. 'parse' = every discovered file failed to parse (cache left
+   * untouched); 'run' = any other failure (fetch, git, persistence, ...).
+   */
+  failureKind?: 'parse' | 'run';
 }
 
 export interface TrashGuideSourceEntityCounts {
@@ -115,10 +126,13 @@ export class TrashGuideSourceConflictError extends Error {
   }
 }
 
-export class TrashGuideSourceValidationError extends Error {
-  readonly code: 'arr_type_invalid' | 'arr_type_mismatch' | 'sync_strategy_invalid';
+export type TrashGuideSourceValidationErrorCode =
+  'arr_type_invalid' | 'arr_type_mismatch' | 'sync_strategy_invalid' | 'parse_failed';
 
-  constructor(code: 'arr_type_invalid' | 'arr_type_mismatch' | 'sync_strategy_invalid', message: string) {
+export class TrashGuideSourceValidationError extends Error {
+  readonly code: TrashGuideSourceValidationErrorCode;
+
+  constructor(code: TrashGuideSourceValidationErrorCode, message: string) {
     super(message);
     this.name = 'TrashGuideSourceValidationError';
     this.code = code;
@@ -260,6 +274,7 @@ class TrashGuideManager {
           arr_type: fetchResult.arr_type,
           discovery: fetchResult.discovery,
         });
+        this.assertParseUsable(parsed);
 
         const nextSource = {
           ...current,
@@ -268,7 +283,8 @@ class TrashGuideManager {
           local_path: clonePath,
         };
 
-        await this.persistSourceSyncData(nextSource, parsed);
+        // Different repository: prior cache rows belong to another repo, so never retain them.
+        await this.persistSourceSyncData(nextSource, parsed, { retainPrior: false });
 
         updated = trashGuideSourcesQueries.update(id, {
           ...updateInput,
@@ -346,6 +362,7 @@ class TrashGuideManager {
         arr_type: fetchResult.arr_type,
         discovery: fetchResult.discovery,
       });
+      this.assertParseUsable(parsed);
 
       sourceId = trashGuideSourcesQueries.create({
         name: options.name,
@@ -360,7 +377,7 @@ class TrashGuideManager {
       });
 
       const source = this.getSourceOrThrow(sourceId);
-      await this.persistSourceSyncData(source, parsed);
+      await this.persistSourceSyncData(source, parsed, { retainPrior: false });
       this.ensureSyncConfigRows(source);
 
       await this.triggerPullSync(source.id);
@@ -455,7 +472,42 @@ class TrashGuideManager {
         arr_type: fetchResult.arr_type,
         discovery: fetchResult.discovery,
       });
-      const transformed = await this.persistSourceSyncData(source, parsed);
+
+      if (parsed.status === 'failed') {
+        // Never persist or fan out on a total parse failure: cache and mappings still hold the
+        // last good entities, and reporting success here would mark everything upstream_deleted.
+        // Log metadata only — no raw file contents.
+        await logger.error('TRaSH source parse failed; no entities persisted', {
+          source: 'TrashGuideManager',
+          meta: {
+            sourceId: source.id,
+            parsedFiles: parsed.parsed_files,
+            failedFiles: parsed.failed_files,
+          },
+        });
+        // The fetch already advanced the clone to the new upstream head. Put it back on the last
+        // successfully synced commit so the clone matches the cache and the next update check still
+        // reports commitsBehind > 0 (otherwise the job would skip and never retry).
+        await this.restoreCloneAfterParseFailure(source, isLocalSource);
+        return {
+          success: false,
+          commitsBehind: updates.commitsBehind,
+          parseStatus: 'failed',
+          parsedFiles: parsed.parsed_files,
+          failedFiles: parsed.failed_files,
+          activeOperations: 0,
+          removedEntities: 0,
+          renamedEntities: 0,
+          error: `TRaSH parse failed for every discovered file (${parsed.failed_files})`,
+          failureKind: 'parse',
+        };
+      }
+
+      const transformed = await this.persistSourceSyncData(source, parsed, { retainPrior: true });
+      if (transformed === null) {
+        // Unreachable: 'failed' returns above. Narrowing guard only.
+        throw new Error(`persistSourceSyncData returned null for a '${parsed.status}' parse result`);
+      }
 
       await this.triggerPullSync(source.id);
 
@@ -489,6 +541,7 @@ class TrashGuideManager {
         removedEntities: 0,
         renamedEntities: 0,
         error: error instanceof Error ? error.message : String(error),
+        failureKind: 'run',
       };
     }
   }
@@ -754,16 +807,86 @@ class TrashGuideManager {
     });
   }
 
-  private async persistSourceSyncData(source: TrashGuideSource, parsed: TrashGuideParseResult) {
+  /** A parse where every discovered file failed must never reach the cache/mappings. */
+  private assertParseUsable(parsed: TrashGuideParseResult): void {
+    if (parsed.status === 'failed') {
+      throw new TrashGuideSourceValidationError(
+        'parse_failed',
+        `TRaSH parse failed for every discovered file (${parsed.failed_files})`
+      );
+    }
+  }
+
+  /**
+   * After a failed parse of a git-backed source, move the clone back to the last synced commit.
+   * Best effort: a failure here only warns.
+   */
+  private async restoreCloneAfterParseFailure(source: TrashGuideSource, isLocalSource: boolean): Promise<void> {
+    if (isLocalSource || !source.last_commit_hash) {
+      return;
+    }
+    try {
+      await resetToCommit(source.local_path, source.last_commit_hash);
+    } catch (error) {
+      await logger.warn('Failed to reset TRaSH clone to last synced commit after parse failure', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          localPath: source.local_path,
+          commit: source.last_commit_hash,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
+
+  /**
+   * Persist a non-failed parse. Returns null (and writes nothing) for a failed parse.
+   *
+   * `retainPrior`: for a partial parse of the SAME repository, keep prior cache entities whose file
+   * failed to parse so they are neither deleted nor reported upstream_deleted. Callers that swap the
+   * repository (link, updateSource re-clone) pass false: old rows belong to different content.
+   */
+  private async persistSourceSyncData(
+    source: TrashGuideSource,
+    parsed: TrashGuideParseResult,
+    options: { retainPrior: boolean }
+  ): Promise<TrashGuideTransformResult | null> {
+    if (parsed.status === 'failed') {
+      return null;
+    }
+
+    let effectiveParsed = parsed;
+    if (parsed.status === 'partial') {
+      const merge = options.retainPrior
+        ? await this.mergeRetainedEntities(source, parsed)
+        : { parsed, retainedEntities: 0, undecodableRows: 0 };
+      effectiveParsed = merge.parsed;
+      if (merge.undecodableRows > 0) {
+        await logger.warn('TRaSH source parse partial; failed to decode retained cache entities', {
+          source: 'TrashGuideManager',
+          meta: { sourceId: source.id, failedFiles: parsed.failed_files, undecodableRows: merge.undecodableRows },
+        });
+      }
+      await logger.warn('TRaSH source parse partial; retained previous entities for failed files', {
+        source: 'TrashGuideManager',
+        meta: {
+          sourceId: source.id,
+          failedFiles: parsed.failed_files,
+          retainedEntities: merge.retainedEntities,
+        },
+      });
+    }
+
     const existingMappings = trashIdMappingsQueries.getBySource(source.id, source.arr_type);
     const transformed = transformTrashGuideEntities({
       sourceId: source.id,
       arrType: source.arr_type,
-      parsed,
+      parsed: effectiveParsed,
       existingMappings,
     });
 
-    const cacheRows = await this.toCacheRows(source.id, parsed.ordered_entities);
+    const cacheRows = await this.toCacheRows(source.id, effectiveParsed.ordered_entities);
     trashGuideEntityCacheQueries.replaceSourceCache(source.id, cacheRows);
     trashIdMappingsQueries.replaceSourceMappings(source.id, source.arr_type, transformed.mappingWrites);
     trashGuideSourcesQueries.updateSyncMetadata(source.id, {
@@ -772,6 +895,65 @@ class TrashGuideManager {
     });
 
     return transformed;
+  }
+
+  /**
+   * Build the parse result a partial sync persists: freshly parsed entities plus the prior cache
+   * entities whose file failed to parse this run. Retention is keyed on the issue file_path (repo
+   * relative, matching the cache row filePath) and skipped when the same identity re-parsed from
+   * another file. Cached rows are validated against their row identity/source before reuse.
+   * Buckets and ordered_entities are kept consistent so downstream consumers of either shape see
+   * the same merged entity set.
+   */
+  private async mergeRetainedEntities(
+    source: TrashGuideSource,
+    parsed: TrashGuideParseResult
+  ): Promise<{ parsed: TrashGuideParseResult; retainedEntities: number; undecodableRows: number }> {
+    const failedFiles = new Set(parsed.issues.map((issue) => issue.file_path));
+    const parsedIdentities = new Set(
+      parsed.ordered_entities.map((entity) => `${entity.entity_type}:${entity.trash_id}`)
+    );
+
+    const retained: TrashGuideParsedEntity[] = [];
+    let undecodableRows = 0;
+    for (const row of trashGuideEntityCacheQueries.getBySource(source.id)) {
+      if (!failedFiles.has(row.filePath)) {
+        continue;
+      }
+      if (parsedIdentities.has(`${row.entityType}:${row.trashId}`)) {
+        continue;
+      }
+      const entity = decodeCachedEntity(row, source.arr_type);
+      if (entity === null) {
+        undecodableRows += 1;
+        continue;
+      }
+      retained.push(entity);
+    }
+
+    if (retained.length === 0) {
+      return { parsed, retainedEntities: 0, undecodableRows };
+    }
+
+    const entities: TrashGuideParsedEntities = {
+      custom_formats: [...parsed.entities.custom_formats, ...retained.filter((e) => e.entity_type === 'custom_format')],
+      custom_format_groups: [
+        ...parsed.entities.custom_format_groups,
+        ...retained.filter((e) => e.entity_type === 'custom_format_group'),
+      ],
+      quality_profiles: [
+        ...parsed.entities.quality_profiles,
+        ...retained.filter((e) => e.entity_type === 'quality_profile'),
+      ],
+      quality_sizes: [...parsed.entities.quality_sizes, ...retained.filter((e) => e.entity_type === 'quality_size')],
+      naming: [...parsed.entities.naming, ...retained.filter((e) => e.entity_type === 'naming')],
+    };
+
+    return {
+      parsed: { ...parsed, entities, ordered_entities: [...parsed.ordered_entities, ...retained] },
+      retainedEntities: retained.length,
+      undecodableRows,
+    };
   }
 
   private async toCacheRows(
@@ -812,6 +994,30 @@ class TrashGuideManager {
       return null;
     }
   }
+}
+
+/** Decode a cached entity row, rejecting rows whose payload disagrees with the row identity. */
+function decodeCachedEntity(row: TrashGuideEntityCache, arrType: string): TrashGuideParsedEntity | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(row.jsonData);
+  } catch {
+    return null;
+  }
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+  const entity = value as Partial<TrashGuideParsedEntity>;
+  if (
+    entity.entity_type !== row.entityType ||
+    entity.trash_id !== row.trashId ||
+    entity.arr_type !== arrType ||
+    entity.file_path !== row.filePath ||
+    typeof entity.name !== 'string'
+  ) {
+    return null;
+  }
+  return entity as TrashGuideParsedEntity;
 }
 
 async function computeContentHash(payload: string): Promise<string> {

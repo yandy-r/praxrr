@@ -336,16 +336,11 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       return resolveRunFailure(message);
     }
 
-    if (!syncResult.success) {
-      const message = syncResult.error ?? 'TRaSH sync failed';
-      await logger.error('TRaSH source sync failed', {
-        source: 'TrashGuideSyncJob',
-        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
-      });
-      return resolveRunFailure(message);
-    }
-
-    if (syncResult.parseStatus === 'failed') {
+    // Parse failure is checked BEFORE the generic !success branch: both carry success:false, but a
+    // total parse failure must report parser_failed evidence (never the transient git/network
+    // auto-retry). The explicit typed failureKind (not message/count heuristics) discriminates it
+    // from run failures, which sync() reports with failureKind 'run'.
+    if (syncResult.failureKind === 'parse') {
       return failureEvidence(
         trigger,
         'parser_failed',
@@ -353,6 +348,15 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         scheduledRescheduleAt,
         countsFromSyncResult(syncResult)
       );
+    }
+
+    if (!syncResult.success) {
+      const message = syncResult.error ?? 'TRaSH sync failed';
+      await logger.error('TRaSH source sync failed', {
+        source: 'TrashGuideSyncJob',
+        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
+      });
+      return resolveRunFailure(message);
     }
 
     return finalize(

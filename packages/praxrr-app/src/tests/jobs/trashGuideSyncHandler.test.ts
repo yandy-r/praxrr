@@ -229,8 +229,9 @@ Deno.test('trashGuideSync handler reports parser failures with counts', async ()
     trashGuideManager,
     'sync',
     (async () => ({
-      success: true,
+      success: false,
       parseStatus: 'failed',
+      failureKind: 'parse',
       commitsBehind: 2,
       parsedFiles: 5,
       failedFiles: 2,
@@ -250,6 +251,113 @@ Deno.test('trashGuideSync handler reports parser failures with counts', async ()
     assertEquals(evidence.counts?.failedFiles, 2);
   } finally {
     restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler maps a failed parse result to parser_failed (no transient retry)', async () => {
+  const restores: Restore[] = [];
+  const errorCalls: LoggerCall[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() => makeSource({ last_synced_at: null })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (async () => updateInfo(true, 2)) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (async () => ({
+      success: false,
+      parseStatus: 'failed',
+      failureKind: 'parse',
+      commitsBehind: 2,
+      parsedFiles: 0,
+      failedFiles: 3,
+      activeOperations: 0,
+      removedEntities: 0,
+      renamedEntities: 0,
+      error: 'TRaSH parse failed for every discovered file (3)',
+    })) as typeof trashGuideManager.sync,
+    restores
+  );
+  patchLogger('warn', [], restores);
+  patchLogger('error', errorCalls, restores);
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(result.status, 'failure');
+    assertEquals(evidence.failure?.code, 'parser_failed');
+    assertEquals(evidence.counts?.failedFiles, 3);
+    // Parser failures never take the transient git/network auto-retry branch: reschedule stays on
+    // the normal schedule cadence rather than a short backoff retry.
+    const dueMs = Date.parse(result.rescheduleAt as string);
+    assert(Number.isFinite(dueMs));
+    assert(dueMs > Date.now() + 30 * 60_000);
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler keeps run failures (sync() catch shape) out of parser_failed', async () => {
+  const cases = [
+    { message: 'git network failure while pulling', code: 'network' },
+    { message: 'schema validation failed: bad operator', code: 'sync_failed' },
+  ];
+
+  for (const { message, code } of cases) {
+    const restores: Restore[] = [];
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() => makeSource({ last_synced_at: null })) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideManager,
+      'checkForUpdates',
+      (async () => updateInfo(true, 2)) as typeof trashGuideManager.checkForUpdates,
+      restores
+    );
+    // Exact shape sync() returns from its catch block: parseStatus 'failed' with zero file counts.
+    patchTarget(
+      trashGuideManager,
+      'sync',
+      (async () => ({
+        success: false,
+        parseStatus: 'failed',
+        failureKind: 'run',
+        commitsBehind: 2,
+        parsedFiles: 0,
+        failedFiles: 0,
+        activeOperations: 0,
+        removedEntities: 0,
+        renamedEntities: 0,
+        error: message,
+      })) as typeof trashGuideManager.sync,
+      restores
+    );
+    patchLogger('warn', [], restores);
+    patchLogger('error', [], restores);
+
+    try {
+      const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+      const evidence = parseEvidence(result);
+
+      assertEquals(result.status, 'failure');
+      assertEquals(evidence.failure?.code, code);
+      assert(evidence.failure?.code !== 'parser_failed');
+    } finally {
+      restoreAll(restores);
+    }
   }
 });
 
