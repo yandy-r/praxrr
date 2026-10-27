@@ -191,12 +191,14 @@ migratedTest('incoming preview == pull: override strategy (conflict + align)', a
     assertEquals(conflict.predictedStatus, 'conflicted');
     assertEquals(conflict.conflictReason, 'guard_mismatch');
     assertEquals(conflict.strategy, 'override');
+    assertEquals(conflict.autoResolvable, true);
     assertEquals(conflict.entityType, 'custom_format');
     assertEquals(conflict.operation, 'update');
     const aligned = byEntity(ctx.preview, 'Align Format');
     assertEquals(aligned.kind, 'aligned');
     assertEquals(aligned.predictedStatus, 'dropped');
     assertEquals(aligned.conflictReason, 'aligned');
+    assertEquals(aligned.autoResolvable, false);
     // Under `override` the pull may resolve the recorded conflict afterwards (superseded /
     // replacement-op rows); AC2 compares build-batch rows only, which assertAc1And2 does.
     assertEquals(await cfDescription(ctx.fixture.databaseId, 'Align Format'), ALIGN_VALUE);
@@ -210,6 +212,7 @@ migratedTest('incoming preview == pull: ask strategy parks the conflict', async 
     assertEquals(conflict.predictedStatus, 'conflicted_pending');
     assertEquals(conflict.conflictReason, 'guard_mismatch');
     assertEquals(conflict.strategy, 'ask');
+    assertEquals(conflict.autoResolvable, false);
     assertEquals(await cfDescription(ctx.fixture.databaseId, 'Test Format'), UPSTREAM_DESC);
     const row = db.queryFirst<{ state: string }>('SELECT state FROM pcd_ops WHERE id = ?', conflict.opId);
     assertEquals(row?.state, 'published');
@@ -224,6 +227,7 @@ migratedTest('incoming preview == pull: align strategy force-aligns the conflict
     assertEquals(conflict.predictedStatus, 'dropped');
     assertEquals(conflict.conflictReason, 'aligned');
     assertEquals(conflict.strategy, 'align');
+    assertEquals(conflict.autoResolvable, false);
     assertEquals(await cfDescription(ctx.fixture.databaseId, 'Test Format'), UPSTREAM_DESC);
   });
 });
@@ -261,6 +265,8 @@ for (const strategy of ['override', 'ask', 'align'] as const) {
       assertEquals(predicted.conflictReason, 'duplicate_key');
       assertEquals(predicted.operation, 'create');
       assertEquals(predicted.strategy, strategy);
+      // Only `override` auto-overrides a duplicate_key conflict (custom_format has a handler).
+      assertEquals(predicted.autoResolvable, strategy === 'override');
       // duplicate_key is a SQL-error conflict: it stays conflicted under every strategy (no
       // force-align), and only override would auto-override it after the build.
       assertEquals(predicted.predictedStatus, strategy === 'ask' ? 'conflicted_pending' : 'conflicted');
@@ -335,6 +341,127 @@ migratedTest('incoming preview == pull: delete a multi-op CF sharing a refreshed
     }
   } finally {
     preBase.close();
+    await fixture.cleanup();
+  }
+});
+
+migratedTest(
+  'incoming preview == pull: autoResolvable is false for an entity without an override handler',
+  async () => {
+    const fixture = await setUpGitFixture(async (local) => {
+      await writeEntity(local, 'custom-formats/test-format.yaml', cfYaml('Test Format', BASE_DESC));
+    });
+    const { databaseId } = fixture;
+    try {
+      // A guard-mismatched local op tagged as a metadata profile edit: `overrideConflict` has no
+      // handler for that entity, so the pull records the conflict but cannot auto-resolve it.
+      const opId = pcdOpsQueries.create({
+        databaseId,
+        origin: 'user',
+        state: 'published',
+        source: 'local',
+        sql: "UPDATE custom_formats SET description = 'mine' WHERE name = 'Test Format' AND description = 'no-such-value';",
+        metadata: JSON.stringify({ operation: 'update', entity: 'metadata_profile', name: 'Test Format' }),
+      });
+      await writeEntity(fixture.upstreamPath, 'custom-formats/test-format.yaml', cfYaml('Test Format', UPSTREAM_DESC));
+      await fixture.pushUpstream('upstream change');
+      const maxHistoryId = Math.max(0, ...pcdOpHistoryQueries.listByDatabase(databaseId).map((row) => row.id));
+
+      const preview = await previewIncoming(databaseId);
+      const predicted = preview.predictedConflicts.find((conflict) => conflict.opId === opId);
+      assert(predicted, JSON.stringify(preview.predictedConflicts));
+      assertEquals(predicted.kind, 'conflict');
+      assertEquals(predicted.predictedStatus, 'conflicted');
+      assertEquals(predicted.strategy, 'override');
+      assertEquals(predicted.autoResolvable, false);
+
+      const pulled = await pcdManager.sync(databaseId);
+      assertEquals(pulled.success, true, pulled.error);
+      const row = buildBatchRow(databaseId, opId, maxHistoryId);
+      assertEquals(row?.status, 'conflicted');
+      // Not auto-overridden: still published and still the latest word on the op.
+      assertEquals(pcdOpsQueries.getById(opId)?.state, 'published');
+      assertEquals(pcdOpHistoryQueries.listByOp(opId).filter((h) => h.id > maxHistoryId).length > 0, true);
+      assertEquals(
+        pcdOpHistoryQueries
+          .listByOp(opId)
+          .filter((h) => h.id > maxHistoryId)
+          .every((h) => h.status === 'conflicted'),
+        true
+      );
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
+
+migratedTest('incoming preview == pull: align rebuild pass judges later ops against a clean cache', async () => {
+  const fixture = await setUpGitFixture(async (local) => {
+    await writeEntity(local, 'custom-formats/test-format.yaml', cfYaml('Test Format', BASE_DESC));
+  });
+  const { databaseId } = fixture;
+  try {
+    fixture.setStrategy('align');
+    // Op 1: its guarded UPDATE misses once upstream changes the description, but its tag INSERT
+    // still changes a row (rowcount > 0). The scalar post-check then force-aligns it
+    // (`auto_align_full_list`, needsRebuild) and the tag row stays behind in the build's cache.
+    const firstOpId = pcdOpsQueries.create({
+      databaseId,
+      origin: 'user',
+      state: 'published',
+      source: 'local',
+      sql: [
+        `UPDATE custom_formats SET description = 'mine' WHERE name = 'Test Format' AND description = '${BASE_DESC}';`,
+        "INSERT INTO tags (name) VALUES ('align-leftover');",
+      ].join('\n'),
+      metadata: JSON.stringify({
+        operation: 'update',
+        entity: 'custom_format',
+        name: 'Test Format',
+        stable_key: { key: 'custom_format_name', value: 'Test Format' },
+        changed_fields: ['description'],
+      }),
+      desiredState: JSON.stringify({ description: { from: BASE_DESC, to: 'mine' } }),
+    });
+    // Op 2 (same entity): inserting the same tag only succeeds on a cache WITHOUT op 1's
+    // leftover. The first build sees UNIQUE -> conflicted; compile()'s rebuild (op 1 excluded)
+    // applies it, and that second pass is what the user ends up with.
+    const secondOpId = pcdOpsQueries.create({
+      databaseId,
+      origin: 'user',
+      state: 'published',
+      source: 'local',
+      sql: "INSERT INTO tags (name) VALUES ('align-leftover');",
+      metadata: JSON.stringify({ operation: 'update', entity: 'custom_format', name: 'Test Format' }),
+    });
+    await writeEntity(fixture.upstreamPath, 'custom-formats/test-format.yaml', cfYaml('Test Format', UPSTREAM_DESC));
+    await fixture.pushUpstream('upstream change');
+    const maxHistoryId = Math.max(0, ...pcdOpHistoryQueries.listByDatabase(databaseId).map((row) => row.id));
+
+    const preview = await previewIncoming(databaseId);
+    const first = preview.predictedConflicts.find((conflict) => conflict.opId === firstOpId);
+    assert(first, JSON.stringify(preview.predictedConflicts));
+    assertEquals(first.kind, 'aligned');
+    assertEquals(first.decision, 'auto_align_full_list');
+    assertEquals(
+      preview.predictedConflicts.some((conflict) => conflict.opId === secondOpId),
+      false,
+      'the rebuild pass applies op 2 cleanly, so it must not be predicted as a conflict'
+    );
+
+    const pulled = await pcdManager.sync(databaseId);
+    assertEquals(pulled.success, true, pulled.error);
+    const firstRows = pcdOpHistoryQueries.listByOp(firstOpId).filter((h) => h.id > maxHistoryId);
+    assertEquals(pcdOpsQueries.getById(firstOpId)?.state, 'dropped');
+    assertEquals(firstRows.at(-1)?.status ?? firstRows[0]?.status, 'dropped');
+    const secondRows = pcdOpHistoryQueries
+      .listByOp(secondOpId)
+      .filter((h) => h.id > maxHistoryId)
+      .sort((a, b) => a.id - b.id);
+    // The pull really did run twice: the dirty first build conflicted op 2, the rebuild applied it.
+    assertEquals(secondRows[0]?.status, 'conflicted');
+    assertEquals(secondRows.at(-1)?.status, 'applied');
+  } finally {
     await fixture.cleanup();
   }
 });

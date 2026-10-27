@@ -244,7 +244,7 @@ async function buildIncomingState(
   treePath: string,
   personalAccessToken: string | undefined,
   cloneRoot: string
-): Promise<{ cache: PCDCache; capturedCount: number }> {
+): Promise<{ cache: PCDCache; capturedCount: number; rebuild: () => Promise<PCDCache> }> {
   try {
     await copyInstalledDependencies(cloneRoot, treePath);
     await syncDependencies(treePath, personalAccessToken);
@@ -294,19 +294,21 @@ async function buildIncomingState(
     excluded = computeExcludedBaseOps(databaseId, []);
   }
 
-  try {
-    const cache = await buildBaseOnlyCache(treePath, databaseId, {
-      excludeBaseOpIds: excluded,
-      extraPublishedBaseOps: capturedToOperations(captured),
-    });
-    return { cache, capturedCount: captured.length };
-  } catch (error) {
-    throw new IncomingPreviewError(
-      'incoming_unavailable',
-      `Failed to build incoming state: ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error }
-    );
-  }
+  const build = async (): Promise<PCDCache> => {
+    try {
+      return await buildBaseOnlyCache(treePath, databaseId, {
+        excludeBaseOpIds: excluded,
+        extraPublishedBaseOps: capturedToOperations(captured),
+      });
+    } catch (error) {
+      throw new IncomingPreviewError(
+        'incoming_unavailable',
+        `Failed to build incoming state: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
+      );
+    }
+  };
+  return { cache: await build(), capturedCount: captured.length, rebuild: build };
 }
 
 /**
@@ -413,7 +415,7 @@ async function previewIncomingUncached(databaseId: number): Promise<IncomingPrev
     let replay: Awaited<ReturnType<typeof replayUserOpsDry>>;
     try {
       sections = await withBaseOnlyCache(databaseId, (currentBase) => diffAllFamilies(currentBase, incomingState));
-      replay = await replayUserOpsDry(incomingState, databaseId, conflictStrategy);
+      replay = await replayUserOpsDry(incomingState, databaseId, conflictStrategy, built.rebuild);
     } catch (error) {
       // A renamed/removed table in the incoming schema can break resolved readers mid-diff;
       // never answer 500 with a half-built preview (spec R5).

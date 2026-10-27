@@ -5269,6 +5269,13 @@ export interface components {
       decision: string | null;
       autoAlignRule: string | null;
       strategy: components['schemas']['ConflictStrategy'];
+      /**
+       * @description True only when the pull's automatic override will resolve this conflict itself: strategy
+       *     override, predictedStatus conflicted, an enabled database, and an override handler for the
+       *     op (delete ops, or an entity type with an override handler). False for aligned entries and
+       *     for conflicts that need a user decision.
+       */
+      autoResolvable: boolean;
     };
     /** @description A published local user op that would fail with a non-conflict error against the incoming base */
     PredictedError: {

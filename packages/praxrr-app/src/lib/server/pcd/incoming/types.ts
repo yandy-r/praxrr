@@ -35,6 +35,11 @@ export interface PredictedConflict {
   decision: string | null;
   autoAlignRule: string | null;
   strategy: ConflictStrategy;
+  /**
+   * True only when the pull's automatic override will resolve this conflict itself: strategy
+   * `override`, status `conflicted`, enabled instance, and an override handler for the op.
+   */
+  autoResolvable: boolean;
 }
 
 export interface PredictedError {

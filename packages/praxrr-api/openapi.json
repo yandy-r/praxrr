@@ -15039,7 +15039,8 @@
           "conflictReason",
           "decision",
           "autoAlignRule",
-          "strategy"
+          "strategy",
+          "autoResolvable"
         ],
         "properties": {
           "opId": {
@@ -15084,6 +15085,10 @@
           },
           "strategy": {
             "$ref": "#/components/schemas/ConflictStrategy"
+          },
+          "autoResolvable": {
+            "type": "boolean",
+            "description": "True only when the pull's automatic override will resolve this conflict itself: strategy\noverride, predictedStatus conflicted, an enabled database, and an override handler for the\nop (delete ops, or an entity type with an override handler). False for aligned entries and\nfor conflicts that need a user decision.\n"
           }
         }
       },

@@ -637,7 +637,7 @@
     if (conflict.kind === 'aligned') {
       return { label: 'Will auto-align (local change dropped)', variant: 'info' };
     }
-    if (conflict.predictedStatus === 'conflicted' && conflict.strategy === 'override') {
+    if (conflict.autoResolvable) {
       return { label: 'Will conflict — auto-overridden on pull', variant: 'warning' };
     }
     return { label: 'Will conflict — needs your decision', variant: 'danger' };

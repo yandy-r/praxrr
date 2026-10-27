@@ -733,8 +733,12 @@ currentStateHash, currentHead, incomingHead}`. `sections`/`summary` have the rol
 `predictedConflicts` match the conflicts the pull's cache build records: `kind: "conflict"` with
 `predictedStatus` `conflicted` (`override`/`align`) or `conflicted_pending` (`ask`), or
 `kind: "aligned"` / `dropped` when the local op is redundant or force-aligned. SQL-error conflicts
-(`duplicate_key`, `missing_target`) stay `conflicted` under every strategy and still need a
-decision; only `override` auto-overrides guard-mismatch conflicts after the build. Local-path sources return `available: false`
+(`duplicate_key`, `missing_target`) are never auto-aligned: they are `conflicted`
+(`conflicted_pending` under `ask`), and under `override` the pull auto-overrides them after the
+build. `autoResolvable` is `true` only when that automatic override will actually resolve the entry
+(strategy `override`, status `conflicted`, enabled database, and an override handler for the op's
+entity or a delete); otherwise the conflict needs a user decision. When a force-align drop leaves
+partial writes, the prediction follows the pull's single rebuild pass. Local-path sources return `available: false`
 (`unavailableReason: "local_source"`). When `commitsAhead > 0` the pull may not fast-forward.
 
 Errors: `400` invalid id, `404` unknown database, `409` with `code` `sync_in_progress` or
