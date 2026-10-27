@@ -3,6 +3,7 @@
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import type { Column } from '$ui/table/types';
   import { Tag, ToggleRight, Copy, Download, Database } from 'lucide-svelte';
@@ -174,7 +175,12 @@
 >
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
-      <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)}</span>
+      <div class="flex items-center gap-2">
+        <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type, row.sourceType)}</span>
+        {#if row.locallyModified}
+          <LocallyModifiedBadge />
+        {/if}
+      </div>
     {:else if column.key === 'source'}
       {@const source = resolveSource(row)}
       <SourceBadge sourceType={source.type} sourceName={source.name} arrType={source.arrType} size="sm" />

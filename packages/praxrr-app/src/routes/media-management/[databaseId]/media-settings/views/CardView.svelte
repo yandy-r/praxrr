@@ -4,6 +4,7 @@
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
   import Label from '$ui/label/Label.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import { Copy, Download } from 'lucide-svelte';
   import type { MediaSettingsListItem } from '$shared/pcd/display.ts';
@@ -107,6 +108,9 @@
               {getMediaManagementDisplayName(config.name, config.arr_type)}
             </h3>
             <div class="mt-1 flex flex-wrap items-center gap-1">
+              {#if config.locallyModified}
+                <LocallyModifiedBadge />
+              {/if}
               <Label variant={prConfig.variant} size="sm" rounded="md">{prConfig.label}</Label>
               {#if config.enable_media_info}
                 <Label variant="success" size="sm" rounded="md">Media Info</Label>

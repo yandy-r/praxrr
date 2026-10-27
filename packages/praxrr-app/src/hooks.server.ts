@@ -16,6 +16,7 @@ import { reconcileEnvInstances } from '$arr/envInstances.ts';
 import { initializeJobs } from '$jobs/init.ts';
 import { upsertScheduledJob } from '$jobs/queueService.ts';
 import { pcdManager } from '$pcd/index.ts';
+import { withUserOpAction } from '$pcd/ops/actionContext.ts';
 import { trashGuideManager } from '$trashguide/index.ts';
 import { isPluginsEnabled, loadPluginsFeatureFlag, pluginHost } from '$server/plugins/index.ts';
 import {
@@ -360,8 +361,14 @@ const authHandle: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+/** Group all user-layer writes made by one HTTP mutation into one undo unit. */
+const userActionHandle: Handle = ({ event, resolve }) =>
+  ['GET', 'HEAD', 'OPTIONS'].includes(event.request.method)
+    ? resolve(event)
+    : withUserOpAction(async () => resolve(event));
+
 /**
  * Request pipeline: CSRF origin gate runs first (YAN-433 / #276) so cross-origin mutations are
  * rejected before auth or routing can apply them; auth handling is unchanged.
  */
-export const handle = sequence(csrfGuard, authHandle);
+export const handle = sequence(csrfGuard, authHandle, userActionHandle);

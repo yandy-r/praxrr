@@ -7,6 +7,8 @@ relevant API behavior.
 
 - [Link, Bridge, Sync](./link-bridge-sync.md): connect a PCD, connect Arr apps, configure sync
   triggers, run sync, and clean up stale configs.
+- [Local Overrides](./local-overrides.md): find local edits, inspect upstream differences, revert
+  selected operations, and undo the latest database change.
 - [Progressive Disclosure](./progressive-disclosure.md): show optional advanced settings only when
   you request them while keeping media-app setup pages clean.
 - [Entity Testing](./entity-testing.md): build test entities/releases, evaluate custom format
@@ -21,11 +23,12 @@ relevant API behavior.
 ## Recommended reading order
 
 1. [Link, Bridge, Sync](./link-bridge-sync.md)
-2. [Progressive Disclosure](./progressive-disclosure.md)
-3. [Entity Testing](./entity-testing.md)
-4. [Plugin Management](./plugin-management.md)
-5. [Portable Import/Export](./portable-import-export.md)
-6. [TRaSH Guide Sync](./trash-guide-sync.md)
+2. [Local Overrides](./local-overrides.md)
+3. [Progressive Disclosure](./progressive-disclosure.md)
+4. [Entity Testing](./entity-testing.md)
+5. [Plugin Management](./plugin-management.md)
+6. [Portable Import/Export](./portable-import-export.md)
+7. [TRaSH Guide Sync](./trash-guide-sync.md)
 
 ## Related documentation
 

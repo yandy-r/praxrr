@@ -6,6 +6,7 @@
   import type { RegularExpressionWithTags } from '$shared/pcd/display';
   import { Tag, Code, FileText, Link, Copy, Download } from 'lucide-svelte';
   import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
+  import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
   import { page } from '$app/stores';
 
   export let expressions: RegularExpressionWithTags[];
@@ -39,6 +40,7 @@
         html: `
 					<div>
 						<div class="font-medium">${escapeHtml(row.name)}</div>
+						${row.locallyModified ? locallyModifiedBadgeHtml() : ''}
 						${
               row.tags.length > 0
                 ? `

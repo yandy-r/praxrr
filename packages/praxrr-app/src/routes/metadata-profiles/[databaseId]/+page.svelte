@@ -6,6 +6,13 @@
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
   import { browser } from '$app/environment';
   import Table from '$ui/table/Table.svelte';
@@ -19,6 +26,8 @@
   import { alertStore } from '$alerts/store';
   import Button from '$ui/button/Button.svelte';
   import CloneModal from '$ui/modal/CloneModal.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
+  import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
 
   export let data: PageData;
 
@@ -29,6 +38,23 @@
   });
 
   $: setItems(data.metadataProfiles);
+
+  let onlyLocal = false;
+  let initializedLocalOnlyKey = '';
+
+  $: localOnlyStorageKey = `metadataProfilesLocalOnly:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    onlyLocal = loadLocalOnly(localOnlyStorageKey);
+  }
+
+  function toggleOnlyLocal() {
+    onlyLocal = !onlyLocal;
+    saveLocalOnly(localOnlyStorageKey, onlyLocal);
+  }
+
+  $: locallyModifiedCount = countLocallyModified(data.metadataProfiles);
+  $: filteredProfiles = filterLocallyModified($filtered, onlyLocal);
 
   $: tabs = data.databases.map((database) => ({
     label: database.name,
@@ -83,7 +109,7 @@
       align: 'left',
       sortable: true,
       cell: (row: LidarrMetadataProfileListItem) => ({
-        html: `<div class="font-medium text-neutral-900 dark:text-neutral-100">${escapeHtml(row.name)}</div>`,
+        html: `<div class="font-medium text-neutral-900 dark:text-neutral-100">${escapeHtml(row.name)}</div>${row.locallyModified ? locallyModifiedBadgeHtml() : ''}`,
       }),
     },
     {
@@ -144,6 +170,7 @@
 
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search metadata profiles..." responsive />
+    <LocalOnlyFilterAction active={onlyLocal} count={locallyModifiedCount} on:toggle={toggleOnlyLocal} />
     <ViewToggle bind:value={$view} />
     <ActionButton
       icon={Plus}
@@ -161,15 +188,17 @@
           No metadata profiles found for {data.currentDatabase.name}
         </p>
       </div>
-    {:else if $filtered.length === 0}
+    {:else if filteredProfiles.length === 0}
       <div
         class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <p class="text-neutral-600 dark:text-neutral-400">No metadata profiles match your search</p>
+        <p class="text-neutral-600 dark:text-neutral-400">
+          {onlyLocal ? 'No locally modified metadata profiles' : 'No metadata profiles match your search'}
+        </p>
       </div>
     {:else if $view === 'table'}
       <Table
-        data={$filtered}
+        data={filteredProfiles}
         {columns}
         emptyMessage="No metadata profiles found"
         rowHref={getRowHref}
@@ -204,11 +233,16 @@
       </Table>
     {:else}
       <CardGrid flush>
-        {#each $filtered as profile (profile.id)}
+        {#each filteredProfiles as profile (profile.id)}
           <Card href={getRowHref(profile)} hoverable>
             <svelte:fragment slot="header">
               <div class="flex items-center justify-between gap-2">
-                <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+                  {#if profile.locallyModified}
+                    <LocallyModifiedBadge />
+                  {/if}
+                </div>
                 <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
                 <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
                   <Button

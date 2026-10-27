@@ -206,7 +206,7 @@
               <div class="flex shrink-0 items-center gap-2 pt-0.5">
                 {#if $$slots.actions}
                   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -- swallow-only wrapper: keeps row-toggle clicks from firing when clicking action buttons (which are themselves keyboard-accessible). -->
-                  <div on:click|stopPropagation>
+                  <div on:click|stopPropagation on:keydown|stopPropagation>
                     <slot name="actions" {row} />
                   </div>
                 {/if}
@@ -383,7 +383,11 @@
                 </td>
               {/each}
               {#if $$slots.actions}
-                <td class="{compact ? 'px-4 py-2' : 'px-6 py-4'} text-right text-sm" on:click|stopPropagation>
+                <td
+                  class="{compact ? 'px-4 py-2' : 'px-6 py-4'} text-right text-sm"
+                  on:click|stopPropagation
+                  on:keydown|stopPropagation
+                >
                   <slot name="actions" {row} />
                 </td>
               {/if}

@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, canWriteToBase, pcdManager } from '$pcd/index.ts';
 import * as customFormatQueries from '$pcd/entities/customFormats/index.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
@@ -59,7 +59,13 @@ export const load: ServerLoad = async ({ params }) => {
         }
 
         const rows = await customFormatQueries.list(cache);
-        return withPcdSource(rows, database);
+        const locallyModified = database.id === currentDatabaseId ? buildLocallyModifiedLookup(database.id) : null;
+        const flaggedRows = locallyModified
+          ? rows.map((row) =>
+              locallyModified('customFormat', undefined, row.name) ? { ...row, locallyModified: true } : row
+            )
+          : rows;
+        return withPcdSource(flaggedRows, database);
       })
     )
   ).flat();

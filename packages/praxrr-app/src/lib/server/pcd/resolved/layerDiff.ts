@@ -153,7 +153,10 @@ export function computeUserOverrides(
  * (`ENTITY_BY_STABLE_KEY`), extended with the per-arr media-management/metadata-profile
  * variants resolved-config also serves.
  */
-function resolveOpMetadataEntity(entityType: ResolvedEntityType, arrType: ArrAppType | undefined): string | null {
+export function resolveOpMetadataEntity(
+  entityType: ResolvedEntityType,
+  arrType: ArrAppType | undefined
+): string | null {
   switch (entityType) {
     case 'delayProfile':
       return 'delay_profile';
@@ -185,6 +188,46 @@ function resolveOpMetadataEntity(entityType: ResolvedEntityType, arrType: ArrApp
       return exhaustiveCheck;
     }
   }
+}
+
+const OP_METADATA_ENTITY_TYPES: readonly ResolvedEntityType[] = [
+  'delayProfile',
+  'regularExpression',
+  'customFormat',
+  'qualityProfile',
+  'naming',
+  'mediaSettings',
+  'qualityDefinitions',
+  'lidarrMetadataProfile',
+];
+
+const OP_METADATA_ARR_TYPES: ReadonlyArray<ArrAppType | undefined> = [undefined, 'radarr', 'sonarr', 'lidarr'];
+
+const INVERSE_OP_METADATA_ENTITY: ReadonlyMap<string, { entityType: ResolvedEntityType; arrType: ArrAppType | null }> =
+  (() => {
+    const inverse = new Map<string, { entityType: ResolvedEntityType; arrType: ArrAppType | null }>();
+    for (const entityType of OP_METADATA_ENTITY_TYPES) {
+      for (const arrType of OP_METADATA_ARR_TYPES) {
+        const entity = resolveOpMetadataEntity(entityType, arrType);
+        if (entity !== null && !inverse.has(entity)) {
+          inverse.set(entity, { entityType, arrType: arrType ?? null });
+        }
+      }
+    }
+    return inverse;
+  })();
+
+/**
+ * Inverse of `resolveOpMetadataEntity`: maps a `pcd_ops.metadata.entity` vocabulary value
+ * (e.g. `radarr_naming`) back to its resolved `(entityType, arrType)`. `arrType` is `null`
+ * for arr-agnostic entity types. Returns `null` for unknown entities (e.g. `test_entity`).
+ * Built by iterating `resolveOpMetadataEntity`, so there is a single vocabulary source.
+ */
+export function inverseOpMetadataEntity(
+  entity: string
+): { entityType: ResolvedEntityType; arrType: ArrAppType | null } | null {
+  const found = INVERSE_OP_METADATA_ENTITY.get(entity);
+  return found ? { ...found } : null;
 }
 
 interface ParsedOpMetadata {

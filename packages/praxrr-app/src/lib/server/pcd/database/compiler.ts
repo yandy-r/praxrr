@@ -9,6 +9,7 @@ import type { CacheBuildStats } from '../core/types.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { logger } from '$logger/logger.ts';
+import { withNewUserOpAction } from '../ops/actionContext.ts';
 
 const AUTO_OVERRIDE_MAX_ROUNDS = 10;
 /** Per-database count of active suppressors (auto-resolve runs and restore compiles). */
@@ -89,7 +90,8 @@ async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise
 
       let resolvedThisRound = 0;
       for (const opId of conflicts) {
-        const result = await overrideConflict({ databaseId: databaseInstanceId, opId });
+        // Each automatic override is its own undo unit, never part of the triggering save's action.
+        const result = await withNewUserOpAction(() => overrideConflict({ databaseId: databaseInstanceId, opId }));
         if (result.success) {
           resolvedThisRound++;
           continue;

@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, canWriteToBase, pcdManager } from '$pcd/index.ts';
 import * as regularExpressionQueries from '$pcd/entities/regularExpressions/index.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -33,8 +33,12 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  // Load regular expressions for the current database
-  const regularExpressions = await regularExpressionQueries.list(cache);
+  // Load regular expressions for the current database, flagging rows with local overrides
+  const isLocallyModified = buildLocallyModifiedLookup(currentDatabaseId);
+  const regularExpressions = (await regularExpressionQueries.list(cache)).map((row) => ({
+    ...row,
+    locallyModified: isLocallyModified('regularExpression', undefined, row.name),
+  }));
 
   return {
     databases,

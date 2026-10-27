@@ -10,6 +10,7 @@
   import { Tag, FileText, Layers, FlaskConical, Copy, Download, Database } from 'lucide-svelte';
   import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { sortConditions } from '$shared/pcd/conditions';
+  import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
 
   export let formats: CustomFormatTableRow[];
   export let sources: SourceRef[] = [];
@@ -115,7 +116,9 @@
       cell: (row: CustomFormatTableRow) => ({
         html: `
 					<div>
-						<div class="font-medium">${escapeHtml(row.name)}</div>
+						<div class="font-medium">${escapeHtml(row.name)}${
+              row.locallyModified ? ` <span class="ml-1 align-middle">${locallyModifiedBadgeHtml()}</span>` : ''
+            }</div>
 						${
               row.tags.length > 0
                 ? `

@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import type { Column } from '$ui/table/types';
   import { Tag, Info, RefreshCw, Copy, Download } from 'lucide-svelte';
@@ -93,7 +94,12 @@
 >
   <svelte:fragment slot="cell" let:row let:column>
     {#if column.key === 'name'}
-      <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
+      <div class="flex items-center gap-2">
+        <span class="font-medium">{getMediaManagementDisplayName(row.name, row.arr_type)}</span>
+        {#if row.locallyModified}
+          <LocallyModifiedBadge />
+        {/if}
+      </div>
     {:else if column.key === 'arr_type'}
       <div class="flex items-center gap-2">
         {#if getLogoPath(row.arr_type)}

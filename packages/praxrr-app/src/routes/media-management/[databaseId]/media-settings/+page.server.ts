@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, pcdManager } from '$pcd/index.ts';
 import { list } from '$pcd/entities/mediaManagement/media-settings/read.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -20,7 +20,11 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  const mediaSettingsConfigs = await list(cache);
+  const isLocallyModified = buildLocallyModifiedLookup(currentDatabaseId);
+  const mediaSettingsConfigs = (await list(cache)).map((row) => ({
+    ...row,
+    locallyModified: isLocallyModified('mediaSettings', row.arr_type, row.name),
+  }));
 
   return {
     mediaSettingsConfigs,

@@ -3,6 +3,7 @@
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
   import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
   import InfoModal from '$ui/modal/InfoModal.svelte';
@@ -26,6 +27,12 @@
     toSourceFilterKey,
     type SourceFilterSelection,
   } from '$lib/client/utils/sourceFilter.ts';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
   import type { PageData } from './$types';
 
@@ -150,14 +157,30 @@
     localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
   }
 
+  // Locally modified filter (persisted per database)
+  let onlyLocal = false;
+  let initializedLocalOnlyKey = '';
+
+  $: localOnlyStorageKey = `customFormatsLocalOnly:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    onlyLocal = loadLocalOnly(localOnlyStorageKey);
+  }
+
+  function toggleLocalOnly() {
+    onlyLocal = !onlyLocal;
+    saveLocalOnly(localOnlyStorageKey, onlyLocal);
+  }
+
   $: sourceFiltered = filterBySourceSelection(data.customFormats, selectedSourceKeys, fallbackSourceKey);
 
   // Custom filtering based on selected search options
   $: filtered = filterFormats(sourceFiltered, $debouncedQuery, searchOptions);
   $: sourceFilterActive = isSourceFilterActive(selectedSourceKeys, availableSources);
+  $: locallyFiltered = filterLocallyModified(filtered, onlyLocal);
+  $: locallyModifiedCount = countLocallyModified(filtered);
   $: hasSearchQuery = $debouncedQuery.trim().length > 0;
   $: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
-
   $: emptyMessage = (() => {
     if (sourceFilterActive && hasSearchQuery) {
       return 'No custom formats match your search and source filters';
@@ -234,6 +257,7 @@
         responsive
       />
     </div>
+    <LocalOnlyFilterAction active={onlyLocal} count={locallyModifiedCount} on:toggle={toggleLocalOnly} />
     <ViewToggle bind:value={$view} />
     <ActionButton icon={Info} label="Custom formats info" on:click={() => (infoModalOpen = true)} />
   </ActionsBar>
@@ -263,9 +287,15 @@
           </button>
         {/if}
       </div>
+    {:else if locallyFiltered.length === 0}
+      <div
+        class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <p class="text-neutral-600 dark:text-neutral-400">No custom formats are locally modified</p>
+      </div>
     {:else if $view === 'table'}
       <TableView
-        formats={filtered}
+        formats={locallyFiltered}
         sources={availableSources}
         currentDatabaseId={data.currentDatabase.id}
         currentDatabaseName={data.currentDatabase.name}
@@ -275,7 +305,7 @@
       />
     {:else}
       <CardView
-        formats={filtered}
+        formats={locallyFiltered}
         sources={availableSources}
         currentDatabaseId={data.currentDatabase.id}
         currentDatabaseName={data.currentDatabase.name}

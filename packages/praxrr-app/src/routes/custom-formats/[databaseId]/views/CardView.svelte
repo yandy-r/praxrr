@@ -11,6 +11,7 @@
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import Label from '$ui/label/Label.svelte';
   import Button from '$ui/button/Button.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
   import {
     getArrAppMetadata,
@@ -59,6 +60,10 @@
     }
 
     return `/custom-formats/${resolveSourceDatabaseId(row)}/${row.id}`;
+  }
+
+  function showLocallyModified(format: CustomFormatTableRow): boolean {
+    return isEditableRow(format) && format.locallyModified === true;
   }
 
   const { visibleCount, sentinel, reset, setTotalCount } = createProgressiveList({ pageSize: 30 });
@@ -116,9 +121,14 @@
     <Card href={getCardHref(format)} hoverable>
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
-          <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-            {format.name}
-          </h3>
+          <div class="flex flex-col">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{format.name}</h3>
+            {#if showLocallyModified(format)}
+              <div class="mt-1">
+                <LocallyModifiedBadge />
+              </div>
+            {/if}
+          </div>
           {#if isEditableRow(format)}
             <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
             <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>

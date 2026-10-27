@@ -3,6 +3,7 @@
   import { Plus } from 'lucide-svelte';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
@@ -25,6 +26,12 @@
     toSourceFilterKey,
     type SourceFilterSelection,
   } from '$lib/client/utils/sourceFilter.ts';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
 
   export let data: PageData;
 
@@ -102,6 +109,22 @@
 
   // Update items when data changes (e.g., switching databases)
   $: setItems(data.qualityProfiles.map((profile) => withSourceFallback(profile)));
+
+  // Locally modified filter (persisted per database)
+  let onlyLocal = false;
+  let initializedLocalOnlyKey = '';
+
+  $: localOnlyStorageKey = `qualityProfilesLocalOnly:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    onlyLocal = loadLocalOnly(localOnlyStorageKey);
+  }
+
+  function toggleLocalOnly() {
+    onlyLocal = !onlyLocal;
+    saveLocalOnly(localOnlyStorageKey, onlyLocal);
+  }
+
   $: sourceFilterStorageKey = SOURCE_FILTER_STORAGE_KEY + `:${data.currentDatabase.id}`;
   $: if (initializedSourceFilterKey !== sourceFilterStorageKey) {
     initializedSourceFilterKey = sourceFilterStorageKey;
@@ -132,15 +155,24 @@
       id: data.currentDatabase.id,
     })
   );
-  $: sourceFilterStatusMessage = sourceFilterActive
-    ? `Showing ${filteredProfiles.length} of ${$searchFiltered.length} quality profiles after source filtering`
-    : '';
-  $: filteredEmptyMessage =
-    sourceFilterActive && $search.query
-      ? 'No quality profiles match your search and selected sources'
-      : sourceFilterActive
-        ? 'No quality profiles match your selected sources'
-        : 'No quality profiles match your search';
+  $: locallyFiltered = filterLocallyModified(filteredProfiles, onlyLocal);
+  $: locallyModifiedCount = countLocallyModified(filteredProfiles);
+  $: sourceFilterStatusMessage = onlyLocal
+    ? `Showing ${locallyFiltered.length} locally modified of ${filteredProfiles.length} quality profiles`
+    : sourceFilterActive
+      ? `Showing ${filteredProfiles.length} of ${$searchFiltered.length} quality profiles after source filtering`
+      : '';
+  $: filteredEmptyMessage = (() => {
+    if (sourceFilterActive && $search.query) {
+      return 'No quality profiles match your search and selected sources';
+    }
+
+    if (sourceFilterActive) {
+      return 'No quality profiles match your selected sources';
+    }
+
+    return 'No quality profiles match your search';
+  })();
   $: if (browser && initializedSourceFilterKey === sourceFilterStorageKey) {
     localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
   }
@@ -176,6 +208,7 @@
       ariaLabel="Filter quality profiles by source"
       dropdownOnly
     />
+    <LocalOnlyFilterAction active={onlyLocal} count={locallyModifiedCount} on:toggle={toggleLocalOnly} />
     <ActionButton
       icon={Plus}
       label="Add quality profile"
@@ -206,9 +239,15 @@
       >
         <p class="text-neutral-600 dark:text-neutral-400">{filteredEmptyMessage}</p>
       </div>
+    {:else if locallyFiltered.length === 0}
+      <div
+        class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
+      >
+        <p class="text-neutral-600 dark:text-neutral-400">No quality profiles are locally modified</p>
+      </div>
     {:else if $view === 'table'}
       <TableView
-        profiles={filteredProfiles}
+        profiles={locallyFiltered}
         availableSources={data.sourceContext.availableSources}
         showSourceBadges={data.sourceContext.showAllSourcesTab}
         currentDatabaseId={data.currentDatabase.id}
@@ -217,7 +256,7 @@
       />
     {:else}
       <CardView
-        profiles={filteredProfiles}
+        profiles={locallyFiltered}
         availableSources={data.sourceContext.availableSources}
         showSourceBadges={data.sourceContext.showAllSourcesTab}
         currentDatabaseId={data.currentDatabase.id}

@@ -21,6 +21,7 @@ import {
   isValueGuardBlockingStatus,
 } from '../migration/valueGuardGate.ts';
 import { uuid } from '$shared/utils/uuid.ts';
+import { currentUserOpActionId } from './actionContext.ts';
 
 interface RepoImportWriteContext {
   filenamePrefix: string;
@@ -101,8 +102,11 @@ export async function withRepoImportWriteContext<T>(
   return writeContextStorage.run(nextStack, callback);
 }
 
-function buildMetadataJson(metadata?: OperationMetadata): string | null {
-  if (!metadata) return null;
+function buildMetadataJson(
+  metadata?: OperationMetadata,
+  actionId: string | null = metadata?.actionId ?? null
+): string | null {
+  if (!metadata) return actionId === null ? null : JSON.stringify({ action_id: actionId });
   const payload: Record<string, unknown> = {
     operation: metadata.operation,
     entity: metadata.entity,
@@ -125,6 +129,9 @@ function buildMetadataJson(metadata?: OperationMetadata): string | null {
   }
   if (metadata.groupId) {
     payload.group_id = metadata.groupId;
+  }
+  if (actionId !== null) {
+    payload.action_id = actionId;
   }
   if (metadata.generated) {
     payload.generated = true;
@@ -166,14 +173,20 @@ function normalizeSql(sql: string): string {
   return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
 }
 
-function serializeMigrationSqlOperation(operation: MigrationSqlOperation): {
+function serializeMigrationSqlOperation(
+  operation: MigrationSqlOperation,
+  actionId: string | null
+): {
   sql: string;
   metadataJson: string | null;
   desiredStateJson: string | null;
 } {
   return {
     sql: normalizeSql(operation.sql),
-    metadataJson: buildMetadataJson(operation.metadata),
+    metadataJson: buildMetadataJson(
+      operation.metadata,
+      actionId === null ? null : (operation.metadata?.actionId ?? actionId)
+    ),
     desiredStateJson: serializeDesiredState(operation.desiredState),
   };
 }
@@ -189,7 +202,8 @@ function resolveConflictStrategy(conflictStrategy: string | undefined): Conflict
 function runValueGuardGate(
   databaseId: number,
   layer: OperationLayer,
-  operations: MigrationSqlOperation[]
+  operations: MigrationSqlOperation[],
+  actionId: string | null = null
 ): ValueGuardGateResult {
   if (layer !== 'user') {
     return { ok: true };
@@ -216,7 +230,7 @@ function runValueGuardGate(
   try {
     for (let i = 0; i < operations.length; i++) {
       const operation = operations[i];
-      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation, actionId);
       if (sql.length === 0) {
         continue;
       }
@@ -282,6 +296,8 @@ export function __testOnly_runValueGuardGate(
 
 export const __testOnly_supersedePriorUserOps = (...args: Parameters<typeof supersedePriorUserOps>) =>
   supersedePriorUserOps(...args);
+
+export const __testOnly_buildMetadataJson = buildMetadataJson;
 
 async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
   if (metadata.operation !== 'delete') {
@@ -635,6 +651,8 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     return { success: false, error: 'No SQL operations provided' };
   }
 
+  const actionId = layer === 'user' ? (currentUserOpActionId() ?? uuid()) : null;
+
   try {
     const instance = databaseInstancesQueries.getById(databaseId);
     if (!instance) {
@@ -686,7 +704,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     }
 
     if (options.runValueGuardGate) {
-      const gateResult = runValueGuardGate(databaseId, layer, operations);
+      const gateResult = runValueGuardGate(databaseId, layer, operations, actionId);
       if (!gateResult.ok) {
         return {
           success: false,
@@ -698,7 +716,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
     let lastOpId: number | null = null;
 
     for (const operation of operations) {
-      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation);
+      const { sql, metadataJson, desiredStateJson } = serializeMigrationSqlOperation(operation, actionId);
       const importIdentity = consumeRepoImportIdentity(layer, source);
 
       if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {

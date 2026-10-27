@@ -1,9 +1,10 @@
 import type { ArrAppType } from '../../arr/capabilities.ts';
 import type { SourcedDisplayRow } from '../../sources/types.ts';
+import type { LocallyModifiable } from './common.ts';
 
 export type { RadarrQualityDefinitionsRow, SonarrQualityDefinitionsRow } from '../types.ts';
 
-export interface QualityDefinitionListItem {
+export interface QualityDefinitionListItem extends LocallyModifiable {
   name: string;
   arr_type: ArrAppType;
   quality_count: number;

@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, canWriteToBase, pcdManager } from '$pcd/index.ts';
 import * as metadataProfileQueries from '$pcd/entities/metadataProfiles/index.ts';
 import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
 
@@ -39,6 +39,7 @@ export const load: ServerLoad = async ({ params }) => {
 
   const updatedAtById = new Map<number, string>(metadataProfileRows.map((row) => [row.id, row.updated_at]));
 
+  const isLocallyModified = buildLocallyModifiedLookup(currentDatabaseId);
   const metadataProfileListItems: LidarrMetadataProfileListItem[] = metadataProfiles.map((profile) => ({
     id: profile.id,
     name: profile.name,
@@ -50,6 +51,7 @@ export const load: ServerLoad = async ({ params }) => {
     primaryAllowedCount: profile.primaryAlbumTypes.filter((entry) => entry.allowed).length,
     secondaryAllowedCount: profile.secondaryAlbumTypes.filter((entry) => entry.allowed).length,
     releaseStatusAllowedCount: profile.releaseStatuses.filter((entry) => entry.allowed).length,
+    locallyModified: isLocallyModified('lidarrMetadataProfile', 'lidarr', profile.name),
   }));
 
   return {

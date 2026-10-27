@@ -3,12 +3,19 @@
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import PageTitle from '$ui/meta/PageTitle.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
   import SourceFilterAction from '$ui/actions/SourceFilterAction.svelte';
   import ViewToggle from '$ui/actions/ViewToggle.svelte';
   import CloneModal from '$ui/modal/CloneModal.svelte';
   import TableView from './views/TableView.svelte';
   import CardView from './views/CardView.svelte';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -161,7 +168,26 @@
     localStorage.setItem(sourceFilterStorageKey, JSON.stringify(selectedSourceKeys));
   }
 
-  $: sourceFiltered = filterBySourceSelection($filtered, selectedSourceKeys, fallbackSourceKey);
+  const LOCAL_ONLY_STORAGE_PREFIX = 'namingLocalOnly';
+  let localOnly = false;
+  let initializedLocalOnlyKey = '';
+
+  function toggleLocalOnly() {
+    localOnly = !localOnly;
+    saveLocalOnly(localOnlyStorageKey, localOnly);
+  }
+
+  $: localOnlyStorageKey = `${LOCAL_ONLY_STORAGE_PREFIX}:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    localOnly = loadLocalOnly(localOnlyStorageKey);
+  }
+  $: localModifiedCount = countLocallyModified(data.namingConfigs);
+
+  $: sourceFiltered = filterLocallyModified(
+    filterBySourceSelection($filtered, selectedSourceKeys, fallbackSourceKey),
+    localOnly
+  );
   $: sourceFilterActive = isSourceFilterActive(selectedSourceKeys, availableSources);
   $: hasSearchQuery = $search.query.trim().length > 0;
   $: showSourceClearAction = sourceFilterActive && availableSources.length > 1;
@@ -170,12 +196,15 @@
       ? 'No naming configs match your search and selected sources'
       : 'No naming configs match your selected sources'
     : 'No naming configs match your search';
+
+  $: displayEmptyMessage = localOnly ? 'No locally modified naming configs match your filters' : emptyMessage;
 </script>
 
 <PageTitle parts={['Naming', data.currentDatabase.name]} />
 
 <ActionsBar>
   <SearchAction searchStore={search} placeholder="Search naming configs..." responsive />
+  <LocalOnlyFilterAction active={localOnly} count={localModifiedCount} on:toggle={toggleLocalOnly} />
   <div title={sourceFilterDisabledReason ?? undefined}>
     <SourceFilterAction
       sources={availableSources}
@@ -208,7 +237,7 @@
     <div
       class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <p class="text-neutral-600 dark:text-neutral-400">{emptyMessage}</p>
+      <p class="text-neutral-600 dark:text-neutral-400">{displayEmptyMessage}</p>
       {#if showSourceClearAction}
         <button
           type="button"

@@ -8,6 +8,13 @@
   import CloneModal from '$ui/modal/CloneModal.svelte';
   import TableView from './views/TableView.svelte';
   import CardView from './views/CardView.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
@@ -20,6 +27,20 @@
   let showInfoModal = false;
   let cloneModalOpen = false;
   let cloneSourceName = '';
+
+  let onlyLocal = false;
+  let initializedLocalOnlyKey = '';
+
+  $: localOnlyStorageKey = `delayProfilesLocalOnly:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    onlyLocal = loadLocalOnly(localOnlyStorageKey);
+  }
+
+  function toggleOnlyLocal() {
+    onlyLocal = !onlyLocal;
+    saveLocalOnly(localOnlyStorageKey, onlyLocal);
+  }
 
   function handleClone(event: CustomEvent<{ name: string }>) {
     cloneSourceName = event.detail.name;
@@ -57,6 +78,9 @@
   // Update items when data changes (e.g., switching databases)
   $: setItems(data.delayProfiles);
 
+  $: locallyModifiedCount = countLocallyModified(data.delayProfiles);
+  $: filteredProfiles = filterLocallyModified($filtered, onlyLocal);
+
   // Map databases to tabs
   $: tabs = data.databases.map((db) => ({
     label: db.name,
@@ -81,6 +105,7 @@
   <!-- Actions Bar -->
   <ActionsBar>
     <SearchAction searchStore={search} placeholder="Search delay profiles..." responsive />
+    <LocalOnlyFilterAction active={onlyLocal} count={locallyModifiedCount} on:toggle={toggleOnlyLocal} />
     <ViewToggle bind:value={$view} />
     <ActionButton icon={Info} label="About delay profiles" on:click={() => (showInfoModal = true)} />
     <ActionButton
@@ -100,16 +125,18 @@
           No delay profiles found for {data.currentDatabase.name}
         </p>
       </div>
-    {:else if $filtered.length === 0}
+    {:else if filteredProfiles.length === 0}
       <div
         class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <p class="text-neutral-600 dark:text-neutral-400">No delay profiles match your search</p>
+        <p class="text-neutral-600 dark:text-neutral-400">
+          {onlyLocal ? 'No locally modified delay profiles' : 'No delay profiles match your search'}
+        </p>
       </div>
     {:else if $view === 'table'}
-      <TableView profiles={$filtered} on:clone={handleClone} on:export={handleExport} />
+      <TableView profiles={filteredProfiles} on:clone={handleClone} on:export={handleExport} />
     {:else}
-      <CardView profiles={$filtered} on:clone={handleClone} on:export={handleExport} />
+      <CardView profiles={filteredProfiles} on:clone={handleClone} on:export={handleExport} />
     {/if}
   </div>
 </div>

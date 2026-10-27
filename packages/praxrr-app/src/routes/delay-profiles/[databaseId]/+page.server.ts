@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager, canWriteToBase } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, canWriteToBase, pcdManager } from '$pcd/index.ts';
 import * as delayProfileQueries from '$pcd/entities/delayProfiles/index.ts';
 
 export const load: ServerLoad = async ({ params }) => {
@@ -33,8 +33,12 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(500, 'Database cache not available');
   }
 
-  // Load delay profiles for the current database
-  const delayProfiles = await delayProfileQueries.list(cache);
+  // Load delay profiles for the current database, flagging rows with local overrides
+  const isLocallyModified = buildLocallyModifiedLookup(currentDatabaseId);
+  const delayProfiles = (await delayProfileQueries.list(cache)).map((row) => ({
+    ...row,
+    locallyModified: isLocallyModified('delayProfile', undefined, row.name),
+  }));
 
   return {
     databases,

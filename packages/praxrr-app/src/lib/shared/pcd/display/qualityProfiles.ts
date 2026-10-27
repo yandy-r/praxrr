@@ -1,7 +1,7 @@
 import type { ArrAppType } from '../../arr/capabilities.ts';
 import type { QualityProfilesRow } from '../types.ts';
 import type { SourcedDisplayRow } from '../../sources/types.ts';
-import type { Tag } from './common.ts';
+import type { LocallyModifiable, Tag } from './common.ts';
 
 /** Quality profile option for select/dropdown */
 export type QualityProfileOption = Pick<QualityProfilesRow, 'id' | 'name'>;
@@ -45,7 +45,8 @@ export type QualityProfileTableRow = Omit<
   custom_formats: CustomFormatCounts;
   qualities: QualityItem[];
   language?: ProfileLanguage;
-} & SourcedDisplayRow;
+} & SourcedDisplayRow &
+  LocallyModifiable;
 
 /** Quality profile general information */
 export type QualityProfileGeneral = Pick<QualityProfilesRow, 'id' | 'name'> & {

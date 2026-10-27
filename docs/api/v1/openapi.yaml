@@ -30,6 +30,8 @@ tags:
     description: PCD state snapshot management endpoints
   - name: Resolved Config
     description: Resolved PCD configuration state, layer breakdown, and live/cross-instance diff endpoints
+  - name: Local Overrides
+    description: Review, revert, and undo published local PCD user operations
   - name: Dependency Graph
     description: Resolved dependency relationships between PCD config entities, with per-entity impact
   - name: User Preferences
@@ -401,6 +403,12 @@ paths:
     $ref: './paths/pcd-snapshots.yaml#/snapshotRollbackPreview'
   /pcd/{databaseId}/snapshots/{snapshotId}/rollback:
     $ref: './paths/pcd-snapshots.yaml#/snapshotRollback'
+  /pcd/{databaseId}/overrides:
+    $ref: './paths/pcd-overrides.yaml#/list'
+  /pcd/{databaseId}/overrides/undo:
+    $ref: './paths/pcd-overrides.yaml#/undo'
+  /pcd/{databaseId}/overrides/{entityType}/{name}/revert:
+    $ref: './paths/pcd-overrides.yaml#/revert'
   /pcd/{databaseId}/lidarr-metadata-profiles:
     get:
       operationId: listLidarrMetadataProfiles
@@ -1838,6 +1846,27 @@ components:
       $ref: './schemas/resolved-config.yaml#/CrossInstanceComparisonResponse'
     ResolvedLiveDiffResponse:
       $ref: './schemas/resolved-config.yaml#/ResolvedLiveDiffResponse'
+    # Local Overrides
+    PcdOverrideEntityRef:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideEntityRef'
+    PcdOverrideOp:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideOp'
+    PcdOverrideEntity:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideEntity'
+    PcdOverrideLastAction:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideLastAction'
+    PcdOverridesResponse:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverridesResponse'
+    PcdOverrideRevertRequest:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideRevertRequest'
+    PcdOverrideRevertResult:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideRevertResult'
+    PcdOverrideUndoRequest:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideUndoRequest'
+    PcdOverrideUndoResult:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideUndoResult'
+    PcdOverrideErrorResponse:
+      $ref: './schemas/pcd-overrides.yaml#/PcdOverrideErrorResponse'
     # Dependency Graph
     GraphNodeKind:
       $ref: './schemas/graph.yaml#/GraphNodeKind'

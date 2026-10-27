@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { ServerLoad } from '@sveltejs/kit';
-import { pcdManager } from '$pcd/index.ts';
+import { buildLocallyModifiedLookup, pcdManager } from '$pcd/index.ts';
 import type { SourcedNamingListItem } from '$shared/pcd/display.ts';
 import { list } from '$pcd/entities/mediaManagement/naming/read.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
@@ -71,7 +71,11 @@ export const load: ServerLoad = async ({ params }) => {
           return [] as SourcedNamingListItem[];
         }
 
-        const rows = await list(cache);
+        const isLocallyModified = buildLocallyModifiedLookup(database.id);
+        const rows = (await list(cache)).map((row) => ({
+          ...row,
+          locallyModified: isLocallyModified('naming', row.arr_type, row.name),
+        }));
         return withPcdSource(rows, database);
       })
     )

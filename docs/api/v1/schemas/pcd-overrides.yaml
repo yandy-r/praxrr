@@ -1,0 +1,279 @@
+PcdOverrideEntityRef:
+  type: object
+  required:
+    - entityType
+    - arrType
+    - name
+  properties:
+    entityType:
+      type: string
+      enum:
+        - delayProfile
+        - regularExpression
+        - customFormat
+        - qualityProfile
+        - naming
+        - mediaSettings
+        - qualityDefinitions
+        - lidarrMetadataProfile
+      description: Resolved config entity type
+    arrType:
+      type: string
+      nullable: true
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+      description: Explicit Arr app for scoped entities; null for Arr-agnostic entities
+    name:
+      type: string
+      minLength: 1
+      description: Current resolved entity name, preserved exactly without trimming
+
+PcdOverrideOp:
+  type: object
+  description: A published user operation attributed to an entity
+  required:
+    - id
+    - operation
+    - title
+    - summary
+    - changedFields
+    - actionId
+    - groupId
+    - status
+    - createdAt
+  properties:
+    id:
+      type: integer
+    operation:
+      type: string
+    title:
+      type: string
+    summary:
+      type: string
+      nullable: true
+    changedFields:
+      type: array
+      items:
+        type: string
+    actionId:
+      type: string
+      nullable: true
+      description: User-action undo unit; null for legacy ops without action_id metadata
+    groupId:
+      type: string
+      nullable: true
+      description: Explicit dependent-operation group, when present
+    status:
+      type: string
+      nullable: true
+      description: Latest operation-history status; null when no history exists
+    createdAt:
+      type: string
+      format: date-time
+
+PcdOverrideEntity:
+  allOf:
+    - $ref: '#/PcdOverrideEntityRef'
+    - type: object
+      required:
+        - kind
+        - present
+        - existsInBase
+        - overrides
+        - hasPendingConflict
+        - ops
+      properties:
+        kind:
+          type: string
+          enum:
+            - modified
+            - created
+            - deleted
+        present:
+          type: boolean
+          description: Whether the entity exists in the resolved state
+        existsInBase:
+          type: boolean
+          description: Whether the entity exists in the upstream base state
+        overrides:
+          type: array
+          description: |
+            Field-level differences from upstream base to resolved state. An empty array
+            can coexist with published user ops (a net-zero edit remains locally modified).
+          items:
+            $ref: './sync.yaml#/FieldChange'
+        hasPendingConflict:
+          type: boolean
+        ops:
+          type: array
+          items:
+            $ref: '#/PcdOverrideOp'
+
+PcdOverrideLastAction:
+  type: object
+  description: |
+    Most recent published user-action undo unit across the whole database, unaffected by
+    list filters. Legacy ops fall back to group_id, then to a single operation.
+  required:
+    - actionId
+    - key
+    - opIds
+    - entities
+    - createdAt
+  properties:
+    actionId:
+      type: string
+      description: Undo-unit identifier; echo as expectedActionId to guard against stale undo
+    key:
+      type: string
+      description: Namespaced undo key (action:<id>, group:<id>, or op:<id>)
+    opIds:
+      type: array
+      items:
+        type: integer
+    entities:
+      type: array
+      items:
+        $ref: '#/PcdOverrideEntityRef'
+    createdAt:
+      type: string
+      format: date-time
+
+PcdOverridesResponse:
+  type: object
+  required:
+    - databaseId
+    - entities
+    - lastAction
+    - unmappedOpCount
+  properties:
+    databaseId:
+      type: integer
+    entities:
+      type: array
+      items:
+        $ref: '#/PcdOverrideEntity'
+    lastAction:
+      nullable: true
+      allOf:
+        - $ref: '#/PcdOverrideLastAction'
+    unmappedOpCount:
+      type: integer
+      description: Published user ops whose entity identity cannot be resolved safely
+
+PcdOverrideRevertRequest:
+  type: object
+  description: All fields are optional; omit opIds to revert all user ops for the entity.
+  properties:
+    opIds:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      items:
+        type: integer
+        minimum: 1
+      description: Explicit subset of the entity's published user-op IDs to revert
+    cascadeGroup:
+      type: boolean
+      default: false
+      description: Explicitly include other ops in a required dependent-operation group
+
+PcdOverrideRevertResult:
+  allOf:
+    - $ref: '#/PcdOverrideEntityRef'
+    - type: object
+      required:
+        - databaseId
+        - revertedOpIds
+        - cascadedEntities
+        - remainingOpIds
+        - resolvedMatchesBase
+      properties:
+        databaseId:
+          type: integer
+        revertedOpIds:
+          type: array
+          items:
+            type: integer
+        cascadedEntities:
+          type: array
+          items:
+            $ref: '#/PcdOverrideEntityRef'
+        remainingOpIds:
+          type: array
+          items:
+            type: integer
+        resolvedMatchesBase:
+          type: boolean
+          nullable: true
+          description: |
+            Whether a fully reverted entity matches base. Null when not comparable,
+            including a partial revert or an entity absent from both layers.
+
+PcdOverrideUndoRequest:
+  type: object
+  properties:
+    expectedActionId:
+      type: string
+      minLength: 1
+      description: LastAction.actionId from the last read; mismatch is rejected as stale_action
+
+PcdOverrideUndoResult:
+  type: object
+  required:
+    - databaseId
+    - undoneActionId
+    - revertedOpIds
+    - reactivatedOpIds
+    - entities
+  properties:
+    databaseId:
+      type: integer
+    undoneActionId:
+      type: string
+    revertedOpIds:
+      type: array
+      items:
+        type: integer
+    reactivatedOpIds:
+      type: array
+      description: Previously applied edits superseded by the undone action and now restored
+      items:
+        type: integer
+    entities:
+      type: array
+      items:
+        $ref: '#/PcdOverrideEntityRef'
+
+PcdOverrideErrorResponse:
+  type: object
+  required:
+    - error
+    - reason
+  properties:
+    error:
+      type: string
+    reason:
+      type: string
+      enum:
+        - entity_not_found
+        - op_not_found
+        - nothing_to_undo
+        - group_dependency
+        - dependent_ops
+        - selection_blocked
+        - op_not_revertible
+        - conflict_after_revert
+        - collateral_ops
+        - stale_action
+      description: Machine-readable missing-target (404) or fail-closed conflict (409) reason
+    blockingOpIds:
+      type: array
+      items:
+        type: integer
+    entities:
+      type: array
+      items:
+        $ref: '#/PcdOverrideEntityRef'

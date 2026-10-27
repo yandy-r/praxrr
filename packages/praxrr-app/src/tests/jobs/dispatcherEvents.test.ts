@@ -13,6 +13,7 @@ import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { cleanupJobsForDatabase } from '$jobs/cleanup.ts';
 import { cancelQueuedRenameJobs } from '$jobs/renameHelpers.ts';
 import { scheduleDriftCheck } from '$jobs/schedule.ts';
+import { currentUserOpActionId, withUserOpAction } from '$pcd/ops/actionContext.ts';
 
 // Register production handlers (side-effect only) so the override/restore below is meaningful.
 import '$jobs/handlers/index.ts';
@@ -326,4 +327,27 @@ migratedTest('T-D8 listActive excludes future-dated queued rows from every sourc
       .sort((a, b) => a - b),
     [...expected].sort((a, b) => a - b)
   );
+});
+
+migratedTest("dispatcher jobs never run under the enqueuing request's user-op action", async () => {
+  let requestActionId: string | undefined;
+  let jobActionId: string | undefined;
+  await withStub(
+    () => {
+      jobActionId = currentUserOpActionId();
+      return Promise.resolve({ status: 'success', output: 'ok' });
+    },
+    async () => {
+      const pending = collect(finishedFor('logs.cleanup'));
+      await withUserOpAction(() => {
+        requestActionId = currentUserOpActionId();
+        enqueueJob({ jobType: 'logs.cleanup', runAt: new Date().toISOString(), source: 'manual' });
+        return Promise.resolve();
+      });
+      await pending;
+    }
+  );
+  assert(requestActionId !== undefined);
+  assert(jobActionId !== undefined, 'job handler must run in its own action');
+  assert(jobActionId !== requestActionId, 'job must not reuse the request action id');
 });

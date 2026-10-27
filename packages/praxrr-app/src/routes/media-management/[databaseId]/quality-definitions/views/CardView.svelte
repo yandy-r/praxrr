@@ -6,6 +6,7 @@
   import Label from '$ui/label/Label.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import { Copy, Download } from 'lucide-svelte';
   import type { SourcedQualityDefinitionListItem } from '$shared/pcd/display.ts';
@@ -200,6 +201,9 @@
               {#if showSourceBadges}
                 {@const source = resolveSource(config)}
                 <SourceBadge sourceType={source.type} sourceName={source.name} arrType={source.arrType} size="sm" />
+              {/if}
+              {#if config.locallyModified}
+                <LocallyModifiedBadge />
               {/if}
               <Badge variant={hasAppMapping ? config.arr_type : 'warning'} size="sm">
                 {appLabel}

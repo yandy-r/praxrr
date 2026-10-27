@@ -11,6 +11,13 @@
   import TableView from './views/TableView.svelte';
   import CardView from './views/CardView.svelte';
   import SearchFilterAction from './components/SearchFilterAction.svelte';
+  import LocalOnlyFilterAction from '$ui/actions/LocalOnlyFilterAction.svelte';
+  import {
+    countLocallyModified,
+    filterLocallyModified,
+    loadLocalOnly,
+    saveLocalOnly,
+  } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
   import { browser } from '$app/environment';
   import { Info, Plus, FileText, Users } from 'lucide-svelte';
@@ -24,6 +31,20 @@
   let infoModalOpen = false;
   let cloneModalOpen = false;
   let cloneSourceName = '';
+
+  let onlyLocal = false;
+  let initializedLocalOnlyKey = '';
+
+  $: localOnlyStorageKey = `regularExpressionsLocalOnly:${data.currentDatabase.id}`;
+  $: if (initializedLocalOnlyKey !== localOnlyStorageKey) {
+    initializedLocalOnlyKey = localOnlyStorageKey;
+    onlyLocal = loadLocalOnly(localOnlyStorageKey);
+  }
+
+  function toggleOnlyLocal() {
+    onlyLocal = !onlyLocal;
+    saveLocalOnly(localOnlyStorageKey, onlyLocal);
+  }
 
   function handleClone(event: CustomEvent<{ name: string }>) {
     cloneSourceName = event.detail.name;
@@ -102,8 +123,13 @@
   // Update items when data changes (e.g., switching databases)
   $: setItems(data.regularExpressions);
 
-  // Custom filtering based on selected search options
-  $: filtered = filterExpressions(data.regularExpressions, $debouncedQuery, searchOptions);
+  $: locallyModifiedCount = countLocallyModified(data.regularExpressions);
+
+  // Custom filtering based on selected search options, then the local-only filter
+  $: filtered = filterLocallyModified(
+    filterExpressions(data.regularExpressions, $debouncedQuery, searchOptions),
+    onlyLocal
+  );
 
   function filterExpressions(
     items: RegularExpressionWithTags[],
@@ -171,6 +197,7 @@
       </svelte:fragment>
     </ActionButton>
     <SearchFilterAction bind:options={searchOptions} />
+    <LocalOnlyFilterAction active={onlyLocal} count={locallyModifiedCount} on:toggle={toggleOnlyLocal} />
     <ViewToggle bind:value={$view} />
     <ActionButton icon={Info} label="About regular expressions" on:click={() => (infoModalOpen = true)} />
   </ActionsBar>
@@ -189,7 +216,9 @@
       <div
         class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <p class="text-neutral-600 dark:text-neutral-400">No regular expressions match your search</p>
+        <p class="text-neutral-600 dark:text-neutral-400">
+          {onlyLocal ? 'No locally modified regular expressions' : 'No regular expressions match your search'}
+        </p>
       </div>
     {:else if $view === 'table'}
       <TableView expressions={filtered} on:clone={handleClone} on:export={handleExport} />

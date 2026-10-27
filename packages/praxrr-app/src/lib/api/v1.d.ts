@@ -886,6 +886,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/pcd/{databaseId}/overrides': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List local PCD overrides
+     * @description Lists entities with published user ops and their upstream-base-to-resolved field
+     *     differences. Net-zero edits remain listed until their user ops are reverted.
+     *     Builds the base-only cache once per request. lastAction always describes the latest
+     *     action across the whole database, independent of filters. API tokens require read scope.
+     */
+    get: operations['listPcdOverrides'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/overrides/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Undo the latest local PCD change
+     * @description Soft-drops exactly the latest published user-action unit and recompiles the PCD.
+     *     New ops use action_id; legacy ops fall back to group_id, then a single op. Previously
+     *     applied edits superseded by this action are reactivated when undoing it. No automatic
+     *     snapshot is created. API tokens require admin scope. The request body is limited to 8 KB.
+     */
+    post: operations['undoPcdOverride'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/pcd/{databaseId}/overrides/{entityType}/{name}/revert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Revert an entity's local PCD overrides
+     * @description Soft-drops all or selected published user ops for the entity and recompiles the PCD.
+     *     Operation rows are retained; no automatic snapshot is created. Revert is fail-closed:
+     *     dependent or conflicting changes are not silently dropped. Only cascadeGroup explicitly
+     *     permits including other entities in a required group. API tokens require admin scope.
+     *     The request body is limited to 8 KB.
+     */
+    post: operations['revertPcdOverride'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/pcd/{databaseId}/lidarr-metadata-profiles': {
     parameters: {
       query?: never;
@@ -5123,6 +5193,133 @@ export interface components {
       /** @description Desired-vs-actual field changes; an empty array means the entity is in sync */
       changes: components['schemas']['EntityChange'][];
     };
+    PcdOverrideEntityRef: {
+      /**
+       * @description Resolved config entity type
+       * @enum {string}
+       */
+      entityType:
+        | 'delayProfile'
+        | 'regularExpression'
+        | 'customFormat'
+        | 'qualityProfile'
+        | 'naming'
+        | 'mediaSettings'
+        | 'qualityDefinitions'
+        | 'lidarrMetadataProfile';
+      /**
+       * @description Explicit Arr app for scoped entities; null for Arr-agnostic entities
+       * @enum {string|null}
+       */
+      arrType: 'radarr' | 'sonarr' | 'lidarr' | null;
+      /** @description Current resolved entity name, preserved exactly without trimming */
+      name: string;
+    };
+    /** @description A published user operation attributed to an entity */
+    PcdOverrideOp: {
+      id: number;
+      operation: string;
+      title: string;
+      summary: string | null;
+      changedFields: string[];
+      /** @description User-action undo unit; null for legacy ops without action_id metadata */
+      actionId: string | null;
+      /** @description Explicit dependent-operation group, when present */
+      groupId: string | null;
+      /** @description Latest operation-history status; null when no history exists */
+      status: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    PcdOverrideEntity: components['schemas']['PcdOverrideEntityRef'] & {
+      /** @enum {string} */
+      kind: 'modified' | 'created' | 'deleted';
+      /** @description Whether the entity exists in the resolved state */
+      present: boolean;
+      /** @description Whether the entity exists in the upstream base state */
+      existsInBase: boolean;
+      /**
+       * @description Field-level differences from upstream base to resolved state. An empty array
+       *     can coexist with published user ops (a net-zero edit remains locally modified).
+       */
+      overrides: components['schemas']['FieldChange'][];
+      hasPendingConflict: boolean;
+      ops: components['schemas']['PcdOverrideOp'][];
+    };
+    /**
+     * @description Most recent published user-action undo unit across the whole database, unaffected by
+     *     list filters. Legacy ops fall back to group_id, then to a single operation.
+     */
+    PcdOverrideLastAction: {
+      /** @description Undo-unit identifier; echo as expectedActionId to guard against stale undo */
+      actionId: string;
+      /** @description Namespaced undo key (action:<id>, group:<id>, or op:<id>) */
+      key: string;
+      opIds: number[];
+      entities: components['schemas']['PcdOverrideEntityRef'][];
+      /** Format: date-time */
+      createdAt: string;
+    };
+    PcdOverridesResponse: {
+      databaseId: number;
+      entities: components['schemas']['PcdOverrideEntity'][];
+      lastAction: components['schemas']['PcdOverrideLastAction'] | null;
+      /** @description Published user ops whose entity identity cannot be resolved safely */
+      unmappedOpCount: number;
+    };
+    /** @description All fields are optional; omit opIds to revert all user ops for the entity. */
+    PcdOverrideRevertRequest: {
+      /** @description Explicit subset of the entity's published user-op IDs to revert */
+      opIds?: number[];
+      /**
+       * @description Explicitly include other ops in a required dependent-operation group
+       * @default false
+       */
+      cascadeGroup: boolean;
+    };
+    PcdOverrideRevertResult: components['schemas']['PcdOverrideEntityRef'] & {
+      databaseId: number;
+      revertedOpIds: number[];
+      cascadedEntities: components['schemas']['PcdOverrideEntityRef'][];
+      remainingOpIds: number[];
+      /**
+       * @description Whether a fully reverted entity matches base. Null when not comparable,
+       *     including a partial revert or an entity absent from both layers.
+       */
+      resolvedMatchesBase: boolean | null;
+    };
+    PcdOverrideUndoRequest: {
+      /** @description LastAction.actionId from the last read; mismatch is rejected as stale_action */
+      expectedActionId?: string;
+    };
+    PcdOverrideUndoResult: {
+      databaseId: number;
+      undoneActionId: string;
+      revertedOpIds: number[];
+      /** @description Previously applied edits superseded by the undone action and now restored */
+      reactivatedOpIds: number[];
+      entities: components['schemas']['PcdOverrideEntityRef'][];
+    };
+    PcdOverrideErrorResponse: {
+      error: string;
+      /**
+       * @description Machine-readable missing-target (404) or fail-closed conflict (409) reason
+       * @enum {string}
+       */
+      reason:
+        | 'entity_not_found'
+        | 'op_not_found'
+        | 'nothing_to_undo'
+        | 'group_dependency'
+        | 'dependent_ops'
+        | 'selection_blocked'
+        | 'op_not_revertible'
+        | 'conflict_after_revert'
+        | 'collateral_ops'
+        | 'stale_action';
+      blockingOpIds?: number[];
+      entities?: components['schemas']['PcdOverrideEntityRef'][];
+    };
     /**
      * @description PCD entity family a dependency-graph node represents. `quality` and
      *     `quality_definition` are leaf kinds with no per-id editor route (see
@@ -8225,6 +8422,284 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  listPcdOverrides: {
+    parameters: {
+      query?: {
+        /** @description Optional resolved entity family filter */
+        entityType?:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+        /**
+         * @description Explicit Arr app filter. Required when entityType is naming, mediaSettings, or
+         *     qualityDefinitions. Required and must be lidarr for lidarrMetadataProfile.
+         *     Rejected when entityType is delayProfile, regularExpression, customFormat, or
+         *     qualityProfile. Never inferred from a sibling Arr app.
+         */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Local override entities and the latest undoable action */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverridesResponse'];
+        };
+      };
+      /** @description Invalid filters or databaseId, unavailable database, or unbuilt cache */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
+      /** @description Failed to list local overrides */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  undoPcdOverride: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PcdOverrideUndoRequest'];
+      };
+    };
+    responses: {
+      /** @description Latest user action undone and cache recompiled */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideUndoResult'];
+        };
+      };
+      /** @description Invalid databaseId or JSON body, oversized body, disabled database, or unbuilt cache */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `admin` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
+      /** @description nothing_to_undo means there are no published user ops to undo */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideErrorResponse'];
+        };
+      };
+      /**
+       * @description Undo rejected without changing the published-op set:
+       *     - stale_action: expectedActionId no longer identifies the latest undoable action.
+       *     - conflict_after_revert: recompilation would introduce a new conflict on a remaining op.
+       *     - collateral_ops: recompilation would change ops outside the explicitly planned set.
+       */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideErrorResponse'];
+        };
+      };
+      /** @description Failed to undo the latest local change */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  revertPcdOverride: {
+    parameters: {
+      query?: {
+        /**
+         * @description Required for naming, mediaSettings, and qualityDefinitions. Required and must be
+         *     lidarr for lidarrMetadataProfile. Rejected for delayProfile, regularExpression,
+         *     customFormat, and qualityProfile. Never inferred from a sibling Arr app.
+         */
+        arrType?: 'radarr' | 'sonarr' | 'lidarr';
+      };
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+        /** @description Resolved entity family */
+        entityType:
+          | 'delayProfile'
+          | 'regularExpression'
+          | 'customFormat'
+          | 'qualityProfile'
+          | 'naming'
+          | 'mediaSettings'
+          | 'qualityDefinitions'
+          | 'lidarrMetadataProfile';
+        /**
+         * @description Current resolved entity name, not an earlier name before a rename. Preserved
+         *     exactly without trimming; empty names are rejected. Names containing a slash
+         *     cannot be addressed through this path segment.
+         */
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PcdOverrideRevertRequest'];
+      };
+    };
+    responses: {
+      /** @description User ops reverted and cache recompiled */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideRevertResult'];
+        };
+      };
+      /** @description Invalid parameters or JSON body, oversized body, disabled database, or unbuilt cache */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `admin` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
+      /**
+       * @description entity_not_found means no local overrides map to the entity's current name.
+       *     op_not_found means a selected op does not belong to this entity.
+       */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideErrorResponse'];
+        };
+      };
+      /**
+       * @description Revert rejected without changing the published-op set:
+       *     - group_dependency: a required group includes unselected ops; use cascadeGroup to opt in.
+       *     - dependent_ops: remaining user ops depend on the selected create or rename.
+       *     - selection_blocked: a partial selection is not closed over overlapping fields or renames.
+       *     - op_not_revertible: a selected op is no longer published and cannot be reverted.
+       *     - conflict_after_revert: recompilation would introduce a new conflict on a remaining op.
+       *     - collateral_ops: recompilation would change ops outside the explicitly planned set.
+       */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdOverrideErrorResponse'];
+        };
+      };
+      /** @description Failed to revert local overrides */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
     };

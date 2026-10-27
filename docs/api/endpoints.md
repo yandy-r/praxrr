@@ -13,41 +13,44 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 
 ## Endpoint index
 
-| Method | Path                                              | Purpose                               |
-| ------ | ------------------------------------------------- | ------------------------------------- |
-| GET    | `/health`                                         | Service/component health check        |
-| GET    | `/openapi.json`                                   | Runtime OpenAPI JSON                  |
-| GET    | `/events`                                         | Live event stream (SSE)               |
-| HEAD   | `/events`                                         | Event stream availability probe       |
-| GET    | `/ui-preferences`                                 | Read per-user section disclosure mode |
-| PATCH  | `/ui-preferences`                                 | Save per-user section disclosure mode |
-| GET    | `/complexity-tiers`                               | Read per-user section complexity tier |
-| PATCH  | `/complexity-tiers`                               | Save per-user section complexity tier |
-| GET    | `/plugins`                                        | List redacted durable plugin state    |
-| POST   | `/plugins/reload`                                 | Reconcile the plugin registry         |
-| GET    | `/plugins/{apiVersion}/{id}`                      | Read one durable plugin record        |
-| POST   | `/plugins/{apiVersion}/{id}/enable`               | Save enabled plugin intent            |
-| POST   | `/plugins/{apiVersion}/{id}/disable`              | Save disabled plugin intent           |
-| POST   | `/entity-testing/evaluate`                        | Parse titles and evaluate CF matches  |
-| GET    | `/arr/library`                                    | Paginated arr app library view        |
-| DELETE | `/arr/library`                                    | Invalidate Arr library cache          |
-| GET    | `/arr/library/episodes`                           | Sonarr-only series episode details    |
-| GET    | `/arr/releases`                                   | Interactive release search            |
-| POST   | `/arr/cleanup`                                    | Scan/execute stale config cleanup     |
-| GET    | `/pcd/export`                                     | Export portable entity payload        |
-| POST   | `/pcd/import`                                     | Import portable entity payload        |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`      | List metadata profiles                |
-| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`      | Create metadata profile               |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Read metadata profile                 |
-| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Update metadata profile               |
-| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}` | Delete metadata profile               |
-| GET    | `/trash-guide/sources`                            | List all configured TRaSH sources     |
-| POST   | `/trash-guide/sources`                            | Create a new TRaSH source             |
-| GET    | `/trash-guide/sources/:id`                        | Get a specific TRaSH source           |
-| PUT    | `/trash-guide/sources/:id`                        | Update a TRaSH source                 |
-| DELETE | `/trash-guide/sources/:id`                        | Delete a TRaSH source                 |
-| POST   | `/trash-guide/sources/:id/sync`                   | Trigger manual sync for a source      |
-| GET    | `/trash-guide/sources/:id/entities`               | List cached entities for a source     |
+| Method | Path                                                     | Purpose                                |
+| ------ | -------------------------------------------------------- | -------------------------------------- |
+| GET    | `/health`                                                | Service/component health check         |
+| GET    | `/openapi.json`                                          | Runtime OpenAPI JSON                   |
+| GET    | `/events`                                                | Live event stream (SSE)                |
+| HEAD   | `/events`                                                | Event stream availability probe        |
+| GET    | `/ui-preferences`                                        | Read per-user section disclosure mode  |
+| PATCH  | `/ui-preferences`                                        | Save per-user section disclosure mode  |
+| GET    | `/complexity-tiers`                                      | Read per-user section complexity tier  |
+| PATCH  | `/complexity-tiers`                                      | Save per-user section complexity tier  |
+| GET    | `/plugins`                                               | List redacted durable plugin state     |
+| POST   | `/plugins/reload`                                        | Reconcile the plugin registry          |
+| GET    | `/plugins/{apiVersion}/{id}`                             | Read one durable plugin record         |
+| POST   | `/plugins/{apiVersion}/{id}/enable`                      | Save enabled plugin intent             |
+| POST   | `/plugins/{apiVersion}/{id}/disable`                     | Save disabled plugin intent            |
+| POST   | `/entity-testing/evaluate`                               | Parse titles and evaluate CF matches   |
+| GET    | `/arr/library`                                           | Paginated arr app library view         |
+| DELETE | `/arr/library`                                           | Invalidate Arr library cache           |
+| GET    | `/arr/library/episodes`                                  | Sonarr-only series episode details     |
+| GET    | `/arr/releases`                                          | Interactive release search             |
+| POST   | `/arr/cleanup`                                           | Scan/execute stale config cleanup      |
+| GET    | `/pcd/export`                                            | Export portable entity payload         |
+| POST   | `/pcd/import`                                            | Import portable entity payload         |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`             | List metadata profiles                 |
+| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`             | Create metadata profile                |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Read metadata profile                  |
+| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Update metadata profile                |
+| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Delete metadata profile                |
+| GET    | `/pcd/{databaseId}/overrides`                            | List local overrides and latest action |
+| POST   | `/pcd/{databaseId}/overrides/{entityType}/{name}/revert` | Revert an entity's local operations    |
+| POST   | `/pcd/{databaseId}/overrides/undo`                       | Undo the latest local action           |
+| GET    | `/trash-guide/sources`                                   | List all configured TRaSH sources      |
+| POST   | `/trash-guide/sources`                                   | Create a new TRaSH source              |
+| GET    | `/trash-guide/sources/:id`                               | Get a specific TRaSH source            |
+| PUT    | `/trash-guide/sources/:id`                               | Update a TRaSH source                  |
+| DELETE | `/trash-guide/sources/:id`                               | Delete a TRaSH source                  |
+| POST   | `/trash-guide/sources/:id/sync`                          | Trigger manual sync for a source       |
+| GET    | `/trash-guide/sources/:id/entities`                      | List cached entities for a source      |
 
 ## System
 
@@ -712,6 +715,101 @@ curl -sS -X DELETE \
 ```json
 { "success": true }
 ```
+
+## PCD Local Overrides
+
+Review and remove published user-layer operations without changing upstream base data. Revert and
+undo soft-drop operation records and recompile the PCD; they do not create automatic snapshots.
+For the UI workflow and limitations, see [Local Overrides](../features/local-overrides.md).
+
+### `GET /pcd/{databaseId}/overrides`
+
+Requires a session or a token with `read` scope. `databaseId` is a positive integer.
+
+Optional query parameters:
+
+- `entityType`: `delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`, `naming`,
+  `mediaSettings`, `qualityDefinitions`, or `lidarrMetadataProfile`.
+- `arrType`: `radarr`, `sonarr`, or `lidarr`. Required with `naming`, `mediaSettings`, or
+  `qualityDefinitions`; required and must be `lidarr` with `lidarrMetadataProfile`. Rejected when
+  one of the four Arr-agnostic entity types is supplied. Without `entityType`, it filters by app.
+
+Returns `{databaseId, entities, lastAction, unmappedOpCount}`. Each entity includes its current name,
+Arr scope, `kind` (`modified`, `created`, or `deleted`), base/resolved presence, field `overrides`,
+pending-conflict flag, and published `ops` with IDs and statuses. Net-zero edits remain listed even
+with no field differences. `lastAction` is database-wide regardless of filters; it is `null` when
+there is nothing to undo. Unmapped operations are counted but excluded from entity rows.
+
+```bash
+curl -sS -H 'X-Api-Key: <token>' \
+  'http://localhost:6868/api/v1/pcd/1/overrides?entityType=naming&arrType=radarr' | jq
+```
+
+### `POST /pcd/{databaseId}/overrides/{entityType}/{name}/revert`
+
+Requires a session or a token with `admin` scope. Use the same `entityType`/`arrType` rules as GET.
+The name is the current resolved name after a rename, URL-encoded and preserved without trimming.
+Empty names and names containing `/` cannot be addressed by this path.
+
+Optional JSON body (maximum 8 KB):
+
+- `opIds`: 1–1000 positive integer IDs belonging to this entity. Omit to revert all its published
+  user operations. Partial selections must not break field/rename dependencies.
+- `cascadeGroup`: boolean, default `false`. Explicitly include unselected operations in a required
+  operation group, potentially affecting other entities.
+
+```bash
+curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
+  -d '{"opIds":[42,43]}' \
+  'http://localhost:6868/api/v1/pcd/1/overrides/regularExpression/My%20Pattern/revert' | jq
+```
+
+Returns the entity identity and `databaseId`, `revertedOpIds`, `cascadedEntities`, `remainingOpIds`,
+and `resolvedMatchesBase`. The latter is `null` for a partial revert or when absent in both layers.
+A full revert removes a locally created entity or restores an upstream entity deleted locally.
+
+### `POST /pcd/{databaseId}/overrides/undo`
+
+Requires a session or a token with `admin` scope. Optional JSON body (maximum 8 KB):
+
+- `expectedActionId`: non-empty identifier from GET's `lastAction.actionId`. A mismatch rejects
+  the request instead of undoing a different action.
+
+```bash
+curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
+  -d '{"expectedActionId":"<lastAction.actionId>"}' \
+  'http://localhost:6868/api/v1/pcd/1/overrides/undo' | jq
+```
+
+Undo covers the latest published user operation's entire `action_id` unit, including other entities.
+Historical operations fall back to `group_id`, then one operation; historical save boundaries are
+not backfilled. Previously applied edits superseded by the undone action can be reactivated.
+
+Returns `{databaseId, undoneActionId, revertedOpIds, reactivatedOpIds, entities}`. This is not redo;
+reapplying a reverted change requires editing again.
+
+### Local Overrides Error Reference
+
+404/409 responses use `{error, reason, blockingOpIds?, entities?}`. Safety rejections do not silently
+drop dependent operations; a failed recompile attempt restores the planned changes.
+
+| Status | `reason`                | Cause                                                                                |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------ |
+| 404    | `entity_not_found`      | No overrides map to the requested current entity name                                |
+| 404    | `op_not_found`          | Selected operation does not belong to the entity                                     |
+| 404    | `nothing_to_undo`       | No published user operations remain                                                  |
+| 409    | `group_dependency`      | Selection splits a required group; review entities before using `cascadeGroup: true` |
+| 409    | `dependent_ops`         | Remaining operations depend on the selected create or rename                         |
+| 409    | `selection_blocked`     | Unsafe partial selection due to overlapping fields, renames, or ordering             |
+| 409    | `op_not_revertible`     | Selected operation is no longer published                                            |
+| 409    | `conflict_after_revert` | Recompilation would introduce a new conflict on a remaining operation                |
+| 409    | `collateral_ops`        | Recompilation would change operations outside the planned set                        |
+| 409    | `stale_action`          | `expectedActionId` no longer identifies the latest action                            |
+
+Other errors use `{error}`: 400 for invalid parameters/body, oversized body, unavailable database,
+or unbuilt cache; 401 for unauthenticated requests; 403 for insufficient token scope; 500 for
+unexpected failures. See the [OpenAPI paths](./v1/paths/pcd-overrides.yaml) and
+[schemas](./v1/schemas/pcd-overrides.yaml) for complete request/response definitions.
 
 ## TRaSH Guide Sources
 

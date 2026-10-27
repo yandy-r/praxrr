@@ -1,6 +1,15 @@
 <script lang="ts">
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
-  import { GitBranch, History, GitPullRequestClosed, Wrench, Settings, FileCog, Camera } from 'lucide-svelte';
+  import {
+    GitBranch,
+    History,
+    GitPullRequestClosed,
+    Wrench,
+    Settings,
+    FileCog,
+    Camera,
+    PencilLine,
+  } from 'lucide-svelte';
   import { page } from '$app/stores';
 
   $: database = $page.data.database;
@@ -25,6 +34,12 @@
           href: `/databases/${database.id}/conflicts`,
           icon: GitPullRequestClosed,
           active: currentPath.includes('/conflicts'),
+        },
+        {
+          label: 'Local overrides',
+          href: `/databases/${database.id}/overrides`,
+          icon: PencilLine,
+          active: currentPath.includes('/overrides'),
         },
         {
           label: 'Tweaks',

@@ -10,6 +10,7 @@
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import Button from '$ui/button/Button.svelte';
   import { createProgressiveList } from '$lib/client/utils/progressiveList';
+  import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import { sanitizeHtml } from '$shared/markdown/markdown.ts';
 
   export let profiles: QualityProfileTableRow[];
@@ -78,6 +79,10 @@
     return !isTrashRow(profile) && resolveSourceDatabaseId(profile) === currentDatabaseId;
   }
 
+  function showLocallyModified(profile: QualityProfileTableRow): boolean {
+    return isEditableRow(profile) && profile.locallyModified === true;
+  }
+
   function getCardHref(profile: QualityProfileTableRow): string | undefined {
     if (isTrashRow(profile)) {
       return profile.trashId
@@ -94,7 +99,14 @@
     <Card href={getCardHref(profile)} hoverable>
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
-          <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+          <div class="flex flex-col">
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+            {#if showLocallyModified(profile)}
+              <div class="mt-1">
+                <LocallyModifiedBadge />
+              </div>
+            {/if}
+          </div>
           {#if isEditableRow(profile)}
             <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
             <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>

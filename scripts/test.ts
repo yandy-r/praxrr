@@ -30,6 +30,8 @@ const aliases: Record<string, string> = {
   normalize: 'packages/praxrr-app/src/tests/upgrades/normalize.test.ts',
   notifications:
     'packages/praxrr-app/src/tests/notifications/manager.test.ts,packages/praxrr-app/src/tests/notifications/delivery.test.ts,packages/praxrr-app/src/tests/shared/health/degradation.test.ts,packages/praxrr-app/src/tests/jobs/configHealthSnapshot.test.ts,packages/praxrr-app/src/tests/notifications/providers.test.ts,packages/praxrr-app/src/tests/notifications/webhookContract.test.ts,packages/praxrr-app/src/tests/notifications/registry.test.ts',
+  overrides:
+    'packages/praxrr-app/src/tests/pcd/overrides,packages/praxrr-app/src/tests/pcd/ops/writerActionId.test.ts,packages/praxrr-app/src/tests/routes/pcdOverridesApi.test.ts',
   parity:
     'packages/praxrr-app/src/tests/arr/parityMap.test.ts,packages/praxrr-app/src/tests/pcd/qualityProfileCompatibility.test.ts,packages/praxrr-app/src/tests/routes/parityMapApi.test.ts',
   phase3:
