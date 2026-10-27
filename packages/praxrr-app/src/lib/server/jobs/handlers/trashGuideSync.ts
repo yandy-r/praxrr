@@ -1,5 +1,6 @@
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 import { logger } from '$logger/logger.ts';
+import { isLocalRepositorySource } from '$utils/git/index.ts';
 import { trashGuideManager, type TrashGuideSyncResult } from '$trashguide/index.ts';
 import { coerceTrashGuideSourceArrType, type TrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
@@ -284,7 +285,13 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       return resolveRunFailure(message);
     }
 
-    if (!updates.hasUpdates && trigger !== 'manual') {
+    // A failed/unpersisted sync can leave the clone at a commit other than the last one whose content
+    // reached the cache. hasUpdates only compares against the remote, so also retry whenever a git
+    // clone's HEAD differs from the last synced commit (currentLocalCommit is `git rev-parse HEAD`).
+    const behindSynced =
+      !isLocalRepositorySource(source.repository_url) && updates.currentLocalCommit !== source.last_commit_hash;
+
+    if (!updates.hasUpdates && !behindSynced && trigger !== 'manual') {
       trashGuideSourcesQueries.updateSyncMetadata(payload.sourceId, { lastSyncedAt: new Date().toISOString() });
       return finalize(
         buildEvidence({
@@ -336,16 +343,11 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       return resolveRunFailure(message);
     }
 
-    if (!syncResult.success) {
-      const message = syncResult.error ?? 'TRaSH sync failed';
-      await logger.error('TRaSH source sync failed', {
-        source: 'TrashGuideSyncJob',
-        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
-      });
-      return resolveRunFailure(message);
-    }
-
-    if (syncResult.parseStatus === 'failed') {
+    // Parse failure is checked BEFORE the generic !success branch: both carry success:false, but a
+    // total parse failure must report parser_failed evidence (never the transient git/network
+    // auto-retry). The explicit typed failureKind (not message/count heuristics) discriminates it
+    // from run failures, which sync() reports with failureKind 'run'.
+    if (syncResult.failureKind === 'parse') {
       return failureEvidence(
         trigger,
         'parser_failed',
@@ -353,6 +355,15 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
         scheduledRescheduleAt,
         countsFromSyncResult(syncResult)
       );
+    }
+
+    if (!syncResult.success) {
+      const message = syncResult.error;
+      await logger.error('TRaSH source sync failed', {
+        source: 'TrashGuideSyncJob',
+        meta: { jobId: job.id, sourceId: payload.sourceId, sourceName: source.name, error: message },
+      });
+      return resolveRunFailure(message);
     }
 
     return finalize(

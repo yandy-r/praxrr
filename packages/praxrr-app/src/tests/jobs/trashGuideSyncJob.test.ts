@@ -10,7 +10,12 @@ import { calculateNextRunFromMinutes } from '$jobs/scheduleUtils.ts';
 import type { JobQueueRecord, JobSource, TrashGuideSyncRunEvidence } from '$jobs/queueTypes.ts';
 import { buildTrashGuideSyncFailure } from '$jobs/trashguide/syncFailure.ts';
 import { logger } from '$logger/logger.ts';
-import { trashGuideManager, type TrashGuideSyncResult } from '$trashguide/index.ts';
+import {
+  trashGuideManager,
+  type TrashGuideSyncFailure,
+  type TrashGuideSyncResult,
+  type TrashGuideSyncSuccess,
+} from '$trashguide/index.ts';
 import type { UpdateInfo } from '$utils/git/index.ts';
 
 // Register the TRaSH sync handler as an import side effect so jobQueueRegistry.get('trashguide.sync') resolves it.
@@ -54,7 +59,8 @@ function createSourceFixture(
     auto_pull: options.autoPull ?? true,
     enabled: options.enabled ?? true,
     last_synced_at: options.lastSyncedAt ?? null,
-    last_commit_hash: null,
+    // Matches createUpdateInfo().currentLocalCommit: the clone is in sync with the cache by default.
+    last_commit_hash: 'local-commit',
     created_at: '2026-02-25T00:00:00.000Z',
     updated_at: '2026-02-25T00:00:00.000Z',
   };
@@ -124,7 +130,7 @@ function createUpdateInfo(overrides: Partial<UpdateInfo> = {}): UpdateInfo {
   };
 }
 
-function createSyncResult(overrides: Partial<TrashGuideSyncResult> = {}): TrashGuideSyncResult {
+function createSyncResult(overrides: Partial<TrashGuideSyncSuccess> = {}): TrashGuideSyncResult {
   return {
     success: true,
     commitsBehind: 0,
@@ -134,6 +140,22 @@ function createSyncResult(overrides: Partial<TrashGuideSyncResult> = {}): TrashG
     activeOperations: 0,
     removedEntities: 0,
     renamedEntities: 0,
+    ...overrides,
+  };
+}
+
+function createFailedSyncResult(overrides: Partial<TrashGuideSyncFailure> = {}): TrashGuideSyncResult {
+  return {
+    success: false,
+    commitsBehind: 0,
+    parseStatus: 'failed',
+    parsedFiles: 0,
+    failedFiles: 0,
+    activeOperations: 0,
+    removedEntities: 0,
+    renamedEntities: 0,
+    error: 'sync failed',
+    failureKind: 'run',
     ...overrides,
   };
 }
@@ -1062,7 +1084,14 @@ Deno.test('trashGuideSync handler treats sync parseStatus failed as a terminal f
     'sync',
     (() =>
       Promise.resolve(
-        createSyncResult({ parseStatus: 'failed', commitsBehind: 1, parsedFiles: 0, failedFiles: 3 })
+        createFailedSyncResult({
+          parseStatus: 'failed',
+          failureKind: 'parse',
+          error: 'TRaSH parse failed for every discovered file (3)',
+          commitsBehind: 1,
+          parsedFiles: 0,
+          failedFiles: 3,
+        })
       )) as typeof trashGuideManager.sync,
     restores
   );
@@ -1127,7 +1156,13 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
     'sync',
     (() =>
       Promise.resolve(
-        createSyncResult({ success: false, error: message, parseStatus: 'failed', commitsBehind: 1, parsedFiles: 0 })
+        createFailedSyncResult({
+          error: message,
+          parseStatus: 'failed',
+          failureKind: 'run',
+          commitsBehind: 1,
+          parsedFiles: 0,
+        })
       )) as typeof trashGuideManager.sync,
     restores
   );
@@ -1146,7 +1181,7 @@ Deno.test('trashGuideSync handler treats sync success:false schema errors as ter
 
     const evidence = parseEvidence(result.output);
     assertEquals(result.status, 'failure');
-    // success:false short-circuits before parseStatus, classifying the raw message (non-transient here).
+    // failureKind 'run' (not 'parse') classifies the raw message (non-transient here).
     assertEquals(evidence.failure?.code, 'sync_failed');
     assertEquals(evidence.failure?.message, buildTrashGuideSyncFailure('sync_failed').message);
     assertFalse(result.output?.includes(message) ?? false);

@@ -66,7 +66,8 @@ function makeSource(overrides: Record<string, unknown> = {}) {
     auto_pull: true,
     enabled: true,
     last_synced_at: null,
-    last_commit_hash: null,
+    // Matches updateInfo().currentLocalCommit: the clone is in sync with the cache by default.
+    last_commit_hash: 'local-commit',
     created_at: '2026-02-26T00:00:00.000Z',
     updated_at: '2026-02-26T00:00:00.000Z',
     ...overrides,
@@ -229,14 +230,16 @@ Deno.test('trashGuideSync handler reports parser failures with counts', async ()
     trashGuideManager,
     'sync',
     (async () => ({
-      success: true,
+      success: false,
       parseStatus: 'failed',
+      failureKind: 'parse',
       commitsBehind: 2,
       parsedFiles: 5,
       failedFiles: 2,
       activeOperations: 0,
       removedEntities: 0,
       renamedEntities: 0,
+      error: 'TRaSH parse failed for every discovered file (2)',
     })) as typeof trashGuideManager.sync,
     restores
   );
@@ -250,6 +253,113 @@ Deno.test('trashGuideSync handler reports parser failures with counts', async ()
     assertEquals(evidence.counts?.failedFiles, 2);
   } finally {
     restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler maps a failed parse result to parser_failed (no transient retry)', async () => {
+  const restores: Restore[] = [];
+  const errorCalls: LoggerCall[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() => makeSource({ last_synced_at: null })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (async () => updateInfo(true, 2)) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (async () => ({
+      success: false,
+      parseStatus: 'failed',
+      failureKind: 'parse',
+      commitsBehind: 2,
+      parsedFiles: 0,
+      failedFiles: 3,
+      activeOperations: 0,
+      removedEntities: 0,
+      renamedEntities: 0,
+      error: 'TRaSH parse failed for every discovered file (3)',
+    })) as typeof trashGuideManager.sync,
+    restores
+  );
+  patchLogger('warn', [], restores);
+  patchLogger('error', errorCalls, restores);
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(result.status, 'failure');
+    assertEquals(evidence.failure?.code, 'parser_failed');
+    assertEquals(evidence.counts?.failedFiles, 3);
+    // Parser failures never take the transient git/network auto-retry branch: reschedule stays on
+    // the normal schedule cadence rather than a short backoff retry.
+    const dueMs = Date.parse(result.rescheduleAt as string);
+    assert(Number.isFinite(dueMs));
+    assert(dueMs > Date.now() + 30 * 60_000);
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler keeps run failures (sync() catch shape) out of parser_failed', async () => {
+  const cases = [
+    { message: 'git network failure while pulling', code: 'network' },
+    { message: 'schema validation failed: bad operator', code: 'sync_failed' },
+  ];
+
+  for (const { message, code } of cases) {
+    const restores: Restore[] = [];
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() => makeSource({ last_synced_at: null })) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideManager,
+      'checkForUpdates',
+      (async () => updateInfo(true, 2)) as typeof trashGuideManager.checkForUpdates,
+      restores
+    );
+    // Exact shape sync() returns from its catch block: parseStatus 'failed' with zero file counts.
+    patchTarget(
+      trashGuideManager,
+      'sync',
+      (async () => ({
+        success: false,
+        parseStatus: 'failed',
+        failureKind: 'run',
+        commitsBehind: 2,
+        parsedFiles: 0,
+        failedFiles: 0,
+        activeOperations: 0,
+        removedEntities: 0,
+        renamedEntities: 0,
+        error: message,
+      })) as typeof trashGuideManager.sync,
+      restores
+    );
+    patchLogger('warn', [], restores);
+    patchLogger('error', [], restores);
+
+    try {
+      const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+      const evidence = parseEvidence(result);
+
+      assertEquals(result.status, 'failure');
+      assertEquals(evidence.failure?.code, code);
+      assert(evidence.failure?.code !== 'parser_failed');
+    } finally {
+      restoreAll(restores);
+    }
   }
 });
 
@@ -376,6 +486,112 @@ Deno.test('trashGuideSync handler never leaks secrets from an unexpected crash',
     assert(!error.includes('user:pass'));
 
     assert(errorCalls.some((call) => call.source === 'TrashGuideSyncJob'));
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+function patchNoUpdateSource(
+  restores: Restore[],
+  sourceOverrides: Record<string, unknown>,
+  currentLocalCommit: string
+): { syncCalls: () => number } {
+  let syncCalls = 0;
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() => makeSource(sourceOverrides)) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideSourcesQueries,
+    'updateSyncMetadata',
+    (() => true) as typeof trashGuideSourcesQueries.updateSyncMetadata,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (async () => ({ ...updateInfo(false, 0), currentLocalCommit })) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (async () => {
+      syncCalls += 1;
+      return {
+        success: true,
+        parseStatus: 'success',
+        commitsBehind: 0,
+        parsedFiles: 1,
+        failedFiles: 0,
+        activeOperations: 0,
+        removedEntities: 0,
+        renamedEntities: 0,
+      };
+    }) as typeof trashGuideManager.sync,
+    restores
+  );
+  return { syncCalls: () => syncCalls };
+}
+
+Deno.test('trashGuideSync handler does not skip when the git clone HEAD differs from last_commit_hash', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: 'synced-commit' }, 'ahead-commit');
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(probe.syncCalls(), 1);
+    assertEquals(result.status, 'success');
+    assertEquals(evidence.status, 'success');
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler does not skip when last_commit_hash was never recorded', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: null }, 'local-commit');
+
+  try {
+    await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    assertEquals(probe.syncCalls(), 1);
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler still skips when HEAD equals last_commit_hash and there are no updates', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(restores, { last_commit_hash: 'same-commit' }, 'same-commit');
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    const evidence = parseEvidence(result);
+
+    assertEquals(probe.syncCalls(), 0);
+    assertEquals(result.status, 'skipped');
+    assertEquals(evidence.status, 'skipped');
+  } finally {
+    restoreAll(restores);
+  }
+});
+
+Deno.test('trashGuideSync handler skips a local-path source regardless of commit mismatch', async () => {
+  const restores: Restore[] = [];
+  const probe = patchNoUpdateSource(
+    restores,
+    { repository_url: '/srv/local/trash-repo', last_commit_hash: 'other' },
+    'local'
+  );
+
+  try {
+    const result = await handler(buildJob({ trigger: 'scheduled', source: 'schedule', attempts: 0 }));
+    assertEquals(probe.syncCalls(), 0);
+    assertEquals(result.status, 'skipped');
   } finally {
     restoreAll(restores);
   }
