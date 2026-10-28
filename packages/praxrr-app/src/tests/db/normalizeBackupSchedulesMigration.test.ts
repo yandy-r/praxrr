@@ -67,7 +67,7 @@ migratedTest('migration 20261029 rewrites legacy every-6/12-hours schedules to c
 migratedTest('migration 20261029 leaves valid schedules untouched and down restores the legacy spelling', async () => {
   for (const valid of ['daily', 'weekly', 'monthly', 'hourly', '0 */6 * * *']) {
     db.execute(`UPDATE backup_settings SET schedule = ? WHERE id = 1`, valid);
-    await migrationRunner.up([normalizeBackupSchedulesMigration]);
+    db.exec(normalizeBackupSchedulesMigration.up);
     assertEquals(storedSchedule(), valid, `${valid} must survive the migration`);
   }
 

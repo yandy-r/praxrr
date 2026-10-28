@@ -114,7 +114,11 @@ export interface TrashGuideSyncCounts {
 export interface TrashGuideSyncRunEvidence {
   schemaVersion: 1;
   runToken: string | null;
-  source: { id: number; name: string | null; arrType: TrashGuideSupportedArrType | null };
+  source: {
+    id: number;
+    name: string | null;
+    arrType: TrashGuideSupportedArrType | null;
+  };
   trigger: 'manual' | 'scheduled';
   requestedAt: string | null;
   status: JobRunStatus;
@@ -155,9 +159,9 @@ export interface ArrPullStartupJobPayload {
 
 export type ArrSyncCleanupOnlyPayload = Record<string, never>;
 
-/** Payload for the recurring backup.create slot: the schedule it was queued under. */
+/** Payload for a backup.create slot: scheduled runs retain their schedule; manual runs omit it. */
 export interface BackupCreateJobPayload {
-  schedule: string;
+  schedule?: string;
 }
 
 /**

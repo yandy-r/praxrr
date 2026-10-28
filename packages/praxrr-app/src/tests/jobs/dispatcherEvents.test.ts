@@ -104,7 +104,11 @@ migratedTest('T-D1 dispatcher publishes queued -> running -> finished in order',
     () => Promise.resolve({ status: 'success', output: 'ok' }),
     async () => {
       const pending = collect(finishedFor('logs.cleanup'));
-      const job = enqueueJob({ jobType: 'logs.cleanup', runAt: new Date().toISOString(), source: 'manual' });
+      const job = enqueueJob({
+        jobType: 'logs.cleanup',
+        runAt: new Date().toISOString(),
+        source: 'manual',
+      });
       const events = await pending;
 
       const forJob = eventsForJob(events, job.id);
@@ -131,7 +135,11 @@ migratedTest('T-D2 thrown handler errors never leak raw error text into events',
     () => Promise.reject(new Error('HTTP 500: Internal | {"apiKey":"SECRET-123","url":"http://arr.local:7878"}')),
     async () => {
       const pending = collect(finishedFor('logs.cleanup'));
-      const job = enqueueJob({ jobType: 'logs.cleanup', runAt: new Date().toISOString(), source: 'manual' });
+      const job = enqueueJob({
+        jobType: 'logs.cleanup',
+        runAt: new Date().toISOString(),
+        source: 'manual',
+      });
       const events = await pending;
 
       const finished = singleFinished(events, job.id);
@@ -178,7 +186,11 @@ migratedTest('T-D4 rescheduled runs publish a non-terminal job.finished', async 
     () => Promise.resolve({ status: 'success', rescheduleAt }),
     async () => {
       const pending = collect(finishedFor('logs.cleanup'));
-      const job = enqueueJob({ jobType: 'logs.cleanup', runAt: new Date().toISOString(), source: 'manual' });
+      const job = enqueueJob({
+        jobType: 'logs.cleanup',
+        runAt: new Date().toISOString(),
+        source: 'manual',
+      });
       const events = await pending;
 
       const finished = singleFinished(events, job.id);
@@ -317,9 +329,22 @@ migratedTest('T-D6 due scheduler upserts publish job.queued; disabling publishes
 
 migratedTest('T-D7 rename cancel and database cleanup publish job.finished cancelled per queued row', () => {
   const runAt = new Date(Date.now() + 3_600_000).toISOString();
-  const slotted = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 5 }, dedupeKey: 'arr.rename:5' });
-  const loose = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 5 } });
-  const other = enqueueJob({ jobType: 'arr.rename', runAt, payload: { instanceId: 6 } });
+  const slotted = enqueueJob({
+    jobType: 'arr.rename',
+    runAt,
+    payload: { instanceId: 5 },
+    dedupeKey: 'arr.rename:5',
+  });
+  const loose = enqueueJob({
+    jobType: 'arr.rename',
+    runAt,
+    payload: { instanceId: 5 },
+  });
+  const other = enqueueJob({
+    jobType: 'arr.rename',
+    runAt,
+    payload: { instanceId: 6 },
+  });
 
   const renameEvents = capture(() => cancelQueuedRenameJobs(5));
   assertEquals(renameEvents.length, 2);
@@ -327,7 +352,11 @@ migratedTest('T-D7 rename cancel and database cleanup publish job.finished cance
   assertCancelled(renameEvents[1], loose.id);
   assertEquals(jobQueueQueries.getById(other.id)?.status, 'queued');
 
-  const pcd = enqueueJob({ jobType: 'pcd.sync', runAt, payload: { databaseId: 9 } });
+  const pcd = enqueueJob({
+    jobType: 'pcd.sync',
+    runAt,
+    payload: { databaseId: 9 },
+  });
   const cleanupEvents = capture(() => assertEquals(cleanupJobsForDatabase(9), 1));
   assertEquals(cleanupEvents.length, 1);
   assertCancelled(cleanupEvents[0], pcd.id);
@@ -397,7 +426,11 @@ migratedTest("dispatcher jobs never run under the enqueuing request's user-op ac
       const pending = collect(finishedFor('logs.cleanup'));
       await withUserOpAction(() => {
         requestActionId = currentUserOpActionId();
-        enqueueJob({ jobType: 'logs.cleanup', runAt: new Date().toISOString(), source: 'manual' });
+        enqueueJob({
+          jobType: 'logs.cleanup',
+          runAt: new Date().toISOString(),
+          source: 'manual',
+        });
         return Promise.resolve();
       });
       await pending;
@@ -438,8 +471,16 @@ for (const failurePoint of ['history', 'finish'] as const) {
     logger.error = () => Promise.reject(new Error('injected logger failure'));
     try {
       const runAt = new Date(Date.now() - 1000).toISOString();
-      const first = jobQueueQueries.create({ jobType: 'logs.cleanup', runAt, source: 'manual' });
-      const second = jobQueueQueries.create({ jobType: 'logs.cleanup', runAt, source: 'manual' });
+      const first = jobQueueQueries.create({
+        jobType: 'logs.cleanup',
+        runAt,
+        source: 'manual',
+      });
+      const second = jobQueueQueries.create({
+        jobType: 'logs.cleanup',
+        runAt,
+        source: 'manual',
+      });
       const executed: number[] = [];
       await withStub(
         (job) => {
@@ -449,9 +490,8 @@ for (const failurePoint of ['history', 'finish'] as const) {
         () => drainDispatcher()
       );
       assertEquals(executed, [first, second]);
-      // A history-write failure no longer ends the run; only the terminal write does.
-      assertEquals(jobQueueQueries.getById(first)?.status, failurePoint === 'history' ? 'success' : 'failed');
-      assertEquals(jobQueueQueries.getById(second)?.status, 'success');
+      // A history-write failure no longer ends the run; an interrupted terminal write leaves it running.
+      assertEquals(jobQueueQueries.getById(first)?.status, failurePoint === 'history' ? 'success' : 'running');
     } finally {
       jobRunHistoryQueries.create = originalCreate;
       jobQueueQueries.markFinished = originalFinish;
@@ -502,6 +542,78 @@ migratedTest('dispatcher keeps a handler reschedule when the history write fails
     logger.error = originalError;
   }
 });
+migratedTest('dispatcher publishes a failed terminal event when marking finished fails', async () => {
+  const originalFinish = jobQueueQueries.markFinished;
+  jobQueueQueries.markFinished = () => {
+    throw new Error('injected terminal write failure');
+  };
+  try {
+    const jobId = jobQueueQueries.create({
+      jobType: 'logs.cleanup',
+      runAt: new Date(Date.now() - 1000).toISOString(),
+      source: 'manual',
+    });
+    const pending = collect(finishedFor('logs.cleanup'));
+    await withStub(
+      () => Promise.resolve({ status: 'success' }),
+      () => drainDispatcher()
+    );
+    const events = await pending;
+
+    const finished = singleFinished(events, jobId);
+    assertEquals(finished.status, 'failed');
+    assertEquals(finished.runStatus, 'success');
+    assertEquals(finished.rescheduled, false);
+    assertEquals(finished.handedBack, false);
+    assert(finished.runId > 0, 'run history should survive the terminal write failure');
+  } finally {
+    jobQueueQueries.markFinished = originalFinish;
+  }
+});
+
+migratedTest(
+  'dispatcher publishes a failed terminal event when rescheduling and marking failed both fail',
+  async () => {
+    const rescheduleAt = new Date(Date.now() + 3_600_000).toISOString();
+    const originalReschedule = jobQueueQueries.reschedule;
+    const originalFinish = jobQueueQueries.markFinished;
+    jobQueueQueries.reschedule = () => {
+      throw new Error('injected reschedule failure');
+    };
+    jobQueueQueries.markFinished = () => {
+      throw new Error('injected terminal write failure');
+    };
+    try {
+      const jobId = jobQueueQueries.create({
+        jobType: 'logs.cleanup',
+        runAt: new Date(Date.now() - 1000).toISOString(),
+        source: 'manual',
+      });
+      const pending = collect(finishedFor('logs.cleanup'));
+      await withStub(
+        () =>
+          Promise.resolve({
+            status: 'success',
+            rescheduleAt,
+            rescheduleSource: 'schedule',
+          }),
+        () => drainDispatcher()
+      );
+      const events = await pending;
+
+      const finished = singleFinished(events, jobId);
+      assertEquals(finished.status, 'failed');
+      assertEquals(finished.runStatus, 'success');
+      assertEquals(finished.rescheduled, false);
+      assertEquals(finished.handedBack, false);
+      assertEquals(finished.nextRunAt, null);
+      assert(finished.runId > 0, 'run history should survive the reschedule failure');
+    } finally {
+      jobQueueQueries.reschedule = originalReschedule;
+      jobQueueQueries.markFinished = originalFinish;
+    }
+  }
+);
 
 migratedTest('dispatcher contains a claim failure and can drain on its next wake', async () => {
   const originalClaim = jobQueueQueries.claimNextDue;

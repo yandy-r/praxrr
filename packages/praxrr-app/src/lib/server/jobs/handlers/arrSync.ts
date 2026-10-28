@@ -703,7 +703,11 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
         });
         await logger.error('Reviewed sync section failed', {
           source: 'ArrSyncJob',
-          meta: { instanceId: instance.id, section, ...failure.protectedDetails },
+          meta: {
+            instanceId: instance.id,
+            section,
+            ...failure.protectedDetails,
+          },
         });
       } finally {
         syncer.clearPreparedExecutionContext();
@@ -961,8 +965,11 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         if (config.trigger !== 'schedule') continue;
         const nextRun = calculateNextRun(config.cron);
         getSection(section).setNextRunAt(instanceId, nextRun);
+        rescheduleAt = nextRun ?? null;
       }
-      rescheduleAt = arrSyncQueries.getNextScheduledRunAt(instanceId) ?? null;
+      if (job.jobType === 'arr.sync') {
+        rescheduleAt = arrSyncQueries.getNextScheduledRunAt(instanceId) ?? rescheduleAt;
+      }
     }
     const syncHistoryId = recordHistory('failed', {
       error: classifySyncFailure(error).message,

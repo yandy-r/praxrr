@@ -160,7 +160,9 @@ export const actions: Actions = {
     }
 
     if (!isValidBackupSchedule(schedule)) {
-      return fail(400, { error: 'Schedule must be hourly, daily, weekly, monthly or a valid cron expression' });
+      return fail(400, {
+        error: 'Schedule must be one of: hourly, daily, weekly, monthly, 0 */6 * * *, 0 */12 * * *'
+      });
     }
 
     if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {

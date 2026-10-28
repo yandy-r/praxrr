@@ -21,6 +21,7 @@ node_modules
 .netlify
 .wrangler
 /dist
+/packages/praxrr-app/dist
 /docs/site/.astro
 /docs/site/dist
 /static

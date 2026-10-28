@@ -127,6 +127,20 @@ class JobDispatcher {
     }
   }
 
+  private async markFinishedBestEffort(job: JobQueueRecord, status: JobStatus): Promise<boolean> {
+    try {
+      jobQueueQueries.markFinished(job.id, status);
+      return true;
+    } catch (error) {
+      await this.logError('Failed to mark the job as finished', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
+      return false;
+    }
+  }
+
   private async executeJob(job: JobQueueRecord): Promise<void> {
     const displayName = buildJobDisplayName(job.jobType, job.payload);
 
@@ -137,7 +151,7 @@ class JobDispatcher {
         jobType: job.jobType,
         displayName,
       });
-      jobQueueQueries.markFinished(job.id, 'failed');
+      await this.markFinishedBestEffort(job, 'failed');
       const finishedAt = new Date().toISOString();
       const runId = jobRunHistoryQueries.create(
         job.id,
@@ -146,7 +160,10 @@ class JobDispatcher {
         job.startedAt ?? finishedAt,
         finishedAt,
         0,
-        buildSafeJobEvidence(job, { status: 'failure', failureCode: 'handlerNotFound' })
+        buildSafeJobEvidence(job, {
+          status: 'failure',
+          failureCode: 'handlerNotFound',
+        })
       );
       publishJobFinished(job, {
         status: 'failed',
@@ -168,10 +185,20 @@ class JobDispatcher {
     try {
       await logger.debug(`Job started: ${job.jobType}`, {
         source: 'JobDispatcher',
-        meta: { jobId: job.id, jobType: job.jobType, displayName, sourceType: job.source, runAt: job.runAt },
+        meta: {
+          jobId: job.id,
+          jobType: job.jobType,
+          displayName,
+          sourceType: job.source,
+          runAt: job.runAt,
+        },
       });
     } catch (error) {
-      await this.logError('Failed to log a job start', { jobId: job.id, jobType: job.jobType, error });
+      await this.logError('Failed to log a job start', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
     }
 
     let result: JobHandlerResult;
@@ -195,9 +222,9 @@ class JobDispatcher {
     const evidence = buildSafeJobEvidence(job, result);
     const failureCode = evidence.failure?.code ?? null;
     // A hand-back re-targets the slot at a different source than the one that ran; the run itself
-    // is over for its own trigger (unlike a canary/chunked continuation, which keeps its source).
-    const handedBack =
-      Boolean(result.rescheduleAt) && result.rescheduleSource !== undefined && result.rescheduleSource !== job.source;
+    // is over for its own trigger only after the reschedule succeeds (unlike a canary/chunked
+    // continuation, which keeps its source).
+    const handedBack = result.rescheduleSource !== undefined && result.rescheduleSource !== job.source;
     // Only rescheduling itself needs the post-handler evidence. All other bookkeeping after the
     // handler returned is independent, best-effort: a failed history insert or log line must never
     // throw away the handler's rescheduleAt or end a recurring schedule (the outer catch otherwise
@@ -219,7 +246,11 @@ class JobDispatcher {
       );
     } catch (error) {
       // 0 is the "no history row" sentinel also used by publishJobsCancelled (ids start at 1).
-      await this.logError('Failed to record the job run history', { jobId: job.id, jobType: job.jobType, error });
+      await this.logError('Failed to record the job run history', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
     }
 
     try {
@@ -236,7 +267,11 @@ class JobDispatcher {
         },
       });
     } catch (error) {
-      await this.logError('Failed to log a job finish', { jobId: job.id, jobType: job.jobType, error });
+      await this.logError('Failed to log a job finish', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
     }
 
     if (result.rescheduleAt) {
@@ -256,7 +291,7 @@ class JobDispatcher {
           jobType: job.jobType,
           error,
         });
-        jobQueueQueries.markFinished(job.id, 'failed');
+        await this.markFinishedBestEffort(job, 'failed');
       }
     } else {
       status =
@@ -267,7 +302,7 @@ class JobDispatcher {
             : result.status === 'cancelled'
               ? 'cancelled'
               : 'failed';
-      jobQueueQueries.markFinished(job.id, status);
+      if (!(await this.markFinishedBestEffort(job, status))) status = 'failed';
     }
 
     // publishJobFinished is best-effort by construction; the terminal/rescheduled event always goes
@@ -276,7 +311,7 @@ class JobDispatcher {
       status,
       runStatus: result.status,
       rescheduled,
-      handedBack,
+      handedBack: rescheduled && handedBack,
       nextRunAt,
       runId,
       failureCode,
