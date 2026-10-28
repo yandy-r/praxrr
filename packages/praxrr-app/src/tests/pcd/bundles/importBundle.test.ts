@@ -6,7 +6,12 @@ import {
   BundlePlanMismatchError,
   importBundle,
 } from '$pcd/bundles/index.ts';
-import type { EntityType, PortableEntityData, PortableQualityProfile } from '$shared/pcd/portable.ts';
+import type {
+  EntityType,
+  PortableCustomFormat,
+  PortableEntityData,
+  PortableQualityProfile,
+} from '$shared/pcd/portable.ts';
 import {
   bundleOf,
   bundleTest,
@@ -449,3 +454,37 @@ bundleTest('bundle import: a base-layer QP scoring a user-only CF fails final co
   assertEquals(namesIn(liveCache(databaseId), 'quality_profiles'), []);
   assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), ['CF User Only']);
 });
+
+bundleTest(
+  'bundle import: a failing multi-write CF in the dry run leaves no partial rows for later entities',
+  async () => {
+    const databaseId = await createPcd();
+    await seedEntity(databaseId, 'regular_expression', regexData('Rx Good'));
+
+    // The second CF conditions step fails: its pattern references a regex that does not exist.
+    const bundle = bundleOf(
+      ['custom_format', customFormatData('CF Broken', 'Rx Missing')],
+      ['custom_format', customFormatData('CF Good', 'Rx Good')],
+      ['quality_profile', qualityProfileData('QP Dry', ['CF Good'])]
+    );
+    // NOTE: CF Broken's missing regex is reported as a missing reference, so it is not executed.
+    // Instead make its write fail mid-entity: a pattern referencing an existing regex but with a
+    // condition payload that violates the table (empty condition name is rejected by the writer).
+    const broken = customFormatData('CF Broken', 'Rx Good') as PortableCustomFormat;
+    // Two conditions sharing one name: the create succeeds, the conditions step fails
+    // (updateConditions rejects duplicate condition names) — a genuine mid-entity failure.
+    broken.conditions.push({ ...broken.conditions[0] });
+    bundle.entities[0].data = broken;
+
+    const report = await importBundle({ databaseId, layer: 'user', bundle, dryRun: true, collisions: SKIP });
+
+    assertEquals(report.dryRun, true);
+    const byName = new Map(report.outcomes.map((outcome) => [outcome.name, outcome]));
+    assertEquals(byName.get('CF Broken')?.action, 'error');
+    assertEquals(byName.get('CF Good')?.action, 'create');
+    assertEquals(byName.get('QP Dry')?.action, 'create');
+
+    // Nothing was written (dry run) and the live cache never saw the broken CF.
+    assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), []);
+  }
+);

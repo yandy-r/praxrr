@@ -149,7 +149,7 @@ import:
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
                 - $ref: '../schemas/pcd.yaml#/PcdBundleImportErrorResponse'
       '409':
@@ -169,6 +169,6 @@ import:
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
                 - $ref: '../schemas/pcd.yaml#/PcdBundleImportErrorResponse'

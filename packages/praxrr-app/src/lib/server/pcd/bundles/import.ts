@@ -805,11 +805,19 @@ async function runPlanInSandbox(
     };
 
     await withScopedCache(databaseId, sandbox, async () => {
-      for (const planned of plan.entities) {
+      for (const [index, planned] of plan.entities.entries()) {
         if (planned.action === 'skip' || planned.hasMissingRefs) continue;
+        // One savepoint per entity: a failing multi-write entity (e.g. a CF whose second op
+        // fails) leaves the sandbox exactly as it was before the entity started, so later
+        // entities — and the report — never see its partial rows.
+        const savepoint = `bundle_sp_${index}`;
+        raw.exec(`SAVEPOINT ${savepoint}`);
         try {
           await withWriterScope(apply, () => executeEntity(databaseId, layer, planned));
+          raw.exec(`RELEASE ${savepoint}`);
         } catch (error) {
+          raw.exec(`ROLLBACK TO ${savepoint}`);
+          raw.exec(`RELEASE ${savepoint}`);
           errors.push({
             entityType: planned.entityType,
             name: planned.name,

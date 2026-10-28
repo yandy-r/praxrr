@@ -10,7 +10,7 @@ import { collectBundleClosure, serializeEntityByType, sortBundleEntries, type Bu
 
 export class BundleExportLimitError extends Error {
   constructor(count: number) {
-    super(`Bundle would exceed the maximum of ${BUNDLE_MAX_ENTITIES} entities (got ${count})`);
+    super(`Bundle would contain ${count} entities; the maximum is ${BUNDLE_MAX_ENTITIES}`);
     this.name = 'BundleExportLimitError';
   }
 }

@@ -61,6 +61,17 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/** Concatenate streamed body chunks into one Uint8Array of exactly `length` bytes. */
+function concatChunks(chunks: readonly Uint8Array[], length: number): Uint8Array {
+  const out = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 /**
  * POST /api/v1/pcd/import
  *
@@ -78,7 +89,6 @@ const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
  */
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
-  let bodyBytes = 0;
   try {
     const contentLength = request.headers.get('content-length');
     if (contentLength !== null) {
@@ -87,11 +97,22 @@ export const POST: RequestHandler = async ({ request }) => {
         return json({ error: `Bundle request exceeds the ${BUNDLE_MAX_JSON_BYTES} byte limit` }, { status: 400 });
       }
     }
-    const text = await request.text();
-    bodyBytes = new TextEncoder().encode(text).byteLength;
-    if (bodyBytes > BUNDLE_MAX_JSON_BYTES) {
-      return json({ error: `Bundle request exceeds the ${BUNDLE_MAX_JSON_BYTES} byte limit` }, { status: 400 });
+    // Stream the body with a byte counter so an oversized payload is rejected without ever
+    // being buffered, then decode only once it is known to fit.
+    const reader = (request.body ?? new ReadableStream<Uint8Array>()).getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > BUNDLE_MAX_JSON_BYTES) {
+        await reader.cancel().catch(() => {});
+        return json({ error: `Bundle request exceeds the ${BUNDLE_MAX_JSON_BYTES} byte limit` }, { status: 400 });
+      }
+      chunks.push(value);
     }
+    const text = new TextDecoder().decode(concatChunks(chunks, received));
     body = JSON.parse(text);
   } catch {
     return json({ error: 'Invalid JSON body' }, { status: 400 });

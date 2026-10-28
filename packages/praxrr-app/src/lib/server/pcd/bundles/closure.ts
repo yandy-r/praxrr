@@ -140,9 +140,12 @@ export async function collectBundleClosure(cache: PCDCache, roots: ReadonlyArray
     try {
       data = await serializeEntityByType(cache, item.entityType, item.name);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Only absence is treated specially: a missing root is a 404 and a missing dependency
+      // becomes a missing reference. Any other failure (e.g. a corrupt row) rethrows unchanged.
+      if (!message.includes('not found')) throw error;
       if (item.isRoot) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(message.includes('not found') ? message : `${item.entityType} "${item.name}" not found`);
+        throw new Error(message);
       }
       if (item.from) {
         missing.push({
