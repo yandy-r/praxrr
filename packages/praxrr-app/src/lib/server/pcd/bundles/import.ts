@@ -952,11 +952,7 @@ async function applyPlanLive(
       ? [{ entityType: failed.entityType, name: failed.name, error: cause }]
       : [];
     throw new BundleImportFailedError(
-      rolledBack
-        ? cause
-        : `${cause} — rollback was incomplete (restored: ${rollback.restored}, recompiled: ${rollback.recompiled}${
-            rollback.cleanupFailed ? ', history cleanup failed' : ''
-          }); the database was disabled`,
+      rolledBack ? cause : `${cause} — ${describeIncompleteRollback(rollback)}`,
       {
         ...baseReport,
         applied: false,
@@ -1003,7 +999,7 @@ async function applyPlanLive(
     throw new BundleImportFailedError(
       rolledBack
         ? `Bundle import failed final compile/verify: ${verifyErrors[0].error}`
-        : `Bundle import failed final compile/verify (${verifyErrors[0].error}) — rollback was incomplete (restored: ${rollback.restored}, recompiled: ${rollback.recompiled}${rollback.cleanupFailed ? ', history cleanup failed' : ''}); the database was disabled`,
+        : `Bundle import failed final compile/verify (${verifyErrors[0].error}) — ${describeIncompleteRollback(rollback)}`,
       {
         ...baseReport,
         applied: false,
@@ -1019,6 +1015,14 @@ async function applyPlanLive(
     meta: { databaseId, layer, entities: plan.entities.length, createdOps: created.opIds.length },
   });
   return { ...baseReport, applied: true };
+}
+
+function describeIncompleteRollback(rollback: BundleRollbackResult): string {
+  if (!rollback.restored) return 'rollback was incomplete: operations could not be restored; the database was disabled';
+  if (!rollback.recompiled) {
+    return 'rollback was incomplete: operations were restored but the cache rebuild failed and will retry on the next compile';
+  }
+  return 'rollback was incomplete: operations were restored but history written by the rollback recompile could not be removed';
 }
 
 /**
