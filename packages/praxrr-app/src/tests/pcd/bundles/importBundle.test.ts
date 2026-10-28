@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertRejects } from '@std/assert';
+import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import {
   _bundleImportDependencies,
@@ -453,6 +454,8 @@ bundleTest('bundle import: a base-layer QP scoring a user-only CF fails final co
   assertEquals(snapshotOps(databaseId), before);
   assertEquals(namesIn(liveCache(databaseId), 'quality_profiles'), []);
   assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), ['CF User Only']);
+  // A failed compile disables the database instance; the rollback must restore the enabled state.
+  assertEquals(databaseInstancesQueries.getById(databaseId)?.enabled, 1);
 });
 
 bundleTest(

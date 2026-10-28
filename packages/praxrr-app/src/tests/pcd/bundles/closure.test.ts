@@ -81,3 +81,14 @@ bundleTest('closure: the walk truncates at the entity cap instead of serializing
   assertEquals(closure.truncated, true);
   assert(closure.entries.length <= BUNDLE_MAX_ENTITIES);
 });
+
+bundleTest('closure: a closure of exactly the entity cap is not truncated', async () => {
+  const databaseId = await createPcd();
+  await seedWideProfile(databaseId, BUNDLE_MAX_ENTITIES - 2);
+
+  const closure = await collectBundleClosure(liveCache(databaseId), [
+    { entityType: 'quality_profile', name: 'QP Cap' },
+  ]);
+  assertEquals(closure.entries.length, BUNDLE_MAX_ENTITIES);
+  assertEquals(closure.truncated, false);
+});

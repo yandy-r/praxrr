@@ -384,8 +384,9 @@ export function planBundle(cache: PCDCache, bundle: PcdBundle, collisions: Bundl
 }
 
 /**
- * Deterministic digest of the plan and the target state it was computed from (max op id and max
- * `updated_at`). A changed digest means the dry-run preview no longer reflects the database.
+ * Deterministic digest of the layer, the ordered plan outcomes and the target state they were
+ * computed from (each op's id, state and content hash). A changed digest means the dry-run
+ * preview no longer reflects the database.
  */
 export function computeBundlePlanDigest(
   plan: BundlePlan,
@@ -917,8 +918,9 @@ async function applyPlanLive(
   plan: BundlePlan,
   baseReport: BundleImportReport,
   snapshot: ReadonlyArray<PcdOp>,
-  instance: { local_path: string }
+  instance: { local_path: string; enabled: number }
 ): Promise<BundleImportReport> {
+  const wasEnabled = instance.enabled === 1;
   const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
   let current: PlannedEntity | null = null;
 
@@ -953,7 +955,7 @@ async function applyPlanLive(
         createdOps: created.opIds.length,
       },
     });
-    const rollback = await rollbackLiveImport(databaseId, instance.local_path, snapshot, created);
+    const rollback = await rollbackLiveImport(databaseId, instance.local_path, snapshot, created, wasEnabled);
     const rolledBack = rollback.restored && rollback.recompiled && !rollback.cleanupFailed;
 
     const errors: BundleImportError[] = failed
@@ -977,9 +979,13 @@ async function applyPlanLive(
   // compile — or any entity missing from the rebuilt cache — means the ops the import persisted do
   // not hold together, so roll back the whole import and surface the real rollback outcome.
   let finalCache: PCDCache | undefined;
+  let compileFailed = false;
+  let compileFailureMessage = '';
   let verifyErrors: BundleImportError[] = [];
   try {
-    await compile(instance.local_path, databaseId);
+    // Record the final compile's own history (and any auto-override ops it triggers) so a rollback
+    // removes them along with the import's writes.
+    await withOpCreationRecorder(created, () => compile(instance.local_path, databaseId));
     finalCache = getCache(databaseId);
     const namesByType = new Map<EntityType, Map<string, string>>();
     const missingAfter = finalCache
@@ -994,20 +1000,23 @@ async function applyPlanLive(
       : plan.imported;
     verifyErrors = missingAfter.map((imported) => ({ ...imported, error: 'Entity missing after import' }));
   } catch (compileError) {
-    verifyErrors = plan.imported.map((imported) => ({ ...imported, error: String(compileError) }));
+    // Tracked separately: even an all-skip apply (no imported entity to blame) must roll back and
+    // throw instead of reporting applied.
+    compileFailed = true;
+    compileFailureMessage = String(compileError);
   }
 
-  if (verifyErrors.length > 0) {
+  if (compileFailed || verifyErrors.length > 0) {
     await logger.error('Bundle import failed final compile/verify; rolling back', {
       source: SOURCE,
       meta: { databaseId, createdOps: created.opIds.length, verifyErrors: verifyErrors.length },
     });
-    const rollback = await rollbackLiveImport(databaseId, instance.local_path, snapshot, created);
+    const rollback = await rollbackLiveImport(databaseId, instance.local_path, snapshot, created, wasEnabled);
     const rolledBack = rollback.restored && rollback.recompiled && !rollback.cleanupFailed;
     throw new BundleImportFailedError(
       rolledBack
-        ? `Bundle import failed final compile/verify: ${verifyErrors[0].error}`
-        : `Bundle import failed final compile/verify (${verifyErrors[0].error}) — ${describeIncompleteRollback(rollback)}`,
+        ? `Bundle import failed final compile/verify: ${compileFailed ? compileFailureMessage : verifyErrors[0].error}`
+        : `Bundle import failed final compile/verify (${compileFailed ? compileFailureMessage : verifyErrors[0].error}) — ${describeIncompleteRollback(rollback)}`,
       {
         ...baseReport,
         applied: false,
@@ -1049,8 +1058,14 @@ async function rollbackLiveImport(
   databaseId: number,
   localPath: string,
   snapshot: ReadonlyArray<PcdOp>,
-  created: CreatedOpRecord
+  created: CreatedOpRecord,
+  wasEnabled: boolean
 ): Promise<BundleRollbackResult> {
+  // A failed cache build disables the database instance (cache.ts). A successful rollback must
+  // restore the enabled state the instance had before the import.
+  const restoreEnabled = () => {
+    if (wasEnabled) databaseInstancesQueries.enable(databaseId);
+  };
   try {
     pcdOpsQueries.restoreImportSnapshot(databaseId, snapshot, created);
   } catch (restoreError) {
@@ -1083,6 +1098,7 @@ async function rollbackLiveImport(
       source: SOURCE,
       meta: { databaseId, error: String(compileError) },
     });
+    restoreEnabled();
     return { restored: true, recompiled: false, cleanupFailed: false };
   }
   try {
@@ -1092,7 +1108,9 @@ async function rollbackLiveImport(
       source: SOURCE,
       meta: { databaseId, error: String(restoreError) },
     });
+    restoreEnabled();
     return { restored: true, recompiled: true, cleanupFailed: true };
   }
+  restoreEnabled();
   return { restored: true, recompiled: true, cleanupFailed: false };
 }
