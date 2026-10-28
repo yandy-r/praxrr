@@ -97,6 +97,7 @@ import { migration as migration20261025CreateArrManagedEntities } from './migrat
 import { migration as migration20261026HashSessionIds } from './migrations/20261026_hash_session_ids.ts';
 import { migration as migration20261027CreateOidcAllowlistState } from './migrations/20261027_create_oidc_allowlist_state.ts';
 import { migration as migration20261028ScrubSyncErrorText } from './migrations/20261028_scrub_sync_error_text.ts';
+import { migration as migration20261029NormalizeBackupSchedules } from './migrations/20261029_normalize_backup_schedules.ts';
 
 export interface Migration {
   version: number;
@@ -428,6 +429,7 @@ export function loadMigrations(): Migration[] {
     migration20261026HashSessionIds,
     migration20261027CreateOidcAllowlistState,
     migration20261028ScrubSyncErrorText,
+    migration20261029NormalizeBackupSchedules,
   ];
 
   // Sort by version number

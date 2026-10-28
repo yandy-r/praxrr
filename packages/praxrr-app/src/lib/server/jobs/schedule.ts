@@ -130,10 +130,30 @@ export function scheduleBackupJobs(): void {
   const backupRunAt = calculateNextRunFromSchedule(settings.schedule);
   const cleanupRunAt = calculateNextRunFromSchedule('daily');
 
+  // A restart must never postpone a pending (possibly overdue) backup: when the queued slot
+  // still belongs to this schedule, keep its earlier run_at. A schedule change writes a
+  // different payload, so it recomputes from the new expression. Rows queued before payloads
+  // carried `{ schedule }` (pre-upgrade, payload `{}` or absent) count as matching (L1): they
+  // were queued under whatever schedule was then current, and recomputing on the first
+  // post-upgrade restart would postpone a due backup.
+  const existing = jobQueueQueries.getByDedupeKey('backup.create');
+  const existingSchedule = existing?.payload?.schedule;
+  const slotMatchesSchedule =
+    existing !== undefined &&
+    (existingSchedule === undefined || existingSchedule === null || existingSchedule === settings.schedule);
+  const runAtToKeep =
+    existing &&
+    existing.status === 'queued' &&
+    existing.source === 'schedule' &&
+    slotMatchesSchedule &&
+    new Date(existing.runAt).getTime() < new Date(backupRunAt).getTime()
+      ? existing.runAt
+      : backupRunAt;
+
   upsertScheduledJob({
     jobType: 'backup.create',
-    runAt: backupRunAt,
-    payload: {},
+    runAt: runAtToKeep,
+    payload: { schedule: settings.schedule },
     source: 'schedule',
     dedupeKey: 'backup.create',
   });

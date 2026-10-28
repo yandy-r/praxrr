@@ -30,7 +30,11 @@ const backupCreateHandler: JobHandler = async (job) => {
         source: 'BackupCreateJob',
         meta: { jobId: job.id, error: result.error ?? 'Backup failed' },
       });
-      return { status: 'failure', failureCode: 'filesystem' };
+      return {
+        status: 'failure',
+        failureCode: 'filesystem',
+        rescheduleAt: job.source === 'schedule' ? calculateNextRunFromSchedule(settings.schedule) : undefined,
+      };
     }
 
     if (result.warning) {
@@ -53,7 +57,11 @@ const backupCreateHandler: JobHandler = async (job) => {
       source: 'BackupCreateJob',
       meta: { jobId: job.id, error },
     });
-    return { status: 'failure', failureCode: 'filesystem' };
+    return {
+      status: 'failure',
+      failureCode: 'filesystem',
+      rescheduleAt: job.source === 'schedule' ? calculateNextRunFromSchedule(settings.schedule) : undefined,
+    };
   }
 };
 

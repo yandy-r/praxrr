@@ -3,6 +3,8 @@ import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
+import { logger } from '$logger/logger.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import { enqueueJob, upsertScheduledJob } from '$jobs/queueService.ts';
@@ -181,12 +183,66 @@ migratedTest('T-D4 rescheduled runs publish a non-terminal job.finished', async 
 
       const finished = singleFinished(events, job.id);
       assertEquals(finished.rescheduled, true);
-      assertEquals(finished.status, 'queued');
+      assertEquals(finished.handedBack, false);
       assertEquals(finished.nextRunAt, rescheduleAt);
 
       const row = jobQueueQueries.getById(job.id);
       assertExists(row);
       assertEquals(row.status, 'queued');
+    }
+  );
+});
+
+migratedTest('dispatcher applies rescheduleSource/reschedulePayload only when the handler provides them', async () => {
+  const rescheduleAt = new Date(Date.now() + 3_600_000).toISOString();
+
+  // Neither provided (e.g. canary continuation): the manual row keeps its source and payload.
+  await withStub(
+    () => Promise.resolve({ status: 'success', rescheduleAt }),
+    async () => {
+      const pending = collect(finishedFor('logs.cleanup'));
+      const job = enqueueJob({
+        jobType: 'logs.cleanup',
+        runAt: new Date().toISOString(),
+        source: 'manual',
+        payload: { marker: 'original' } as never,
+      });
+      await pending;
+
+      const row = jobQueueQueries.getById(job.id);
+      assertExists(row);
+      assertEquals(row.source, 'manual');
+      assertEquals(row.payload, { marker: 'original' });
+      // Same-source continuation: not a hand-back, no manual completion toast semantics.
+      assertEquals(singleFinished(await pending, job.id).handedBack, false);
+    }
+  );
+
+  // Both provided (manual run handing the slot back to the schedule): the row is rewritten.
+  await withStub(
+    () =>
+      Promise.resolve({
+        status: 'success',
+        rescheduleAt,
+        rescheduleSource: 'schedule',
+        reschedulePayload: { marker: 'next' },
+      }),
+    async () => {
+      const pending = collect(finishedFor('logs.cleanup'));
+      const job = enqueueJob({
+        jobType: 'logs.cleanup',
+        runAt: new Date().toISOString(),
+        source: 'manual',
+        payload: { marker: 'original' } as never,
+      });
+      await pending;
+
+      const row = jobQueueQueries.getById(job.id);
+      assertExists(row);
+      assertEquals(row.source, 'schedule');
+      assertEquals(row.payload, { marker: 'next' });
+      // Manual -> schedule hand-back is terminal for the user's click and must toast.
+      assertEquals(singleFinished(await pending, job.id).handedBack, true);
     }
   );
 });
@@ -350,4 +406,145 @@ migratedTest("dispatcher jobs never run under the enqueuing request's user-op ac
   assert(requestActionId !== undefined);
   assert(jobActionId !== undefined, 'job handler must run in its own action');
   assert(jobActionId !== requestActionId, 'job must not reuse the request action id');
+});
+
+// Exercise the drain directly so a rejected promise fails the test rather than escaping a timer.
+const drainDispatcher = () => jobDispatcher['runDueJobs']();
+
+for (const failurePoint of ['history', 'finish'] as const) {
+  migratedTest(`dispatcher contains a ${failurePoint} write failure and runs the next job`, async () => {
+    const originalCreate = jobRunHistoryQueries.create;
+    const originalFinish = jobQueueQueries.markFinished;
+    const originalError = logger.error;
+    let failOnce = true;
+    const fail = () => {
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('injected persistence failure');
+      }
+    };
+    if (failurePoint === 'history') {
+      jobRunHistoryQueries.create = (...args) => {
+        fail();
+        return originalCreate(...args);
+      };
+    } else {
+      jobQueueQueries.markFinished = (...args) => {
+        fail();
+        return originalFinish(...args);
+      };
+    }
+    // Recovery must not depend on the error logger working either.
+    logger.error = () => Promise.reject(new Error('injected logger failure'));
+    try {
+      const runAt = new Date(Date.now() - 1000).toISOString();
+      const first = jobQueueQueries.create({ jobType: 'logs.cleanup', runAt, source: 'manual' });
+      const second = jobQueueQueries.create({ jobType: 'logs.cleanup', runAt, source: 'manual' });
+      const executed: number[] = [];
+      await withStub(
+        (job) => {
+          executed.push(job.id);
+          return Promise.resolve({ status: 'success' });
+        },
+        () => drainDispatcher()
+      );
+      assertEquals(executed, [first, second]);
+      // A history-write failure no longer ends the run; only the terminal write does.
+      assertEquals(jobQueueQueries.getById(first)?.status, failurePoint === 'history' ? 'success' : 'failed');
+      assertEquals(jobQueueQueries.getById(second)?.status, 'success');
+    } finally {
+      jobRunHistoryQueries.create = originalCreate;
+      jobQueueQueries.markFinished = originalFinish;
+      logger.error = originalError;
+    }
+  });
+}
+
+migratedTest('dispatcher keeps a handler reschedule when the history write fails', async () => {
+  const rescheduleAt = new Date(Date.now() + 3_600_000).toISOString();
+  const originalCreate = jobRunHistoryQueries.create;
+  const originalDebug = logger.debug;
+  const originalError = logger.error;
+  // Every post-handler logger call fails, too: neither may abort the bookkeeping.
+  logger.debug = () => Promise.reject(new Error('injected debug logger failure'));
+  logger.error = () => Promise.reject(new Error('injected error logger failure'));
+  jobRunHistoryQueries.create = () => {
+    throw new Error('injected history failure');
+  };
+  try {
+    const jobId = jobQueueQueries.create({
+      jobType: 'logs.cleanup',
+      runAt: new Date(Date.now() - 1000).toISOString(),
+      source: 'schedule',
+    });
+    const pending = collect(finishedFor('logs.cleanup'));
+    await withStub(
+      () => Promise.resolve({ status: 'success', rescheduleAt }),
+      () => drainDispatcher()
+    );
+    const events = await pending;
+
+    // The handler's next slot must survive a failed history insert.
+    const row = jobQueueQueries.getById(jobId);
+    assertExists(row);
+    assertEquals(row.status, 'queued');
+    assertEquals(row.runAt, rescheduleAt);
+    assertEquals(row.source, 'schedule');
+
+    const finished = singleFinished(events, jobId);
+    assertEquals(finished.status, 'queued');
+    assertEquals(finished.runStatus, 'success');
+    assertEquals(finished.rescheduled, true);
+    assertEquals(finished.nextRunAt, rescheduleAt);
+  } finally {
+    jobRunHistoryQueries.create = originalCreate;
+    logger.debug = originalDebug;
+    logger.error = originalError;
+  }
+});
+
+migratedTest('dispatcher contains a claim failure and can drain on its next wake', async () => {
+  const originalClaim = jobQueueQueries.claimNextDue;
+  jobQueueQueries.claimNextDue = () => {
+    throw new Error('injected claim failure');
+  };
+  try {
+    const job = jobQueueQueries.create({
+      jobType: 'logs.cleanup',
+      runAt: new Date(Date.now() - 1000).toISOString(),
+      source: 'manual',
+    });
+    await drainDispatcher();
+    assertEquals(jobQueueQueries.getById(job)?.status, 'queued');
+    jobQueueQueries.claimNextDue = originalClaim;
+    await withStub(
+      () => Promise.resolve({ status: 'success' }),
+      () => drainDispatcher()
+    );
+    assertEquals(jobQueueQueries.getById(job)?.status, 'success');
+  } finally {
+    jobQueueQueries.claimNextDue = originalClaim;
+  }
+});
+
+migratedTest('dispatcher retries after its next-wake database lookup fails', async () => {
+  const originalNext = jobQueueQueries.getNextQueued;
+  const originalTimeout = globalThis.setTimeout;
+  const delays: number[] = [];
+  jobQueueQueries.getNextQueued = () => {
+    throw new Error('injected next-wake failure');
+  };
+  globalThis.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+    delays.push(delay ?? 0);
+    return originalTimeout(handler, delay, ...args);
+  }) as typeof setTimeout;
+  try {
+    await drainDispatcher();
+    assertEquals(delays.length, 1);
+    assert(delays[0] > 0 && delays[0] <= 60_000, 'must arm a bounded retry timer');
+  } finally {
+    jobDispatcher.stop();
+    jobQueueQueries.getNextQueued = originalNext;
+    globalThis.setTimeout = originalTimeout;
+  }
 });

@@ -940,7 +940,11 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
     }
 
     // Non-credential client-creation failure: log the raw message (sanitized), persist only a
-    // typed transport code.
+    // typed transport code. For a scheduled job, still advance every schedule-triggered section
+    // (exactly like the normal loop's scheduleNextSectionRun) and hand the dispatcher a
+    // rescheduleAt, so one bad client creation reschedules to the next slot instead of ending
+    // the recurring arr.sync.* slot (H3). Credential path above is unchanged (it disables the
+    // instance on purpose).
     await logger.error('Arr sync could not create client', {
       source: 'ArrSyncJob',
       meta: {
@@ -950,6 +954,16 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
         error: message,
       },
     });
+    let rescheduleAt: string | null = null;
+    if (job.source === 'schedule') {
+      for (const section of sectionsToRun) {
+        const config = configStatus[section];
+        if (config.trigger !== 'schedule') continue;
+        const nextRun = calculateNextRun(config.cron);
+        getSection(section).setNextRunAt(instanceId, nextRun);
+      }
+      rescheduleAt = arrSyncQueries.getNextScheduledRunAt(instanceId) ?? null;
+    }
     const syncHistoryId = recordHistory('failed', {
       error: classifySyncFailure(error).message,
       sectionsAttempted: sectionsToRun,
@@ -958,6 +972,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
     return {
       status: 'failure',
       failureCode: 'upstream',
+      rescheduleAt,
       outcomes: [],
       syncHistoryId,
     };

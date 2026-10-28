@@ -289,3 +289,51 @@ migratedTest(
     }
   }
 );
+
+migratedTest('arrSyncHandler: non-credential client-creation failure reschedules a scheduled job (H3)', async () => {
+  const id = arrInstancesQueries.create({
+    name: 'Radarr Bad URL',
+    type: 'radarr',
+    url: 'http://169.254.169.254/latest',
+    apiKey: 'radarr-key',
+  });
+
+  const section = { trigger: 'schedule' as const, cron: '0 */6 * * *', nextRunAt: null, syncStatus: 'idle' };
+  const configStatus = {
+    qualityProfiles: { ...section },
+    delayProfiles: { trigger: 'manual' as const, cron: null, nextRunAt: null, syncStatus: 'idle' },
+    mediaManagement: { trigger: 'manual' as const, cron: null, nextRunAt: null, syncStatus: 'idle' },
+    metadataProfiles: { trigger: 'manual' as const, cron: null, nextRunAt: null, syncStatus: 'idle' },
+  };
+  const nextRunAts: Array<string | null> = [];
+  const handler = getSection('qualityProfiles');
+  const origGetSyncConfigStatus = arrSyncQueries.getSyncConfigStatus;
+  const origSetNextRunAt = handler.setNextRunAt;
+  const origLoggerError = logger.error;
+  arrSyncQueries.getSyncConfigStatus = () => configStatus;
+  handler.setNextRunAt = (_instanceId: number, nextRunAt: string | null) => {
+    nextRunAts.push(nextRunAt);
+  };
+  logger.error = (() => Promise.resolve()) as typeof logger.error;
+
+  const origGetNextScheduledRunAt = arrSyncQueries.getNextScheduledRunAt;
+  arrSyncQueries.getNextScheduledRunAt = () => nextRunAts[nextRunAts.length - 1] ?? null;
+  try {
+    const syncHandler = jobQueueRegistry.get('arr.sync');
+    assert(syncHandler !== undefined, 'arr.sync handler must be registered');
+    const result = await syncHandler(createQualityProfilesSyncJob(id, 'schedule'));
+
+    assertEquals(result.status, 'failure');
+    assertEquals(nextRunAts.length, 1, 'the scheduled section next_run_at must advance');
+    const nextRun = nextRunAts[0];
+    assert(nextRun !== null && nextRun !== undefined);
+    assertEquals(new Date(nextRun).getHours() % 6, 0, 'next run must land on a 6-hour boundary');
+    assertEquals(new Date(nextRun).getMinutes(), 0);
+    assertEquals(result.rescheduleAt, nextRun);
+  } finally {
+    arrSyncQueries.getSyncConfigStatus = origGetSyncConfigStatus;
+    handler.setNextRunAt = origSetNextRunAt;
+    arrSyncQueries.getNextScheduledRunAt = origGetNextScheduledRunAt;
+    logger.error = origLoggerError;
+  }
+});

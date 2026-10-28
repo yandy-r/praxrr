@@ -74,7 +74,14 @@ const renameRunHandler: JobHandler = async (job) => {
       source: 'RenameJob',
       meta: { jobId: job.id, instanceId, instanceName: instance.name, error },
     });
-    return { status: 'failure', failureCode: classifyJobFailure(error) };
+    return {
+      status: 'failure',
+      failureCode: classifyJobFailure(error),
+      rescheduleAt:
+        job.source === 'schedule'
+          ? calculateNextRunFromMinutes(new Date().toISOString(), settings.schedule)
+          : undefined,
+    };
   }
 };
 

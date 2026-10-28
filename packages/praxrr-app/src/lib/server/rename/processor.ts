@@ -12,6 +12,7 @@ import { logRenameRun, logRenameStart, logRenameError, logRenameSkipped } from '
 import { groupSeriesByParentFolder } from './folderGroups.ts';
 import { notifications } from '$lib/server/notifications/definitions/index.ts';
 import { getArrInstanceClient } from '$arr/arrInstanceClients.ts';
+import { logger } from '$logger/logger.ts';
 
 /**
  * Create an empty/skipped job log
@@ -62,9 +63,20 @@ function createSkippedLog(
  * Send rename notification (manager handles service filtering, delivery and history)
  */
 async function sendRenameNotification(log: RenameJobLog, summaryNotifications: boolean): Promise<void> {
-  // Only notify if there were files to rename
-  if (log.results.filesNeedingRename > 0) {
-    await notifications.rename({ log, summaryNotifications }).send();
+  try {
+    // Only notify if there were files to rename
+    if (log.results.filesNeedingRename > 0) {
+      await notifications.rename({ log, summaryNotifications }).send();
+    }
+  } catch (error) {
+    try {
+      await logger.error('Failed to send rename notification', {
+        source: 'RenameProcessor',
+        meta: { instanceId: log.instanceId, error },
+      });
+    } catch {
+      // Notification delivery is non-blocking; logging must not create another rejection.
+    }
   }
 }
 

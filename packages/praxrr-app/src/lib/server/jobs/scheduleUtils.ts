@@ -1,5 +1,6 @@
 import { Cron } from 'croner';
 import { parseUTC } from '$shared/utils/dates.ts';
+import { logger } from '$logger/logger.ts';
 
 /**
  * Upper bound (1 year) for every minute-based schedule interval. Route validators and table
@@ -50,6 +51,20 @@ export function calculateCooldownUntil(lastRunAt: string | null, scheduleMinutes
   return addScheduleMinutes(base, scheduleMinutes);
 }
 
+export const BACKUP_SCHEDULE_KEYWORDS = ['hourly', 'daily', 'weekly', 'monthly'] as const;
+
+/**
+ * Valid backup schedules: the named keywords plus the two cron expressions the Backup settings
+ * select offers (every 6h / every 12h at minute 0). Strict allowlist so nothing else reaches
+ * calculateNextRunFromSchedule's +1h fallback (ISO dates, never-matching crons, six-field
+ * seconds patterns). BackupSettings.svelte offers exactly these values.
+ */
+export const VALID_BACKUP_SCHEDULES = ['hourly', 'daily', 'weekly', 'monthly', '0 */6 * * *', '0 */12 * * *'] as const;
+
+export function isValidBackupSchedule(schedule: string): boolean {
+  return (VALID_BACKUP_SCHEDULES as readonly string[]).includes(schedule);
+}
+
 export function calculateNextRunFromSchedule(schedule: string): string {
   const now = new Date();
 
@@ -65,8 +80,12 @@ export function calculateNextRunFromSchedule(schedule: string): string {
     return next.toISOString();
   }
   if (schedule === 'weekly') {
+    // Next Sunday 00:00 local time, strictly after now. A fixed calendar point (matching the
+    // daily/monthly midnight anchoring) so two computations in the same week agree instead of
+    // drifting a full 7 days apart.
     const next = new Date(now);
-    next.setDate(next.getDate() + 7);
+    const daysUntilSunday = (7 - next.getDay()) % 7;
+    next.setDate(next.getDate() + (daysUntilSunday === 0 ? 7 : daysUntilSunday));
     next.setHours(0, 0, 0, 0);
     return next.toISOString();
   }
@@ -80,11 +99,18 @@ export function calculateNextRunFromSchedule(schedule: string): string {
   try {
     const cron = new Cron(schedule);
     const nextRun = cron.nextRun();
+    cron.stop();
     if (nextRun) return nextRun.toISOString();
   } catch {
-    // fall through
+    // fall through to the bounded fallback below
   }
 
+  // Unparseable or never-matching schedule: fall back to +1h instead of throwing during
+  // startup scheduling, but surface it — this is a persisted settings value the user must fix.
+  void logger.warn('Backup schedule is not parseable; falling back to 1 hour', {
+    source: 'JobSchedule',
+    meta: { schedule },
+  });
   const fallback = new Date(now);
   fallback.setHours(fallback.getHours() + 1);
   return fallback.toISOString();

@@ -7,18 +7,16 @@ import { upgradeConfigsQueries } from '$db/queries/upgradeConfigs.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobHandler, JobQueueRecord, JobSource, JobType } from '$jobs/queueTypes.ts';
 import type { FilterConfig, UpgradeConfig } from '$shared/upgrades/filters.ts';
+import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
+import { logger } from '$logger/logger.ts';
 
 // Side-effect imports register the 'arr.rename' and 'arr.upgrade' handlers.
 import '$jobs/handlers/arrRename.ts';
 import '$jobs/handlers/arrUpgrade.ts';
 
 // ============================================================================
-// This suite covers the CLEANLY-TESTABLE early-return evidence branches of the
-// arr.rename / arr.upgrade handlers (issue #237, AC #5): the branches that emit
-// typed safe evidence (failureCode / decision) WITHOUT reaching the
-// non-mockable processRenameConfig / processUpgradeConfig direct-function
-// imports. Every branch here short-circuits before the processor call, so the
-// handlers only touch the swappable query objects below — no real DB needed.
+// Evidence branches and recurring failure recovery for arr.rename / arr.upgrade.
+// Query/logger methods are restored after each test; no database or network is used.
 // ============================================================================
 
 function getHandler(jobType: 'arr.rename' | 'arr.upgrade'): JobHandler {
@@ -240,3 +238,90 @@ Deno.test('arr.upgrade: disabled upgrade config on a radarr instance returns can
     upgradeConfigsQueries.getByArrInstanceId = originalGetUpgradeConfig;
   }
 });
+
+for (const source of ['schedule', 'manual'] as const) {
+  for (const jobType of ['arr.rename', 'arr.upgrade'] as const) {
+    Deno.test(`${jobType}: thrown processor failure recurrence: ${source}`, async () => {
+      const originalGetById = arrInstancesQueries.getById;
+      const originalGetRenameSettings = arrRenameSettingsQueries.getByInstanceId;
+      const originalGetUpgradeConfig = upgradeConfigsQueries.getByArrInstanceId;
+      const originalGetCredentials = arrInstanceCredentialsQueries.getByInstanceId;
+      const originalUpdateRenameLastRun = arrRenameSettingsQueries.updateLastRun;
+      const originalUpdateUpgradeLastRun = upgradeConfigsQueries.updateLastRun;
+      const originalDebug = logger.debug;
+      const originalError = logger.error;
+      let processorReached = false;
+      let lastRunUpdates = 0;
+
+      arrInstancesQueries.getById = () => createInstance(304, 'radarr');
+      arrRenameSettingsQueries.getByInstanceId = (id) => createRenameSettings(id, true);
+      upgradeConfigsQueries.getByArrInstanceId = (id) =>
+        createUpgradeConfig(id, { filters: [createEnabledFilter('f1')] });
+      arrRenameSettingsQueries.updateLastRun = () => {
+        lastRunUpdates++;
+      };
+      upgradeConfigsQueries.updateLastRun = () => {
+        lastRunUpdates++;
+      };
+      logger.error = async () => {};
+      // Both are processor-entry dependencies outside their internal catch blocks:
+      // rename logs its start; upgrade acquires its authenticated Arr client.
+      logger.debug = async () => {
+        if (jobType === 'arr.rename') {
+          processorReached = true;
+          throw new Error('Processor start unavailable');
+        }
+      };
+      arrInstanceCredentialsQueries.getByInstanceId = () => {
+        processorReached = true;
+        throw new Error('Credential storage unavailable');
+      };
+
+      try {
+        const earliest = Date.now() + 60 * 60_000;
+        const result = await getHandler(jobType)(createJob(jobType, 304, source));
+
+        assert(processorReached, 'The real processor must be reached before the injected failure');
+        assert(result.status === 'failure');
+        assertEquals(lastRunUpdates, 0, 'Thrown processing must not update lastRunAt');
+        if (source === 'schedule') {
+          assertExists(result.rescheduleAt);
+          const next = Date.parse(result.rescheduleAt);
+          assert(next >= earliest, 'Retry must wait for the configured normal interval');
+          assert(next <= Date.now() + 60 * 60_000);
+        } else {
+          assertEquals(result.rescheduleAt, undefined);
+        }
+      } finally {
+        arrInstancesQueries.getById = originalGetById;
+        arrRenameSettingsQueries.getByInstanceId = originalGetRenameSettings;
+        upgradeConfigsQueries.getByArrInstanceId = originalGetUpgradeConfig;
+        arrInstanceCredentialsQueries.getByInstanceId = originalGetCredentials;
+        arrRenameSettingsQueries.updateLastRun = originalUpdateRenameLastRun;
+        upgradeConfigsQueries.updateLastRun = originalUpdateUpgradeLastRun;
+        logger.debug = originalDebug;
+        logger.error = originalError;
+      }
+    });
+  }
+}
+
+for (const jobType of ['arr.rename', 'arr.upgrade'] as const) {
+  Deno.test(`${jobType}: invalid scheduled payload and deleted instance stop recurrence`, async () => {
+    const originalGetById = arrInstancesQueries.getById;
+    arrInstancesQueries.getById = () => undefined;
+    try {
+      for (const [instanceId, failureCode] of [
+        [Number.NaN, 'invalidPayload'],
+        [999, 'targetNotFound'],
+      ] as const) {
+        const result = await getHandler(jobType)(createJob(jobType, instanceId, 'schedule'));
+        assert(result.status === 'failure');
+        assertEquals(result.failureCode, failureCode);
+        assertEquals(result.rescheduleAt, undefined);
+      }
+    } finally {
+      arrInstancesQueries.getById = originalGetById;
+    }
+  });
+}

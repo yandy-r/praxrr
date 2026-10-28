@@ -23,6 +23,14 @@ const dbSyncHandler: JobHandler = async (job) => {
   }
 
   if (isManualTrigger) {
+    // The manual run owns the per-database slot; hand it back to the recurring schedule when
+    // auto-sync is enabled so a "Sync now" never silently ends scheduled syncs.
+    const autoRescheduleAt =
+      instance.sync_strategy > 0
+        ? calculateNextRunFromMinutes(new Date().toISOString(), instance.sync_strategy)
+        : undefined;
+    const autoRescheduleSource = autoRescheduleAt ? ('schedule' as const) : undefined;
+
     try {
       const syncResult = await pcdManager.sync(databaseId);
       if (!syncResult.success) {
@@ -30,19 +38,31 @@ const dbSyncHandler: JobHandler = async (job) => {
           source: 'DbSyncJob',
           meta: { jobId: job.id, databaseId, databaseName: instance.name, error: syncResult.error ?? 'Sync failed' },
         });
-        return { status: 'failure', failureCode: 'gitNetwork' };
+        return {
+          status: 'failure',
+          failureCode: 'gitNetwork',
+          rescheduleAt: autoRescheduleAt,
+          rescheduleSource: autoRescheduleSource,
+        };
       }
 
       return {
         status: 'success',
         output: `Pulled ${syncResult.commitsBehind} update(s)`,
+        rescheduleAt: autoRescheduleAt,
+        rescheduleSource: autoRescheduleSource,
       };
     } catch (error) {
       await logger.error('Manual database sync job failed', {
         source: 'DbSyncJob',
         meta: { jobId: job.id, databaseId, databaseName: instance.name, error },
       });
-      return { status: 'failure', failureCode: 'gitNetwork' };
+      return {
+        status: 'failure',
+        failureCode: 'gitNetwork',
+        rescheduleAt: autoRescheduleAt,
+        rescheduleSource: autoRescheduleSource,
+      };
     }
   }
 

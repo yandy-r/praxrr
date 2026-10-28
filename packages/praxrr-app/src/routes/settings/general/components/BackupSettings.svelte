@@ -79,8 +79,8 @@
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
             <option value="hourly">Hourly</option>
-            <option value="*/6 hours">Every 6 hours</option>
-            <option value="*/12 hours">Every 12 hours</option>
+            <option value="0 */6 * * *">Every 6 hours</option>
+            <option value="0 */12 * * *">Every 12 hours</option>
           </select>
           <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">How often to create automatic backups</p>
         </label>

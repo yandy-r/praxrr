@@ -8,6 +8,7 @@ import { generalSettingsQueries } from '$db/queries/generalSettings.ts';
 import { logSettings } from '$logger/settings.ts';
 import { logger } from '$logger/logger.ts';
 import { scheduleBackupJobs, scheduleLogCleanup } from '$lib/server/jobs/init.ts';
+import { isValidBackupSchedule } from '$jobs/scheduleUtils.ts';
 import { maskApiKey } from '$shared/utils/masking.ts';
 
 export const load = () => {
@@ -156,6 +157,10 @@ export const actions: Actions = {
     // Validate
     if (!schedule) {
       return fail(400, { error: 'Schedule is required' });
+    }
+
+    if (!isValidBackupSchedule(schedule)) {
+      return fail(400, { error: 'Schedule must be hourly, daily, weekly, monthly or a valid cron expression' });
     }
 
     if (isNaN(retentionDays) || retentionDays < 1 || retentionDays > 365) {

@@ -26,6 +26,7 @@ function finished(overrides: Partial<LiveJobFinishedEvent> = {}): LiveJobFinishe
     status: 'success',
     runStatus: 'success',
     rescheduled: false,
+    handedBack: false,
     nextRunAt: null,
     runId: 3,
     failureCode: null,
@@ -179,6 +180,62 @@ Deno.test('T-C4: decideJobToast background policy, rescheduled and href fallback
     ),
     { kind: 'none' }
   );
+});
+
+Deno.test('T-C4: manual hand-back to the schedule still toasts; canary continuations stay quiet', () => {
+  // A manual "Sync now" hands its slot back to the recurring schedule: rescheduled + handedBack,
+  // so the manual completion toast must survive the rescheduled suppression.
+  const handedBack = finished({
+    jobType: 'pcd.sync',
+    displayName: 'Sync DB',
+    instanceId: null,
+    arrType: null,
+    databaseId: 1,
+    status: 'queued',
+    rescheduled: true,
+    handedBack: true,
+    nextRunAt: '2026-10-20T01:00:00.000Z',
+  });
+  assertEquals(decideJobToast(handedBack, noSync), {
+    kind: 'toast',
+    type: 'success',
+    message: 'Sync DB finished',
+    sticky: false,
+    href: '/base/settings/jobs',
+  });
+  assertEquals(decideJobToast({ ...handedBack, runStatus: 'failure', failureCode: 'gitNetwork' }, noSync), {
+    kind: 'toast',
+    type: 'error',
+    message: 'Sync DB failed',
+    sticky: true,
+    href: '/base/settings/jobs',
+  });
+  assertEquals(decideJobToast({ ...handedBack, runStatus: 'skipped' }, noSync), {
+    kind: 'toast',
+    type: 'info',
+    message: 'Sync DB skipped',
+    sticky: false,
+    href: '/base/settings/jobs',
+  });
+  assertEquals(decideJobToast({ ...handedBack, runStatus: 'cancelled' }, noSync), {
+    kind: 'toast',
+    type: 'info',
+    message: 'Sync DB cancelled',
+    sticky: false,
+    href: '/base/settings/jobs',
+  });
+
+  // A canary continuation is manual and rescheduled on every batch but is NOT a hand-back;
+  // it must keep its per-batch silence (and its correlation is not a run history row).
+  assertEquals(decideJobToast(finished({ status: 'queued', rescheduled: true, handedBack: false }), noSync), {
+    kind: 'none',
+  });
+  assertEquals(decideJobToast(finished({ status: 'queued', rescheduled: true }), noSync), { kind: 'none' });
+
+  // A scheduled run that merely re-queues itself never sets handedBack.
+  assertEquals(decideJobToast(finished({ source: 'schedule', status: 'queued', rescheduled: true }), noSync), {
+    kind: 'none',
+  });
 });
 
 Deno.test('T-C5: ToastCoalescer blocks repeat background failures inside the window', () => {
