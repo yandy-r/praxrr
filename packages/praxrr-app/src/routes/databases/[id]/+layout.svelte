@@ -9,6 +9,7 @@
     FileCog,
     Camera,
     PencilLine,
+    PackagePlus,
   } from 'lucide-svelte';
   import { page } from '$app/stores';
 
@@ -40,6 +41,12 @@
           href: `/databases/${database.id}/overrides`,
           icon: PencilLine,
           active: currentPath.includes('/overrides'),
+        },
+        {
+          label: 'Import',
+          href: `/databases/${database.id}/import`,
+          icon: PackagePlus,
+          active: currentPath.endsWith('/import'),
         },
         {
           label: 'Tweaks',

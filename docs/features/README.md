@@ -15,8 +15,8 @@ relevant API behavior.
   matches, and score against a selected quality profile.
 - [Plugin Management](./plugin-management.md): discover validated plugins, inspect durable intent
   and lifecycle evidence, and reconcile the registry without inferring runtime health.
-- [Portable Import/Export](./portable-import-export.md): move entities between databases using the
-  portable JSON contract.
+- [Portable Import/Export](./portable-import-export.md): move single entities or dependency-complete
+  bundles between databases, with dry run, collision policies, and atomic apply.
 - [TRaSH Guide Sync](./trash-guide-sync.md): import and sync TRaSH Guides community configurations
   from git repositories into Arr instances.
 

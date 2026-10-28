@@ -8,6 +8,18 @@ export:
       The portable format strips database IDs and timestamps, producing a
       self-contained snapshot suitable for clipboard copy, file export, or
       cross-database import.
+
+      `name` may be repeated (`?name=A&name=B`) to export several entities of the
+      same `entityType`. Set `includeDependencies=true` to also export the
+      custom formats and regular expressions a quality profile references (and the
+      regular expressions a custom format references). Set `format=bundle` to force
+      the bundle response shape.
+
+      Response shape rule: the legacy `ExportResponse` (`entityType`, `data`,
+      `migration`) is returned if and only if exactly one `name` is supplied and
+      neither `includeDependencies=true` nor `format=bundle` is set. Every other
+      request returns a `PcdBundleExportResponse`. A bundle holds at most 1000
+      entities; exceeding the cap returns 400.
     tags:
       - PCD
     parameters:
@@ -26,18 +38,40 @@ export:
       - name: name
         in: query
         required: true
-        description: The entity name to export
+        description: The entity name to export. Repeat the parameter to export several entities.
+        style: form
+        explode: true
+        schema:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      - name: includeDependencies
+        in: query
+        required: false
+        description: Also export referenced custom formats and regular expressions.
+        schema:
+          type: boolean
+          default: false
+      - name: format
+        in: query
+        required: false
+        description: Force the response shape. `bundle` always returns a `PcdBundleExportResponse`.
         schema:
           type: string
+          enum: [json, bundle]
+          default: json
     responses:
       '200':
-        description: Portable entity JSON
+        description: Portable entity JSON (legacy shape) or entity bundle
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/ExportResponse'
+              oneOf:
+                - $ref: '../schemas/pcd.yaml#/ExportResponse'
+                - $ref: '../schemas/pcd.yaml#/PcdBundleExportResponse'
       '400':
-        description: Missing or invalid parameters
+        description: Missing or invalid parameters, or the bundle exceeds the 1000 entity cap
         content:
           application/json:
             schema:
@@ -58,7 +92,7 @@ export:
 import:
   post:
     operationId: importEntity
-    summary: Import a portable entity
+    summary: Import a portable entity or entity bundle
     description: |
       Deserializes a portable entity into PCD operations, creating the entity
       in the target database and layer.
@@ -70,6 +104,27 @@ import:
 
       Name uniqueness is validated — importing an entity with a name that already
       exists will return a 400 error.
+
+      Bundle import: when the body contains a `bundle` key it is treated as a
+      `PcdBundleImportRequest` (the legacy single-entity path is not used). All
+      entities are written to the single requested `layer` as one undo unit.
+
+      - `dryRun: true` applies the bundle against an ephemeral cache and returns a
+        `PcdBundleImportReport` listing creates, collisions and missing references.
+        Nothing is written to `pcd_ops` or `pcd_op_history`.
+      - `collisions` selects `skip`, `rename` or `overwrite` for entities whose name
+        already exists (case-insensitive), with an optional per-entity override keyed
+        `"<entityType>:<name>"`.
+      - References (quality profile to custom format, custom format to regular
+        expression) must resolve inside the bundle or the target database. On a real
+        apply any unresolved reference returns 400 with the report before anything is
+        written.
+      - A failure part-way through applying rolls back every operation the import
+        created and returns 500 with the report and `rolledBack: true`. If the rollback
+        itself failed, the database is disabled and `rolledBack` is false.
+      - `expectedPlanDigest`: pass the `planDigest` returned by a dry run to reject the
+        apply with HTTP 409 when the database changed in between.
+      - Limits: at most 1000 entities and a 5 MiB JSON body (400 otherwise).
     tags:
       - PCD
     requestBody:
@@ -77,20 +132,32 @@ import:
       content:
         application/json:
           schema:
-            $ref: '../schemas/pcd.yaml#/ImportRequest'
+            oneOf:
+              - $ref: '../schemas/pcd.yaml#/ImportRequest'
+              - $ref: '../schemas/pcd.yaml#/PcdBundleImportRequest'
     responses:
       '200':
-        description: Entity created successfully
+        description: Entity created successfully, or bundle import report
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/ImportResponse'
+              oneOf:
+                - $ref: '../schemas/pcd.yaml#/ImportResponse'
+                - $ref: '../schemas/pcd.yaml#/PcdBundleImportReport'
       '400':
-        description: Validation error (missing fields, duplicate name, invalid data)
+        description: Validation error (missing fields, duplicate name, invalid data, bundle caps, unresolved references)
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+              oneOf:
+                - $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+                - $ref: '../schemas/pcd.yaml#/PcdBundleImportErrorResponse'
+      '409':
+        description: The plan digest no longer matches the database (run a new dry run)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdBundleImportErrorResponse'
       '403':
         description: Cannot write to base layer
         content:
@@ -98,8 +165,10 @@ import:
             schema:
               $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
       '500':
-        description: Database cache not available
+        description: Database cache not available, or bundle apply failed and was rolled back
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+              oneOf:
+                - $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+                - $ref: '../schemas/pcd.yaml#/PcdBundleImportErrorResponse'

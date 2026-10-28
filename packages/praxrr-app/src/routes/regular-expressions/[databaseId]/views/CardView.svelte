@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { RegularExpressionWithTags } from '$shared/pcd/display';
-  import { ExternalLink, Copy, Download } from 'lucide-svelte';
+  import { ExternalLink, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import { page } from '$app/stores';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
@@ -14,7 +14,12 @@
 
   export let expressions: RegularExpressionWithTags[];
 
-  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{
+    clone: { name: string };
+    export: { name: string };
+    copy: { name: string };
+    clipboard: { name: string };
+  }>();
 
   $: databaseId = $page.params.databaseId;
 
@@ -29,13 +34,16 @@
 
 <CardGrid flush>
   {#each visibleExpressions as expression (expression.id)}
-    <Card href="/regular-expressions/{databaseId}/{expression.id}" hoverable>
+    <Card hoverable className="relative">
+      <a
+        href={`/regular-expressions/${databaseId}/${expression.id}`}
+        aria-label={expression.name}
+        class="absolute inset-0 rounded-xl"
+      ></a>
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
           <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-              {expression.name}
-            </h3>
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{expression.name}</span>
             {#if expression.locallyModified}
               <LocallyModifiedBadge />
             {/if}
@@ -43,8 +51,7 @@
               <Label variant="info" size="sm" rounded="md">{tag.name}</Label>
             {/each}
           </div>
-          <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
-          <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <div class="relative z-10 flex shrink-0 items-center gap-0.5">
             {#if expression.regex101_id}
               <Button
                 icon={ExternalLink}
@@ -58,8 +65,22 @@
               icon={Download}
               size="xs"
               variant="ghost"
-              tooltip="Export"
+              tooltip="Download bundle"
               on:click={() => dispatch('export', { name: expression.name })}
+            />
+            <Button
+              icon={DatabaseZap}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy to database…"
+              on:click={() => dispatch('copy', { name: expression.name })}
+            />
+            <Button
+              icon={ClipboardCopy}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy JSON to clipboard"
+              on:click={() => dispatch('clipboard', { name: expression.name })}
             />
             <Button
               icon={Copy}

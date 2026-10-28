@@ -1,9 +1,9 @@
 ---
 title: Modals & Dialogs
-description: 'Modal and dialog components: the base Modal shell plus info, clone, and dirty-state confirmation dialogs.'
+description: 'Modal and dialog components: the base Modal shell plus info, clone, copy-to-database, and dirty-state confirmation dialogs.'
 ---
 
-Modal and dialog components layer content above the page and manage backdrop, focus, and confirm/cancel flows. These are reusable components under `$ui/` (source: `packages/praxrr-app/src/lib/client/ui/`), ranging from the base `Modal` shell to purpose-built info, clone, and unsaved-changes dialogs.
+Modal and dialog components layer content above the page and manage backdrop, focus, and confirm/cancel flows. These are reusable components under `$ui/` (source: `packages/praxrr-app/src/lib/client/ui/`), ranging from the base `Modal` shell to purpose-built info, clone, copy-to-database, and unsaved-changes dialogs.
 
 ## Modal
 
@@ -132,7 +132,7 @@ Variants and notes:
 
 ## CloneModal
 
-Self-contained dialog for cloning a PCD entity. It wraps `Modal`, prompts for a new name (pre-filled `<source> (Copy)`), optionally lets the user pick the base/user layer, then exports the source entity and re-imports it under the new name via the PCD API.
+Self-contained dialog for cloning a PCD entity within the same database. It wraps `Modal`, prompts for a new name (pre-filled `<source> (Copy)`), optionally lets the user pick the base/user layer, then exports the source entity in the single-entity shape and re-imports it under the new name via the PCD API. It copies only the entity itself, not its dependencies; use `CopyToDatabaseModal` to copy an entity with its dependencies into another database.
 
 Import:
 
@@ -153,7 +153,7 @@ Props:
 
 Events:
 
-- No outward-facing dispatched events. On confirm it performs `GET /api/v1/pcd/export` then `POST /api/v1/pcd/import`, emits alerts via `alertStore`, calls `invalidateAll()`, and closes.
+- No outward-facing dispatched events. On confirm it performs a single-entity `GET /api/v1/pcd/export` then a single-entity `POST /api/v1/pcd/import`, emits alerts via `alertStore`, calls `invalidateAll()`, and closes.
 - Internally consumes Modal's `on:confirm`/`on:cancel`.
 
 Slots:
@@ -180,6 +180,72 @@ Variants and notes:
 - Uses the Svelte 5 legacy API (`export let`, reactive `$:` blocks). `nameConflict` and `confirmDisabled` are derived reactively; `handleConfirm` early-returns when disabled.
 - Not featured in the dev showcase route. Renders `Modal` with `size="sm"` and header/confirmText `"Clone"`.
 - Depends on `$alerts/store` (`alertStore`), `$app/navigation` (`invalidateAll`), `$ui/form/FormInput.svelte`, and the sibling `Modal.svelte`.
+
+## CopyToDatabaseModal
+
+Dialog behind the **Copy to database…** row action on entity list pages. When it opens, it exports the source entity with its dependencies as a bundle (`includeDependencies=true&format=bundle`) and loads the list of databases. The user then picks another enabled database, and the dialog embeds `BundleImportPanel` (without the paste/upload input) to dry-run and apply the bundle there.
+
+Import:
+
+```svelte
+import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+```
+
+Props:
+
+| Prop         | Type                                          | Default | Required | Description                                                            |
+| ------------ | --------------------------------------------- | ------- | -------- | ---------------------------------------------------------------------- |
+| `open`       | `boolean`                                     | `false` | No       | Controls visibility; use `bind:open`. Closes after a successful apply. |
+| `databaseId` | `number`                                      | —       | Yes      | Source database; excluded from the target list.                        |
+| `entityType` | `EntityType` (from `$shared/pcd/portable.ts`) | —       | Yes      | Type of the entity to copy.                                            |
+| `sourceName` | `string`                                      | —       | Yes      | Name of the entity to copy.                                            |
+
+Usage:
+
+```svelte
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType="quality_profile"
+  sourceName={cloneSourceName}
+/>
+```
+
+Variants and notes:
+
+- Renders `Modal` with `size="xl"`, header `Copy to database…`, and a `Close` confirm button. Closing is blocked while an import request is running.
+- The **Base** layer is offered only when the selected target has a personal access token and local ops disabled.
+- If no other enabled database exists, it shows `Link another database before copying entities.`
+
+## BundleImportPanel
+
+Bundle import form shared by the **Databases → {database} → Import** page and `CopyToDatabaseModal`. It accepts pasted JSON or an uploaded `.json` file (up to 5 MiB), and has layer and default collision policy selects. **Dry run** sends `POST /api/v1/pcd/import` with `dryRun: true` and shows a preview table with a per-entity policy select (keyed `<entityType>:<name>`). **Apply bundle** resends the request with the dry run's `planDigest` as `expectedPlanDigest`.
+
+Import:
+
+```svelte
+import BundleImportPanel from '$ui/bundles/BundleImportPanel.svelte';
+```
+
+Props:
+
+| Prop             | Type                | Default | Required | Description                                                                                          |
+| ---------------- | ------------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `databaseId`     | `number`            | —       | Yes      | Target database.                                                                                     |
+| `canWriteToBase` | `boolean`           | `false` | No       | Offers the **Base** layer option; otherwise the import targets `user`.                               |
+| `bundle`         | `PcdBundle \| null` | `null`  | No       | Preloaded bundle (used by `CopyToDatabaseModal`); replaced by parsed input when `showInput` is true. |
+| `showInput`      | `boolean`           | `true`  | No       | Shows the JSON textarea and file upload.                                                             |
+| `busy`           | `boolean`           | `false` | No       | True while a request is running; bindable.                                                           |
+
+Events:
+
+- `on:applied` — fired after a successful apply, after `invalidateAll()`.
+
+Variants and notes:
+
+- **Apply bundle** is enabled only when the latest dry run matches the current inputs and reported no errors and no missing references. Changing the bundle, layer, or any policy requires a new dry run.
+- A `409` response marks the preview stale and shows a warning to run another dry run. After a rolled-back `500`, an error alert is shown and the report stays visible.
+- Uses the Svelte 5 legacy API (`export let`, `$:`, `createEventDispatcher`).
 
 ## DirtyModal
 

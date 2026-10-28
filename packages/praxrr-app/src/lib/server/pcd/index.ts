@@ -21,8 +21,21 @@ export { compile, invalidate, invalidateAll } from './database/compiler.ts';
 // WRITER
 // ============================================================================
 
-export { writeOperation, canWriteToBase } from './ops/writer.ts';
+import { writeOperation as persistOperation, canWriteToBase, withDeferredCompile } from './ops/writer.ts';
+import { currentWriterApply } from './bundles/writerRedirect.ts';
+import type { WriteOptions, WriteResult } from './core/types.ts';
+
+export { canWriteToBase, withDeferredCompile };
 export { parseOperationLayer } from './utils/operationLayer.ts';
+
+/**
+ * Persist an operation. Identical to `ops/writer.ts#writeOperation` unless a bundle-import writer
+ * scope redirects it to an ephemeral sandbox (see `bundles/writerRedirect.ts`).
+ */
+export async function writeOperation(options: WriteOptions): Promise<WriteResult> {
+  const apply = currentWriterApply();
+  return apply ? apply(options) : persistOperation(options);
+}
 
 // ============================================================================
 // MANIFEST
@@ -213,3 +226,19 @@ export type {
   NodeKind,
   NodeRef,
 } from './graph/types.ts';
+
+// ============================================================================
+// ENTITY BUNDLES
+// ============================================================================
+
+export { withDatabaseOverrideLock } from './conflicts/override.ts';
+export {
+  BundleExportLimitError,
+  BundleImportFailedError,
+  BundleInvalidError,
+  BundlePlanMismatchError,
+  collectBundleClosure,
+  exportBundle,
+  importBundle,
+} from './bundles/index.ts';
+export type { BundleClosure, BundleEntityOutcome, BundleImportOptions, BundleImportReport } from './bundles/index.ts';

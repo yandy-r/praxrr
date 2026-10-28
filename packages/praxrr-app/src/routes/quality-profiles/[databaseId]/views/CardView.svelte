@@ -3,7 +3,7 @@
   import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
   import { page } from '$app/stores';
-  import { BookOpenText, Gauge, Earth, Copy, Download } from 'lucide-svelte';
+  import { BookOpenText, Gauge, Earth, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
   import Label from '$ui/label/Label.svelte';
@@ -18,7 +18,12 @@
   export let showSourceBadges = false;
   export let currentDatabaseId: number;
 
-  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{
+    clone: { name: string };
+    export: { name: string };
+    copy: { name: string };
+    clipboard: { name: string };
+  }>();
 
   $: databaseId = $page.params.databaseId;
   $: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
@@ -96,11 +101,11 @@
 
 <CardGrid flush>
   {#each visibleProfiles as profile}
-    <Card href={getCardHref(profile)} hoverable>
+    <Card hoverable className="relative">
+      <a href={getCardHref(profile)} aria-label={profile.name} class="absolute inset-0 rounded-xl"></a>
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-col">
-            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
             {#if showLocallyModified(profile)}
               <div class="mt-1">
                 <LocallyModifiedBadge />
@@ -108,14 +113,27 @@
             {/if}
           </div>
           {#if isEditableRow(profile)}
-            <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
-            <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+            <div class="relative z-10 flex shrink-0 items-center gap-0.5">
               <Button
                 icon={Download}
                 size="xs"
                 variant="ghost"
-                tooltip="Export"
+                tooltip="Download bundle"
                 on:click={() => dispatch('export', { name: profile.name })}
+              />
+              <Button
+                icon={DatabaseZap}
+                size="xs"
+                variant="ghost"
+                tooltip="Copy to database…"
+                on:click={() => dispatch('copy', { name: profile.name })}
+              />
+              <Button
+                icon={ClipboardCopy}
+                size="xs"
+                variant="ghost"
+                tooltip="Copy JSON to clipboard"
+                on:click={() => dispatch('clipboard', { name: profile.name })}
               />
               <Button
                 icon={Copy}

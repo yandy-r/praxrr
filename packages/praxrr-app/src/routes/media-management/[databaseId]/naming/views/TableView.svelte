@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ClipboardCopy, DatabaseZap } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
@@ -25,6 +26,8 @@
   const dispatch = createEventDispatcher<{
     clone: { name: string; arr_type: string };
     export: { name: string; arr_type: string };
+    copy: { name: string; arr_type: string };
+    clipboard: { name: string; arr_type: string };
   }>();
 
   const supportedArrTypes: ArrAppType[] = ['radarr', 'sonarr', 'lidarr'];
@@ -213,8 +216,22 @@
           icon={Download}
           size="xs"
           variant="ghost"
-          tooltip="Export"
+          tooltip="Download bundle"
           on:click={() => dispatch('export', { name: row.name, arr_type: row.arr_type })}
+        />
+        <Button
+          icon={DatabaseZap}
+          size="xs"
+          variant="ghost"
+          tooltip="Copy to database…"
+          on:click={() => dispatch('copy', { name: row.name, arr_type: row.arr_type })}
+        />
+        <Button
+          icon={ClipboardCopy}
+          size="xs"
+          variant="ghost"
+          tooltip="Copy JSON to clipboard"
+          on:click={() => dispatch('clipboard', { name: row.name, arr_type: row.arr_type })}
         />
         <Button
           icon={Copy}

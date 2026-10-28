@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { DelayProfileListItem } from '$shared/pcd/display.ts';
   import { page } from '$app/stores';
-  import { Clock, Zap, Shield, Copy, Download } from 'lucide-svelte';
+  import { Clock, Zap, Shield, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
   import Button from '$ui/button/Button.svelte';
@@ -11,7 +11,12 @@
 
   export let profiles: DelayProfileListItem[];
 
-  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{
+    clone: { name: string };
+    export: { name: string };
+    copy: { name: string };
+    clipboard: { name: string };
+  }>();
 
   $: databaseId = $page.params.databaseId;
 
@@ -47,23 +52,38 @@
 
 <CardGrid columns={5} flush>
   {#each visibleProfiles as profile}
-    <Card href="/delay-profiles/{databaseId}/{encodeURIComponent(profile.name)}" hoverable>
+    <Card hoverable className="relative">
+      <a
+        href={`/delay-profiles/${databaseId}/${encodeURIComponent(profile.name)}`}
+        aria-label={profile.name}
+        class="absolute inset-0 rounded-xl"
+      ></a>
       <svelte:fragment slot="header">
         <div class="flex items-center justify-between">
           <div class="flex min-w-0 items-center gap-1.5">
-            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
-            {#if profile.locallyModified}
-              <LocallyModifiedBadge />
-            {/if}
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</span>
           </div>
-          <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
-          <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <div class="relative z-10 flex items-center gap-0.5">
             <Button
               icon={Download}
               size="xs"
               variant="ghost"
-              tooltip="Export"
+              tooltip="Download bundle"
               on:click={() => dispatch('export', { name: profile.name })}
+            />
+            <Button
+              icon={DatabaseZap}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy to database…"
+              on:click={() => dispatch('copy', { name: profile.name })}
+            />
+            <Button
+              icon={ClipboardCopy}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy JSON to clipboard"
+              on:click={() => dispatch('clipboard', { name: profile.name })}
             />
             <Button
               icon={Copy}

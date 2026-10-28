@@ -123,7 +123,7 @@ drifted, missing, or unmanaged entities.
 ### Database history
 
 Configuration databases are Git repositories. Browse commits, incoming changes, conflicts, local
-tweaks, and snapshots for each linked database.
+tweaks, and snapshots for each linked database, and import entity bundles from the **Import** tab.
 
 ![Database commit history](../../../assets/screenshots/database-commits.png)
 
