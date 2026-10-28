@@ -387,15 +387,21 @@ export function planBundle(cache: PCDCache, bundle: PcdBundle, collisions: Bundl
  * Deterministic digest of the plan and the target state it was computed from (max op id and max
  * `updated_at`). A changed digest means the dry-run preview no longer reflects the database.
  */
-export function computeBundlePlanDigest(plan: BundlePlan, snapshot: ReadonlyArray<PcdOp>, databaseId: number): string {
+export function computeBundlePlanDigest(
+  plan: BundlePlan,
+  snapshot: ReadonlyArray<PcdOp>,
+  databaseId: number,
+  layer: OperationLayer
+): string {
   const outcomes = planOutcomes(plan).map((outcome) =>
     [outcome.entityType, outcome.name.toLowerCase(), outcome.finalName, outcome.action].join(' ')
   );
-  const ops = snapshot.filter((op) => op.database_id === databaseId);
-  const maxId = ops.reduce((max, op) => Math.max(max, op.id), 0);
-  const maxUpdatedAt = ops.reduce((max, op) => Math.max(max, Date.parse(op.updated_at) || 0), 0);
+  const ops = snapshot
+    .filter((op) => op.database_id === databaseId)
+    .map((op) => [op.id, op.state, op.content_hash].join(':'))
+    .sort();
   return createHash('sha256')
-    .update(JSON.stringify([outcomes, maxId, maxUpdatedAt]))
+    .update(JSON.stringify([layer, outcomes, ops]))
     .digest('hex')
     .slice(0, 16);
 }
@@ -865,7 +871,7 @@ async function importBundleLocked(options: BundleImportOptions): Promise<BundleI
   const plan = planBundle(liveCache, bundle, collisions);
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance) throw new Error(`Database ${databaseId} not found`);
-  const planDigest = computeBundlePlanDigest(plan, snapshot, databaseId);
+  const planDigest = computeBundlePlanDigest(plan, snapshot, databaseId, layer);
   const baseReport: BundleImportReport = {
     planDigest,
     dryRun,
@@ -909,23 +915,23 @@ async function applyPlanLive(
   let current: PlannedEntity | null = null;
 
   try {
-    await withAutoOverrideSuppressed(databaseId, () =>
+    // Defer the per-write compile for user-layer bundles only; base-layer writes keep their
+    // per-write compile so every step's validation runs against the fully recompiled cache.
+    const runPlan = () =>
       withOpCreationRecorder(created, () =>
-        withDeferredCompile(() =>
-          withNewUserOpAction(async () => {
-            for (const [index, planned] of plan.entities.entries()) {
-              if (planned.action === 'skip') continue;
-              current = planned;
-              await executeEntity(databaseId, layer, planned);
-              await _bundleImportDependencies.afterLiveEntity?.(index, planned);
-              // Cache-state precheck: the deferred-apply SQL exec updates the live cache, so the
-              // next entity's deserializer sees this entity's rows.
-              assertCacheReflected(databaseId, plan, planned);
-            }
-          })
-        )
-      )
-    );
+        withNewUserOpAction(async () => {
+          for (const [index, planned] of plan.entities.entries()) {
+            if (planned.action === 'skip') continue;
+            current = planned;
+            await executeEntity(databaseId, layer, planned);
+            await _bundleImportDependencies.afterLiveEntity?.(index, planned);
+            // Cache-state precheck: the deferred-apply SQL exec updates the live cache, so the
+            // next entity's deserializer sees this entity's rows.
+            assertCacheReflected(databaseId, plan, planned);
+          }
+        })
+      );
+    await withAutoOverrideSuppressed(databaseId, () => (layer === 'user' ? withDeferredCompile(runPlan) : runPlan()));
   } catch (error) {
     const failed = current as PlannedEntity | null;
     const cause = error instanceof Error ? error.message : String(error);
@@ -963,33 +969,49 @@ async function applyPlanLive(
   }
 
   // One final compile outside the auto-override suppression so remaining pre-existing conflicts
-  // resolve normally. Each writer compile above is suppressed; this one is not.
+  // resolve normally. The per-write compiles above are suppressed; this one is not. A failure to
+  // compile — or any entity missing from the rebuilt cache — means the ops the import persisted do
+  // not hold together, so roll back the whole import and surface the real rollback outcome.
+  let finalCache: PCDCache | undefined;
+  let verifyErrors: BundleImportError[] = [];
   try {
     await compile(instance.local_path, databaseId);
+    finalCache = getCache(databaseId);
+    const namesByType = new Map<EntityType, Map<string, string>>();
+    const missingAfter = finalCache
+      ? plan.imported.filter((imported) => {
+          let names = namesByType.get(imported.entityType);
+          if (!names) {
+            names = readExistingNames(finalCache as PCDCache, imported.entityType);
+            namesByType.set(imported.entityType, names);
+          }
+          return names.get(imported.name.toLowerCase()) === undefined;
+        })
+      : plan.imported;
+    verifyErrors = missingAfter.map((imported) => ({ ...imported, error: 'Entity missing after import' }));
   } catch (compileError) {
-    invalidate(databaseId);
-    await logger.error('Failed to compile after bundle import', {
-      source: SOURCE,
-      meta: { databaseId, error: String(compileError) },
-    });
+    verifyErrors = plan.imported.map((imported) => ({ ...imported, error: String(compileError) }));
   }
 
-  // Full import guarantee: every non-skipped entity must exist in the compiled cache under its
-  // final name. A missing name means something outside the writer scope dropped a step.
-  const finalCache = getCache(databaseId);
-  const missingAfter = finalCache
-    ? plan.imported.filter(
-        (imported) => readExistingNames(finalCache, imported.entityType).get(imported.name.toLowerCase()) === undefined
-      )
-    : [];
-  if (missingAfter.length > 0) {
-    throw new BundleImportFailedError('Bundle import verify failed: imported entities missing after compile', {
-      ...baseReport,
-      applied: false,
-      rolledBack: false,
-      outcomes: baseReport.outcomes,
-      errors: missingAfter.map((imported) => ({ ...imported, error: 'Entity missing after import' })),
+  if (verifyErrors.length > 0) {
+    await logger.error('Bundle import failed final compile/verify; rolling back', {
+      source: SOURCE,
+      meta: { databaseId, createdOps: created.opIds.length, verifyErrors: verifyErrors.length },
     });
+    const rollback = await rollbackLiveImport(databaseId, instance.local_path, snapshot, created);
+    const rolledBack = rollback.restored && rollback.recompiled && !rollback.cleanupFailed;
+    throw new BundleImportFailedError(
+      rolledBack
+        ? `Bundle import failed final compile/verify: ${verifyErrors[0].error}`
+        : `Bundle import failed final compile/verify (${verifyErrors[0].error}) — rollback was incomplete (restored: ${rollback.restored}, recompiled: ${rollback.recompiled}${rollback.cleanupFailed ? ', history cleanup failed' : ''}); the database was disabled`,
+      {
+        ...baseReport,
+        applied: false,
+        rolledBack,
+        outcomes: withErrors(baseReport.outcomes, verifyErrors),
+        errors: verifyErrors,
+      }
+    );
   }
 
   await logger.info('Bundle import applied', {

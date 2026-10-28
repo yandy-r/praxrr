@@ -141,13 +141,6 @@ export async function withRepoImportWriteContext<T>(
  * ephemeral cache without touching the app database. Outside capture mode the writer behaves
  * exactly as before.
  */
-/** Run `callback` with per-write recompiles deferred (see `WriteContextFrame.deferCompile`). */
-export async function withDeferredCompile<T>(callback: () => Promise<T>): Promise<T> {
-  const parent = writeContextStorage.getStore() ?? [];
-  const frame: WriteContextFrame = { ...(parent[parent.length - 1] ?? {}), deferCompile: true };
-  return writeContextStorage.run([...parent, frame], callback);
-}
-
 export async function withBaseOpCapture<T>(
   callback: () => Promise<T>
 ): Promise<{ result: T; captured: CapturedBaseOp[] }> {
@@ -161,6 +154,13 @@ export async function withBaseOpCapture<T>(
   const frame: WriteContextFrame = { ...top, capture: captured };
   const result = await writeContextStorage.run([...parent, frame], callback);
   return { result, captured };
+}
+
+/** Run `callback` with per-write recompiles deferred (see `WriteContextFrame.deferCompile`). */
+export async function withDeferredCompile<T>(callback: () => Promise<T>): Promise<T> {
+  const parent = writeContextStorage.getStore() ?? [];
+  const frame: WriteContextFrame = { ...(parent[parent.length - 1] ?? {}), deferCompile: true };
+  return writeContextStorage.run([...parent, frame], callback);
 }
 
 function buildMetadataJson(
@@ -844,6 +844,13 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
         operation.metadata &&
         (await cancelOutCreate(databaseId, layer, operation.metadata, operation.desiredState))
       ) {
+        // The cancelled-out op never lands in pcd_ops, so the deferred/final recompile would never
+        // replay its DELETE. Apply the delete to the live cache now so a mid-sequence refetch sees
+        // the row gone.
+        if ((fastPathRepoImport || deferCompile) && cache) {
+          const rawDb = cache.getRawDb();
+          if (rawDb) rawDb.exec(operation.sql);
+        }
         continue;
       }
 

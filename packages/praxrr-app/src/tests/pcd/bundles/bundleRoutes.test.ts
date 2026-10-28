@@ -15,6 +15,7 @@ import {
   regexData,
   scoredFormatNames,
   seedEntity,
+  seedWideProfile,
   snapshotOps,
 } from './bundleTestHelpers.ts';
 
@@ -147,4 +148,16 @@ bundleTest('bundle route: a legacy single-entity body still imports and returns 
   assertEquals(response.status, 200);
   assertEquals(await response.json(), { success: true });
   assertEquals(namesIn(liveCache(databaseId), 'regular_expressions'), ['Legacy Rx']);
+});
+
+bundleTest('export route: a truncated closure is a 400, not a misleading entity-limit error', async () => {
+  const databaseId = await createPcd();
+  await seedWideProfile(databaseId, BUNDLE_MAX_ENTITIES + 5);
+
+  const response = await get(
+    `databaseId=${databaseId}&entityType=quality_profile&name=QP%20Cap&includeDependencies=true`
+  );
+  const body = await response.json();
+  assertEquals(response.status, 400);
+  assert(body.error.includes('truncated'));
 });

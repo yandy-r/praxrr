@@ -24,7 +24,7 @@ export interface BundleClosure {
   entries: PcdBundleEntry[];
   /** Dependencies referenced by an exported entity that do not exist in the source database. */
   missing: PcdBundleMissingRef[];
-  /** True when the traversal hit the visited-node cap and stopped expanding. */
+  /** True when the serialized-entry cap was reached and the traversal stopped expanding. */
   truncated: boolean;
 }
 
@@ -129,14 +129,12 @@ export async function collectBundleClosure(cache: PCDCache, roots: ReadonlyArray
     queue.push({ entityType: root.entityType, name: root.name, isRoot: true });
   }
 
-  let visited = 0;
   for (let head = 0; head < queue.length; head++) {
     const item = queue[head];
-    if (visited >= BUNDLE_MAX_ENTITIES) {
+    if (entries.size >= BUNDLE_MAX_ENTITIES) {
       truncated = true;
       break;
     }
-    visited++;
 
     let data: PortableEntityData;
     try {

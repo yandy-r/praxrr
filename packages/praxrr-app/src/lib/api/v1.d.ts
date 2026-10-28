@@ -8312,7 +8312,7 @@ export interface operations {
             components['schemas']['ExportResponse'] | components['schemas']['PcdBundleExportResponse'];
         };
       };
-      /** @description Missing or invalid parameters, or the bundle exceeds the 1000 entity cap */
+      /** @description Missing or invalid parameters, the bundle exceeds the 1000 entity cap, or the dependency walk was truncated */
       400: {
         headers: {
           [name: string]: unknown;

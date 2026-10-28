@@ -7,6 +7,7 @@ import { pcdOpsQueries, type PcdOp } from '$db/queries/pcdOps.ts';
 import { compile, invalidate } from '$pcd/database/compiler.ts';
 import { getCache } from '$pcd/database/registry.ts';
 import { deserializeByEntityType } from '$pcd/entities/deserialize.ts';
+import { importBundle } from '$pcd/bundles/index.ts';
 import type { PCDCache } from '$pcd/index.ts';
 import type { PcdBundle } from '$shared/pcd/bundle.ts';
 import type { EntityType, PortableEntityData } from '$shared/pcd/portable.ts';
@@ -167,4 +168,40 @@ export function scoredFormatNames(cache: PCDCache, profileName: string): string[
       profileName
     )
     .map((row) => row.custom_format_name);
+}
+
+/**
+ * Seed many entities quickly: one bundle import (deferred per-write compile) instead of one
+ * compile per entity. Use for cap-sized fixtures.
+ */
+export async function seedBundle(databaseId: number, bundle: PcdBundle): Promise<void> {
+  const report = await importBundle({
+    databaseId,
+    layer: 'user',
+    bundle,
+    dryRun: false,
+    collisions: { default: 'skip', perEntity: {} },
+  });
+  if (!report.applied) throw new Error(`seedBundle failed: ${JSON.stringify(report.errors)}`);
+}
+
+/**
+ * Seed a regex, `count` CFs referencing it and one QP scoring all of them, in bundle-cap-sized
+ * batches (a closure over the cap cannot be seeded by a single bundle).
+ */
+export async function seedWideProfile(databaseId: number, count: number): Promise<void> {
+  const cfNames = Array.from({ length: count }, (_, i) => `CF Cap ${i}`);
+  await seedBundle(databaseId, bundleOf(['regular_expression', regexData('Rx Cap')]));
+  const batchSize = 500;
+  for (let start = 0; start < cfNames.length; start += batchSize) {
+    await seedBundle(
+      databaseId,
+      bundleOf(
+        ...cfNames
+          .slice(start, start + batchSize)
+          .map((name) => ['custom_format', customFormatData(name, 'Rx Cap')] as [EntityType, PortableEntityData])
+      )
+    );
+  }
+  await seedBundle(databaseId, bundleOf(['quality_profile', qualityProfileData('QP Cap', cfNames)]));
 }

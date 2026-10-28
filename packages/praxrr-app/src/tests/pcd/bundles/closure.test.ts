@@ -1,4 +1,5 @@
-import { assertEquals, assertRejects } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
+import { BUNDLE_MAX_ENTITIES } from '$shared/pcd/bundle.ts';
 import { collectBundleClosure } from '$pcd/bundles/index.ts';
 import {
   bundleTest,
@@ -8,6 +9,7 @@ import {
   qualityProfileData,
   regexData,
   seedEntity,
+  seedWideProfile,
 } from './bundleTestHelpers.ts';
 
 async function seedGraph(databaseId: number) {
@@ -67,4 +69,15 @@ bundleTest('closure: a missing root throws a not-found error', async () => {
     Error,
     'not found'
   );
+});
+
+bundleTest('closure: the walk truncates at the entity cap instead of serializing partial CF chains', async () => {
+  const databaseId = await createPcd();
+  await seedWideProfile(databaseId, BUNDLE_MAX_ENTITIES + 5);
+
+  const closure = await collectBundleClosure(liveCache(databaseId), [
+    { entityType: 'quality_profile', name: 'QP Cap' },
+  ]);
+  assertEquals(closure.truncated, true);
+  assert(closure.entries.length <= BUNDLE_MAX_ENTITIES);
 });

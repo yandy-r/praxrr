@@ -421,3 +421,31 @@ bundleTest('bundle import: a large synthetic bundle applies well under the 30s t
   console.log(`synthetic 400-entity apply: ${elapsed.toFixed(0)} ms`);
   assert(elapsed < 30_000, `expected well under 30s, took ${elapsed.toFixed(0)} ms`);
 });
+
+bundleTest('bundle import: a base-layer QP scoring a user-only CF fails final compile and rolls back', async () => {
+  const databaseId = await createPcd({ withToken: true });
+  // The CF exists only in the user layer. Base ops replay before user ops, so a base-layer QP
+  // scoring it passes per-write validation against the merged live cache but cannot survive the
+  // final rebuild.
+  await seedEntity(databaseId, 'regular_expression', regexData('Rx User'));
+  await seedEntity(databaseId, 'custom_format', customFormatData('CF User Only', 'Rx User'));
+  const before = snapshotOps(databaseId);
+
+  const error = await assertRejects(
+    () =>
+      importBundle({
+        databaseId,
+        layer: 'base',
+        bundle: bundleOf(['quality_profile', qualityProfileData('QP Base', ['CF User Only'])]),
+        dryRun: false,
+        collisions: SKIP,
+      }),
+    BundleImportFailedError
+  );
+
+  assertEquals(error.report.applied, false);
+  assertEquals(error.report.rolledBack, true);
+  assertEquals(snapshotOps(databaseId), before);
+  assertEquals(namesIn(liveCache(databaseId), 'quality_profiles'), []);
+  assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), ['CF User Only']);
+});

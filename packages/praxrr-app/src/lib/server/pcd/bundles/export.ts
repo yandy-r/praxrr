@@ -10,7 +10,7 @@ import { collectBundleClosure, serializeEntityByType, sortBundleEntries, type Bu
 
 export class BundleExportLimitError extends Error {
   constructor(count: number) {
-    super(`Bundle would contain ${count} entities; the maximum is ${BUNDLE_MAX_ENTITIES}`);
+    super(`Bundle would exceed the maximum of ${BUNDLE_MAX_ENTITIES} entities (got ${count})`);
     this.name = 'BundleExportLimitError';
   }
 }
@@ -62,9 +62,6 @@ export async function exportBundle(
   }
 
   const closure = await collectBundleClosure(cache, roots);
-  if (closure.entries.length > BUNDLE_MAX_ENTITIES) {
-    throw new BundleExportLimitError(closure.entries.length);
-  }
   return {
     bundle: { version: BUNDLE_VERSION, entities: closure.entries },
     missing: closure.missing,
