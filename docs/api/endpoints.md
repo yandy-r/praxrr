@@ -714,7 +714,7 @@ Bundle responses:
 | 500    | `{error, report, rolledBack}`        | Apply failed midway; all ops the import created were removed and superseded ops restored    |
 
 `rolledBack` is `false` when the rollback itself failed (`error` contains `rollback was incomplete`);
-if the ops could not be restored, the database is also disabled.
+if the ops could not be restored or the cache could not be rebuilt, the database is also disabled.
 
 ## PCD Lidarr Metadata Profiles
 

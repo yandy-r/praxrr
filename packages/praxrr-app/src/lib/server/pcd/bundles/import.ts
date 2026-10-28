@@ -1037,7 +1037,7 @@ async function applyPlanLive(
 function describeIncompleteRollback(rollback: BundleRollbackResult): string {
   if (!rollback.restored) return 'rollback was incomplete: operations could not be restored; the database was disabled';
   if (!rollback.recompiled) {
-    return 'rollback was incomplete: operations were restored but the cache rebuild failed and will retry on the next compile';
+    return 'rollback was incomplete: operations were restored but the cache rebuild failed; the database was disabled';
   }
   return 'rollback was incomplete: operations were restored but history written by the rollback recompile could not be removed';
 }
@@ -1098,7 +1098,6 @@ async function rollbackLiveImport(
       source: SOURCE,
       meta: { databaseId, error: String(compileError) },
     });
-    restoreEnabled();
     return { restored: true, recompiled: false, cleanupFailed: false };
   }
   try {

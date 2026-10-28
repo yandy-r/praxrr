@@ -239,7 +239,8 @@ plus `rolledBack` after a failed apply. Each outcome has `entityType`, `name`, `
   it superseded are restored, and the cache is rebuilt. The response is `500` with
   `{ error, report, rolledBack }`. `rolledBack` is `true` only when the ops were restored and the
   cache was rebuilt. Otherwise the error contains `rollback was incomplete` and `rolledBack` is
-  `false`. If the ops could not be restored, the database is also disabled.
+  `false`. If the ops could not be restored or the cache could not be rebuilt, the database is also
+  disabled.
 - **Base layer**: `layer: "base"` returns `403` when the database has no personal access token or
   has local ops enabled.
 
