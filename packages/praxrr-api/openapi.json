@@ -11376,6 +11376,7 @@
           "status",
           "runStatus",
           "rescheduled",
+          "handedBack",
           "nextRunAt",
           "runId",
           "failureCode",
@@ -11439,6 +11440,10 @@
           },
           "rescheduled": {
             "type": "boolean"
+          },
+          "handedBack": {
+            "type": "boolean",
+            "description": "True when the run handed the queue slot to a different source than the one that ran (a manual run returning to the recurring schedule). Terminal for the run's own trigger."
           },
           "nextRunAt": {
             "oneOf": [

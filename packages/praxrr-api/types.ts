@@ -3610,6 +3610,8 @@ export interface components {
       status: components['schemas']['LiveJobStatus'];
       runStatus: components['schemas']['LiveJobRunStatus'];
       rescheduled: boolean;
+      /** @description True when the run handed the queue slot to a different source than the one that ran (a manual run returning to the recurring schedule). Terminal for the run's own trigger. */
+      handedBack: boolean;
       nextRunAt: string | null;
       runId: number;
       failureCode: components['schemas']['LiveJobFailureCode'] | null;

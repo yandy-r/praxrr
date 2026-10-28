@@ -6,9 +6,9 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 
 - Base path: `/api/v1`
 - Content type: JSON (`application/json`) unless noted
-- Authentication: required for all endpoints except `GET /health`. Examples send an API token
-  (`prx_…`) in the `X-Api-Key` header; each token needs the scope its request requires (see
-  `docs/api/authentication.md`)
+- Authentication: required for all endpoints except `GET /health`. Examples send
+  an API token (`prx_…`) in the `X-Api-Key` header; each token needs the scope
+  its request requires (see `docs/api/authentication.md`)
 - Error payloads: typically `{ "error": "..." }` (see `docs/api/errors.md`)
 
 ## Endpoint index
@@ -106,20 +106,22 @@ curl -sS -H 'X-Api-Key: <token>' http://localhost:5173/api/v1/openapi.json | jq 
 ### `GET /events`
 
 Streams job and sync lifecycle events as Server-Sent Events
-(`Content-Type: text/event-stream`). The stream carries notifications only; clients re-read the
-matching REST or page data when an event arrives.
+(`Content-Type: text/event-stream`). The stream carries notifications only;
+clients re-read the matching REST or page data when an event arrives.
 
 Authentication:
 
-- Browser: the session cookie (`EventSource` sends it automatically on the same origin).
-- API clients: `X-Api-Key: prx_…` with the `read` scope. `?apikey=prx_…` also works, but the
-  token then appears in proxy and access logs; prefer the header.
-- An unauthenticated request returns `401` before a stream opens; a token without the `read`
-  scope returns `403`.
+- Browser: the session cookie (`EventSource` sends it automatically on the same
+  origin).
+- API clients: `X-Api-Key: prx_…` with the `read` scope. `?apikey=prx_…` also
+  works, but the token then appears in proxy and access logs; prefer the header.
+- An unauthenticated request returns `401` before a stream opens; a token
+  without the `read` scope returns `403`.
 
-Framing: the stream starts with `retry: 5000`, then a `hello` event, then any replayed events
-(or a `resync`), then live events. Each event is one `data:` line of JSON with a `type`
-discriminator. Domain events also carry an `id:` of the form `<bootId>-<seq>`.
+Framing: the stream starts with `retry: 5000`, then a `hello` event, then any
+replayed events (or a `resync`), then live events. Each event is one `data:`
+line of JSON with a `type` discriminator. Domain events also carry an `id:` of
+the form `<bootId>-<seq>`.
 
 ```text
 retry: 5000
@@ -127,7 +129,7 @@ retry: 5000
 data: {"type":"hello","bootId":"k3x9","headId":"k3x9-41","serverTime":"2026-10-20T12:00:00.000Z","heartbeatMs":20000}
 
 id: k3x9-42
-data: {"type":"job.finished","jobId":118,"jobType":"arr.sync","source":"manual","displayName":"Arr Sync - Radarr","instanceId":1,"arrType":"radarr","databaseId":null,"status":"success","runStatus":"success","rescheduled":false,"nextRunAt":null,"runId":907,"failureCode":null,"durationMs":1840,"finishedAt":"2026-10-20T12:00:03.000Z"}
+data: {"type":"job.finished","jobId":118,"jobType":"arr.sync","source":"manual","displayName":"Arr Sync - Radarr","instanceId":1,"arrType":"radarr","databaseId":null,"status":"success","runStatus":"success","rescheduled":false,"handedBack":false,"nextRunAt":null,"runId":907,"failureCode":null,"durationMs":1840,"finishedAt":"2026-10-20T12:00:03.000Z"}
 
 : ping
 ```
@@ -146,25 +148,28 @@ Event types:
 | `drift.updated`   | yes   | A drift check result was saved (`instanceId`, `status`, counts)      |
 | `session.expired` | no    | The credential is no longer valid; the server closes the stream      |
 
-Job events share `jobId`, `jobType`, `source`, `displayName`, `instanceId`, `arrType` and
-`databaseId`. The full payload schemas live in `docs/api/v1/schemas/events.yaml`.
+Job events share `jobId`, `jobType`, `source`, `displayName`, `instanceId`,
+`arrType` and `databaseId`. The full payload schemas live in
+`docs/api/v1/schemas/events.yaml`.
 
 Replay:
 
-- Reconnect with the `Last-Event-ID` header (browsers send it automatically) or the
-  `lastEventId` query parameter. The server replays newer events from a 256-event buffer, at
-  most 61 events per connection.
-- If the id is from a previous process, or is malformed or over-long, the server sends `resync`
-  with `reason: "boot"`. If the id is older than the buffer, or more than 61 events were missed,
-  it sends `resync` with `reason: "gap"`. Either way, re-read everything you display.
+- Reconnect with the `Last-Event-ID` header (browsers send it automatically) or
+  the `lastEventId` query parameter. The server replays newer events from a
+  256-event buffer, at most 61 events per connection.
+- If the id is from a previous process, or is malformed or over-long, the server
+  sends `resync` with `reason: "boot"`. If the id is older than the buffer, or
+  more than 61 events were missed, it sends `resync` with `reason: "gap"`.
+  Either way, re-read everything you display.
 
 Lifetime:
 
-- Every 20 s the server sends a `: ping` comment and re-checks the session or token. If it is no
-  longer valid, the server sends `session.expired` and closes the stream. Heartbeats never
-  extend a session.
+- Every 20 s the server sends a `: ping` comment and re-checks the session or
+  token. If it is no longer valid, the server sends `session.expired` and closes
+  the stream. Heartbeats never extend a session.
 - Each stream closes after 60 minutes; clients reconnect with `Last-Event-ID`.
-- A consumer that stops reading is disconnected rather than buffered without limit.
+- A consumer that stops reading is disconnected rather than buffered without
+  limit.
 
 Connection caps:
 
@@ -181,24 +186,28 @@ curl -N -H 'X-Api-Key: prx_…' http://localhost:6868/api/v1/events
 
 ### `HEAD /events`
 
-Checks authentication and capacity without opening a stream. Returns `204` when a stream would be
-accepted, otherwise the same `401`, `403`, `429` or `503` as `GET` (with `Retry-After` on `429`
-and `503`). It accepts the same `X-Api-Key` header or `apikey` query parameter.
+Checks authentication and capacity without opening a stream. Returns `204` when
+a stream would be accepted, otherwise the same `401`, `403`, `429` or `503` as
+`GET` (with `Retry-After` on `429` and `503`). It accepts the same `X-Api-Key`
+header or `apikey` query parameter.
 
 ## User Interface Preferences
 
-The UI persistence endpoints store **end-user display state** for media app setup workflows.
-They are intentionally scoped to section visibility (`basic` vs `advanced`) and are not part of
-developer configuration or API auth token administration.
+The UI persistence endpoints store **end-user display state** for media app
+setup workflows. They are intentionally scoped to section visibility (`basic` vs
+`advanced`) and are not part of developer configuration or API auth token
+administration.
 
 ### `GET /ui-preferences`
 
 Query params:
 
-- `section_key` (required string): deterministic section key, e.g. `media-management:media-settings:naming`
+- `section_key` (required string): deterministic section key, e.g.
+  `media-management:media-settings:naming`
   - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
   - max length 96
-- `strict` (optional boolean, default `false`): when `true`, missing saved state returns `404`
+- `strict` (optional boolean, default `false`): when `true`, missing saved state
+  returns `404`
 
 Response shape:
 
@@ -252,12 +261,14 @@ curl -sS -X PATCH \
 
 Semantics:
 
-- Only authenticated sessions can read/write (unauthenticated sessions receive `401`).
+- Only authenticated sessions can read/write (unauthenticated sessions receive
+  `401`).
 - Unknown/invalid keys return `400` before persistence.
 - Persisted values are per-user and per-section.
 - Unknown `mode` returns `400`.
 - Stale `expected_updated_at` values return `409`.
-- Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
+- Rapid successive updates are rate-limited: more than 8 updates per section
+  within 30s returns `429`.
 - Returns the same payload shape as `GET`.
 
 Response shape on success:
@@ -273,9 +284,9 @@ Response shape on success:
 
 ## Complexity Tiers
 
-Complexity tier endpoints store a per-user, per-section tier used to choose the default
-disclosure mode for progressive complexity. The saved disclosure mode from `/ui-preferences`
-still wins after a user manually toggles a section.
+Complexity tier endpoints store a per-user, per-section tier used to choose the
+default disclosure mode for progressive complexity. The saved disclosure mode
+from `/ui-preferences` still wins after a user manually toggles a section.
 
 ### `GET /complexity-tiers`
 
@@ -284,7 +295,8 @@ Query params:
 - `section_key` (required string): deterministic section key
   - must match `^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$`
   - max length 96
-- `strict` (optional boolean, default `false`): when `true`, missing saved state returns `404`
+- `strict` (optional boolean, default `false`): when `true`, missing saved state
+  returns `404`
 
 Response shape:
 
@@ -323,18 +335,22 @@ Request body:
 
 Semantics:
 
-- Only authenticated sessions can read/write (unauthenticated sessions receive `401`).
-- API-token synthetic user id `0` returns default state and performs no DB write.
+- Only authenticated sessions can read/write (unauthenticated sessions receive
+  `401`).
+- API-token synthetic user id `0` returns default state and performs no DB
+  write.
 - Values are per-user and per-section.
 - Unknown `tier` or malformed `section_key` returns `400`.
 - Stale `expected_updated_at` values return `409`.
-- Rapid successive updates are rate-limited: more than 8 updates per section within 30s returns `429`.
+- Rapid successive updates are rate-limited: more than 8 updates per section
+  within 30s returns `429`.
 - Internal SQL/error details are not included in `500` responses.
 
 ## Plugin Management
 
-The auth-gated plugin route family exposes validated, redacted durable registry state. It does not
-expose local source directories, raw manifests, runtime availability, or execution telemetry.
+The auth-gated plugin route family exposes validated, redacted durable registry
+state. It does not expose local source directories, raw manifests, runtime
+availability, or execution telemetry.
 
 | Method | Path                                 | Behavior                                    |
 | ------ | ------------------------------------ | ------------------------------------------- |
@@ -344,18 +360,21 @@ expose local source directories, raw manifests, runtime availability, or executi
 | POST   | `/plugins/{apiVersion}/{id}/enable`  | Persist enabled administrator intent        |
 | POST   | `/plugins/{apiVersion}/{id}/disable` | Persist disabled administrator intent       |
 
-Feature-off behavior is explicit: list returns `200` with `pluginsEnabled:false` and no items;
-reload returns a `200` no-op summary with zero counters; detail and enable/disable return `409`.
-None of those paths scans or changes durable state while `PLUGINS_ENABLED` is off.
+Feature-off behavior is explicit: list returns `200` with `pluginsEnabled:false`
+and no items; reload returns a `200` no-op summary with zero counters; detail
+and enable/disable return `409`. None of those paths scans or changes durable
+state while `PLUGINS_ENABLED` is off.
 
-Browser enable, disable, and reload requests must be exact same-origin. Malformed, foreign, or
-explicit cross-site browser requests receive an empty `403` before identity validation, scanning,
-or mutation. Authenticated non-browser clients may omit `Origin`; this does not bypass
-authentication or add CORS support. Read routes do not apply the mutation Origin guard.
+Browser enable, disable, and reload requests must be exact same-origin.
+Malformed, foreign, or explicit cross-site browser requests receive an empty
+`403` before identity validation, scanning, or mutation. Authenticated
+non-browser clients may omit `Origin`; this does not bypass authentication or
+add CORS support. Read routes do not apply the mutation Origin guard.
 
 See the [generated OpenAPI source](./v1/openapi.yaml) for response schemas, the
-[Plugin Management guide](../features/plugin-management.md) for operator workflows, and the
-[Plugin System Architecture](../architecture/plugins.md) for registry and security boundaries.
+[Plugin Management guide](../features/plugin-management.md) for operator
+workflows, and the [Plugin System Architecture](../architecture/plugins.md) for
+registry and security boundaries.
 
 ## Entity Testing
 
@@ -413,8 +432,8 @@ Semantics:
 
 ### `GET /arr/library`
 
-- Behavior applies to the selected arr app instance (`instanceId`), unless an endpoint/parameter
-  explicitly notes Sonarr-only constraints.
+- Behavior applies to the selected arr app instance (`instanceId`), unless an
+  endpoint/parameter explicitly notes Sonarr-only constraints.
 
 Parameters:
 
@@ -427,12 +446,12 @@ Parameters:
 
 Sort keys by app type:
 
-- `radarr`: `id`, `title`, `year`, `qualityProfileName`, `qualityName`, `qualityScore`,
-  `customFormatScore`, `progress`, `popularity`, `dateAdded`
-- `sonarr`: `id`, `title`, `year`, `qualityProfileName`, `status`, `percentOfEpisodes`,
-  `episodeCount`, `seasonCount`, `dateAdded`
-- `lidarr`: `id`, `title`, `artistName`, `year`, `qualityProfileName`, `status`, `percentOfTracks`,
-  `trackCount`, `dateAdded`
+- `radarr`: `id`, `title`, `year`, `qualityProfileName`, `qualityName`,
+  `qualityScore`, `customFormatScore`, `progress`, `popularity`, `dateAdded`
+- `sonarr`: `id`, `title`, `year`, `qualityProfileName`, `status`,
+  `percentOfEpisodes`, `episodeCount`, `seasonCount`, `dateAdded`
+- `lidarr`: `id`, `title`, `artistName`, `year`, `qualityProfileName`, `status`,
+  `percentOfTracks`, `trackCount`, `dateAdded`
 
 ```bash
 curl -sS \
@@ -506,7 +525,8 @@ Parameters:
 
 - `instanceId` (required integer)
 - `itemId` (required integer)
-- `season` (optional integer, Sonarr only, defaults to `1`; invalid values fall back to `1`)
+- `season` (optional integer, Sonarr only, defaults to `1`; invalid values fall
+  back to `1`)
 
 ```bash
 curl -sS \
@@ -537,7 +557,12 @@ Request variants:
 - Scan: `{ "instanceId": 1, "action": "scan" }`
 - Execute: `{ "instanceId": 1, "action": "execute", "scanResult": { ... } }`
 
-Execute scans the instance again. It deletes a requested custom format or quality profile only when its `id` and `name` still match a stale item of the same kind. Requested items missing from that fresh stale list stay on the instance. Custom formats are reported in `failedCustomFormats`, and quality profiles in `skippedQualityProfiles`, with reason `No longer stale; not deleted`.
+Execute scans the instance again. It deletes a requested custom format or
+quality profile only when its `id` and `name` still match a stale item of the
+same kind. Requested items missing from that fresh stale list stay on the
+instance. Custom formats are reported in `failedCustomFormats`, and quality
+profiles in `skippedQualityProfiles`, with reason
+`No longer stale; not deleted`.
 
 ```bash
 curl -sS \
@@ -635,7 +660,8 @@ Request fields:
 - `layer` (optional `user` or `base`, defaults to `user`)
 - `name` (required, non-empty, case-insensitive unique, cannot be `None`)
 - `description` (optional string or `null`)
-- `primaryTypes`, `secondaryTypes`, `releaseStatuses` (required arrays of `{ id, name, allowed }`)
+- `primaryTypes`, `secondaryTypes`, `releaseStatuses` (required arrays of
+  `{ id, name, allowed }`)
 - Each section must contain at least one `allowed: true`
 
 ```bash
@@ -664,7 +690,8 @@ Path params:
 - `databaseId` (required integer)
 - `id` (required integer)
 
-Returns detail payload including `primaryTypes`, `secondaryTypes`, and `releaseStatuses`.
+Returns detail payload including `primaryTypes`, `secondaryTypes`, and
+`releaseStatuses`.
 
 ### `PUT /pcd/{databaseId}/lidarr-metadata-profiles/{id}`
 
@@ -676,7 +703,8 @@ Path params:
 Request fields:
 
 - `layer` (optional `user` or `base`, defaults to `user`)
-- Any mutable subset of `name`, `description`, `primaryTypes`, `secondaryTypes`, `releaseStatuses`
+- Any mutable subset of `name`, `description`, `primaryTypes`, `secondaryTypes`,
+  `releaseStatuses`
 - At least one mutable field must be provided
 - Final merged profile must still have at least one allowed entry per section
 
@@ -720,54 +748,68 @@ curl -sS -X DELETE \
 
 ### `GET /pcd/{databaseId}/incoming/preview`
 
-Requires a session or a token with `read` scope. Read-only preview of what pulling the upstream
-branch would change per entity and which published local user ops would conflict (or be
-auto-aligned) under the database's conflict strategy. It fetches only `origin/<branch>` (never
-HEAD, the index, the working tree, or tags), builds the incoming state in a temporary directory,
-and never writes `pcd_ops` or `pcd_op_history`. Accepts no ref or URL parameter.
+Requires a session or a token with `read` scope. Read-only preview of what
+pulling the upstream branch would change per entity and which published local
+user ops would conflict (or be auto-aligned) under the database's conflict
+strategy. It fetches only `origin/<branch>` (never HEAD, the index, the working
+tree, or tags), builds the incoming state in a temporary directory, and never
+writes `pcd_ops` or `pcd_op_history`. Accepts no ref or URL parameter.
 
-Returns `{databaseId, available, unavailableReason, branch, hasUpdates, commitsBehind,
+Returns
+`{databaseId, available, unavailableReason, branch, hasUpdates, commitsBehind,
 commitsAhead, commits, conflictStrategy, sections, summary, predictedConflicts, predictedErrors,
-currentStateHash, currentHead, incomingHead}`. `sections`/`summary` have the rollback-preview shape
-(`current` = today's base state, `desired` = base state after the pull; user ops are excluded).
-`predictedConflicts` match the conflicts the pull's cache build records: `kind: "conflict"` with
-`predictedStatus` `conflicted` (`override`/`align`) or `conflicted_pending` (`ask`), or
-`kind: "aligned"` / `dropped` when the local op is redundant or force-aligned. SQL-error conflicts
-(`duplicate_key`, `missing_target`) are never auto-aligned: they are `conflicted`
-(`conflicted_pending` under `ask`), and under `override` the pull auto-overrides them after the
-build. `autoResolvable` is `true` only when that automatic override will actually resolve the entry
-(strategy `override`, status `conflicted`, enabled database, and an override handler for the op's
-entity or a delete); otherwise the conflict needs a user decision. When a force-align drop leaves
-partial writes, the prediction follows the pull's single rebuild pass. Local-path sources return `available: false`
-(`unavailableReason: "local_source"`). When `commitsAhead > 0` the pull may not fast-forward.
+currentStateHash, currentHead, incomingHead}`.
+`sections`/`summary` have the rollback-preview shape (`current` = today's base
+state, `desired` = base state after the pull; user ops are excluded).
+`predictedConflicts` match the conflicts the pull's cache build records:
+`kind: "conflict"` with `predictedStatus` `conflicted` (`override`/`align`) or
+`conflicted_pending` (`ask`), or `kind: "aligned"` / `dropped` when the local op
+is redundant or force-aligned. SQL-error conflicts (`duplicate_key`,
+`missing_target`) are never auto-aligned: they are `conflicted`
+(`conflicted_pending` under `ask`), and under `override` the pull auto-overrides
+them after the build. `autoResolvable` is `true` only when that automatic
+override will actually resolve the entry (strategy `override`, status
+`conflicted`, enabled database, and an override handler for the op's entity or a
+delete); otherwise the conflict needs a user decision. When a force-align drop
+leaves partial writes, the prediction follows the pull's single rebuild pass.
+Local-path sources return `available: false`
+(`unavailableReason: "local_source"`). When `commitsAhead > 0` the pull may not
+fast-forward.
 
-Errors: `400` invalid id, `404` unknown database, `409` with `code` `sync_in_progress` or
-`preview_stale` (local state changed mid-build; re-run), `502` with `code` `fetch_failed` or
-`incoming_unavailable` (fetch, archive, dependency, or entity-file failure — no partial preview).
+Errors: `400` invalid id, `404` unknown database, `409` with `code`
+`sync_in_progress` or `preview_stale` (local state changed mid-build; re-run),
+`502` with `code` `fetch_failed` or `incoming_unavailable` (fetch, archive,
+dependency, or entity-file failure — no partial preview).
 
 ## PCD Local Overrides
 
-Review and remove published user-layer operations without changing upstream base data. Revert and
-undo soft-drop operation records and recompile the PCD; they do not create automatic snapshots.
-For the UI workflow and limitations, see [Local Overrides](../features/local-overrides.md).
+Review and remove published user-layer operations without changing upstream base
+data. Revert and undo soft-drop operation records and recompile the PCD; they do
+not create automatic snapshots. For the UI workflow and limitations, see
+[Local Overrides](../features/local-overrides.md).
 
 ### `GET /pcd/{databaseId}/overrides`
 
-Requires a session or a token with `read` scope. `databaseId` is a positive integer.
+Requires a session or a token with `read` scope. `databaseId` is a positive
+integer.
 
 Optional query parameters:
 
-- `entityType`: `delayProfile`, `regularExpression`, `customFormat`, `qualityProfile`, `naming`,
-  `mediaSettings`, `qualityDefinitions`, or `lidarrMetadataProfile`.
-- `arrType`: `radarr`, `sonarr`, or `lidarr`. Required with `naming`, `mediaSettings`, or
-  `qualityDefinitions`; required and must be `lidarr` with `lidarrMetadataProfile`. Rejected when
-  one of the four Arr-agnostic entity types is supplied. Without `entityType`, it filters by app.
+- `entityType`: `delayProfile`, `regularExpression`, `customFormat`,
+  `qualityProfile`, `naming`, `mediaSettings`, `qualityDefinitions`, or
+  `lidarrMetadataProfile`.
+- `arrType`: `radarr`, `sonarr`, or `lidarr`. Required with `naming`,
+  `mediaSettings`, or `qualityDefinitions`; required and must be `lidarr` with
+  `lidarrMetadataProfile`. Rejected when one of the four Arr-agnostic entity
+  types is supplied. Without `entityType`, it filters by app.
 
-Returns `{databaseId, entities, lastAction, unmappedOpCount}`. Each entity includes its current name,
-Arr scope, `kind` (`modified`, `created`, or `deleted`), base/resolved presence, field `overrides`,
-pending-conflict flag, and published `ops` with IDs and statuses. Net-zero edits remain listed even
-with no field differences. `lastAction` is database-wide regardless of filters; it is `null` when
-there is nothing to undo. Unmapped operations are counted but excluded from entity rows.
+Returns `{databaseId, entities, lastAction, unmappedOpCount}`. Each entity
+includes its current name, Arr scope, `kind` (`modified`, `created`, or
+`deleted`), base/resolved presence, field `overrides`, pending-conflict flag,
+and published `ops` with IDs and statuses. Net-zero edits remain listed even
+with no field differences. `lastAction` is database-wide regardless of filters;
+it is `null` when there is nothing to undo. Unmapped operations are counted but
+excluded from entity rows.
 
 ```bash
 curl -sS -H 'X-Api-Key: <token>' \
@@ -776,16 +818,19 @@ curl -sS -H 'X-Api-Key: <token>' \
 
 ### `POST /pcd/{databaseId}/overrides/{entityType}/{name}/revert`
 
-Requires a session or a token with `admin` scope. Use the same `entityType`/`arrType` rules as GET.
-The name is the current resolved name after a rename, URL-encoded and preserved without trimming.
-Empty names are rejected; names containing `/` are supported when the slash is encoded as `%2F`.
+Requires a session or a token with `admin` scope. Use the same
+`entityType`/`arrType` rules as GET. The name is the current resolved name after
+a rename, URL-encoded and preserved without trimming. Empty names are rejected;
+names containing `/` are supported when the slash is encoded as `%2F`.
 
 Optional JSON body (maximum 8 KB):
 
-- `opIds`: 1–1000 positive integer IDs belonging to this entity. Omit to revert all its published
-  user operations. Partial selections must not break field/rename dependencies.
-- `cascadeGroup`: boolean, default `false`. Explicitly include unselected operations in a required
-  operation group, potentially affecting other entities.
+- `opIds`: 1–1000 positive integer IDs belonging to this entity. Omit to revert
+  all its published user operations. Partial selections must not break
+  field/rename dependencies.
+- `cascadeGroup`: boolean, default `false`. Explicitly include unselected
+  operations in a required operation group, potentially affecting other
+  entities.
 
 ```bash
 curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
@@ -793,16 +838,18 @@ curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
   'http://localhost:6868/api/v1/pcd/1/overrides/regularExpression/My%20Pattern/revert' | jq
 ```
 
-Returns the entity identity and `databaseId`, `revertedOpIds`, `cascadedEntities`, `remainingOpIds`,
-and `resolvedMatchesBase`. The latter is `null` for a partial revert or when absent in both layers.
-A full revert removes a locally created entity or restores an upstream entity deleted locally.
+Returns the entity identity and `databaseId`, `revertedOpIds`,
+`cascadedEntities`, `remainingOpIds`, and `resolvedMatchesBase`. The latter is
+`null` for a partial revert or when absent in both layers. A full revert removes
+a locally created entity or restores an upstream entity deleted locally.
 
 ### `POST /pcd/{databaseId}/overrides/undo`
 
-Requires a session or a token with `admin` scope. Optional JSON body (maximum 8 KB):
+Requires a session or a token with `admin` scope. Optional JSON body (maximum 8
+KB):
 
-- `expectedActionId`: non-empty identifier from GET's `lastAction.actionId`. A mismatch rejects
-  the request instead of undoing a different action.
+- `expectedActionId`: non-empty identifier from GET's `lastAction.actionId`. A
+  mismatch rejects the request instead of undoing a different action.
 
 ```bash
 curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
@@ -810,22 +857,26 @@ curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
   'http://localhost:6868/api/v1/pcd/1/overrides/undo' | jq
 ```
 
-Undo covers the latest published user operation's entire `action_id` unit, including other entities.
-Every mutating HTTP request is one action; a scheduled or manual job run is its own action, and each
-automatic conflict override applied during recompilation is a separate action. Outside these
-contexts, a single writer call falls back to one action. Historical operations fall back to
-`group_id`, then one operation; historical save boundaries are not backfilled. Previously applied
-edits superseded by the undone action can be reactivated. Undoing a manual or automatic conflict
-override reactivates the original published operation it replaced; its previously pending conflict
-may return after the recompile.
+Undo covers the latest published user operation's entire `action_id` unit,
+including other entities. Every mutating HTTP request is one action; a scheduled
+or manual job run is its own action, and each automatic conflict override
+applied during recompilation is a separate action. Outside these contexts, a
+single writer call falls back to one action. Historical operations fall back to
+`group_id`, then one operation; historical save boundaries are not backfilled.
+Previously applied edits superseded by the undone action can be reactivated.
+Undoing a manual or automatic conflict override reactivates the original
+published operation it replaced; its previously pending conflict may return
+after the recompile.
 
-Returns `{databaseId, undoneActionId, revertedOpIds, reactivatedOpIds, entities}`. This is not redo;
-reapplying a reverted change requires editing again.
+Returns
+`{databaseId, undoneActionId, revertedOpIds, reactivatedOpIds, entities}`. This
+is not redo; reapplying a reverted change requires editing again.
 
 ### Local Overrides Error Reference
 
-404/409 responses use `{error, reason, blockingOpIds?, entities?}`. Safety rejections do not silently
-drop dependent operations; a failed recompile attempt restores the planned changes.
+404/409 responses use `{error, reason, blockingOpIds?, entities?}`. Safety
+rejections do not silently drop dependent operations; a failed recompile attempt
+restores the planned changes.
 
 | Status | `reason`                | Cause                                                                                |
 | ------ | ----------------------- | ------------------------------------------------------------------------------------ |
@@ -840,10 +891,12 @@ drop dependent operations; a failed recompile attempt restores the planned chang
 | 409    | `collateral_ops`        | Recompilation would change operations outside the planned set                        |
 | 409    | `stale_action`          | `expectedActionId` no longer identifies the latest action                            |
 
-Other errors use `{error}`: 400 for invalid parameters/body, oversized body, unavailable database,
-or unbuilt cache; 401 for unauthenticated requests; 403 for insufficient token scope; 500 for
-unexpected failures. See the [OpenAPI paths](./v1/paths/pcd-overrides.yaml) and
-[schemas](./v1/schemas/pcd-overrides.yaml) for complete request/response definitions.
+Other errors use `{error}`: 400 for invalid parameters/body, oversized body,
+unavailable database, or unbuilt cache; 401 for unauthenticated requests; 403
+for insufficient token scope; 500 for unexpected failures. See the
+[OpenAPI paths](./v1/paths/pcd-overrides.yaml) and
+[schemas](./v1/schemas/pcd-overrides.yaml) for complete request/response
+definitions.
 
 ## TRaSH Guide Sources
 
@@ -896,7 +949,8 @@ Request fields:
 - `scoreProfile` (optional string)
 - `autoPull` (optional boolean)
 - `enabled` (optional boolean)
-- `syncStrategy` (optional integer, sync interval in minutes, `0`–`525600`; `0` disables the schedule)
+- `syncStrategy` (optional integer, sync interval in minutes, `0`–`525600`; `0`
+  disables the schedule)
 
 ```bash
 curl -sS \
@@ -1004,7 +1058,8 @@ Request fields (all optional, at least one required):
 - `scoreProfile` (string)
 - `autoPull` (boolean)
 - `enabled` (boolean)
-- `syncStrategy` (integer, sync interval in minutes, `0`–`525600`; `0` disables the schedule)
+- `syncStrategy` (integer, sync interval in minutes, `0`–`525600`; `0` disables
+  the schedule)
 
 Note: `arrType` cannot be changed after creation.
 
@@ -1046,7 +1101,8 @@ curl -sS -X PUT \
 Semantics:
 
 - Returns `200` on success
-- Returns `400` if no mutable fields are provided or `arrType` change is attempted
+- Returns `400` if no mutable fields are provided or `arrType` change is
+  attempted
 - Returns `404` if the source does not exist
 - Returns `409` if updated name or repository URL conflicts with another source
 - Returns `422` for validation errors

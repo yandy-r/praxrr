@@ -244,12 +244,23 @@ export const jobQueueQueries = {
     return this.getById(next.id);
   },
 
-  reschedule(id: number, runAt: string, cooldownUntil?: string | null): void {
+  /**
+   * Re-queue a finished handler-driven job. `options.payload` / `options.source`, when provided,
+   * replace the stored payload / source; when omitted the row keeps its existing values.
+   */
+  reschedule(
+    id: number,
+    runAt: string,
+    cooldownUntil?: string | null,
+    options: { payload?: Record<string, unknown>; source?: JobSource } = {}
+  ): void {
     db.execute(
       `UPDATE job_queue
-			 SET status = 'queued', run_at = ?, cooldown_until = ?, started_at = NULL, finished_at = NULL, updated_at = CURRENT_TIMESTAMP
+			 SET status = 'queued', run_at = ?, payload = COALESCE(?, payload), source = COALESCE(?, source), cooldown_until = ?, started_at = NULL, finished_at = NULL, updated_at = CURRENT_TIMESTAMP
 			 WHERE id = ?`,
       runAt,
+      options.payload === undefined ? null : JSON.stringify(options.payload),
+      options.source ?? null,
       cooldownUntil ?? null,
       id
     );

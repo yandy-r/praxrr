@@ -65,6 +65,13 @@ export interface LiveJobFinishedEvent extends LiveJobEventBase {
   status: JobStatus;
   runStatus: JobRunStatus;
   rescheduled: boolean;
+  /**
+   * True when the run handed the queue slot to a DIFFERENT source than the one that ran
+   * (e.g. a manual "Sync now" handing back to the recurring schedule). Such a run is terminal
+   * for its own trigger even though `rescheduled` is true. Plain continuations (canary batches,
+   * chunked sweeps) keep the same source and leave this false.
+   */
+  handedBack: boolean;
   nextRunAt: string | null;
   runId: number;
   failureCode: JobFailureCode | null;

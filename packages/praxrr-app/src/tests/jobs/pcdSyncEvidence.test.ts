@@ -278,3 +278,81 @@ Deno.test('pcd.sync fails with gitNetwork and never leaks a thrown secret token'
     for (const restore of restores.reverse()) restore();
   }
 });
+
+// ============================================================================
+// manual runs hand the per-database slot back to the schedule (YAN-452)
+// ============================================================================
+
+function assertReschedulesAboutOneHourOut(rescheduleAt: string | null | undefined, before: number): void {
+  assertExists(rescheduleAt);
+  const delta = new Date(rescheduleAt).getTime() - before;
+  assert(delta > 59 * 60_000 && delta <= 61 * 60_000, `expected ~60 min out, got ${delta}ms`);
+}
+
+Deno.test('pcd.sync manual success reschedules to the next interval when auto-sync is enabled', async () => {
+  const restores: Restore[] = [];
+  stubGetById(createInstance({ enabled: 1, sync_strategy: 60 }), restores);
+  patchTarget(
+    pcdManager,
+    'sync',
+    (() => Promise.resolve(createSyncResult({ success: true, commitsBehind: 1 }))) as typeof pcdManager.sync,
+    restores
+  );
+  try {
+    const before = Date.now();
+    const result = await getHandler()(createSyncJob({ payload: { databaseId: 501 }, source: 'manual' }));
+
+    assertEquals(result.status, 'success');
+    assertReschedulesAboutOneHourOut(result.rescheduleAt, before);
+    assertEquals(result.rescheduleSource, 'schedule');
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
+});
+
+Deno.test('pcd.sync manual failure (result and throw) still reschedules when auto-sync is enabled', async () => {
+  const restores: Restore[] = [];
+  stubGetById(createInstance({ enabled: 1, sync_strategy: 60 }), restores);
+  stubLogger(restores);
+  try {
+    const before = Date.now();
+    patchTarget(
+      pcdManager,
+      'sync',
+      (() => Promise.resolve(createSyncResult({ success: false, error: 'boom' }))) as typeof pcdManager.sync,
+      restores
+    );
+    const failed = await getHandler()(createSyncJob({ payload: { databaseId: 501 }, source: 'manual' }));
+    assertEquals(failed.status, 'failure');
+    assertReschedulesAboutOneHourOut(failed.rescheduleAt, before);
+    assertEquals(failed.rescheduleSource, 'schedule');
+
+    patchTarget(pcdManager, 'sync', (() => Promise.reject(new Error('boom'))) as typeof pcdManager.sync, restores);
+    const thrown = await getHandler()(createSyncJob({ payload: { databaseId: 501 }, source: 'manual' }));
+    assertEquals(thrown.status, 'failure');
+    assertReschedulesAboutOneHourOut(thrown.rescheduleAt, before);
+    assertEquals(thrown.rescheduleSource, 'schedule');
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
+});
+
+Deno.test('pcd.sync manual run does not reschedule when auto-sync is off', async () => {
+  const restores: Restore[] = [];
+  stubGetById(createInstance({ enabled: 1, sync_strategy: 0 }), restores);
+  patchTarget(
+    pcdManager,
+    'sync',
+    (() => Promise.resolve(createSyncResult({ success: true }))) as typeof pcdManager.sync,
+    restores
+  );
+  try {
+    const result = await getHandler()(createSyncJob({ payload: { databaseId: 501 }, source: 'manual' }));
+
+    assertEquals(result.status, 'success');
+    assertEquals(result.rescheduleAt, undefined);
+    assertEquals(result.rescheduleSource, undefined);
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
+});

@@ -2,7 +2,7 @@ import { assert, assertEquals } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
-import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
+import { type ArrInstance, arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
 import { syncHistoryQueries } from '$db/queries/syncHistory.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
@@ -58,7 +58,12 @@ function createRadarrInstanceRow(name: string): number {
 }
 
 function baselineSyncConfigStatus() {
-  const section = { trigger: 'manual' as const, cron: null, nextRunAt: null, syncStatus: 'idle' };
+  const section = {
+    trigger: 'manual' as const,
+    cron: null,
+    nextRunAt: null,
+    syncStatus: 'idle',
+  };
   return {
     qualityProfiles: { ...section },
     delayProfiles: { ...section },
@@ -119,7 +124,11 @@ function driveThrowingHarness(syncOutcome: 'throw' | 'return-raw'): {
 
   const originalGetSystemStatus = BaseArrClient.prototype.getSystemStatus;
   BaseArrClient.prototype.getSystemStatus = () =>
-    Promise.resolve({ ok: true as const, appName: 'Radarr', version: '5.14.0.9383' });
+    Promise.resolve({
+      ok: true as const,
+      appName: 'Radarr',
+      version: '5.14.0.9383',
+    });
   restores.push(() => {
     BaseArrClient.prototype.getSystemStatus = originalGetSystemStatus;
   });
@@ -164,9 +173,17 @@ function driveThrowingHarness(syncOutcome: 'throw' | 'return-raw'): {
         if (syncOutcome === 'throw') {
           throw raw;
         }
-        return { success: false, itemsSynced: 0, error: raw.message, outcomes: [] };
+        return {
+          success: false,
+          itemsSynced: 0,
+          error: raw.message,
+          outcomes: [],
+        };
       },
-      generatePreview: async () => ({ section: 'qualityProfiles', profile: null }),
+      generatePreview: async () => ({
+        section: 'qualityProfiles',
+        profile: null,
+      }),
       setPreviewConfig: () => undefined,
       clearPreviewConfig: () => undefined,
     }) as unknown as BaseSyncer;
@@ -219,7 +236,10 @@ function persistedRows(instanceId: number) {
 
 migratedTest('arrSyncHandler: a throwing syncer stores only the closed reason everywhere', async () => {
   const id = createRadarrInstanceRow('Radarr Throwing Syncer');
-  arrSyncQueries.saveQualityProfilesSync(id, [], { trigger: 'manual', cron: null });
+  arrSyncQueries.saveQualityProfilesSync(id, [], {
+    trigger: 'manual',
+    cron: null,
+  });
   arrSyncQueries.setQualityProfilesStatusPending(id);
   const { logged, restore } = driveThrowingHarness('throw');
   try {
@@ -244,7 +264,13 @@ migratedTest('arrSyncHandler: a throwing syncer stores only the closed reason ev
     assert(!JSON.stringify(sectionResults).includes('SECRET123'), 'section results must not leak');
 
     // The mapped reader surfaces are sanitized too (list + canary diagnostics path).
-    const summary = syncHistoryQueries.search({ instanceId: id }, { limit: 5, offset: 0 })[0];
+    const summary = syncHistoryQueries.search(
+      { instanceId: id },
+      {
+        limit: 5,
+        offset: 0,
+      }
+    )[0];
     assert(summary !== undefined);
     assertEquals(summary.error, 'qualityProfiles: failed');
 
@@ -265,7 +291,10 @@ migratedTest(
   'arrSyncHandler: a legacy syncer returning raw error text is backstopped to the closed reason',
   async () => {
     const id = createRadarrInstanceRow('Radarr Legacy Syncer');
-    arrSyncQueries.saveQualityProfilesSync(id, [], { trigger: 'manual', cron: null });
+    arrSyncQueries.saveQualityProfilesSync(id, [], {
+      trigger: 'manual',
+      cron: null,
+    });
     arrSyncQueries.setQualityProfilesStatusPending(id);
     const { restore } = driveThrowingHarness('return-raw');
     try {
@@ -289,3 +318,86 @@ migratedTest(
     }
   }
 );
+
+migratedTest("arrSyncHandler: a scheduled section client failure ignores another section's past next run", async () => {
+  const id = arrInstancesQueries.create({
+    name: 'Radarr Bad URL',
+    type: 'radarr',
+    url: 'http://169.254.169.254/latest',
+    apiKey: 'radarr-key',
+  });
+  const cron = '0 */6 * * *';
+  const pastNextRunAt = new Date(Date.now() - 3_600_000).toISOString();
+  arrSyncQueries.saveQualityProfilesSync(id, [], {
+    trigger: 'schedule',
+    cron,
+    nextRunAt: pastNextRunAt,
+  });
+  arrSyncQueries.saveDelayProfilesSync(id, {
+    databaseId: null,
+    profileName: null,
+    trigger: 'schedule',
+    cron,
+    nextRunAt: pastNextRunAt,
+  });
+
+  const origLoggerError = logger.error;
+  logger.error = (() => Promise.resolve()) as typeof logger.error;
+  try {
+    const syncHandler = jobQueueRegistry.get('arr.sync.qualityProfiles');
+    assert(syncHandler !== undefined, 'quality profiles sync handler must be registered');
+    const result = await syncHandler({
+      ...createQualityProfilesSyncJob(id, 'schedule'),
+      jobType: 'arr.sync.qualityProfiles',
+    });
+
+    assertEquals(result.status, 'failure');
+    const nextRunAt = arrSyncQueries.getSyncConfigStatus(id).qualityProfiles.nextRunAt;
+    assert(nextRunAt !== null, 'the scheduled section next_run_at must advance');
+    assert(Date.parse(nextRunAt) > Date.now(), 'the section must advance to a future slot');
+    assertEquals(
+      arrSyncQueries.getNextScheduledRunAt(id),
+      pastNextRunAt,
+      'the second scheduled section must retain its earlier next_run_at'
+    );
+    assertEquals(result.rescheduleAt, nextRunAt);
+  } finally {
+    logger.error = origLoggerError;
+  }
+});
+
+migratedTest('arrSyncHandler: a combined scheduled client failure uses the earliest section next run', async () => {
+  const id = arrInstancesQueries.create({
+    name: 'Radarr Combined Bad URL',
+    type: 'radarr',
+    url: 'http://169.254.169.254/latest',
+    apiKey: 'radarr-key',
+  });
+  const cron = '0 */6 * * *';
+  const futureNextRunAt = new Date(Date.now() + 3_600_000).toISOString();
+  arrSyncQueries.saveQualityProfilesSync(id, [], {
+    trigger: 'schedule',
+    cron,
+    nextRunAt: futureNextRunAt,
+  });
+  arrSyncQueries.saveDelayProfilesSync(id, {
+    databaseId: null,
+    profileName: null,
+    trigger: 'schedule',
+    cron,
+    nextRunAt: futureNextRunAt,
+  });
+
+  const origLoggerError = logger.error;
+  logger.error = (() => Promise.resolve()) as typeof logger.error;
+  try {
+    const syncHandler = jobQueueRegistry.get('arr.sync');
+    assert(syncHandler !== undefined, 'combined sync handler must be registered');
+    const result = await syncHandler(createQualityProfilesSyncJob(id, 'schedule'));
+
+    assertEquals(result.status, 'failure');
+    assertEquals(result.rescheduleAt, arrSyncQueries.getNextScheduledRunAt(id));
+  } finally {
+    logger.error = origLoggerError;
+  }
+});

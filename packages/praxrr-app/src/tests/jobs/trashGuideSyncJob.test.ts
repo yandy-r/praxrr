@@ -950,7 +950,9 @@ Deno.test('trashGuideSync handler does not retry transient failures on manual tr
     assertFalse(result.output?.includes(message) ?? false);
     assertFalse(evidence.failure?.message?.includes(message) ?? false);
     assertEquals(counters.warnCalls(), 0);
-    assertEquals(result.rescheduleAt, null);
+    // A manual run is never transient-retried; it hands the slot back to the schedule (next interval).
+    assertExists(result.rescheduleAt);
+    assertEquals(result.reschedulePayload?.trigger, 'scheduled');
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -1457,7 +1459,8 @@ Deno.test('trashGuideSync handler skips sync when auto_pull is disabled on a man
     assertEquals(evidence.counts.commitsBehind, 4);
     assertEquals(syncCalls, 0);
     assertEquals(meta.calls(), 1);
-    assertEquals(result.rescheduleAt, null);
+    assertExists(result.rescheduleAt);
+    assertEquals(result.reschedulePayload?.trigger, 'scheduled');
   } finally {
     for (const restore of restores.reverse()) {
       restore();
@@ -1533,6 +1536,120 @@ Deno.test('trashGuideSync handler runs sync when auto_pull is enabled', async ()
   }
 });
 
+Deno.test('trashGuideSync manual run hands the slot back to the schedule with a fresh scheduled payload', async () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() =>
+      createSourceFixture(94, {
+        arrType: 'sonarr',
+        syncStrategy: 60,
+        lastSyncedAt: null,
+      })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (() =>
+      Promise.resolve(
+        createUpdateInfo({ hasUpdates: true, commitsBehind: 1 })
+      )) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (() => Promise.resolve(createSyncResult({ commitsBehind: 1 }))) as typeof trashGuideManager.sync,
+    restores
+  );
+  patchUpdateSyncMetadata(restores);
+
+  try {
+    const before = Date.now();
+    const result = await getSyncHandler()(
+      createHandlerJob({
+        payload: {
+          sourceId: 94,
+          trigger: 'manual',
+          runToken: 'tok-94',
+          requestedAt: '2026-03-01T00:00:00.000Z',
+          sourceName: 'trash-source-94',
+          sourceArrType: 'sonarr',
+        },
+        source: 'manual',
+      })
+    );
+
+    // The manual run's own evidence still records the manual trigger and its token.
+    const evidence = parseEvidence(result.output);
+    assertEquals(evidence.trigger, 'manual');
+    assertEquals(evidence.runToken, 'tok-94');
+
+    assertExists(result.rescheduleAt);
+    assertAlmostEquals(new Date(result.rescheduleAt).getTime(), before + 60 * 60_000, 60_000);
+
+    const next = result.reschedulePayload;
+    assertExists(next);
+    assertEquals(result.rescheduleSource, 'schedule');
+    assertEquals(next.trigger, 'scheduled');
+    assertEquals(next.sourceId, 94);
+    assertEquals(next.sourceName, 'trash-source-94');
+    assertEquals(next.sourceArrType, 'sonarr');
+    assertExists(next.runToken);
+    assertFalse(next.runToken === 'tok-94');
+    assertFalse(next.requestedAt === '2026-03-01T00:00:00.000Z');
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trashGuideSync manual run on a source without auto-sync does not reschedule', async () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() =>
+      createSourceFixture(95, {
+        arrType: 'radarr',
+        syncStrategy: 0,
+        lastSyncedAt: null,
+      })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (() => Promise.resolve(createUpdateInfo({ hasUpdates: true }))) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'sync',
+    (() => Promise.resolve(createSyncResult())) as typeof trashGuideManager.sync,
+    restores
+  );
+  patchUpdateSyncMetadata(restores);
+
+  try {
+    const result = await getSyncHandler()(
+      createHandlerJob({ payload: { sourceId: 95, trigger: 'manual', runToken: 'tok-95' }, source: 'manual' })
+    );
+    assertEquals(result.rescheduleAt, null);
+    assertEquals(result.reschedulePayload, undefined);
+    assertEquals(result.rescheduleSource, undefined);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
 Deno.test('trashGuideSync handler skips before the auto_pull gate when there are no updates', async () => {
   const restores: Restore[] = [];
   let syncCalls = 0;
@@ -1587,3 +1704,199 @@ Deno.test('trashGuideSync handler skips before the auto_pull gate when there are
     }
   }
 });
+Deno.test('trashGuideSync catch-all reschedules a scheduled run on a post-lookup throw (H3)', async () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() =>
+      createSourceFixture(96, {
+        arrType: 'radarr',
+        syncStrategy: 60,
+        lastSyncedAt: null,
+        autoPull: false,
+      })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (() => Promise.resolve(createUpdateInfo({ hasUpdates: true }))) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  // auto_pull is false, so this metadata write is reached — and throws post-lookup.
+  patchTarget(
+    trashGuideSourcesQueries,
+    'updateSyncMetadata',
+    (() => {
+      throw new Error('database unavailable');
+    }) as typeof trashGuideSourcesQueries.updateSyncMetadata,
+    restores
+  );
+  patchLoggerCounters(restores);
+
+  try {
+    const before = Date.now();
+    const result = await getSyncHandler()(
+      createHandlerJob({
+        payload: { sourceId: 96, trigger: 'scheduled', runToken: 'tok-96' },
+        source: 'schedule',
+        attempts: 0,
+      })
+    );
+
+    const evidence = parseEvidence(result.output);
+    assertEquals(result.status, 'failure');
+    assertEquals(evidence.failure?.code, 'internal');
+    assertEquals(evidence.trigger, 'scheduled');
+    // The scheduled slot re-arms to the next interval instead of dying on the crash.
+    assertEquals(typeof result.rescheduleAt, 'string');
+    assertAlmostEquals((Date.parse(result.rescheduleAt as string) - before) / 60_000, 60, 1);
+    // A scheduled failure's next slot IS its automatic retry, so it stays in the evidence.
+    assertEquals(evidence.retry.rescheduleAt, result.rescheduleAt);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trashGuideSync catch-all hands a manual run back to the schedule on a post-lookup throw (H3)', async () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() =>
+      createSourceFixture(97, {
+        arrType: 'sonarr',
+        syncStrategy: 60,
+        lastSyncedAt: null,
+        autoPull: false,
+      })) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchTarget(
+    trashGuideManager,
+    'checkForUpdates',
+    (() => Promise.resolve(createUpdateInfo({ hasUpdates: true }))) as typeof trashGuideManager.checkForUpdates,
+    restores
+  );
+  // auto_pull is false, so this metadata write is reached — and throws post-lookup.
+  patchTarget(
+    trashGuideSourcesQueries,
+    'updateSyncMetadata',
+    (() => {
+      throw new Error('database unavailable');
+    }) as typeof trashGuideSourcesQueries.updateSyncMetadata,
+    restores
+  );
+  patchLoggerCounters(restores);
+
+  try {
+    const result = await getSyncHandler()(
+      createHandlerJob({
+        payload: { sourceId: 97, trigger: 'manual', runToken: 'tok-97' },
+        source: 'manual',
+        attempts: 0,
+      })
+    );
+
+    assertEquals(result.status, 'failure');
+    assertEquals(parseEvidence(result.output).failure?.code, 'internal');
+    // Hand-back: the handler result carries the next scheduled slot and a fresh scheduled payload.
+    assertEquals(typeof result.rescheduleAt, 'string');
+    assertEquals(result.reschedulePayload?.trigger, 'scheduled');
+    assertEquals(result.rescheduleSource, 'schedule');
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test('trashGuideSync catch-all stays terminal when the source is unknown (lookup throws)', async () => {
+  const restores: Restore[] = [];
+
+  patchTarget(
+    trashGuideSourcesQueries,
+    'getById',
+    (() => {
+      throw new Error('database unavailable');
+    }) as typeof trashGuideSourcesQueries.getById,
+    restores
+  );
+  patchLoggerCounters(restores);
+
+  try {
+    const result = await getSyncHandler()(
+      createHandlerJob({
+        payload: { sourceId: 99, trigger: 'scheduled', runToken: 'tok-99' },
+        source: 'schedule',
+        attempts: 0,
+      })
+    );
+
+    assertEquals(result.status, 'failure');
+    assertEquals(parseEvidence(result.output).failure?.code, 'internal');
+    // No source was ever loaded, so there is no schedule to reschedule to: terminal.
+    assertEquals(result.rescheduleAt, null);
+  } finally {
+    for (const restore of restores.reverse()) {
+      restore();
+    }
+  }
+});
+
+Deno.test(
+  'trashGuideSync manual failure keeps evidence retry.rescheduleAt null while the handler reschedules (L2)',
+  async () => {
+    const restores: Restore[] = [];
+
+    patchTarget(
+      trashGuideSourcesQueries,
+      'getById',
+      (() =>
+        createSourceFixture(98, {
+          arrType: 'radarr',
+          syncStrategy: 60,
+          lastSyncedAt: null,
+        })) as typeof trashGuideSourcesQueries.getById,
+      restores
+    );
+    patchTarget(
+      trashGuideManager,
+      'checkForUpdates',
+      (() => {
+        throw new Error('git network failure');
+      }) as typeof trashGuideManager.checkForUpdates,
+      restores
+    );
+    patchLoggerCounters(restores);
+
+    try {
+      const result = await getSyncHandler()(
+        createHandlerJob({
+          payload: { sourceId: 98, trigger: 'manual', runToken: 'tok-98' },
+          source: 'manual',
+          attempts: 0,
+        })
+      );
+
+      const evidence = parseEvidence(result.output);
+      assertEquals(result.status, 'failure');
+      assertEquals(evidence.trigger, 'manual');
+      assertEquals(evidence.failure?.code, 'network');
+      // The hand-back time lives only in the handler result; the evidence must not present the
+      // regular schedule as an "Automatic retry" (the trash page labels retry.rescheduleAt that way).
+      assertEquals(typeof result.rescheduleAt, 'string');
+      assertEquals(result.reschedulePayload?.trigger, 'scheduled');
+      assertEquals(evidence.retry.rescheduleAt, null);
+    } finally {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    }
+  }
+);

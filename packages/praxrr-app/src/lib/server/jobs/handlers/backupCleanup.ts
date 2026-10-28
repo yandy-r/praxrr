@@ -47,7 +47,11 @@ const backupCleanupHandler: JobHandler = async (job) => {
       source: 'BackupCleanupJob',
       meta: { jobId: job.id, error },
     });
-    return { status: 'failure', failureCode: 'filesystem' };
+    return {
+      status: 'failure',
+      failureCode: 'filesystem',
+      rescheduleAt: job.source === 'schedule' ? calculateNextRunFromSchedule('daily') : undefined,
+    };
   }
 
   const message = `Cleanup completed: deleted ${deletedCount} backup(s), ${errorCount} error(s)`;

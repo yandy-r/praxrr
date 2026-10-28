@@ -6,6 +6,7 @@ import { backupSettingsQueries } from '$db/queries/backupSettings.ts';
 import { logSettingsQueries } from '$db/queries/logSettings.ts';
 import { jobQueueRegistry } from '$jobs/queueRegistry.ts';
 import type { JobHandler, JobQueueRecord, JobType } from '$jobs/queueTypes.ts';
+import { calculateNextRunFromSchedule } from '$jobs/scheduleUtils.ts';
 
 // Side-effect imports register the backup/logs handlers under test.
 import '$jobs/handlers/backupCreate.ts';
@@ -53,11 +54,7 @@ function getHandler(jobType: JobType): JobHandler {
   return handler;
 }
 
-/**
- * Build a job record for one of the backup/logs cleanup handlers. `source`
- * defaults to `manual`; none of the evidence branches asserted here depend on
- * `rescheduleAt`, which is only emitted on a scheduled run.
- */
+/** Build a backup/logs job record, defaulting to a manual trigger. */
 function createJob(jobType: JobType, overrides: Partial<JobQueueRecord> = {}): JobQueueRecord {
   const now = new Date().toISOString();
   return {
@@ -89,8 +86,7 @@ Deno.test('backup/logs cleanup handlers are registered in the queue registry', (
 });
 
 // ============================================================================
-// backup.create — settings-driven cancel (createBackup is a non-mockable direct
-// import, so only the disabled short-circuit is exercised here).
+// backup.create — disabled settings and failed creation.
 // ============================================================================
 
 migratedTest('backup.create returns cancelled when backups are disabled', async () => {
@@ -149,9 +145,7 @@ migratedTest('backup.cleanup fails with failureCode filesystem when the backups 
 });
 
 // ============================================================================
-// logs.cleanup — cancel (file logging disabled), skip (empty dir).
-// (cleanupLogs is a non-mockable direct import; the readDir-throws failure path
-// is already covered structurally by backup.cleanup above.)
+// logs.cleanup — cancel (file logging disabled), skip (empty dir), failure (absent dir).
 // ============================================================================
 
 migratedTest('logs.cleanup returns cancelled when file logging is disabled', async () => {
@@ -177,3 +171,47 @@ migratedTest('logs.cleanup returns skipped when the logs dir has no aged log fil
   assertEquals(result.status, 'skipped');
   assertStringIncludes(result.decision!, 'No old log files');
 });
+
+for (const source of ['schedule', 'manual'] as const) {
+  migratedTest(`backup.create failure recurrence: ${source}`, async () => {
+    backupSettingsQueries.update({ enabled: true, schedule: 'weekly' });
+    // A regular file cannot be used as the destination directory. This makes
+    // createBackup return success: false without invoking tar or taking a snapshot.
+    await Deno.writeTextFile(config.paths.backups, 'not a directory');
+    const earliest = calculateNextRunFromSchedule('weekly');
+
+    const result = await getHandler('backup.create')(createJob('backup.create', { source }));
+
+    assert(result.status === 'failure');
+    assertEquals(result.failureCode, 'filesystem');
+    if (source === 'schedule') {
+      assertExists(result.rescheduleAt);
+      assert(result.rescheduleAt >= earliest);
+      assert(result.rescheduleAt <= calculateNextRunFromSchedule('weekly'));
+    } else {
+      assertEquals(result.rescheduleAt, undefined);
+    }
+  });
+
+  for (const jobType of ['backup.cleanup', 'logs.cleanup'] as const) {
+    migratedTest(`${jobType} failure recurrence: ${source}`, async () => {
+      backupSettingsQueries.update({ enabled: true });
+      logSettingsQueries.update({ fileLogging: true });
+      const dir = jobType === 'backup.cleanup' ? config.paths.backups : config.paths.logs;
+      await Deno.remove(dir, { recursive: true }).catch(() => {});
+      const earliest = calculateNextRunFromSchedule('daily');
+
+      const result = await getHandler(jobType)(createJob(jobType, { source }));
+
+      assert(result.status === 'failure');
+      assertEquals(result.failureCode, 'filesystem');
+      if (source === 'schedule') {
+        assertExists(result.rescheduleAt);
+        assert(result.rescheduleAt >= earliest);
+        assert(result.rescheduleAt <= calculateNextRunFromSchedule('daily'));
+      } else {
+        assertEquals(result.rescheduleAt, undefined);
+      }
+    });
+  }
+}

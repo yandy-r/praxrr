@@ -26,12 +26,14 @@ const NONE: ToastDecision = { kind: 'none' };
 
 export function decideJobToast(e: LiveJobFinishedEvent, ctx: JobToastContext): ToastDecision {
   // Scheduled runs always come back rescheduled, even on failure; only non-failures stay quiet.
-  if (e.rescheduled && e.runStatus !== 'failure') return NONE;
+  // A manual run that hands its slot back to the recurring schedule (`handedBack`) is terminal for
+  // the user's click, so it still toasts; manual continuations (canary batches) stay quiet.
+  const manual = e.source === 'manual';
+  if (e.rescheduled && !(manual && e.handedBack) && e.runStatus !== 'failure') return NONE;
 
   const href =
     ctx.syncHistoryId !== null ? `${ctx.base}/sync-history/${ctx.syncHistoryId}` : `${ctx.base}/settings/jobs`;
   const name = e.displayName;
-  const manual = e.source === 'manual';
   const syncFamily = SYNC_FAMILY_JOB_TYPES.includes(e.jobType);
 
   // A partial sync reports runStatus 'failure'; surface it as a warning rather than an error.

@@ -47,7 +47,11 @@ const logsCleanupHandler: JobHandler = async (job) => {
       source: 'LogsCleanupJob',
       meta: { jobId: job.id, error },
     });
-    return { status: 'failure', failureCode: 'filesystem' };
+    return {
+      status: 'failure',
+      failureCode: 'filesystem',
+      rescheduleAt: job.source === 'schedule' ? calculateNextRunFromSchedule('daily') : undefined,
+    };
   }
 };
 

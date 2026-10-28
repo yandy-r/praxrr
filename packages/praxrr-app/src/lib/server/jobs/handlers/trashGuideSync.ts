@@ -146,8 +146,13 @@ function countsFromSyncResult(syncResult: TrashGuideSyncResult): TrashGuideSyncC
   };
 }
 
-function getScheduledRescheduleAt(trigger: SyncTrigger, enabled: boolean, scheduleMinutes: number): string | null {
-  if (trigger !== 'scheduled' || !hasValidSchedule(enabled, scheduleMinutes)) {
+/**
+ * Next recurring slot time for a terminal result. Scheduled runs re-arm their own slot; a manual run
+ * hands the per-source slot back to the schedule (see `finalize`) so "Sync now" never silently ends
+ * auto-sync. Null when the source has no valid schedule (the slot then simply finishes).
+ */
+function getScheduledRescheduleAt(enabled: boolean, scheduleMinutes: number): string | null {
+  if (!hasValidSchedule(enabled, scheduleMinutes)) {
     return null;
   }
 
@@ -189,16 +194,49 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
     };
   }
 
+  function buildScheduledSlotPayload(): Record<string, unknown> {
+    const payload: TrashGuideSyncJobPayload = {
+      sourceId: identity.id,
+      trigger: 'scheduled',
+      requestedAt: new Date().toISOString(),
+      runToken: crypto.randomUUID(),
+      ...(identity.name !== null ? { sourceName: identity.name } : {}),
+      ...(identity.arrType !== null ? { sourceArrType: identity.arrType } : {}),
+    };
+    return { ...payload };
+  }
+
   function finalize(evidence: TrashGuideSyncRunEvidence): JobHandlerResult {
     // The full typed TRaSH evidence (source label, counts, safe failure copy, retry) rides in
     // `output`; a failure additionally carries the generic typed `failureCode` (issue #237) so the
     // dispatcher persists safe cross-job evidence. Raw text never enters either channel.
-    const output = JSON.stringify(evidence);
     const rescheduleAt = evidence.retry.rescheduleAt;
+    // A manual run owns the single per-source slot. When it hands the slot back to the schedule,
+    // replace the row payload with a fresh scheduled one (new correlation token) so the next run is
+    // a scheduled run. The recorded evidence above still says `manual` for THIS run.
+    const handBack = rescheduleAt !== null && evidence.trigger === 'manual';
+    const reschedulePayload = handBack ? buildScheduledSlotPayload() : undefined;
+    const rescheduleSource = handBack ? ('schedule' as const) : undefined;
+    // L2: for a manual failure the hand-back time (the next regular scheduled slot) rides only in
+    // the handler result's `rescheduleAt`; the evidence `retry.rescheduleAt` stays null so the
+    // trash-source page does not mislabel the regular schedule as an "Automatic retry". Scheduled
+    // runs keep their rescheduleAt in the evidence because it IS the automatic next slot/retry.
+    const failureEvidenceRecord =
+      evidence.status === 'failure' && evidence.trigger === 'manual'
+        ? { ...evidence, retry: { ...evidence.retry, rescheduleAt: null } }
+        : evidence;
+    const output = JSON.stringify(failureEvidenceRecord);
     if (evidence.status === 'failure') {
-      return { status: 'failure', failureCode: toJobFailureCode(evidence.failure?.code), output, rescheduleAt };
+      return {
+        status: 'failure',
+        failureCode: toJobFailureCode(evidence.failure?.code),
+        output,
+        rescheduleAt,
+        reschedulePayload,
+        rescheduleSource,
+      };
     }
-    return { status: evidence.status, output, rescheduleAt };
+    return { status: evidence.status, output, rescheduleAt, reschedulePayload, rescheduleSource };
   }
 
   function failureEvidence(
@@ -212,6 +250,13 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       buildEvidence({ trigger, status, counts, failure: buildTrashGuideSyncFailure(code), rescheduleAt })
     );
   }
+
+  // Set once the live source is known (after getById succeeds): lets the catch-all re-arm a
+  // scheduled run (or hand a manual run back) instead of killing the slot on an unexpected
+  // post-source-lookup error (H3). Stays null for the invalid-payload path (no sourceId) and
+  // when getById itself throws — with no source there is no schedule to reschedule to.
+  let knownSourceRescheduleAt: string | null = null;
+  let knownSourceTrigger: SyncTrigger = triggerFallback;
 
   try {
     const payload = parsePayload(job.payload, job.source);
@@ -227,6 +272,9 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       // AC5: keep the run identifiable from the durable snapshot even though the source is gone.
       return failureEvidence(trigger, 'source_missing', 'cancelled', null);
     }
+
+    knownSourceTrigger = trigger;
+    knownSourceRescheduleAt = getScheduledRescheduleAt(source.enabled, source.sync_strategy);
 
     // Refine identity from the live source (freshest name/arr type).
     identity.name = source.name;
@@ -255,7 +303,7 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       }
     }
 
-    const scheduledRescheduleAt = getScheduledRescheduleAt(trigger, source.enabled, source.sync_strategy);
+    const scheduledRescheduleAt = getScheduledRescheduleAt(source.enabled, source.sync_strategy);
 
     function resolveRunFailure(message: string): JobHandlerResult {
       const transient = isTransientGitOrNetworkError(message);
@@ -376,14 +424,18 @@ const trashGuideSyncHandler: JobHandler = async (job) => {
       })
     );
   } catch (error) {
-    // Total handler: any unexpected throw becomes typed, safe evidence — the dispatcher never persists
-    // a raw exception message. Full diagnostics go only to the sanitized logger boundary.
+    // Total handler: any unexpected throw becomes typed, safe evidence — the dispatcher never
+    // persists a raw exception message. Full diagnostics go only to the sanitized logger boundary.
+    // Reschedule to the next scheduled slot once the source is known: an unexpected post-lookup
+    // error must not end the recurring TRaSH slot (H3); a manual run hands the slot back through
+    // `finalize`. Before the source is known (invalid payload, or getById itself threw) there is
+    // no source to read a schedule from, so the run stays terminal.
     const message = error instanceof Error ? error.message : String(error);
     await logger.error('TRaSH sync handler crashed', {
       source: 'TrashGuideSyncJob',
       meta: { jobId: job.id, sourceId: identity.id, error: message },
     });
-    return failureEvidence(triggerFallback, 'internal', 'failure', null);
+    return failureEvidence(knownSourceTrigger, 'internal', 'failure', knownSourceRescheduleAt);
   }
 };
 

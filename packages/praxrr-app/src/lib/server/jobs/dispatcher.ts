@@ -15,6 +15,7 @@ import './handlers/index.ts';
  * Waking at the cap is safe: runDueJobs finds nothing due and reschedules the next wake.
  */
 export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+const DISPATCHER_RETRY_DELAY_MS = 60_000;
 
 class JobDispatcher {
   private timerId: number | null = null;
@@ -41,13 +42,21 @@ class JobDispatcher {
   }
 
   private scheduleNextWake(): void {
-    const next = jobQueueQueries.getNextQueued();
-    if (!next) {
-      this.stop();
-      return;
+    try {
+      const next = jobQueueQueries.getNextQueued();
+      if (!next) {
+        this.stop();
+        return;
+      }
+      this.armWakeAt(new Date(next.runAt).getTime());
+    } catch (error) {
+      void this.logError('Failed to schedule the next job wake', { error });
+      // A transient queue read failure must not leave the dispatcher permanently idle.
+      this.armWakeAt(Date.now() + DISPATCHER_RETRY_DELAY_MS);
     }
+  }
 
-    const runAtMs = new Date(next.runAt).getTime();
+  private armWakeAt(runAtMs: number): void {
     const delay = Math.min(Math.max(0, runAtMs - Date.now()), MAX_TIMER_DELAY_MS);
     this.nextWakeAt = runAtMs;
 
@@ -58,24 +67,77 @@ class JobDispatcher {
     // Timers inherit the async context of whoever armed them (e.g. a POST handler's undo action);
     // exit it so background jobs never write under a stale request action.
     this.timerId = setTimeout(() => {
-      runOutsideUserOpAction(() => void this.runDueJobs());
+      runOutsideUserOpAction(() => {
+        void this.runDueJobs().catch((error) => this.logError('Job dispatcher drain failed unexpectedly', { error }));
+      });
     }, delay) as unknown as number;
+  }
+
+  private async logError(message: string, meta: Record<string, unknown>): Promise<void> {
+    try {
+      await logger.error(message, { source: 'JobDispatcher', meta });
+    } catch {
+      // Logging is best-effort here: recovery must work even when the logger fails.
+    }
   }
 
   private async runDueJobs(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    let claimFailed = false;
 
     try {
       while (true) {
-        const job = jobQueueQueries.claimNextDue();
+        let job: JobQueueRecord | undefined;
+        try {
+          job = jobQueueQueries.claimNextDue();
+        } catch (error) {
+          await this.logError('Failed to claim the next due job', { error });
+          claimFailed = true;
+          break;
+        }
         if (!job) break;
-        publishJobRunning(job);
-        await this.executeJob(job);
+        try {
+          publishJobRunning(job);
+          await this.executeJob(job);
+        } catch (error) {
+          await this.logError('Job execution failed unexpectedly', {
+            jobId: job.id,
+            jobType: job.jobType,
+            error,
+          });
+          try {
+            jobQueueQueries.markFinished(job.id, 'failed');
+          } catch (error) {
+            await this.logError('Failed to mark the job as failed', {
+              jobId: job.id,
+              jobType: job.jobType,
+              error,
+            });
+          }
+        }
       }
     } finally {
       this.running = false;
-      this.scheduleNextWake();
+      if (claimFailed) {
+        this.armWakeAt(Date.now() + DISPATCHER_RETRY_DELAY_MS);
+      } else {
+        this.scheduleNextWake();
+      }
+    }
+  }
+
+  private async markFinishedBestEffort(job: JobQueueRecord, status: JobStatus): Promise<boolean> {
+    try {
+      jobQueueQueries.markFinished(job.id, status);
+      return true;
+    } catch (error) {
+      await this.logError('Failed to mark the job as finished', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
+      return false;
     }
   }
 
@@ -84,11 +146,12 @@ class JobDispatcher {
 
     const handler = jobQueueRegistry.get(job.jobType);
     if (!handler) {
-      await logger.error(`Job handler not found for ${job.jobType}`, {
-        source: 'JobDispatcher',
-        meta: { jobId: job.id, jobType: job.jobType, displayName },
+      await this.logError(`Job handler not found for ${job.jobType}`, {
+        jobId: job.id,
+        jobType: job.jobType,
+        displayName,
       });
-      jobQueueQueries.markFinished(job.id, 'failed');
+      await this.markFinishedBestEffort(job, 'failed');
       const finishedAt = new Date().toISOString();
       const runId = jobRunHistoryQueries.create(
         job.id,
@@ -97,12 +160,16 @@ class JobDispatcher {
         job.startedAt ?? finishedAt,
         finishedAt,
         0,
-        buildSafeJobEvidence(job, { status: 'failure', failureCode: 'handlerNotFound' })
+        buildSafeJobEvidence(job, {
+          status: 'failure',
+          failureCode: 'handlerNotFound',
+        })
       );
       publishJobFinished(job, {
         status: 'failed',
         runStatus: 'failure',
         rescheduled: false,
+        handedBack: false,
         nextRunAt: null,
         runId,
         failureCode: 'handlerNotFound',
@@ -115,16 +182,24 @@ class JobDispatcher {
     const startedAt = job.startedAt ?? new Date().toISOString();
     const startMs = Date.now();
 
-    await logger.debug(`Job started: ${job.jobType}`, {
-      source: 'JobDispatcher',
-      meta: {
+    try {
+      await logger.debug(`Job started: ${job.jobType}`, {
+        source: 'JobDispatcher',
+        meta: {
+          jobId: job.id,
+          jobType: job.jobType,
+          displayName,
+          sourceType: job.source,
+          runAt: job.runAt,
+        },
+      });
+    } catch (error) {
+      await this.logError('Failed to log a job start', {
         jobId: job.id,
         jobType: job.jobType,
-        displayName,
-        sourceType: job.source,
-        runAt: job.runAt,
-      },
-    });
+        error,
+      });
+    }
 
     let result: JobHandlerResult;
     try {
@@ -133,9 +208,11 @@ class JobDispatcher {
     } catch (error) {
       // Redaction by construction: the raw exception is logged through the sanitized
       // boundary; only a typed, safe failure code reaches the durable evidence.
-      await logger.error(`Job threw an unhandled error: ${job.jobType}`, {
-        source: 'JobDispatcher',
-        meta: { jobId: job.id, jobType: job.jobType, displayName, error },
+      await this.logError(`Job threw an unhandled error: ${job.jobType}`, {
+        jobId: job.id,
+        jobType: job.jobType,
+        displayName,
+        error,
       });
       result = { status: 'failure', failureCode: classifyJobFailure(error) };
     }
@@ -143,61 +220,99 @@ class JobDispatcher {
     const finishedAt = new Date().toISOString();
     const durationMs = Date.now() - startMs;
     const evidence = buildSafeJobEvidence(job, result);
-
-    const runId = jobRunHistoryQueries.create(
-      job.id,
-      job.jobType,
-      result.status,
-      startedAt,
-      finishedAt,
-      durationMs,
-      evidence
-    );
     const failureCode = evidence.failure?.code ?? null;
+    // A hand-back re-targets the slot at a different source than the one that ran; the run itself
+    // is over for its own trigger only after the reschedule succeeds (unlike a canary/chunked
+    // continuation, which keeps its source).
+    const handedBack = result.rescheduleSource !== undefined && result.rescheduleSource !== job.source;
+    // Only rescheduling itself needs the post-handler evidence. All other bookkeeping after the
+    // handler returned is independent, best-effort: a failed history insert or log line must never
+    // throw away the handler's rescheduleAt or end a recurring schedule (the outer catch otherwise
+    // marks the row failed).
+    let rescheduled = false;
+    let nextRunAt: string | null = null;
+    let status: JobStatus = 'failed';
 
-    await logger.debug(`Job finished: ${job.jobType} (${result.status})`, {
-      source: 'JobDispatcher',
-      meta: {
+    let runId = 0;
+    try {
+      runId = jobRunHistoryQueries.create(
+        job.id,
+        job.jobType,
+        result.status,
+        startedAt,
+        finishedAt,
+        durationMs,
+        evidence
+      );
+    } catch (error) {
+      // 0 is the "no history row" sentinel also used by publishJobsCancelled (ids start at 1).
+      await this.logError('Failed to record the job run history', {
         jobId: job.id,
         jobType: job.jobType,
-        displayName,
-        status: result.status,
-        durationMs,
-        rescheduleAt: result.rescheduleAt ?? null,
-        failureCode,
-      },
-    });
-
-    if (result.rescheduleAt) {
-      jobQueueQueries.reschedule(job.id, result.rescheduleAt, job.cooldownUntil);
-      publishJobFinished(job, {
-        status: 'queued',
-        runStatus: result.status,
-        rescheduled: true,
-        nextRunAt: result.rescheduleAt,
-        runId,
-        failureCode,
-        durationMs,
-        finishedAt,
+        error,
       });
-      return;
     }
 
-    const status: JobStatus =
-      result.status === 'success'
-        ? 'success'
-        : result.status === 'skipped'
-          ? 'success'
-          : result.status === 'cancelled'
-            ? 'cancelled'
-            : 'failed';
+    try {
+      await logger.debug(`Job finished: ${job.jobType} (${result.status})`, {
+        source: 'JobDispatcher',
+        meta: {
+          jobId: job.id,
+          jobType: job.jobType,
+          displayName,
+          status: result.status,
+          durationMs,
+          rescheduleAt: result.rescheduleAt ?? null,
+          failureCode,
+        },
+      });
+    } catch (error) {
+      await this.logError('Failed to log a job finish', {
+        jobId: job.id,
+        jobType: job.jobType,
+        error,
+      });
+    }
 
-    jobQueueQueries.markFinished(job.id, status);
+    if (result.rescheduleAt) {
+      // The next slot must survive a failed history insert; only a failed reschedule itself ends
+      // the run, and even then the outer runDueJobs catch is the backstop if marking failed fails.
+      try {
+        jobQueueQueries.reschedule(job.id, result.rescheduleAt, job.cooldownUntil, {
+          payload: result.reschedulePayload,
+          source: result.rescheduleSource,
+        });
+        rescheduled = true;
+        nextRunAt = result.rescheduleAt;
+        status = 'queued';
+      } catch (error) {
+        await this.logError('Failed to reschedule the job; marking the run as failed', {
+          jobId: job.id,
+          jobType: job.jobType,
+          error,
+        });
+        await this.markFinishedBestEffort(job, 'failed');
+      }
+    } else {
+      status =
+        result.status === 'success'
+          ? 'success'
+          : result.status === 'skipped'
+            ? 'success'
+            : result.status === 'cancelled'
+              ? 'cancelled'
+              : 'failed';
+      if (!(await this.markFinishedBestEffort(job, status))) status = 'failed';
+    }
+
+    // publishJobFinished is best-effort by construction; the terminal/rescheduled event always goes
+    // out, even after a failed history write.
     publishJobFinished(job, {
       status,
       runStatus: result.status,
-      rescheduled: false,
-      nextRunAt: null,
+      rescheduled,
+      handedBack: rescheduled && handedBack,
+      nextRunAt,
       runId,
       failureCode,
       durationMs,

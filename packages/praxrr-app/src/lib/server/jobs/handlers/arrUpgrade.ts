@@ -133,7 +133,12 @@ const upgradeRunHandler: JobHandler = async (job) => {
       source: 'UpgradeJob',
       meta: { jobId: job.id, instanceId, instanceName: instance.name, error },
     });
-    return { status: 'failure', failureCode: classifyJobFailure(error) };
+    return {
+      status: 'failure',
+      failureCode: classifyJobFailure(error),
+      rescheduleAt:
+        job.source === 'schedule' ? calculateNextRunFromMinutes(new Date().toISOString(), config.schedule) : undefined,
+    };
   }
 };
 

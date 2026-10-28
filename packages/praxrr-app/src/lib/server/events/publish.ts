@@ -22,6 +22,7 @@ export interface JobFinishedOutcome {
   status: JobStatus;
   runStatus: JobRunStatus;
   rescheduled: boolean;
+  handedBack: boolean;
   nextRunAt: string | null;
   runId: number;
   failureCode: JobFailureCode | null;
@@ -127,6 +128,7 @@ export function publishJobFinished(job: JobQueueRecord, outcome: JobFinishedOutc
       status: outcome.status,
       runStatus: outcome.runStatus,
       rescheduled: outcome.rescheduled,
+      handedBack: outcome.handedBack,
       nextRunAt: toUTC(outcome.nextRunAt),
       runId: outcome.runId,
       failureCode: outcome.failureCode,
@@ -153,6 +155,7 @@ export function publishJobsCancelled(jobs: readonly JobQueueRecord[]): void {
         status: 'cancelled',
         runStatus: 'cancelled',
         rescheduled: false,
+        handedBack: false,
         nextRunAt: null,
         runId: 0,
         failureCode: null,

@@ -114,7 +114,11 @@ export interface TrashGuideSyncCounts {
 export interface TrashGuideSyncRunEvidence {
   schemaVersion: 1;
   runToken: string | null;
-  source: { id: number; name: string | null; arrType: TrashGuideSupportedArrType | null };
+  source: {
+    id: number;
+    name: string | null;
+    arrType: TrashGuideSupportedArrType | null;
+  };
   trigger: 'manual' | 'scheduled';
   requestedAt: string | null;
   status: JobRunStatus;
@@ -155,6 +159,11 @@ export interface ArrPullStartupJobPayload {
 
 export type ArrSyncCleanupOnlyPayload = Record<string, never>;
 
+/** Payload for a backup.create slot: scheduled runs retain their schedule; manual runs omit it. */
+export interface BackupCreateJobPayload {
+  schedule?: string;
+}
+
 /**
  * Payload for the global drift.check sweep. Empty `{}` starts a fresh sweep; the
  * continuation carries a cursor so a chunked sweep can resume without monopolizing the
@@ -180,7 +189,7 @@ export interface JobPayloadByType {
   'pcd.sync': PcdSyncJobPayload;
   'trashguide.sync': TrashGuideSyncJobPayload;
   'arr.pull.startup': ArrPullStartupJobPayload;
-  'backup.create': ArrSyncCleanupOnlyPayload;
+  'backup.create': BackupCreateJobPayload;
   'backup.cleanup': ArrSyncCleanupOnlyPayload;
   'logs.cleanup': ArrSyncCleanupOnlyPayload;
   'drift.check': DriftCheckJobPayload;
@@ -270,6 +279,17 @@ export type JobHandlerResult =
       /** Short safe decision/skip/cancel summary; bounded before persistence. */
       decision?: string;
       rescheduleAt?: string | null;
+      /**
+       * Replaces the queue row payload when the job is rescheduled. Used when the next run is a
+       * different kind than the one that just finished (e.g. a manual run handing the slot back
+       * to the recurring scheduled run).
+       */
+      reschedulePayload?: Record<string, unknown>;
+      /**
+       * Overrides the queue row `source` on reschedule. Omit to keep the row's existing source;
+       * set `'schedule'` when handing a manual run's slot back to the recurring schedule.
+       */
+      rescheduleSource?: JobSource;
     }
   | {
       status: 'failure';
@@ -281,6 +301,10 @@ export type JobHandlerResult =
       /** Optional static recovery override; omit to use the code's pre-authored default. */
       recovery?: string;
       rescheduleAt?: string | null;
+      /** Replaces the queue row payload on reschedule; see the success/skip variant. */
+      reschedulePayload?: Record<string, unknown>;
+      /** Overrides the queue row `source` on reschedule; see the success/skip variant. */
+      rescheduleSource?: JobSource;
     };
 
 export type JobHandler = (job: JobQueueRecord) => Promise<JobHandlerResult>;
