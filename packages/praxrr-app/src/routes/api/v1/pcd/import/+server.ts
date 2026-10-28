@@ -1,6 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import {
+  BundleImportFailedError,
+  BundleInvalidError,
+  BundlePlanMismatchError,
+  importBundle,
   pcdManager,
   canWriteToBase,
   parseOperationLayer,
@@ -26,6 +30,7 @@ import {
   type PortableLidarrMetadataProfile,
   validatePortableMigrationMetadata,
 } from '$shared/pcd/portable.ts';
+import { BUNDLE_MAX_JSON_BYTES, validateBundle, validateCollisionOptions } from '$shared/pcd/bundle.ts';
 import * as deserialize from '$pcd/entities/deserialize.ts';
 import { createLidarrNaming } from '$pcd/entities/mediaManagement/naming/create.ts';
 import { validatePortableData } from '$pcd/entities/validate.ts';
@@ -56,6 +61,17 @@ export const _deserializeDependencies = {
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
+/** Concatenate streamed body chunks into one Uint8Array of exactly `length` bytes. */
+function concatChunks(chunks: readonly Uint8Array[], length: number): Uint8Array {
+  const out = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 /**
  * POST /api/v1/pcd/import
  *
@@ -67,13 +83,43 @@ const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
  * - entityType: portable entity type
  * - data: portable entity payload
  * - migration: optional migration metadata
+ *
+ * Bundle import: a body containing a `bundle` key is handled by `handleBundleImport` instead
+ * (`{ databaseId, layer, bundle, dryRun?, collisions? }`); the legacy path below is unchanged.
  */
 export const POST: RequestHandler = async ({ request }) => {
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    const contentLength = request.headers.get('content-length');
+    if (contentLength !== null) {
+      const declared = parseInt(contentLength, 10);
+      if (Number.isFinite(declared) && declared > BUNDLE_MAX_JSON_BYTES) {
+        return json({ error: `Bundle request exceeds the ${BUNDLE_MAX_JSON_BYTES} byte limit` }, { status: 400 });
+      }
+    }
+    // Stream the body with a byte counter so an oversized payload is rejected without ever
+    // being buffered, then decode only once it is known to fit.
+    const reader = (request.body ?? new ReadableStream<Uint8Array>()).getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > BUNDLE_MAX_JSON_BYTES) {
+        await reader.cancel().catch(() => {});
+        return json({ error: `Bundle request exceeds the ${BUNDLE_MAX_JSON_BYTES} byte limit` }, { status: 400 });
+      }
+      chunks.push(value);
+    }
+    const text = new TextDecoder().decode(concatChunks(chunks, received));
+    body = JSON.parse(text);
   } catch {
     return json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  if (typeof body === 'object' && body !== null && !Array.isArray(body) && Object.hasOwn(body, 'bundle')) {
+    return handleBundleImport(body);
   }
 
   const { databaseId, layer, entityType, data, migration } = body;
@@ -168,6 +214,100 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: message }, { status });
   }
 };
+
+/**
+ * Bundle import: validates the request, then delegates to `importBundle`.
+ * - 200: report (dry run, or a successful apply)
+ * - 400: invalid request / caps / unresolved references / entities failing preflight (report attached)
+ * - 403: base layer not writable
+ * - 500: mid-apply failure (report attached; `rolledBack` is true only when the restore and recompile succeeded)
+ */
+async function handleBundleImport(body: Record<string, unknown>): Promise<Response> {
+  const { databaseId, layer, bundle, dryRun, collisions, expectedPlanDigest } = body;
+
+  if (databaseId === undefined || !layer) {
+    return json({ error: 'Missing required fields: databaseId, layer, bundle' }, { status: 400 });
+  }
+  if (typeof databaseId !== 'number' || !Number.isInteger(databaseId)) {
+    return json({ error: 'Invalid databaseId' }, { status: 400 });
+  }
+
+  const layerResult = parseOperationLayer(layer);
+  if ('error' in layerResult) {
+    return json({ error: layerResult.error }, { status: 400 });
+  }
+  const parsedLayer = layerResult.value;
+
+  if (parsedLayer === 'base' && !canWriteToBase(databaseId)) {
+    return json({ error: 'Cannot write to base layer' }, { status: 403 });
+  }
+
+  if (dryRun !== undefined && typeof dryRun !== 'boolean') {
+    return json({ error: 'dryRun must be a boolean' }, { status: 400 });
+  }
+  if (expectedPlanDigest !== undefined && typeof expectedPlanDigest !== 'string') {
+    return json({ error: 'expectedPlanDigest must be a string' }, { status: 400 });
+  }
+
+  const bundleResult = validateBundle(bundle);
+  if ('error' in bundleResult) {
+    return json({ error: bundleResult.error }, { status: 400 });
+  }
+
+  const collisionResult = validateCollisionOptions(collisions);
+  if ('error' in collisionResult) {
+    return json({ error: collisionResult.error }, { status: 400 });
+  }
+
+  if (!pcdManager.getCache(databaseId)) {
+    return json({ error: 'Database cache not available' }, { status: 500 });
+  }
+
+  const isDryRun = dryRun === true;
+  try {
+    const report = await importBundle({
+      databaseId,
+      layer: parsedLayer,
+      bundle: bundleResult.bundle,
+      dryRun: isDryRun,
+      collisions: collisionResult.options,
+      expectedPlanDigest: expectedPlanDigest as string | undefined,
+    });
+
+    if (!isDryRun && !report.applied) {
+      const error =
+        report.missingReferences.length > 0
+          ? 'Bundle references entities that exist neither in the bundle nor in the target database'
+          : 'Bundle import failed validation; nothing was written';
+      return json({ error, report, missingReferences: report.missingReferences }, { status: 400 });
+    }
+
+    return json(report);
+  } catch (err) {
+    if (err instanceof BundleImportFailedError) {
+      await logger.error('Bundle import failed and was rolled back', {
+        source: 'PCDImport',
+        meta: { databaseId, layer: parsedLayer, error: err.message },
+      });
+      return json(
+        { error: err.message, report: err.report, rolledBack: err.report.rolledBack === true },
+        { status: 500 }
+      );
+    }
+    if (err instanceof BundlePlanMismatchError) {
+      return json({ error: err.message, report: err.report }, { status: 409 });
+    }
+    if (err instanceof BundleInvalidError) {
+      return json({ error: err.message }, { status: 400 });
+    }
+    const message = getErrorMessage(err);
+    await logger.error('Bundle import failed', {
+      source: 'PCDImport',
+      meta: { databaseId, layer: parsedLayer, error: message },
+    });
+    return json({ error: message }, { status: isValidationError(err) ? 400 : 500 });
+  }
+}
 
 interface DeserializeArgs {
   databaseId: number;

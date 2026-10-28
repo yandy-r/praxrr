@@ -7,7 +7,7 @@ This is the reference for the reusable UI components that make up the Praxrr
 application client. Every component lives under
 `packages/praxrr-app/src/lib/client/ui/` (imported via the `$ui/` alias), with
 client stores under `$stores/` and the alert system under
-`$lib/client/alerts/`. The catalog below covers **76 components, stores, and
+`$lib/client/alerts/`. The catalog below covers **78 components, stores, and
 helper modules** across 12 category pages.
 
 ## Conventions
@@ -68,12 +68,14 @@ message)`. See [Store Patterns](/app/components/patterns/).
 
 ### [Modals & Dialogs](/app/components/modals/)
 
-| Component    | Description                                                                                                                                                                                                                                                             |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Modal`      | Base confirm/cancel dialog with header, body slot (falling back to a message), and a two-button footer; handles backdrop, transitions, focus trap with focus restore on close, Escape-to-cancel (innermost modal only), size/height presets, and loading/danger states. |
-| `InfoModal`  | Read-only informational dialog with an X close button and a default-slot body; self-manages closing (X, backdrop, Escape), traps focus and restores it on close, and is sized via maxWidth/maxHeight CSS strings.                                                       |
-| `CloneModal` | Self-contained dialog for cloning a PCD entity; wraps Modal to prompt for a new name, optionally pick the base/user layer, then export and re-import via the PCD API.                                                                                                   |
-| `DirtyModal` | Global unsaved-changes guard that renders a store-wired Modal and intercepts SvelteKit navigation via beforeNavigate to prompt before leaving a dirty page.                                                                                                             |
+| Component             | Description                                                                                                                                                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Modal`               | Base confirm/cancel dialog with header, body slot (falling back to a message), and a two-button footer; handles backdrop, transitions, focus trap with focus restore on close, Escape-to-cancel (innermost modal only), size/height presets, and loading/danger states. |
+| `InfoModal`           | Read-only informational dialog with an X close button and a default-slot body; self-manages closing (X, backdrop, Escape), traps focus and restores it on close, and is sized via maxWidth/maxHeight CSS strings.                                                       |
+| `CloneModal`          | Self-contained dialog for cloning a PCD entity within the same database; wraps Modal to prompt for a new name, optionally pick the base/user layer, then export and re-import the single entity via the PCD API.                                                        |
+| `CopyToDatabaseModal` | Dialog behind the "Copy to database…" row action; exports the entity with its dependencies as a bundle, lets the user pick another database, and embeds BundleImportPanel to dry-run and apply it there.                                                                |
+| `BundleImportPanel`   | Bundle import form (paste or upload JSON, layer, default and per-entity collision policies) that dry-runs `POST /api/v1/pcd/import` and applies the reviewed plan with its plan digest; used by the database Import tab and CopyToDatabaseModal.                        |
+| `DirtyModal`          | Global unsaved-changes guard that renders a store-wired Modal and intercepts SvelteKit navigation via beforeNavigate to prompt before leaving a dirty page.                                                                                                             |
 
 ### [Dropdowns & Tabs](/app/components/navigation/)
 

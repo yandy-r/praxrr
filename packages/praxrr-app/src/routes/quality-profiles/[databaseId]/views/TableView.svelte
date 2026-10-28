@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ClipboardCopy, DatabaseZap } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import Table from '$ui/table/Table.svelte';
   import Button from '$ui/button/Button.svelte';
@@ -18,7 +19,12 @@
   export let showSourceBadges = false;
   export let currentDatabaseId: number;
 
-  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{
+    clone: { name: string };
+    export: { name: string };
+    copy: { name: string };
+    clipboard: { name: string };
+  }>();
 
   $: databaseId = $page.params.databaseId;
   $: sourceMap = new Map(availableSources.map((source) => [`${source.type}:${source.id}`, source]));
@@ -259,8 +265,22 @@
           icon={Download}
           size="xs"
           variant="ghost"
-          tooltip="Export"
+          tooltip="Download bundle"
           on:click={() => dispatch('export', { name: row.name })}
+        />
+        <Button
+          icon={DatabaseZap}
+          size="xs"
+          variant="ghost"
+          tooltip="Copy to database…"
+          on:click={() => dispatch('copy', { name: row.name })}
+        />
+        <Button
+          icon={ClipboardCopy}
+          size="xs"
+          variant="ghost"
+          tooltip="Copy JSON to clipboard"
+          on:click={() => dispatch('clipboard', { name: row.name })}
         />
         <Button
           icon={Copy}

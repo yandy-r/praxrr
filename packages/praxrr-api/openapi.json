@@ -2275,7 +2275,7 @@
       "get": {
         "operationId": "exportEntity",
         "summary": "Export a portable entity",
-        "description": "Serializes a PCD entity into its portable JSON representation.\n\nThe portable format strips database IDs and timestamps, producing a\nself-contained snapshot suitable for clipboard copy, file export, or\ncross-database import.\n",
+        "description": "Serializes a PCD entity into its portable JSON representation.\n\nThe portable format strips database IDs and timestamps, producing a\nself-contained snapshot suitable for clipboard copy, file export, or\ncross-database import.\n\n`name` may be repeated (`?name=A&name=B`) to export several entities of the\nsame `entityType`. Set `includeDependencies=true` to also export the\ncustom formats and regular expressions a quality profile references (and the\nregular expressions a custom format references). Set `format=bundle` to force\nthe bundle response shape.\n\nResponse shape rule: the legacy `ExportResponse` (`entityType`, `data`,\n`migration`) is returned if and only if exactly one `name` is supplied and\nneither `includeDependencies=true` nor `format=bundle` is set. Every other\nrequest returns a `PcdBundleExportResponse`. A bundle holds at most 1000\nentities; exceeding the cap returns 400.\n",
         "tags": ["PCD"],
         "parameters": [
           {
@@ -2300,25 +2300,59 @@
             "name": "name",
             "in": "query",
             "required": true,
-            "description": "The entity name to export",
+            "description": "The entity name to export. Repeat the parameter to export several entities.",
+            "style": "form",
+            "explode": true,
             "schema": {
-              "type": "string"
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "includeDependencies",
+            "in": "query",
+            "required": false,
+            "description": "Also export referenced custom formats and regular expressions.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Force the response shape. `bundle` always returns a `PcdBundleExportResponse`.",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "bundle"],
+              "default": "json"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Portable entity JSON",
+            "description": "Portable entity JSON (legacy shape) or entity bundle",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExportResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ExportResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PcdBundleExportResponse"
+                    }
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Missing or invalid parameters",
+            "description": "Missing or invalid parameters, the bundle exceeds the 1000 entity cap, or the dependency walk was truncated",
             "content": {
               "application/json": {
                 "schema": {
@@ -2353,36 +2387,57 @@
     "/pcd/import": {
       "post": {
         "operationId": "importEntity",
-        "summary": "Import a portable entity",
-        "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\nOptional `migration` metadata (`format`, `version`, `source`) can be provided\nfor hybrid JSON/YAML ingestion flows.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n",
+        "summary": "Import a portable entity or entity bundle",
+        "description": "Deserializes a portable entity into PCD operations, creating the entity\nin the target database and layer.\n\nThe request body matches the export response format (`entityType` + `data`),\nplus `databaseId` and `layer` to specify the target.\nOptional `migration` metadata (`format`, `version`, `source`) can be provided\nfor hybrid JSON/YAML ingestion flows.\n\nName uniqueness is validated — importing an entity with a name that already\nexists will return a 400 error.\n\nBundle import: when the body contains a `bundle` key it is treated as a\n`PcdBundleImportRequest` (the legacy single-entity path is not used). All\nentities are written to the single requested `layer` as one undo unit.\n\n- `dryRun: true` applies the bundle against an ephemeral cache and returns a\n  `PcdBundleImportReport` listing creates, collisions and missing references.\n  Nothing is written to `pcd_ops` or `pcd_op_history`.\n- `collisions` selects `skip`, `rename` or `overwrite` for entities whose name\n  already exists (case-insensitive), with an optional per-entity override keyed\n  `\"<entityType>:<name>\"`.\n- References (quality profile to custom format, custom format to regular\n  expression) must resolve inside the bundle or the target database. On a real\n  apply any unresolved reference returns 400 with the report before anything is\n  written.\n- A failure part-way through applying rolls back every operation the import\n  created and returns 500 with the report and `rolledBack: true`. If the rollback\n  itself failed, the database is disabled and `rolledBack` is false.\n- `expectedPlanDigest`: pass the `planDigest` returned by a dry run to reject the\n  apply with HTTP 409 when the database changed in between.\n- Limits: at most 1000 entities and a 5 MiB JSON body (400 otherwise).\n",
         "tags": ["PCD"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ImportRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PcdBundleImportRequest"
+                  }
+                ]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Entity created successfully",
+            "description": "Entity created successfully, or bundle import report",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ImportResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PcdBundleImportReport"
+                    }
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Validation error (missing fields, duplicate name, invalid data)",
+            "description": "Validation error (missing fields, duplicate name, invalid data, bundle caps, unresolved references)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PcdErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PcdBundleImportErrorResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -2397,12 +2452,29 @@
               }
             }
           },
-          "500": {
-            "description": "Database cache not available",
+          "409": {
+            "description": "The plan digest no longer matches the database (run a new dry run)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/PcdBundleImportErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database cache not available, or bundle apply failed and was rolled back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PcdErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PcdBundleImportErrorResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -13543,6 +13615,259 @@
         "properties": {
           "success": {
             "type": "boolean"
+          }
+        }
+      },
+      "PcdBundleEntry": {
+        "type": "object",
+        "required": ["entityType", "data"],
+        "properties": {
+          "entityType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "data": {
+            "description": "The portable entity payload. Same shape set as `ExportResponse.data`; the\nshape varies by `entityType`. Bundle entries carry no ids, timestamps or\nsource-database identity.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PortableDelayProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRegularExpression"
+              },
+              {
+                "$ref": "#/components/schemas/PortableCustomFormat"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableRadarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableSonarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrNaming"
+              },
+              {
+                "$ref": "#/components/schemas/PortableMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMediaSettings"
+              },
+              {
+                "$ref": "#/components/schemas/PortableQualityDefinitions"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrMetadataProfile"
+              },
+              {
+                "$ref": "#/components/schemas/PortableLidarrQualityDefinitions"
+              }
+            ]
+          }
+        }
+      },
+      "PcdBundle": {
+        "type": "object",
+        "required": ["version", "entities"],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [1],
+            "description": "Bundle format version. Only `1` is supported."
+          },
+          "entities": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "Portable entities ordered dependency-first (regular expressions, custom\nformats, quality profiles, then all other entity types). A bundle holds at\nmost 1000 entities and its JSON body is capped at 5 MiB.\n",
+            "items": {
+              "$ref": "#/components/schemas/PcdBundleEntry"
+            }
+          }
+        },
+        "description": "A set of portable PCD entities that can be exported together with their\ndependencies and imported atomically.\n"
+      },
+      "PcdBundleExportResponse": {
+        "type": "object",
+        "required": ["bundle"],
+        "properties": {
+          "bundle": {
+            "$ref": "#/components/schemas/PcdBundle"
+          },
+          "missingReferences": {
+            "type": "array",
+            "description": "Dependencies referenced by an exported entity that do not exist in the source\ndatabase. Present only when non-empty.\n",
+            "items": {
+              "$ref": "#/components/schemas/PcdBundleMissingRef"
+            }
+          }
+        }
+      },
+      "PcdBundleCollisionPolicy": {
+        "type": "string",
+        "enum": ["skip", "rename", "overwrite"],
+        "description": "How an entity whose name already exists (case-insensitive) in the target\ndatabase is handled:\n- `skip` leaves the existing entity untouched.\n- `rename` imports under a unique `\"<name> (2)\"`, `\"<name> (3)\"`, ... name and\n  rewrites bundle references (for example quality profile score entries) to it.\n- `overwrite` updates the existing entity in place with value-guarded update\n  operations (never delete + create).\n"
+      },
+      "PcdBundleImportRequest": {
+        "type": "object",
+        "required": ["databaseId", "layer", "bundle"],
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "description": "The PCD database ID to import into"
+          },
+          "layer": {
+            "type": "string",
+            "enum": ["user", "base"],
+            "description": "The single operation layer every bundle entity is written to. `base`\nrequires a personal access token and local ops disabled (403 otherwise).\n"
+          },
+          "bundle": {
+            "$ref": "#/components/schemas/PcdBundle"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true the whole bundle is applied against an ephemeral cache and a\nreport is returned. Nothing is written to `pcd_ops` or `pcd_op_history`\nand the live cache is not modified.\n"
+          },
+          "collisions": {
+            "type": "object",
+            "required": ["default"],
+            "properties": {
+              "default": {
+                "$ref": "#/components/schemas/PcdBundleCollisionPolicy"
+              },
+              "perEntity": {
+                "type": "object",
+                "description": "Per-entity overrides keyed by `\"<entityType>:<name>\"` (name matched\ncase-insensitively).\n",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/PcdBundleCollisionPolicy"
+                }
+              }
+            }
+          },
+          "expectedPlanDigest": {
+            "type": "string",
+            "description": "When set, the apply is rejected with HTTP 409 if the plan computed from the\ncurrent database state does not match this digest (another write landed after\nthe dry run).\n"
+          }
+        }
+      },
+      "PcdBundleEntityOutcome": {
+        "type": "object",
+        "required": ["entityType", "name", "finalName", "action"],
+        "properties": {
+          "entityType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "name": {
+            "type": "string",
+            "description": "Entity name as it appears in the bundle."
+          },
+          "finalName": {
+            "type": "string",
+            "description": "Name the entity has (or would have) in the target database after import."
+          },
+          "action": {
+            "type": "string",
+            "enum": ["create", "skip", "rename", "overwrite", "error"]
+          },
+          "error": {
+            "type": "string",
+            "description": "Present when `action` is `error`."
+          }
+        }
+      },
+      "PcdBundleMissingRef": {
+        "type": "object",
+        "required": ["fromType", "fromName", "toType", "toName"],
+        "properties": {
+          "fromType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "fromName": {
+            "type": "string"
+          },
+          "toType": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "toName": {
+            "type": "string"
+          }
+        },
+        "description": "A reference (quality profile to custom format, custom format to regular\nexpression) that resolves neither inside the bundle nor in the target database.\n"
+      },
+      "PcdBundleImportReport": {
+        "type": "object",
+        "required": ["planDigest", "dryRun", "applied", "outcomes", "missingReferences", "errors"],
+        "properties": {
+          "planDigest": {
+            "type": "string",
+            "description": "Deterministic hash over the ordered plan outcomes and the target state they were\ncomputed from. Pass back as `expectedPlanDigest` on the apply request to get a 409\nwhen the plan no longer matches the database.\n"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean",
+            "description": "True only when a non-dry-run import wrote its operations."
+          },
+          "rolledBack": {
+            "type": "boolean",
+            "description": "True when a failure mid-apply was fully rolled back (HTTP 500)."
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PcdBundleEntityOutcome"
+            }
+          },
+          "missingReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PcdBundleMissingRef"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["entityType", "name", "error"],
+              "properties": {
+                "entityType": {
+                  "$ref": "#/components/schemas/EntityType"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PcdBundleImportErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/PcdBundleImportReport"
+          },
+          "rolledBack": {
+            "type": "boolean",
+            "description": "True when a mid-apply failure was fully rolled back (HTTP 500)."
+          },
+          "missingReferences": {
+            "type": "array",
+            "description": "Present on HTTP 400 when references resolve neither in the bundle nor the target database.",
+            "items": {
+              "$ref": "#/components/schemas/PcdBundleMissingRef"
+            }
           }
         }
       },

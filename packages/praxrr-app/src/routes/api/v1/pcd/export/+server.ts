@@ -8,7 +8,7 @@ import {
   PORTABLE_MIGRATION_MIN_VERSION,
   PORTABLE_MIGRATION_SOURCE_EXPORT,
 } from '$shared/pcd/portable.ts';
-import type { PCDCache } from '$pcd/index.ts';
+import { BundleExportLimitError, exportBundle, type PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
 
 /**
@@ -41,19 +41,24 @@ const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 /**
  * GET /api/v1/pcd/export
  *
- * Export a portable representation of a single PCD entity for migration/import workflows.
+ * Export portable PCD entities for migration/import workflows.
  *
  * Query params:
  * - databaseId: target PCD database ID (required)
  * - entityType: portable entity type (required)
- * - name: entity name (required)
+ * - name: entity name (required); repeat to export several entities of the same type
+ * - includeDependencies: `true` also exports referenced custom formats / regular expressions
+ * - format: `json` (default) or `bundle`
+ *
+ * Response: the legacy `{ entityType, data, migration }` shape iff exactly one `name` is given and
+ * neither `includeDependencies=true` nor `format=bundle` is set; otherwise `{ bundle }`.
  */
 export const GET: RequestHandler = async ({ url }) => {
   const databaseIdParam = url.searchParams.get('databaseId');
   const entityType = url.searchParams.get('entityType');
-  const name = url.searchParams.get('name');
+  const names = url.searchParams.getAll('name');
 
-  if (!databaseIdParam || !entityType || !name) {
+  if (!databaseIdParam || !entityType || names.length === 0 || names.some((name) => name.length === 0)) {
     return json({ error: 'Missing required parameters: databaseId, entityType, name' }, { status: 400 });
   }
 
@@ -66,24 +71,58 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({ error: `Invalid entityType: ${entityType}` }, { status: 400 });
   }
 
+  const includeDependenciesParam = url.searchParams.get('includeDependencies');
+  if (
+    includeDependenciesParam !== null &&
+    includeDependenciesParam !== 'true' &&
+    includeDependenciesParam !== 'false'
+  ) {
+    return json({ error: 'Invalid includeDependencies: expected true or false' }, { status: 400 });
+  }
+  const includeDependencies = includeDependenciesParam === 'true';
+
+  const format = url.searchParams.get('format') ?? 'json';
+  if (format !== 'json' && format !== 'bundle') {
+    return json({ error: `Invalid format: ${format}` }, { status: 400 });
+  }
+
   const cache = pcdManager.getCache(databaseId);
   if (!cache) {
     return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
+  const legacyShape = names.length === 1 && !includeDependencies && format === 'json';
+
   try {
-    const data = await serializeEntity(cache, entityType as EntityType, name);
+    if (legacyShape) {
+      const data = await serializeEntity(cache, entityType as EntityType, names[0]);
+      return json({
+        entityType,
+        data,
+        migration: {
+          source: PORTABLE_MIGRATION_SOURCE_EXPORT,
+          format: 'json',
+          version: PORTABLE_MIGRATION_MIN_VERSION,
+        },
+      });
+    }
+
+    const exported = await exportBundle(databaseId, entityType as EntityType, names, includeDependencies);
+    if (exported.truncated) {
+      return json(
+        { error: 'Bundle export truncated: the dependency walk reached its entity cap; export fewer entities' },
+        { status: 400 }
+      );
+    }
     return json({
-      entityType,
-      data,
-      migration: {
-        source: PORTABLE_MIGRATION_SOURCE_EXPORT,
-        format: 'json',
-        version: PORTABLE_MIGRATION_MIN_VERSION,
-      },
+      bundle: exported.bundle,
+      ...(exported.missing.length > 0 ? { missingReferences: exported.missing } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Export failed';
+    if (err instanceof BundleExportLimitError) {
+      return json({ error: message }, { status: 400 });
+    }
     if (message.includes('not found')) {
       return json({ error: message }, { status: 404 });
     }

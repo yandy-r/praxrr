@@ -31,16 +31,10 @@ import * as qualityDefsQueries from './mediaManagement/quality-definitions/index
 import * as metadataProfilesQueries from './metadataProfiles/index.ts';
 import { createLidarrNaming } from './mediaManagement/naming/create.ts';
 import type { EntityType } from '$shared/pcd/portable.ts';
-
-interface LidarrMetadataProfileTypeRow {
-  id?: number;
-  typeId?: number;
-  statusId?: number;
-  name?: string;
-  allowed?: boolean;
-}
-
-type MetadataProfileSectionKind = 'primary' | 'secondary' | 'status';
+import {
+  normalizeLidarrMetadataProfileReleaseStatusRows,
+  normalizeLidarrMetadataProfileTypeRows,
+} from './metadataProfiles/normalize.ts';
 
 // ============================================================================
 // COMMON OPTIONS
@@ -461,54 +455,6 @@ export async function deserializeLidarrQualityDefinitions(
 // ============================================================================
 // LIDARR METADATA PROFILES
 // ============================================================================
-
-function getMetadataProfileTypeId(typeRow: LidarrMetadataProfileTypeRow, kind: 'album' | 'status'): number {
-  if (typeof typeRow.id === 'number' && Number.isInteger(typeRow.id)) {
-    return typeRow.id;
-  }
-
-  if (kind === 'status' && typeof typeRow.statusId === 'number' && Number.isInteger(typeRow.statusId)) {
-    return typeRow.statusId;
-  }
-
-  if (kind === 'album' && typeof typeRow.typeId === 'number' && Number.isInteger(typeRow.typeId)) {
-    return typeRow.typeId;
-  }
-
-  throw new Error(
-    kind === 'status'
-      ? 'Metadata profile status identifier must be an integer id or statusId'
-      : 'Metadata profile type identifier must be an integer id or typeId'
-  );
-}
-
-function normalizeLidarrMetadataProfileTypeRows(
-  section: MetadataProfileSectionKind,
-  typeRows: readonly LidarrMetadataProfileTypeRow[]
-): Array<{ typeId: number; name: string; allowed: boolean }> {
-  return typeRows
-    .slice()
-    .sort((a, b) => {
-      const aId = getMetadataProfileTypeId(a, section === 'status' ? 'status' : 'album');
-      const bId = getMetadataProfileTypeId(b, section === 'status' ? 'status' : 'album');
-      return aId - bId;
-    })
-    .map((type) => ({
-      typeId: getMetadataProfileTypeId(type, section === 'status' ? 'status' : 'album'),
-      name: type.name ?? '',
-      allowed: !!type.allowed,
-    }));
-}
-
-function normalizeLidarrMetadataProfileReleaseStatusRows(
-  rows: readonly LidarrMetadataProfileTypeRow[]
-): Array<{ statusId: number; name: string; allowed: boolean }> {
-  return normalizeLidarrMetadataProfileTypeRows('status', rows).map((row) => ({
-    statusId: row.typeId,
-    name: row.name,
-    allowed: row.allowed,
-  }));
-}
 
 export async function deserializeLidarrMetadataProfile(options: DeserializeOptions<PortableLidarrMetadataProfile>) {
   const { databaseId, cache, layer, portable } = options;

@@ -34,8 +34,8 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 | GET    | `/arr/library/episodes`                                  | Sonarr-only series episode details     |
 | GET    | `/arr/releases`                                          | Interactive release search             |
 | POST   | `/arr/cleanup`                                           | Scan/execute stale config cleanup      |
-| GET    | `/pcd/export`                                            | Export portable entity payload         |
-| POST   | `/pcd/import`                                            | Import portable entity payload         |
+| GET    | `/pcd/export`                                            | Export portable entity or bundle       |
+| POST   | `/pcd/import`                                            | Import portable entity or bundle       |
 | GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`             | List metadata profiles                 |
 | POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`             | Create metadata profile                |
 | GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Read metadata profile                  |
@@ -583,38 +583,76 @@ curl -sS \
 
 ## PCD Portable Import/Export
 
+For the UI workflow and full semantics, see
+[Portable Import/Export](../features/portable-import-export.md).
+
 ### `GET /pcd/export`
+
+Requires a session or a token with `read` scope.
 
 Parameters:
 
 - `databaseId` (required integer)
 - `entityType` (required enum from OpenAPI `EntityType`)
-- `name` (required string)
+- `name` (required string, repeatable: `?name=A&name=B` exports several entities of one type)
+- `includeDependencies` (optional `true`/`false`, default `false`): also export the custom formats a
+  quality profile scores and the regular expressions a custom format uses, transitively
+- `format` (optional `json` or `bundle`, default `json`): `bundle` forces the bundle shape
+
+The legacy shape `{entityType, data, migration}` is returned only for exactly one `name`,
+no `includeDependencies=true`, and `format=json`. Every other request returns
+`{bundle: {version: 1, entities: [{entityType, data}]}, missingReferences?}`. Entities are ordered
+regular expressions, custom formats, quality profiles, then everything else. `missingReferences`
+(`fromType`, `fromName`, `toType`, `toName`) lists dependencies absent from the source database and
+is omitted when empty.
 
 ```bash
-curl -sS \
-  -H 'X-Api-Key: <token>' \
-  'http://localhost:5173/api/v1/pcd/export?databaseId=1&entityType=quality_profile&name=Default' | jq
+curl -sS -G -H 'X-Api-Key: <token>' 'http://localhost:5173/api/v1/pcd/export' \
+  --data-urlencode 'databaseId=1' --data-urlencode 'entityType=quality_profile' \
+  --data-urlencode 'name=Default' --data-urlencode 'includeDependencies=true' | jq
 ```
 
 ```json
 {
-  "entityType": "quality_profile",
-  "data": {
-    "name": "Default",
-    "description": null
+  "bundle": {
+    "version": 1,
+    "entities": [
+      {
+        "entityType": "regular_expression",
+        "data": { "name": "x265", "pattern": "x265" }
+      },
+      {
+        "entityType": "custom_format",
+        "data": { "name": "x265 (HD)", "conditions": [] }
+      },
+      {
+        "entityType": "quality_profile",
+        "data": { "name": "Default", "customFormatScores": [] }
+      }
+    ]
   }
 }
 ```
 
+Errors: `400` invalid parameters, more than 1000 entities (`Bundle would contain N entities; the
+maximum is 1000`), or a dependency walk that reaches 1000 entities (`Bundle export truncated: ...`);
+`404` a named entity does not exist; `500` database cache not available.
+
 ### `POST /pcd/import`
 
-Request fields:
+Requires a session or a token with `admin` scope, including for dry runs. The JSON body is limited to
+5 MiB (`400` otherwise). A body with a `bundle` key is a bundle import; any other body is a
+single-entity import.
+
+Single-entity request fields:
 
 - `databaseId` (required integer)
 - `layer` (required: `user` or `base`)
 - `entityType` (required enum from OpenAPI `EntityType`)
 - `data` (required object matching the portable schema for `entityType`)
+- `migration` (optional `{format, version, source}`)
+
+Returns `{ "success": true }`. A name that already exists (case-insensitive) returns `400`.
 
 ```bash
 curl -sS \
@@ -635,9 +673,73 @@ curl -sS \
   http://localhost:5173/api/v1/pcd/import | jq
 ```
 
-```json
-{ "success": true }
+Bundle request fields:
+
+- `databaseId` (required integer), `layer` (required `user` or `base`; every entity goes to this one
+  layer as a single undo unit)
+- `bundle` (required): `version: 1`, 1–1000 entities, no duplicate `entityType` + name
+  (case-insensitive); each `data` passes the same portable validation as a single import
+- `dryRun` (optional boolean, default `false`): run the plan against a throwaway cache; nothing is
+  written to `pcd_ops` or `pcd_op_history`
+- `collisions` (optional, default `{default: "skip"}`): `{default, perEntity}` where `perEntity` is
+  keyed `"<entityType>:<name>"` (name case-insensitive) and overrides `default`
+  - `skip`: keep the existing entity; bundle references resolve to it
+  - `rename`: import as `<name> (2)`, `<name> (3)`, … and rewrite bundle references to the new name
+  - `overwrite`: update the existing entity in place with value-guarded updates (no delete + create)
+- `expectedPlanDigest` (optional string): the dry run's `planDigest`; reject the apply if it no longer
+  matches
+
+Quality profile scores must name a custom format, and custom format patterns must name a regular
+expression, found in the bundle or the target database. Entries that are skipped are not checked.
+
+Dry run, then apply the same plan:
+
+```bash
+curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
+  -d '{"databaseId":2,"layer":"user","dryRun":true,"collisions":{"default":"rename"},
+       "bundle":{"version":1,"entities":[{"entityType":"regular_expression",
+       "data":{"name":"x265","pattern":"x265","tags":[],"description":null,"regex101Id":null}}]}}' \
+  http://localhost:5173/api/v1/pcd/import | jq
+
+curl -sS -X POST -H 'X-Api-Key: <token>' -H 'Content-Type: application/json' \
+  -d '{"databaseId":2,"layer":"user","collisions":{"default":"rename"},
+       "expectedPlanDigest":"<planDigest from the dry run>",
+       "bundle":{"version":1,"entities":[{"entityType":"regular_expression",
+       "data":{"name":"x265","pattern":"x265","tags":[],"description":null,"regex101Id":null}}]}}' \
+  http://localhost:5173/api/v1/pcd/import | jq
 ```
+
+```json
+{
+  "planDigest": "3f9c1a7be04d5e21",
+  "dryRun": true,
+  "applied": false,
+  "outcomes": [
+    {
+      "entityType": "regular_expression",
+      "name": "x265",
+      "finalName": "x265 (2)",
+      "action": "rename"
+    }
+  ],
+  "missingReferences": [],
+  "errors": []
+}
+```
+
+Bundle responses:
+
+| Status | Body                                 | Cause                                                                                       |
+| ------ | ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| 200    | report                               | Dry run (errors and missing references included), or apply succeeded (`applied: true`)      |
+| 400    | `{error}`                            | Invalid fields, bundle structure, caps, 5 MiB body, or an entry failing portable validation |
+| 400    | `{error, report, missingReferences}` | Apply refused: unresolved references or entity errors in the preflight; nothing written     |
+| 403    | `{error}`                            | `layer: "base"` without a personal access token, or with local ops enabled                  |
+| 409    | `{error, report}`                    | `expectedPlanDigest` no longer matches the database; run a new dry run                      |
+| 500    | `{error, report, rolledBack}`        | Apply failed midway; all ops the import created were removed and superseded ops restored    |
+
+`rolledBack` is `false` when the rollback itself failed (`error` contains `rollback was incomplete`);
+if the ops could not be restored or the cache could not be rebuilt, the database is also disabled.
 
 ## PCD Lidarr Metadata Profiles
 

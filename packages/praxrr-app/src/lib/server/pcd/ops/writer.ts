@@ -50,6 +50,12 @@ interface WriteContextFrame {
   repoImport?: RepoImportWriteContext;
   /** When set, repo-import base writes are captured here and never persisted. */
   capture?: CapturedBaseOp[];
+  /**
+   * When set, `writeOperation` skips the full `compile()` and applies the validated op SQL
+   * directly to the live cache (the repo-import fast path), so a multi-entity writer can do a
+   * single final compile. Only the bundle importer sets this.
+   */
+  deferCompile?: boolean;
 }
 
 const writeContextStorage = new AsyncLocalStorage<WriteContextFrame[]>();
@@ -148,6 +154,13 @@ export async function withBaseOpCapture<T>(
   const frame: WriteContextFrame = { ...top, capture: captured };
   const result = await writeContextStorage.run([...parent, frame], callback);
   return { result, captured };
+}
+
+/** Run `callback` with per-write recompiles deferred (see `WriteContextFrame.deferCompile`). */
+export async function withDeferredCompile<T>(callback: () => Promise<T>): Promise<T> {
+  const parent = writeContextStorage.getStore() ?? [];
+  const frame: WriteContextFrame = { ...(parent[parent.length - 1] ?? {}), deferCompile: true };
+  return writeContextStorage.run([...parent, frame], callback);
 }
 
 function buildMetadataJson(
@@ -347,7 +360,12 @@ export const __testOnly_supersedePriorUserOps = (...args: Parameters<typeof supe
 
 export const __testOnly_buildMetadataJson = buildMetadataJson;
 
-async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata: OperationMetadata): Promise<boolean> {
+async function cancelOutCreate(
+  databaseId: number,
+  origin: PcdOpOrigin,
+  metadata: OperationMetadata,
+  desiredState?: Record<string, unknown> | null
+): Promise<boolean> {
   if (metadata.operation !== 'delete') {
     return false;
   }
@@ -461,6 +479,24 @@ async function cancelOutCreate(databaseId: number, origin: PcdOpOrigin, metadata
     }
 
     if (parsed.operation === 'create' && parsed.entity === metadata.entity && parsed.name === metadata.name) {
+      // Custom-format tests share the CF's entity/name metadata; a delete must only cancel out the
+      // create of the exact same test (title + type), not a sibling test written by the same bundle.
+      if (metadata.entity === 'custom_format') {
+        // Test ops share the CF's entity/name metadata; compare desired_state so a delete only
+        // cancels out the exact test it targets.
+        const deleteTestTitle = typeof desiredState?.test_title === 'string' ? desiredState.test_title : undefined;
+        const deleteTestType = typeof desiredState?.test_type === 'string' ? desiredState.test_type : undefined;
+        const createDesired = parseDesired(candidate.desired_state);
+        const createTestTitle = typeof createDesired?.test_title === 'string' ? createDesired.test_title : undefined;
+        const createTestType = typeof createDesired?.test_type === 'string' ? createDesired.test_type : undefined;
+        if (
+          deleteTestTitle !== undefined &&
+          createTestTitle !== undefined &&
+          (deleteTestTitle.toLowerCase() !== createTestTitle.toLowerCase() || deleteTestType !== createTestType)
+        ) {
+          continue;
+        }
+      }
       if (await hasDependentOps(candidate.id, parsed, parsed.stable_key)) {
         return false;
       }
@@ -723,6 +759,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
 
     const sqlStatements = operations.map((operation) => normalizeSql(operation.sql));
     const fastPathRepoImport = layer === 'base' && source === 'repo' && !!context?.repoImport;
+    const deferCompile = context?.deferCompile === true;
 
     // Validate against current cache
     const cache = getCache(databaseId);
@@ -803,7 +840,17 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
         continue;
       }
 
-      if (operation.metadata && (await cancelOutCreate(databaseId, layer, operation.metadata))) {
+      if (
+        operation.metadata &&
+        (await cancelOutCreate(databaseId, layer, operation.metadata, operation.desiredState))
+      ) {
+        // The cancelled-out op never lands in pcd_ops, so the deferred/final recompile would never
+        // replay its DELETE. Apply the delete to the live cache now so a mid-sequence refetch sees
+        // the row gone.
+        if ((fastPathRepoImport || deferCompile) && cache) {
+          const rawDb = cache.getRawDb();
+          if (rawDb) rawDb.exec(operation.sql);
+        }
         continue;
       }
 
@@ -881,7 +928,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
         await supersedePriorUserOps(databaseId, opId, operation.metadata, operation.desiredState);
       }
 
-      if (fastPathRepoImport && cache) {
+      if ((fastPathRepoImport || deferCompile) && cache) {
         const rawDb = cache.getRawDb();
         if (!rawDb) {
           throw new Error('Cache not built for repo import fast-path apply');
@@ -891,7 +938,7 @@ async function writeOperationsFromSqlOperations(options: WriteSqlOperationsOptio
       }
     }
 
-    if (fastPathRepoImport) {
+    if (fastPathRepoImport || deferCompile) {
       await logger.debug('Skipped full cache recompile for repo import write', {
         source: 'PCDWriter',
         meta: { databaseId },

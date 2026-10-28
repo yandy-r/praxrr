@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+  import { downloadBundle } from '$lib/client/bundles/api.ts';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
@@ -21,7 +23,7 @@
   import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
-  import { Tag, CheckCircle2, CalendarClock, Plus, Copy, Download } from 'lucide-svelte';
+  import { Tag, CheckCircle2, CalendarClock, Plus, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import type { PageData } from './$types';
   import { alertStore } from '$alerts/store';
   import Button from '$ui/button/Button.svelte';
@@ -68,6 +70,19 @@
 
   let cloneModalOpen = false;
   let cloneSourceName = '';
+  let copyModalOpen = false;
+  function handleCopy(name: string) {
+    cloneSourceName = name;
+    copyModalOpen = true;
+  }
+  async function handleExport(name: string) {
+    try {
+      await downloadBundle(data.currentDatabase.id, 'lidarr_metadata_profile', name);
+      alertStore.add('success', 'Bundle downloaded');
+    } catch (error) {
+      alertStore.add('error', error instanceof Error ? error.message : 'Export failed');
+    }
+  }
 
   function getRowHref(row: LidarrMetadataProfileListItem): string {
     return `/metadata-profiles/${data.currentDatabase.id}/${encodeURIComponent(row.name)}`;
@@ -78,7 +93,7 @@
     cloneModalOpen = true;
   }
 
-  async function handleExport(name: string) {
+  async function handleClipboard(name: string) {
     try {
       const params = new URLSearchParams({
         databaseId: String(data.currentDatabase.id),
@@ -212,10 +227,30 @@
               icon={Download}
               size="xs"
               variant="ghost"
-              tooltip="Export"
+              tooltip="Download bundle"
               on:click={(event) => {
                 event.stopPropagation();
                 handleExport(row.name);
+              }}
+            />
+            <Button
+              icon={DatabaseZap}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy to database…"
+              on:click={(event) => {
+                event.stopPropagation();
+                handleCopy(row.name);
+              }}
+            />
+            <Button
+              icon={ClipboardCopy}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy JSON to clipboard"
+              on:click={(event) => {
+                event.stopPropagation();
+                handleClipboard(row.name);
               }}
             />
             <Button
@@ -234,23 +269,39 @@
     {:else}
       <CardGrid flush>
         {#each filteredProfiles as profile (profile.id)}
-          <Card href={getRowHref(profile)} hoverable>
+          <Card hoverable className="relative">
+            <a href={getRowHref(profile)} aria-label={profile.name} class="absolute inset-0 rounded-xl"></a>
             <svelte:fragment slot="header">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex min-w-0 items-center gap-1.5">
-                  <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{profile.name}</h3>
+                  <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+                    >{profile.name}</span
+                  >
                   {#if profile.locallyModified}
                     <LocallyModifiedBadge />
                   {/if}
                 </div>
-                <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
-                <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+                <div class="relative z-10 flex items-center gap-0.5">
                   <Button
                     icon={Download}
                     size="xs"
                     variant="ghost"
-                    tooltip="Export"
+                    tooltip="Download bundle"
                     on:click={() => handleExport(profile.name)}
+                  />
+                  <Button
+                    icon={DatabaseZap}
+                    size="xs"
+                    variant="ghost"
+                    tooltip="Copy to database…"
+                    on:click={() => handleCopy(profile.name)}
+                  />
+                  <Button
+                    icon={ClipboardCopy}
+                    size="xs"
+                    variant="ghost"
+                    tooltip="Copy JSON to clipboard"
+                    on:click={() => handleClipboard(profile.name)}
                   />
                   <Button
                     icon={Copy}
@@ -295,4 +346,11 @@
   sourceName={cloneSourceName}
   existingNames={data.metadataProfiles.map((profile) => profile.name)}
   canWriteToBase={data.canWriteToBase}
+/>
+
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType="lidarr_metadata_profile"
+  sourceName={cloneSourceName}
 />

@@ -8,7 +8,7 @@
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import LocallyModifiedBadge from '$ui/badge/LocallyModifiedBadge.svelte';
   import Button from '$ui/button/Button.svelte';
-  import { Copy, Download } from 'lucide-svelte';
+  import { Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import type { SourcedQualityDefinitionListItem } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
   import {
@@ -33,6 +33,8 @@
   const dispatch = createEventDispatcher<{
     clone: { name: string; arr_type: string };
     export: { name: string; arr_type: string };
+    copy: { name: string; arr_type: string };
+    clipboard: { name: string; arr_type: string };
   }>();
 
   // Available logo assets keyed by ArrIconKey.
@@ -170,8 +172,9 @@
     {@const hasAppMapping = isArrAppType(config.arr_type)}
     {@const hasMappedQualities = config.quality_count > 0}
     {@const mappedQualityLabel = getMappedQualityLabel(config.quality_count)}
-    <Card href={getRowHref(config)} hoverable>
+    <Card hoverable className="relative">
       <div class="flex items-center gap-4">
+        <a href={getRowHref(config)} aria-label={config.name} class="absolute inset-0 rounded-xl"></a>
         <!-- Logo + Name -->
         <div class="flex min-w-0 flex-1 items-center gap-3">
           <div class="relative h-10 w-10 flex-shrink-0">
@@ -194,9 +197,9 @@
             {/if}
           </div>
           <div class="min-w-0">
-            <h3 class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-              {getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}
-            </h3>
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+              >{getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}</span
+            >
             <div class="mt-1 flex flex-wrap items-center gap-1">
               {#if showSourceBadges}
                 {@const source = resolveSource(config)}
@@ -220,15 +223,28 @@
           </div>
         </div>
 
-        <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
         {#if isEditableRow(config)}
-          <div role="presentation" class="flex items-center gap-0.5" on:click|stopPropagation|preventDefault>
+          <div class="relative z-10 flex items-center gap-0.5">
             <Button
               icon={Download}
               size="xs"
               variant="ghost"
-              tooltip="Export"
+              tooltip="Download bundle"
               on:click={() => dispatch('export', { name: config.name, arr_type: config.arr_type })}
+            />
+            <Button
+              icon={DatabaseZap}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy to database…"
+              on:click={() => dispatch('copy', { name: config.name, arr_type: config.arr_type })}
+            />
+            <Button
+              icon={ClipboardCopy}
+              size="xs"
+              variant="ghost"
+              tooltip="Copy JSON to clipboard"
+              on:click={() => dispatch('clipboard', { name: config.name, arr_type: config.arr_type })}
             />
             <Button
               icon={Copy}

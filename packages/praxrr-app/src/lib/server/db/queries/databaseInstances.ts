@@ -397,6 +397,18 @@ export const databaseInstancesQueries = {
     );
     return affected > 0;
   },
+
+  /**
+   * Enable a database instance (set enabled = 1). Used to restore the enabled state after a
+   * rolled-back bundle import whose failed cache build disabled it.
+   */
+  enable(id: number): boolean {
+    const affected = db.execute(
+      'UPDATE database_instances SET enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      id
+    );
+    return affected > 0;
+  },
 };
 
 /**

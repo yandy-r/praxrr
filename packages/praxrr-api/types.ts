@@ -748,6 +748,18 @@ export interface paths {
      *     The portable format strips database IDs and timestamps, producing a
      *     self-contained snapshot suitable for clipboard copy, file export, or
      *     cross-database import.
+     *
+     *     `name` may be repeated (`?name=A&name=B`) to export several entities of the
+     *     same `entityType`. Set `includeDependencies=true` to also export the
+     *     custom formats and regular expressions a quality profile references (and the
+     *     regular expressions a custom format references). Set `format=bundle` to force
+     *     the bundle response shape.
+     *
+     *     Response shape rule: the legacy `ExportResponse` (`entityType`, `data`,
+     *     `migration`) is returned if and only if exactly one `name` is supplied and
+     *     neither `includeDependencies=true` nor `format=bundle` is set. Every other
+     *     request returns a `PcdBundleExportResponse`. A bundle holds at most 1000
+     *     entities; exceeding the cap returns 400.
      */
     get: operations['exportEntity'];
     put?: never;
@@ -768,7 +780,7 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Import a portable entity
+     * Import a portable entity or entity bundle
      * @description Deserializes a portable entity into PCD operations, creating the entity
      *     in the target database and layer.
      *
@@ -779,6 +791,27 @@ export interface paths {
      *
      *     Name uniqueness is validated — importing an entity with a name that already
      *     exists will return a 400 error.
+     *
+     *     Bundle import: when the body contains a `bundle` key it is treated as a
+     *     `PcdBundleImportRequest` (the legacy single-entity path is not used). All
+     *     entities are written to the single requested `layer` as one undo unit.
+     *
+     *     - `dryRun: true` applies the bundle against an ephemeral cache and returns a
+     *       `PcdBundleImportReport` listing creates, collisions and missing references.
+     *       Nothing is written to `pcd_ops` or `pcd_op_history`.
+     *     - `collisions` selects `skip`, `rename` or `overwrite` for entities whose name
+     *       already exists (case-insensitive), with an optional per-entity override keyed
+     *       `"<entityType>:<name>"`.
+     *     - References (quality profile to custom format, custom format to regular
+     *       expression) must resolve inside the bundle or the target database. On a real
+     *       apply any unresolved reference returns 400 with the report before anything is
+     *       written.
+     *     - A failure part-way through applying rolls back every operation the import
+     *       created and returns 500 with the report and `rolledBack: true`. If the rollback
+     *       itself failed, the database is disabled and `rolledBack` is false.
+     *     - `expectedPlanDigest`: pass the `planDigest` returned by a dry run to reject the
+     *       apply with HTTP 409 when the database changed in between.
+     *     - Limits: at most 1000 entities and a 5 MiB JSON body (400 otherwise).
      */
     post: operations['importEntity'];
     delete?: never;
@@ -6337,6 +6370,146 @@ export interface components {
      *     The shape matches `PortableQualityDefinitions`.
      */
     PortableLidarrQualityDefinitions: components['schemas']['PortableQualityDefinitions'];
+    PcdBundleEntry: {
+      entityType: components['schemas']['EntityType'];
+      /**
+       * @description The portable entity payload. Same shape set as `ExportResponse.data`; the
+       *     shape varies by `entityType`. Bundle entries carry no ids, timestamps or
+       *     source-database identity.
+       */
+      data:
+        | components['schemas']['PortableDelayProfile']
+        | components['schemas']['PortableRegularExpression']
+        | components['schemas']['PortableCustomFormat']
+        | components['schemas']['PortableQualityProfile']
+        | components['schemas']['PortableRadarrNaming']
+        | components['schemas']['PortableSonarrNaming']
+        | components['schemas']['PortableLidarrNaming']
+        | components['schemas']['PortableMediaSettings']
+        | components['schemas']['PortableLidarrMediaSettings']
+        | components['schemas']['PortableQualityDefinitions']
+        | components['schemas']['PortableLidarrMetadataProfile']
+        | components['schemas']['PortableLidarrQualityDefinitions'];
+    };
+    /**
+     * @description A set of portable PCD entities that can be exported together with their
+     *     dependencies and imported atomically.
+     */
+    PcdBundle: {
+      /**
+       * @description Bundle format version. Only `1` is supported.
+       * @enum {integer}
+       */
+      version: 1;
+      /**
+       * @description Portable entities ordered dependency-first (regular expressions, custom
+       *     formats, quality profiles, then all other entity types). A bundle holds at
+       *     most 1000 entities and its JSON body is capped at 5 MiB.
+       */
+      entities: components['schemas']['PcdBundleEntry'][];
+    };
+    /**
+     * @description A reference (quality profile to custom format, custom format to regular
+     *     expression) that resolves neither inside the bundle nor in the target database.
+     */
+    PcdBundleMissingRef: {
+      fromType: components['schemas']['EntityType'];
+      fromName: string;
+      toType: components['schemas']['EntityType'];
+      toName: string;
+    };
+    PcdBundleExportResponse: {
+      bundle: components['schemas']['PcdBundle'];
+      /**
+       * @description Dependencies referenced by an exported entity that do not exist in the source
+       *     database. Present only when non-empty.
+       */
+      missingReferences?: components['schemas']['PcdBundleMissingRef'][];
+    };
+    /**
+     * @description How an entity whose name already exists (case-insensitive) in the target
+     *     database is handled:
+     *     - `skip` leaves the existing entity untouched.
+     *     - `rename` imports under a unique `"<name> (2)"`, `"<name> (3)"`, ... name and
+     *       rewrites bundle references (for example quality profile score entries) to it.
+     *     - `overwrite` updates the existing entity in place with value-guarded update
+     *       operations (never delete + create).
+     * @enum {string}
+     */
+    PcdBundleCollisionPolicy: 'skip' | 'rename' | 'overwrite';
+    PcdBundleImportRequest: {
+      /** @description The PCD database ID to import into */
+      databaseId: number;
+      /**
+       * @description The single operation layer every bundle entity is written to. `base`
+       *     requires a personal access token and local ops disabled (403 otherwise).
+       * @enum {string}
+       */
+      layer: 'user' | 'base';
+      bundle: components['schemas']['PcdBundle'];
+      /**
+       * @description When true the whole bundle is applied against an ephemeral cache and a
+       *     report is returned. Nothing is written to `pcd_ops` or `pcd_op_history`
+       *     and the live cache is not modified.
+       * @default false
+       */
+      dryRun: boolean;
+      collisions?: {
+        default: components['schemas']['PcdBundleCollisionPolicy'];
+        /**
+         * @description Per-entity overrides keyed by `"<entityType>:<name>"` (name matched
+         *     case-insensitively).
+         */
+        perEntity?: {
+          [key: string]: components['schemas']['PcdBundleCollisionPolicy'];
+        };
+      };
+      /**
+       * @description When set, the apply is rejected with HTTP 409 if the plan computed from the
+       *     current database state does not match this digest (another write landed after
+       *     the dry run).
+       */
+      expectedPlanDigest?: string;
+    };
+    PcdBundleEntityOutcome: {
+      entityType: components['schemas']['EntityType'];
+      /** @description Entity name as it appears in the bundle. */
+      name: string;
+      /** @description Name the entity has (or would have) in the target database after import. */
+      finalName: string;
+      /** @enum {string} */
+      action: 'create' | 'skip' | 'rename' | 'overwrite' | 'error';
+      /** @description Present when `action` is `error`. */
+      error?: string;
+    };
+    PcdBundleImportReport: {
+      /**
+       * @description Deterministic hash over the ordered plan outcomes and the target state they were
+       *     computed from. Pass back as `expectedPlanDigest` on the apply request to get a 409
+       *     when the plan no longer matches the database.
+       */
+      planDigest: string;
+      dryRun: boolean;
+      /** @description True only when a non-dry-run import wrote its operations. */
+      applied: boolean;
+      /** @description True when a failure mid-apply was fully rolled back (HTTP 500). */
+      rolledBack?: boolean;
+      outcomes: components['schemas']['PcdBundleEntityOutcome'][];
+      missingReferences: components['schemas']['PcdBundleMissingRef'][];
+      errors: {
+        entityType: components['schemas']['EntityType'];
+        name: string;
+        error: string;
+      }[];
+    };
+    PcdBundleImportErrorResponse: {
+      error: string;
+      report?: components['schemas']['PcdBundleImportReport'];
+      /** @description True when a mid-apply failure was fully rolled back (HTTP 500). */
+      rolledBack?: boolean;
+      /** @description Present on HTTP 400 when references resolve neither in the bundle nor the target database. */
+      missingReferences?: components['schemas']['PcdBundleMissingRef'][];
+    };
     /**
      * @description Closed result of bounded DNS evidence gathering for one stored Arr hostname.
      * @enum {string}
@@ -8123,8 +8296,12 @@ export interface operations {
         databaseId: number;
         /** @description The entity type to export */
         entityType: components['schemas']['EntityType'];
-        /** @description The entity name to export */
-        name: string;
+        /** @description The entity name to export. Repeat the parameter to export several entities. */
+        name: string[];
+        /** @description Also export referenced custom formats and regular expressions. */
+        includeDependencies?: boolean;
+        /** @description Force the response shape. `bundle` always returns a `PcdBundleExportResponse`. */
+        format?: 'json' | 'bundle';
       };
       header?: never;
       path?: never;
@@ -8132,16 +8309,17 @@ export interface operations {
     };
     requestBody?: never;
     responses: {
-      /** @description Portable entity JSON */
+      /** @description Portable entity JSON (legacy shape) or entity bundle */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ExportResponse'];
+          'application/json':
+            components['schemas']['ExportResponse'] | components['schemas']['PcdBundleExportResponse'];
         };
       };
-      /** @description Missing or invalid parameters */
+      /** @description Missing or invalid parameters, the bundle exceeds the 1000 entity cap, or the dependency walk was truncated */
       400: {
         headers: {
           [name: string]: unknown;
@@ -8179,26 +8357,27 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['ImportRequest'];
+        'application/json': components['schemas']['ImportRequest'] | components['schemas']['PcdBundleImportRequest'];
       };
     };
     responses: {
-      /** @description Entity created successfully */
+      /** @description Entity created successfully, or bundle import report */
       200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ImportResponse'];
+          'application/json': components['schemas']['ImportResponse'] | components['schemas']['PcdBundleImportReport'];
         };
       };
-      /** @description Validation error (missing fields, duplicate name, invalid data) */
+      /** @description Validation error (missing fields, duplicate name, invalid data, bundle caps, unresolved references) */
       400: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json':
+            components['schemas']['PcdErrorResponse'] | components['schemas']['PcdBundleImportErrorResponse'];
         };
       };
       /** @description Cannot write to base layer */
@@ -8210,13 +8389,23 @@ export interface operations {
           'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
-      /** @description Database cache not available */
+      /** @description The plan digest no longer matches the database (run a new dry run) */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdBundleImportErrorResponse'];
+        };
+      };
+      /** @description Database cache not available, or bundle apply failed and was rolled back */
       500: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json':
+            components['schemas']['PcdErrorResponse'] | components['schemas']['PcdBundleImportErrorResponse'];
         };
       };
     };

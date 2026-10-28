@@ -152,6 +152,242 @@ ImportResponse:
     success:
       type: boolean
 
+PcdBundleEntry:
+  type: object
+  required:
+    - entityType
+    - data
+  properties:
+    entityType:
+      $ref: '#/EntityType'
+    data:
+      description: |
+        The portable entity payload. Same shape set as `ExportResponse.data`; the
+        shape varies by `entityType`. Bundle entries carry no ids, timestamps or
+        source-database identity.
+      oneOf:
+        - $ref: '#/PortableDelayProfile'
+        - $ref: '#/PortableRegularExpression'
+        - $ref: '#/PortableCustomFormat'
+        - $ref: '#/PortableQualityProfile'
+        - $ref: '#/PortableRadarrNaming'
+        - $ref: '#/PortableSonarrNaming'
+        - $ref: '#/PortableLidarrNaming'
+        - $ref: '#/PortableMediaSettings'
+        - $ref: '#/PortableLidarrMediaSettings'
+        - $ref: '#/PortableQualityDefinitions'
+        - $ref: '#/PortableLidarrMetadataProfile'
+        - $ref: '#/PortableLidarrQualityDefinitions'
+
+PcdBundle:
+  type: object
+  required:
+    - version
+    - entities
+  properties:
+    version:
+      type: integer
+      enum: [1]
+      description: Bundle format version. Only `1` is supported.
+    entities:
+      type: array
+      minItems: 1
+      maxItems: 1000
+      description: |
+        Portable entities ordered dependency-first (regular expressions, custom
+        formats, quality profiles, then all other entity types). A bundle holds at
+        most 1000 entities and its JSON body is capped at 5 MiB.
+      items:
+        $ref: '#/PcdBundleEntry'
+  description: |
+    A set of portable PCD entities that can be exported together with their
+    dependencies and imported atomically.
+
+PcdBundleExportResponse:
+  type: object
+  required:
+    - bundle
+  properties:
+    bundle:
+      $ref: '#/PcdBundle'
+    missingReferences:
+      type: array
+      description: |
+        Dependencies referenced by an exported entity that do not exist in the source
+        database. Present only when non-empty.
+      items:
+        $ref: '#/PcdBundleMissingRef'
+
+PcdBundleCollisionPolicy:
+  type: string
+  enum:
+    - skip
+    - rename
+    - overwrite
+  description: |
+    How an entity whose name already exists (case-insensitive) in the target
+    database is handled:
+    - `skip` leaves the existing entity untouched.
+    - `rename` imports under a unique `"<name> (2)"`, `"<name> (3)"`, ... name and
+      rewrites bundle references (for example quality profile score entries) to it.
+    - `overwrite` updates the existing entity in place with value-guarded update
+      operations (never delete + create).
+
+PcdBundleImportRequest:
+  type: object
+  required:
+    - databaseId
+    - layer
+    - bundle
+  properties:
+    databaseId:
+      type: integer
+      description: The PCD database ID to import into
+    layer:
+      type: string
+      enum: [user, base]
+      description: |
+        The single operation layer every bundle entity is written to. `base`
+        requires a personal access token and local ops disabled (403 otherwise).
+    bundle:
+      $ref: '#/PcdBundle'
+    dryRun:
+      type: boolean
+      default: false
+      description: |
+        When true the whole bundle is applied against an ephemeral cache and a
+        report is returned. Nothing is written to `pcd_ops` or `pcd_op_history`
+        and the live cache is not modified.
+    collisions:
+      type: object
+      required:
+        - default
+      properties:
+        default:
+          $ref: '#/PcdBundleCollisionPolicy'
+        perEntity:
+          type: object
+          description: |
+            Per-entity overrides keyed by `"<entityType>:<name>"` (name matched
+            case-insensitively).
+          additionalProperties:
+            $ref: '#/PcdBundleCollisionPolicy'
+    expectedPlanDigest:
+      type: string
+      description: |
+        When set, the apply is rejected with HTTP 409 if the plan computed from the
+        current database state does not match this digest (another write landed after
+        the dry run).
+
+PcdBundleEntityOutcome:
+  type: object
+  required:
+    - entityType
+    - name
+    - finalName
+    - action
+  properties:
+    entityType:
+      $ref: '#/EntityType'
+    name:
+      type: string
+      description: Entity name as it appears in the bundle.
+    finalName:
+      type: string
+      description: Name the entity has (or would have) in the target database after import.
+    action:
+      type: string
+      enum: [create, skip, rename, overwrite, error]
+    error:
+      type: string
+      description: Present when `action` is `error`.
+
+PcdBundleMissingRef:
+  type: object
+  required:
+    - fromType
+    - fromName
+    - toType
+    - toName
+  properties:
+    fromType:
+      $ref: '#/EntityType'
+    fromName:
+      type: string
+    toType:
+      $ref: '#/EntityType'
+    toName:
+      type: string
+  description: |
+    A reference (quality profile to custom format, custom format to regular
+    expression) that resolves neither inside the bundle nor in the target database.
+
+PcdBundleImportReport:
+  type: object
+  required:
+    - planDigest
+    - dryRun
+    - applied
+    - outcomes
+    - missingReferences
+    - errors
+  properties:
+    planDigest:
+      type: string
+      description: |
+        Deterministic hash over the ordered plan outcomes and the target state they were
+        computed from. Pass back as `expectedPlanDigest` on the apply request to get a 409
+        when the plan no longer matches the database.
+    dryRun:
+      type: boolean
+    applied:
+      type: boolean
+      description: True only when a non-dry-run import wrote its operations.
+    rolledBack:
+      type: boolean
+      description: True when a failure mid-apply was fully rolled back (HTTP 500).
+    outcomes:
+      type: array
+      items:
+        $ref: '#/PcdBundleEntityOutcome'
+    missingReferences:
+      type: array
+      items:
+        $ref: '#/PcdBundleMissingRef'
+    errors:
+      type: array
+      items:
+        type: object
+        required:
+          - entityType
+          - name
+          - error
+        properties:
+          entityType:
+            $ref: '#/EntityType'
+          name:
+            type: string
+          error:
+            type: string
+
+PcdBundleImportErrorResponse:
+  type: object
+  required:
+    - error
+  properties:
+    error:
+      type: string
+    report:
+      $ref: '#/PcdBundleImportReport'
+    rolledBack:
+      type: boolean
+      description: True when a mid-apply failure was fully rolled back (HTTP 500).
+    missingReferences:
+      type: array
+      description: Present on HTTP 400 when references resolve neither in the bundle nor the target database.
+      items:
+        $ref: '#/PcdBundleMissingRef'
+
 PcdErrorResponse:
   type: object
   required:

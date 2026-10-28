@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+  import { downloadBundle } from '$lib/client/bundles/api.ts';
   import { goto } from '$app/navigation';
   import { Plus } from 'lucide-svelte';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
@@ -39,6 +41,19 @@
 
   let cloneModalOpen = false;
   let cloneSourceName = '';
+  let copyModalOpen = false;
+  function handleCopy(event: CustomEvent<{ name: string }>) {
+    cloneSourceName = event.detail.name;
+    copyModalOpen = true;
+  }
+  async function handleExport(event: CustomEvent<{ name: string }>) {
+    try {
+      await downloadBundle(data.currentDatabase.id, 'quality_profile', event.detail.name);
+      alertStore.add('success', 'Bundle downloaded');
+    } catch (error) {
+      alertStore.add('error', error instanceof Error ? error.message : 'Export failed');
+    }
+  }
   let selectedSourceKeys: SourceFilterSelection = [];
   let initializedSourceFilterKey = '';
 
@@ -47,7 +62,7 @@
     cloneModalOpen = true;
   }
 
-  async function handleExport(event: CustomEvent<{ name: string }>) {
+  async function handleClipboard(event: CustomEvent<{ name: string }>) {
     const { name } = event.detail;
     try {
       const params = new URLSearchParams({
@@ -252,6 +267,8 @@
         showSourceBadges={data.sourceContext.showAllSourcesTab}
         currentDatabaseId={data.currentDatabase.id}
         on:clone={handleClone}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
         on:export={handleExport}
       />
     {:else}
@@ -261,6 +278,8 @@
         showSourceBadges={data.sourceContext.showAllSourcesTab}
         currentDatabaseId={data.currentDatabase.id}
         on:clone={handleClone}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
         on:export={handleExport}
       />
     {/if}
@@ -276,4 +295,11 @@
     .filter((profile) => isCurrentDatabasePcdItem(profile, data.currentDatabase.id))
     .map((profile) => profile.name)}
   canWriteToBase={data.canWriteToBase}
+/>
+
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType="quality_profile"
+  sourceName={cloneSourceName}
 />

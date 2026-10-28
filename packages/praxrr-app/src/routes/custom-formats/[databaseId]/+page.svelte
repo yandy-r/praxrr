@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+  import { downloadBundle } from '$lib/client/bundles/api.ts';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
@@ -41,13 +43,26 @@
   let infoModalOpen = false;
   let cloneModalOpen = false;
   let cloneSourceName = '';
+  let copyModalOpen = false;
+  function handleCopy(event: CustomEvent<{ name: string }>) {
+    cloneSourceName = event.detail.name;
+    copyModalOpen = true;
+  }
+  async function handleExport(event: CustomEvent<{ name: string }>) {
+    try {
+      await downloadBundle(data.currentDatabase.id, 'custom_format', event.detail.name);
+      alertStore.add('success', 'Bundle downloaded');
+    } catch (error) {
+      alertStore.add('error', error instanceof Error ? error.message : 'Export failed');
+    }
+  }
 
   function handleClone(event: CustomEvent<{ name: string }>) {
     cloneSourceName = event.detail.name;
     cloneModalOpen = true;
   }
 
-  async function handleExport(event: CustomEvent<{ name: string }>) {
+  async function handleClipboard(event: CustomEvent<{ name: string }>) {
     const { name } = event.detail;
     try {
       const params = new URLSearchParams({
@@ -301,6 +316,8 @@
         currentDatabaseName={data.currentDatabase.name}
         {showSourceBadges}
         on:clone={handleClone}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
         on:export={handleExport}
       />
     {:else}
@@ -311,6 +328,8 @@
         currentDatabaseName={data.currentDatabase.name}
         {showSourceBadges}
         on:clone={handleClone}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
         on:export={handleExport}
       />
     {/if}
@@ -360,4 +379,11 @@
     .filter((format) => isCurrentDatabasePcdItem(format, data.currentDatabase.id))
     .map((format) => format.name)}
   canWriteToBase={data.canWriteToBase}
+/>
+
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType="custom_format"
+  sourceName={cloneSourceName}
 />

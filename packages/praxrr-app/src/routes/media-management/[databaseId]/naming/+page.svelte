@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+  import { downloadBundle } from '$lib/client/bundles/api.ts';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
   import PageTitle from '$ui/meta/PageTitle.svelte';
@@ -96,7 +98,28 @@
     cloneModalOpen = true;
   }
 
+  let copyModalOpen = false;
+  function handleCopy(event: CustomEvent<{ name: string; arr_type: string }>) {
+    handleClone(event);
+    if (cloneModalOpen) {
+      cloneModalOpen = false;
+      copyModalOpen = true;
+    }
+  }
   async function handleExport(event: CustomEvent<{ name: string; arr_type: string }>) {
+    const entityType = toEntityType(event.detail.arr_type);
+    if (!entityType || !event.detail.name?.trim()) {
+      alertStore.add('error', 'Invalid naming config');
+      return;
+    }
+    try {
+      await downloadBundle(data.currentDatabase.id, entityType, event.detail.name);
+      alertStore.add('success', 'Bundle downloaded');
+    } catch (error) {
+      alertStore.add('error', error instanceof Error ? error.message : 'Export failed');
+    }
+  }
+  async function handleClipboard(event: CustomEvent<{ name: string; arr_type: string }>) {
     const { name, arr_type } = event.detail;
     if (!name?.trim()) {
       alertStore.add('error', 'Missing naming config name');
@@ -257,6 +280,8 @@
       sources={availableSources}
       showSourceBadges={data.sourceContext.showAllSourcesTab}
       on:clone={handleClone}
+      on:copy={handleCopy}
+      on:clipboard={handleClipboard}
       on:export={handleExport}
     />
   {:else}
@@ -268,6 +293,8 @@
       sources={availableSources}
       showSourceBadges={data.sourceContext.showAllSourcesTab}
       on:clone={handleClone}
+      on:copy={handleCopy}
+      on:clipboard={handleClipboard}
       on:export={handleExport}
     />
   {/if}
@@ -280,4 +307,11 @@
   sourceName={cloneSourceName}
   existingNames={cloneExistingNames}
   canWriteToBase={data.canWriteToBase}
+/>
+
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType={cloneEntityType}
+  sourceName={cloneSourceName}
 />

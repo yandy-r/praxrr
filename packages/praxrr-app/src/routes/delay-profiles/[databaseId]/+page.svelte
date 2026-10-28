@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
+  import { downloadBundle } from '$lib/client/bundles/api.ts';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
@@ -27,6 +29,19 @@
   let showInfoModal = false;
   let cloneModalOpen = false;
   let cloneSourceName = '';
+  let copyModalOpen = false;
+  function handleCopy(event: CustomEvent<{ name: string }>) {
+    cloneSourceName = event.detail.name;
+    copyModalOpen = true;
+  }
+  async function handleExport(event: CustomEvent<{ name: string }>) {
+    try {
+      await downloadBundle(data.currentDatabase.id, 'delay_profile', event.detail.name);
+      alertStore.add('success', 'Bundle downloaded');
+    } catch (error) {
+      alertStore.add('error', error instanceof Error ? error.message : 'Export failed');
+    }
+  }
 
   let onlyLocal = false;
   let initializedLocalOnlyKey = '';
@@ -47,7 +62,7 @@
     cloneModalOpen = true;
   }
 
-  async function handleExport(event: CustomEvent<{ name: string }>) {
+  async function handleClipboard(event: CustomEvent<{ name: string }>) {
     const { name } = event.detail;
     try {
       const params = new URLSearchParams({
@@ -134,9 +149,21 @@
         </p>
       </div>
     {:else if $view === 'table'}
-      <TableView profiles={filteredProfiles} on:clone={handleClone} on:export={handleExport} />
+      <TableView
+        profiles={filteredProfiles}
+        on:clone={handleClone}
+        on:export={handleExport}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
+      />
     {:else}
-      <CardView profiles={filteredProfiles} on:clone={handleClone} on:export={handleExport} />
+      <CardView
+        profiles={filteredProfiles}
+        on:clone={handleClone}
+        on:export={handleExport}
+        on:copy={handleCopy}
+        on:clipboard={handleClipboard}
+      />
     {/if}
   </div>
 </div>
@@ -174,4 +201,11 @@
   sourceName={cloneSourceName}
   existingNames={data.delayProfiles.map((p) => p.name)}
   canWriteToBase={data.canWriteToBase}
+/>
+
+<CopyToDatabaseModal
+  bind:open={copyModalOpen}
+  databaseId={data.currentDatabase.id}
+  entityType="delay_profile"
+  sourceName={cloneSourceName}
 />

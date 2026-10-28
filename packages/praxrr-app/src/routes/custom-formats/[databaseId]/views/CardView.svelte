@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
-  import { FlaskConical, Copy, Download } from 'lucide-svelte';
+  import { FlaskConical, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { sortConditions } from '$shared/pcd/conditions';
   import CardGrid from '$ui/card/CardGrid.svelte';
@@ -26,7 +26,12 @@
   export let currentDatabaseName: string;
   export let showSourceBadges: boolean = false;
 
-  const dispatch = createEventDispatcher<{ clone: { name: string }; export: { name: string } }>();
+  const dispatch = createEventDispatcher<{
+    clone: { name: string };
+    export: { name: string };
+    copy: { name: string };
+    clipboard: { name: string };
+  }>();
 
   $: sourceLookup = new Map(sources.map((source) => [`${source.type}:${source.id}`, source] as const));
   $: fallbackSource = {
@@ -118,11 +123,12 @@
 
 <CardGrid flush>
   {#each visibleFormats as format}
-    <Card href={getCardHref(format)} hoverable>
+    <Card hoverable className="relative">
+      <a href={getCardHref(format)} aria-label={format.name} class="absolute inset-0 rounded-xl"></a>
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-col">
-            <h3 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{format.name}</h3>
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{format.name}</span>
             {#if showLocallyModified(format)}
               <div class="mt-1">
                 <LocallyModifiedBadge />
@@ -130,8 +136,7 @@
             {/if}
           </div>
           {#if isEditableRow(format)}
-            <!-- presentation role: stopPropagation wrapper; inner buttons carry the interaction -->
-            <div role="presentation" class="flex shrink-0 items-center gap-0.5" on:click|stopPropagation|preventDefault>
+            <div class="relative z-10 flex shrink-0 items-center gap-0.5">
               {#if format.testCount > 0}
                 <div
                   class="flex items-center gap-1 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
@@ -145,8 +150,22 @@
                 icon={Download}
                 size="xs"
                 variant="ghost"
-                tooltip="Export"
+                tooltip="Download bundle"
                 on:click={() => dispatch('export', { name: format.name })}
+              />
+              <Button
+                icon={DatabaseZap}
+                size="xs"
+                variant="ghost"
+                tooltip="Copy to database…"
+                on:click={() => dispatch('copy', { name: format.name })}
+              />
+              <Button
+                icon={ClipboardCopy}
+                size="xs"
+                variant="ghost"
+                tooltip="Copy JSON to clipboard"
+                on:click={() => dispatch('clipboard', { name: format.name })}
               />
               <Button
                 icon={Copy}
