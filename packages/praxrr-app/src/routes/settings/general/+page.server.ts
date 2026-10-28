@@ -161,7 +161,7 @@ export const actions: Actions = {
 
     if (!isValidBackupSchedule(schedule)) {
       return fail(400, {
-        error: 'Schedule must be one of: hourly, daily, weekly, monthly, 0 */6 * * *, 0 */12 * * *'
+        error: 'Schedule must be one of: hourly, daily, weekly, monthly, 0 */6 * * *, 0 */12 * * *',
       });
     }
 
