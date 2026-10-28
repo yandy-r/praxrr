@@ -128,6 +128,7 @@
       <svelte:fragment slot="header">
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-col">
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{format.name}</span>
             {#if showLocallyModified(format)}
               <div class="mt-1">
                 <LocallyModifiedBadge />
