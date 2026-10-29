@@ -10,18 +10,18 @@
     "sync:external-docs": "node scripts/import-external-docs.mjs"
   },
   "dependencies": {
-    "astro-mermaid": "^2.1.0",
-    "@astrojs/starlight": "^0.42.5",
-    "@astrojs/svelte": "^9.0.1",
+    "astro-mermaid": "^2.2.0",
+    "@astrojs/starlight": "^0.42.7",
+    "@astrojs/svelte": "^9.1.1",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.0.6",
-    "starlight-openapi": "^0.26.3",
-    "svelte": "^5.57.1",
+    "astro": "^7.4.2",
+    "starlight-openapi": "^0.27.0",
+    "svelte": "^5.57.3",
     "tailwindcss": "^4.1.13"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
-    "typescript": "^5.9.3"
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "dompurify": "3.4.17",
