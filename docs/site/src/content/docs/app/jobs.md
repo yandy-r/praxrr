@@ -52,6 +52,14 @@ not copied. Restore from **Settings → Backups** validates and stages the archi
 runs at the next startup, before the database opens. The previous `data/` directory is kept
 as `data.pre-restore-*`.
 
+Accepted `backup_settings.schedule` values are `hourly`, `daily`, `weekly`, `monthly`,
+`0 */6 * * *`, and `0 */12 * * *`. `weekly` is the next Sunday at 00:00 in the process
+local timezone. A restart keeps an earlier queued `backup.create` when that row is still
+`queued`, `source` is `schedule`, and its payload schedule matches the current setting
+(a missing payload schedule counts as a match). Migration `20261029` rewrites stored
+`*/6 hours` and `*/12 hours` to the two cron values. Any other stored schedule is logged
+and treated as one hour ahead.
+
 ## Config Health Jobs
 
 `config-health.snapshot` runs a chunked, instance-ordered sweep of enabled sync-capable Arr
@@ -80,7 +88,23 @@ when Config Health scoring is disabled.
 5. On `rescheduleAt` in the handler result, reschedules instead of marking finished
 
 There is **no central retry policy** — handlers return `rescheduleAt` and optional
-`cooldownUntil` when they want deferred retry.
+`cooldownUntil` when they want another run.
+
+Bookkeeping after the handler returns is independent. A failed history insert or finish
+log does not drop `rescheduleAt`. `job.finished` is still published. `handedBack` is true
+only when that reschedule changes `source` (a manual PCD or TRaSH sync handing the slot
+back to `schedule`). A database error while claiming a job or looking up the wake time
+waits 60 seconds and tries again.
+
+A failed scheduled run of `backup.create`, `backup.cleanup`, `logs.cleanup`, `arr.upgrade`,
+or `arr.rename` returns the next normal slot. A scheduled `pcd.sync` or `trashguide.sync`
+failure does the same when that database or source still has a schedule. A scheduled
+`arr.sync*` run does too, including a failure while creating the Arr client. A credential
+failure disables the instance and does not reschedule. A manual `pcd.sync` or
+`trashguide.sync` hands the slot back when auto-sync is still enabled (`sync_strategy` /
+`syncStrategy` greater than 0). Other manual runs, and runs whose target was deleted or
+disabled, do not recur. A scheduled TRaSH git/network failure can use a short retry (up to
+3 attempts) before that next interval; a total parse failure (`parser_failed`) does not.
 
 ## Handler Registration
 

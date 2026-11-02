@@ -39,6 +39,11 @@ errors for env-managed instances.
 
 Re-run preview after resolving conflicts. Preview is read-only and safe to repeat.
 
+Sync history and Arr sync form errors do not include the Arr response body. A generic line
+such as `Sync failed. Check the server logs for details.` means the detail is in
+`APP_BASE_PATH/logs/app.log`. HTTP failures name the status
+(`The Arr instance rejected the request (HTTP 400).`) and nothing from the body.
+
 ## Sync succeeds but Arr looks wrong
 
 **Symptoms:** Push reports success but scores or qualities differ from PCD.
@@ -65,12 +70,12 @@ Re-run preview after resolving conflicts. Preview is read-only and safe to repea
 
 ## Authentication issues
 
-| Mode         | Common issue                                                         |
-| ------------ | -------------------------------------------------------------------- |
-| `AUTH=on`    | Reset password via admin flows; confirm session cookies reach the UI |
-| `AUTH=oidc`  | Verify `OIDC_*`, redirect URIs, and the sign-in allowlist            |
-| `AUTH=local` | Remember it skips auth only for local-network requests               |
-| `AUTH=off`   | **Insecure** — anyone with network access can use the UI             |
+| Mode         | Common issue                                                                                    |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `AUTH=on`    | Reset password via admin flows; confirm session cookies reach the UI                            |
+| `AUTH=oidc`  | Verify `OIDC_*`, https endpoints (loopback http only), redirect URIs, and the sign-in allowlist |
+| `AUTH=local` | Remember it skips auth only for local-network requests                                          |
+| `AUTH=off`   | **Insecure** — anyone with network access can use the UI                                        |
 
 > **Warning:** Do not run `AUTH=off` on the public internet. Pair with external
 > auth (Authentik, Authelia) if you disable built-in login.

@@ -124,6 +124,9 @@ drifted, missing, or unmanaged entities.
 
 Configuration databases are Git repositories. Browse commits, incoming changes, conflicts, local
 tweaks, and snapshots for each linked database, and import entity bundles from the **Import** tab.
+When the database is behind upstream, **Preview changes** shows the entity diff the pull would
+apply and which published local ops would conflict. The preview does not write ops. A local-path
+source has no upstream to preview.
 
 ![Database commit history](../../../assets/screenshots/database-commits.png)
 

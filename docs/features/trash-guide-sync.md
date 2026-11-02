@@ -24,9 +24,10 @@ Supported Arr types: `radarr`, `sonarr`.
 - Navigate to `/databases/new/trash-guide` in the UI.
 - Provide a name, repository URL, branch (defaults to `master`), and target Arr type (`radarr` or
   `sonarr`).
-- On save, Praxrr clones the repository, reads `metadata.json` to discover entity file paths, parses
-  all JSON entities, persists the entity cache and TRaSH ID mappings, and creates sync config rows
-  for every matching Arr instance.
+- On save, Praxrr clones the repository, reads `metadata.json` to discover entity file paths, and
+  parses the JSON entities. If every discovered file fails to parse, the source is not created
+  (HTTP 422, `parse_failed`) and the temporary clone is removed. Otherwise Praxrr persists the
+  entity cache and TRaSH ID mappings and creates sync config rows for every matching Arr instance.
 
 Constraints:
 
@@ -70,10 +71,13 @@ The sync flow:
 2. Run `git fetch` and compare local/remote HEADs to detect upstream changes.
 3. If updates are available (or this is a manual trigger): run `git pull`.
 4. Parse all JSON entity files discovered via `metadata.json` paths.
-5. Transform entities into portable format, build TRaSH ID mappings, detect renames and upstream
-   deletions, compute diffs.
-6. Replace the entity cache and TRaSH ID mappings in the database. Update sync metadata (last synced
-   timestamp, last commit hash).
+5. If every discovered file failed, stop. Nothing is written: the cache, mappings, and sync
+   metadata stay as they were, and `on_pull` does not fire. The job reports `parser_failed`.
+   For a git URL source that already has `last_commit_hash`, the clone is reset to that commit
+   so the next check still sees the update.
+6. Otherwise transform the parsed entities (a partial parse also keeps prior cache rows whose
+   file failed, unless that identity was parsed from another file; files removed upstream are
+   still dropped), replace the cache and TRaSH ID mappings, and update sync metadata.
 7. Fire `on_pull` sync events to connected Arr instances.
 
 ## 5) Monitor sync jobs
@@ -86,13 +90,20 @@ Sync jobs run as `trashguide.sync` in the background job queue. The job handler:
 - Respects the `autoPull` flag -- when disabled, the job reports available updates without pulling.
 - Retries transient git/network errors with exponential backoff (max 3 attempts, delay starts at 1
   minute, capped at 15 minutes).
-- Automatically reschedules the next run for scheduled triggers.
+- Automatically reschedules the next run for scheduled triggers, including after a failure.
+  A total parse failure is recorded as `parser_failed` and does not use the short git/network
+  retry; it still returns the queue slot to the next scheduled interval when `syncStrategy` is
+  greater than 0.
+- A manual sync uses that same per-source queue slot. When `syncStrategy` is greater than 0, the
+  slot is handed back to the schedule instead of ending auto-sync.
 
 ## 6) Update a source
 
 - Send a partial update via `PUT /api/v1/trash-guide/sources/{id}`.
-- If `repositoryUrl` changes, Praxrr clones to a new path, parses, persists, then swaps paths
-  atomically. The old clone directory is removed.
+- If `repositoryUrl` changes, Praxrr clones to a new path and parses before it changes the source
+  row. A parse where every file fails is rejected (`parse_failed`, HTTP 422): the row is unchanged
+  and the temporary clone is removed. A usable parse persists with `retainPrior: false` (the old
+  rows describe a different repository), then swaps paths. The old clone directory is removed.
 - `arrType` cannot be changed after creation (returns 422).
 - `name` changes are validated against uniqueness constraints.
 
@@ -336,8 +347,12 @@ curl -sS "http://localhost:6868/api/v1/trash-guide/sources/1/entities?search=x26
 - `TRaSH source disabled` / `TRaSH source schedule is disabled`: Enable the source or set a valid
   `syncStrategy` value greater than 0.
 
-- Sync completes but entity counts seem wrong: Check `parsedFiles` and `failedFiles` in the sync
-  result. Files that fail JSON validation are counted as failed but do not block the overall sync.
+- Sync reports failure and the entity list looks unchanged: a parse where every discovered file
+  failed persists nothing and does not count as success. Fix or wait on the upstream guide, then
+  retry. The previous cache is still the one Arr sync reads.
+- Some files failed but the sync still finished: the good files were written, and entities from
+  files that failed to parse were kept from the previous cache when that identity was not parsed
+  from another file. `failedFiles` counts the files that did not parse.
 
 - Entities show stale data after upstream update: Trigger a manual sync. Scheduled syncs only pull
   when upstream commits are detected via `git fetch`.

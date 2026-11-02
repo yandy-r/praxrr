@@ -90,6 +90,35 @@ enabled. See [Configuration](./configuration/). The first OIDC boot on this beha
 any later change to the effective allowlist, signs out OIDC sessions. API tokens are
 separate; review them in **Settings → Security** before upgrading.
 
+The discovery URL and the authorization, token, and JWKS endpoints it advertises must be
+https, except loopback http (`localhost`, `127.0.0.0/8`, `::1`). An IdP that is only
+reachable over plain http on another host cannot sign anyone in. ID tokens must be signed
+with RS256/384/512, PS256/384/512, ES256/384/512, or EdDSA; `none` and HMAC are rejected.
+
+Email allowlist matching now lowercases ASCII only and compares domains in punycode. That
+change bumps the allowlist fingerprint to v2, so existing OIDC sessions are signed out once
+on upgrade even when the allowlist text is unchanged.
+
+## Stored sync errors
+
+Migration `20261028` rewrites sync history errors and per-instance `last_error` values that
+are not in the closed reason set. The UI and API then show
+`Sync failed. Check the server logs for details.` (or a fixed HTTP reason) instead of the
+Arr response body. The original body is not kept.
+
+## Backup schedules
+
+Migration `20261029` rewrites backup schedules `*/6 hours` and `*/12 hours` to
+`0 */6 * * *` and `0 */12 * * *`. Other schedules are unchanged. See
+[Job System](/app/jobs/) for the allowlist.
+
+## PCD op history on old upgrades
+
+Migration `20260226` rebuilds `pcd_ops` and now copies `pcd_op_history` aside first, then
+restores it, on both upgrade and downgrade. A database that has not run that migration yet
+keeps its op history, including conflict rows. A database that already ran the older
+migration lost those rows; this change does not recreate them.
+
 ## In-app backup restore
 
 **Settings → Backups** does not replace the live database immediately. It stages the

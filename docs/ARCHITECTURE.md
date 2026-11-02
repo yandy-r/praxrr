@@ -285,6 +285,10 @@ Each compile records a row in `pcd_op_history` with:
 
 This powers conflict visibility and audit trails.
 
+A failed conflict override restores the database's ops and history to the
+pre-attempt snapshot, and the original user op stays published. If that restore
+fails, the database is disabled.
+
 ### 6.7 Exporter
 
 Base drafts are exported back to repo files for publishing. The exporter
@@ -303,7 +307,12 @@ https://github.com/yandy-r/praxrr-schema
 Every PCD repo includes a `pcd.json` manifest in its root. Key fields:
 
 - `name`, `version`, `description`
-- `dependencies` (must include `schema`)
+- `dependencies`: `https` repository URL keys mapped to a git ref (tag or branch).
+  A non-empty map must include the schema repository. The directory name is the
+  URL's last path segment (`https://github.com/yandy-r/praxrr-schema` →
+  `deps/praxrr-schema`). That name must be one plain segment, two dependencies
+  cannot share it, and the ref must be non-empty and must not start with `-`.
+  `deps/` and each dependency directory must be real directories, not symlinks.
 - `praxrr.minimum_version`
 - Optional: `arr_types`, `authors`, `license`, `repository`, `tags`, `links`
 
@@ -315,7 +324,9 @@ Example:
   "version": "2.1.35",
   "description": "Seraphys' OCD Playground",
   "arr_types": ["radarr", "sonarr", "whisparr"],
-  "dependencies": { "schema": "^1.1.0" },
+  "dependencies": {
+    "https://github.com/yandy-r/praxrr-schema": "1.0.0"
+  },
   "authors": [{ "name": "Yandy-R", "email": "yandy-r@yandy-r.github.io" }],
   "license": "MIT",
   "repository": "https://github.com/yandy-r/praxrr-db",
@@ -999,17 +1010,28 @@ Session settings live in `auth_settings` and `sessions` (`authSettingsQueries`,
 
 ### 19.3 OIDC
 
-OIDC flow lives in `packages/praxrr-app/src/routes/auth/oidc/*` and `auth/oidc.ts`:
+OIDC flow lives in `packages/praxrr-app/src/routes/auth/oidc/*` and `auth/oidc.ts`.
+Operator settings are in the [configuration guide](site/src/content/docs/guides/configuration.md).
 
-- Discovery + token exchange
-- ID token decode + basic verification
+- Discovery refuses a non-https URL, and a document whose authorization, token, or
+  JWKS endpoint is not https. Plain http is accepted only for loopback (`localhost`,
+  `127.0.0.0/8`, `::1`). Discovery, token, and JWKS requests do not follow redirects
+  and time out after 10 seconds.
+- Login sets 10-minute httpOnly cookies for `state`, `nonce`, and the PKCE verifier,
+  sends a S256 `code_challenge` and `nonce`, and the callback sends `code_verifier`.
+- The ID token signature is checked against the provider JWKS before any claim is
+  trusted. Allowed algorithms are RS256/384/512, PS256/384/512, ES256/384/512, and
+  EdDSA. `none` and HMAC (`HS*`) are rejected. Claim checks include `azp`, `iat`, and
+  a constant-time nonce match.
 - Fail-closed sign-in allowlist (`auth/oidcAllowlist.ts`). With no list and without
   `OIDC_ALLOW_ALL_USERS`, the callback returns 403 and creates no user or session.
-- Session created after a successful allowlist check
+  Email matching lowercases ASCII only and compares domains in punycode.
+- Session created after a successful allowlist check. The per-login cookies are
+  cleared, with the options they were set with, only after `state` matches.
 - Password login returns 403 and `/auth/setup` redirects home. In other modes the OIDC
   routes return 404. Sessions whose user kind does not match `AUTH` are removed at startup.
-  A changed allowlist fingerprint (including the first OIDC boot that records one) deletes
-  OIDC sessions.
+  A changed allowlist fingerprint deletes OIDC sessions. That includes the first OIDC
+  boot that records one, and the v2 fingerprint from the email-matching rules above.
 
 ### 19.4 Routes
 
