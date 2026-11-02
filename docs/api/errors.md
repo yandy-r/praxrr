@@ -38,7 +38,7 @@ Notes:
 | Entity testing               | `404`  | `databaseId` cache not found                                                           |
 | Arr library/releases/cleanup | `400`  | Invalid query/body values or unsupported instance/type-specific input                  |
 | Arr library/releases/cleanup | `404`  | Arr instance not found                                                                 |
-| Arr library/releases/cleanup | `500`  | Upstream Arr or runtime failure                                                        |
+| Arr library/releases/cleanup | `500`  | Fixed message plus `code`; raw Arr text is logged server-side only                     |
 | PCD export                   | `400`  | Missing/invalid query params or unsupported `entityType`                               |
 | PCD export                   | `404`  | Requested entity not found                                                             |
 | PCD export                   | `500`  | Database cache unavailable                                                             |
@@ -77,6 +77,37 @@ Metadata profile guard failure:
 ```json
 { "error": "Profile name does not match the selected profile" }
 ```
+
+## Arr failures
+
+Library, episode, release, and cleanup `500` responses use a fixed `error` string and a
+`code`. They do not include the Arr response body.
+
+| Route                              | `code`                  | `error`                                                               |
+| ---------------------------------- | ----------------------- | --------------------------------------------------------------------- |
+| `GET /api/v1/arr/library`          | `library_fetch_failed`  | `Failed to fetch library. Check the server logs for details.`         |
+| `GET /api/v1/arr/library/episodes` | `episodes_fetch_failed` | `Failed to fetch episode details. Check the server logs for details.` |
+| `GET /api/v1/arr/releases`         | `releases_fetch_failed` | `Failed to fetch releases. Check the server logs for details.`        |
+| `POST /api/v1/arr/cleanup`         | `cleanup_failed`        | `Cleanup failed. Check the server logs for details.`                  |
+
+Cleanup item reasons are a closed set. Examples: `Profile is assigned to media`,
+`No longer stale; not deleted`, `The Arr instance rejected the request (HTTP 400).`,
+`The delete failed unexpectedly.`
+
+Sync history `error` (and per-section `error`) is a closed reason or a static writer
+label. Text outside that set, including rows stored before this change, is rewritten to
+`Sync failed. Check the server logs for details.` HTTP failures use
+`Could not reach the Arr instance.`, `The Arr instance timed out.`,
+`The Arr instance rejected the request (HTTP <status>).`, or
+`The Arr instance returned an error (HTTP <status>).` `errorCode` is `unreachable`,
+`timeout`, `rejected`, `serverError`, or `internal`. Arr authorization and not-found
+writes are both `rejected`. Migration `20261028` scrubs `sync_history.error`,
+`sync_history.section_results`, and `last_error` on the Arr sync config tables and
+`trash_guide_sync_config`. Reads apply the same filter.
+
+Arr sync page actions that fail unexpectedly return a fixed message such as
+`Failed to queue the sync. Check the server logs for details.` The exception text
+stays in the server log.
 
 ## Health endpoint special case
 

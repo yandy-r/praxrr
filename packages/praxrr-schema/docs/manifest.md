@@ -369,6 +369,16 @@ single sentence or short phrase that communicates the PCD's purpose at a glance.
 An object mapping PCD names to semver version ranges. Declares which other PCDs this database
 requires at build time.
 
+> **Runtime check.** The app clones dependency keys as git repositories. A key must be an
+> `https` URL ending in a plain repository name, and the value is a git ref (tag or branch),
+> not a semver range. `validateManifest` rejects the name→semver keys in the examples below.
+> `packages/praxrr-db/pcd.json` uses `"https://github.com/yandy-r/praxrr-schema": "1.0.0"`.
+> The clone directory is `deps/<last path segment>`, names must be unique, and `deps/` plus
+> each dependency directory must be real directories rather than symlinks. A ref must be
+> non-empty and must not start with `-`.
+
+The paragraphs and examples under this heading are the PCD spec's planned name→semver shape.
+
 | Property     | Value                                                     |
 | ------------ | --------------------------------------------------------- |
 | **Type**     | `object`                                                  |
