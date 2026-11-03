@@ -136,6 +136,7 @@ export interface DriftRemediationLink {
   `driftSignature` to use it; the output must stay byte-identical (existing tests must stay green). Add
   `signatureOfKeys(keys: readonly string[]): string | null` (sort, then `stableHash`; returns null when empty).
 - `$sync/drift/suppression.ts` (A1, new, pure, no I/O):
+
   ```ts
   export const DRIFT_SNOOZE_MAX_MS = 90 * 24 * 60 * 60 * 1000;
   export function alertingKeys(changes: readonly DriftEntityChange[]): string[];
@@ -160,6 +161,7 @@ export interface DriftRemediationLink {
     ackedKeys: readonly string[]
   ): SyncPreviewSection[];
   ```
+
   Rules: a snooze is active iff `snoozedUntil > now`. The instance ack is active iff
   `acknowledgedSignature !== null && acknowledgedSignature === driftSignature`. An active snooze or
   instance ack gives effective counts 0 and `effectiveSignature` null. Otherwise acked keys are
@@ -173,6 +175,7 @@ export interface DriftRemediationLink {
   `driftDetectedAt: string | null`, and include it in the `INSERT … ON CONFLICT` list. Suppression and
   remediation columns are **never** touched by `upsert`. New methods, all bare `db.execute` (no
   `db.transaction`, see the re-entrancy note at driftStatus.ts:130):
+
   ```ts
   setSuppression(instanceId: number, expectedSignature: string | null, input: {
     acknowledgedSignature: string | null; acknowledgedEntityKeys: readonly string[]; snoozedUntil: string | null;
@@ -182,6 +185,7 @@ export interface DriftRemediationLink {
   recordRemediation(instanceId: number, rec: { trigger; status; signature; at; syncHistoryId }): boolean;
   markAutoAttempt(instanceId: number, signature: string): boolean;   // WHERE last_auto_attempt_signature IS NOT ? → false = already attempted
   ```
+
 - `$db/queries/driftRemediationPolicy.ts` (A1, new):
   `get(instanceId, arrType): DriftRemediationPolicy` (synthesizes `off` when there is no row),
   `upsert(input): DriftRemediationPolicy`, `listAuto(): DriftRemediationPolicy[]`.
