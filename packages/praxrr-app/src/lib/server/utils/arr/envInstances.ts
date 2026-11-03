@@ -240,6 +240,32 @@ function defaultName(type: ArrAppType, index: number): string {
   return index === 1 ? APP_LABELS[type] : `${APP_LABELS[type]} ${index}`;
 }
 
+/**
+ * Whether an env-sourced instance is still declared by the current `*_INSTANCE_*` variables,
+ * matched the same way reconciliation does (API-key fingerprint, then name). A declared instance
+ * would be re-created on restart, so it must not be deleted. Fails closed: any parse or
+ * fingerprint error reports the instance as declared.
+ */
+export async function isEnvInstanceDeclared(instance: {
+  name: string;
+  api_key_fingerprint: string | null;
+}): Promise<boolean> {
+  try {
+    for (const descriptor of parseArrInstanceEnvVars()) {
+      if (descriptor.name === instance.name) {
+        return true;
+      }
+      const fingerprint = (await deriveArrInstanceApiKeyFingerprint(descriptor.apiKey)).value;
+      if (fingerprint === instance.api_key_fingerprint) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 type ArrInstanceEnvKeys = {
   all: string[];
   unsupported: string[];

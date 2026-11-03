@@ -34,6 +34,7 @@
   export let instance: ArrInstance | undefined = undefined;
   export let initialType: string = '';
   export let canEditCoreConnectionFields = true;
+  export let canDelete = true;
   export let hasStoredApiKey = false;
   export let apiKeyMasked = '';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -452,7 +453,7 @@
           text="Delete"
           icon={Trash2}
           iconColor="text-red-600 dark:text-red-400"
-          disabled={saving || deleting || !canEditCoreConnectionFields}
+          disabled={saving || deleting || !canDelete}
           on:click={() => (showDeleteModal = true)}
         />
         <Button
