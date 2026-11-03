@@ -399,7 +399,8 @@ export interface paths {
     };
     /**
      * Read command palette recents
-     * @description Returns the signed-in user's command palette recents, most recent first. Returns an empty list
+     * @description Returns the signed-in user's command palette recents, most recent first, plus the `updatedAt`
+     *     concurrency token (`null` when nothing is stored). Returns an empty list
      *     when nothing is stored. Requires a real user session: auth-bypass sessions and API tokens
      *     receive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and
      *     keeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.
@@ -410,9 +411,11 @@ export interface paths {
      * Replace command palette recents
      * @description Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`
      *     must be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual
-     *     bytes) are rejected with 400. Writes are rate-limited per user. Requires a real user session:
-     *     an API token without the `admin` scope is rejected with 403, and any API token holding it
-     *     receives 401.
+     *     bytes) are rejected with 400. Writes are rate-limited per user (8 per 30 seconds). Optional
+     *     `expectedUpdatedAt` makes the write conditional (optimistic concurrency): a stale token, or
+     *     `null` when a list is already stored, returns 409 and nothing is written. Requires a real user
+     *     session: an API token without the `admin` scope is rejected with 403, and any API token holding
+     *     it receives 401.
      */
     put: operations['putCommandPaletteRecents'];
     post?: never;
@@ -6219,12 +6222,13 @@ export interface components {
       truncated: boolean;
     };
     CommandPaletteRecent: {
-      /** @description Stable item key (for entity results, the search result id). */
+      /** @description Stable item key (for entity results, the search result id). Must not contain control characters. */
       key: string;
+      /** @description Display label. Must not contain control characters. */
       label: string;
       /** @description Same-origin relative path. Must start with `/`, must not start with `//`, and must not contain `\` or control characters. */
       href: string;
-      /** @description Item kind (a search result type, `nav`, or `action`). */
+      /** @description Item kind (a search result type, `nav`, or `action`). Must not contain control characters. */
       kind: string;
       /**
        * Format: date-time
@@ -6234,10 +6238,21 @@ export interface components {
     };
     CommandPaletteRecentsResponse: {
       recents: components['schemas']['CommandPaletteRecent'][];
+      /**
+       * @description Opaque optimistic concurrency token for the stored list (`null` when nothing is stored).
+       *     Send it back as `expectedUpdatedAt` on the next PUT.
+       */
+      updatedAt: string | null;
     };
     CommandPaletteRecentsUpdateRequest: {
       /** @description Full replacement list, most recent first. Keys must be unique. */
       recents: components['schemas']['CommandPaletteRecent'][];
+      /**
+       * @description Optional optimistic concurrency token: the `updatedAt` from the last GET/PUT. A string
+       *     applies the write only while the stored token still matches; `null` applies it only while
+       *     nothing is stored. Omit for an unconditional write. A mismatch returns 409.
+       */
+      expectedUpdatedAt?: string | null;
     };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
@@ -7690,6 +7705,18 @@ export interface operations {
       };
       /** @description The API token lacks the `admin` scope. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /**
+       * @description Concurrency conflict: `expectedUpdatedAt` no longer matches the stored list (another tab or
+       *     session wrote it). Re-read, merge, and retry.
+       */
+      409: {
         headers: {
           [name: string]: unknown;
         };

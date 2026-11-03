@@ -69,7 +69,13 @@ errors ("Searching…" only when a search takes longer than half a second).
 - Opening any result records it as a recent (max 10, deduplicated, newest first).
 - Recents are stored per user through the recents API. Writes are coalesced client-side because the
   API is rate-limited, wait until the stored list has loaded (so nothing is overwritten unread), and
-  retry with backoff after `429` or server errors.
+  retry with backoff after `429` or server errors. A change that exhausted its retries is saved again
+  the next time the palette opens.
+- Each write carries the token from the last read or write. If another tab (or the previous user of
+  the same browser) changed the stored list in between, the API answers `409`; the palette re-reads
+  the list, puts this page's unsaved activations first (deduplicated, max 10), and saves once more.
+- Pending changes are also sent when the page is hidden or unloaded (`visibilitychange`,
+  `pagehide`). A save already in flight finishes first, so writes never race each other.
 - Auth-bypass sessions (`AUTH=off`, local bypass) have no user id, so the palette keeps their
   recents in the browser's `localStorage` under `praxrr:command-palette:recents`. Signed-in users
   never fall back to `localStorage`: after an expired session (`401`) the change is dropped; while

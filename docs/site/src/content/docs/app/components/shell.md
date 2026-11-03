@@ -56,26 +56,30 @@ import CommandPalette from '$ui/command-palette/CommandPalette.svelte';
 
 Props:
 
-| Prop       | Type       | Default | Required | Description                                                                                      |
-| ---------- | ---------- | ------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `navShell` | `NavShell` | —       | Yes      | The resolved navigation shell; its groups (items and children) become the palette's Pages group. |
+| Prop             | Type               | Default | Required | Description                                                                                                                                                                               |
+| ---------------- | ------------------ | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `navShell`       | `NavShell`         | —       | Yes      | The resolved navigation shell; its groups (items and children) become the palette's Pages group.                                                                                          |
+| `recentsBackend` | `'api' \| 'local'` | —       | Yes      | Where recents persist, from root layout data: `api` (per-user recents API) for a real signed-in user, `local` (`localStorage`) for auth-bypass sessions. Always set alongside `navShell`. |
 
 Usage (root layout; mount once, only when a session exists):
 
 ```svelte
 {#if !isAuthPage && data.navShell}
-  <CommandPalette navShell={data.navShell} />
+  <CommandPalette
+    navShell={data.navShell}
+    recentsBackend={data.recentsBackend}
+  />
 {/if}
 ```
 
 Notes:
 
-- Open state lives in `$stores/commandPalette` (`commandPaletteOpen` with `open`, `close`, `toggle`, mirroring `mobileNav`). A `svelte:window` keydown handler toggles on `isPaletteShortcut` (Cmd+K on Apple platforms, Ctrl+K elsewhere, never with Shift/Alt; matches `code === 'KeyK'` or `key` `k`) and opens on `/` unless the event target is an input, textarea, select, or contenteditable. Neither shortcut opens the palette over another `aria-modal` dialog. Panel keys are ignored during IME composition.
+- Open state lives in `$stores/commandPalette` (`commandPaletteOpen` with `open`, `close`, `toggle`, mirroring `mobileNav`). A `svelte:window` keydown handler toggles on `isPaletteShortcut` (Cmd+K on Apple platforms, Ctrl+K elsewhere, never with Shift/Alt; matches the typed `key` `k`, or `code === 'KeyK'` only when the typed key is not a Latin letter, so remapped Latin layouts such as Dvorak use their own `k` while non-Latin layouts use the physical K key) and opens on `/` unless the event target is an input, textarea, select, or contenteditable. Neither shortcut opens the palette over another `aria-modal` dialog. Panel keys are ignored during IME composition.
 - Dialog markup copies `Modal` (backdrop click closes, `role="dialog"`, `aria-modal`, `aria-labelledby` on a visually hidden title) but has no footer. `use:focusTrap` focuses the search input and restores focus on close. Escape is handled on the panel with `preventDefault` and `stopPropagation`.
 - The input is a `combobox` with `aria-controls`, `aria-autocomplete="list"`, `aria-expanded`, and `aria-activedescendant`. The listbox contains one `role="group"` per section labelled by its heading; options have ids that stay stable per item key (`createOptionIdMap`), `aria-selected`, and `data-href`. ArrowUp/ArrowDown wrap via `wrapIndex`; Enter activates the highlighted option (the first by default); the active option scrolls into view; hover highlights and click activates.
 - Group order: Recent, Pages, Actions, then Custom formats, Quality profiles, Regular expressions, Delay profiles, Metadata profiles, Arr instances, Databases. Pure helpers live in `$ui/command-palette/sources.ts` (`flattenNavItems` skips `/auth/logout` and applies the `$navScope` filter like `PageNav`; `buildPaletteGroups`; `parseSearchResults` validates API responses).
 - Entity search is debounced 150 ms, cancels stale requests with `AbortController`, ignores out-of-date responses, passes `arrType` when `$navScope` is not `all`, and re-runs when `$navScope` changes while open. Entity results are shown only while their query equals the current trimmed query (`currentResults`). Entity options show `SourceBadge` when `source` is set, or the Arr badge for Arr instances. Result count, "No results", and errors go to an always-mounted polite `role="status"` region ("Searching…" only after 500 ms); errors also render inline (no alert toasts).
-- Recents (`$ui/command-palette/recents.ts`, `createRecentsSync`): activation records `{ key, label, href, kind, usedAt }` (deduped, newest first, max 10; hrefs over 500 chars are not stored). The backend comes from root layout data `recentsBackend`: `api` (`GET`/`PUT /api/v1/ui-preferences/command-palette-recents`) for a real user, `local` (`localStorage` key `praxrr:command-palette:recents`) for auth-bypass sessions. Saves wait until the load succeeds (activations during loading merge and save once), a failed load retries on the next open, a `401` drops the write, `429`/5xx retry with bounded backoff, and teardown flushes with `keepalive`. Nav logout clears the `localStorage` key. Recent actions re-resolve their context-aware href. All reads pass through `sanitizeCommandPaletteRecents` from `$shared/search/recents.ts`, and navigation uses `goto` only for safe relative hrefs.
+- Recents (`$ui/command-palette/recents.ts`, `createRecentsSync`): activation records `{ key, label, href, kind, usedAt }` (deduped, newest first, max 10; hrefs over 500 chars are not stored). The backend comes from root layout data `recentsBackend`: `api` (`GET`/`PUT /api/v1/ui-preferences/command-palette-recents`) for a real user, `local` (`localStorage` key `praxrr:command-palette:recents`) for auth-bypass sessions. Saves wait until the load succeeds (activations during loading merge and save once), a failed load retries on the next open, a `401` drops the write, `429`/5xx retry with bounded backoff (a change that gave up resumes on the next open), and teardown flushes with `keepalive` (component destroy, `pagehide`, or the tab becoming hidden; a flush requested during an in-flight save runs after it). API writes send the last `updatedAt` as `expectedUpdatedAt`; on `409` the palette re-reads, merges only its own unsaved activations first (dedupe, max 10), and resaves (bounded rounds). Entries the shared validator would reject are never recorded. Nav logout clears the `localStorage` key. Recent actions re-resolve their context-aware href. All reads pass through `sanitizeCommandPaletteRecents` from `$shared/search/recents.ts`, and navigation uses `goto` only for safe relative hrefs.
 - Closes after any client navigation.
 
 Variants:

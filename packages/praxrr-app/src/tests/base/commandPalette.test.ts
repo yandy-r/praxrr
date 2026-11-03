@@ -25,6 +25,7 @@ import {
   COMMAND_PALETTE_RECENTS_MAX,
   isSafeRelativeHref,
   isStorableRecentHref,
+  validateCommandPaletteRecents,
   type CommandPaletteRecent,
 } from '../../lib/shared/search/recents.ts';
 import type { SearchResult } from '../../lib/shared/search/types.ts';
@@ -218,6 +219,19 @@ Deno.test('addRecent ignores unsafe hrefs and strips control characters from lab
   assertEquals(entry.label, 'Bad Name');
 });
 
+Deno.test('addRecent only records entries the shared PUT validator accepts', () => {
+  const existing = addRecent([], { key: 'k0', label: 'Kept', href: '/kept', kind: 'nav' });
+  // Control characters in key or kind would make the server reject the whole list.
+  assertEquals(addRecent(existing, { key: 'bad\u0000key', label: 'L', href: '/ok', kind: 'nav' }), existing);
+  assertEquals(addRecent(existing, { key: 'k1', label: 'L', href: '/ok', kind: 'n\u0085v' }), existing);
+  assertEquals(addRecent(existing, { key: '', label: 'L', href: '/ok', kind: 'nav' }), existing);
+  // An empty label falls back to the href, truncated to the label limit.
+  const longHref = `/${'p'.repeat(COMMAND_PALETTE_RECENT_LIMITS.label + 50)}`;
+  const [fallback] = addRecent([], { key: 'k2', label: ' \n ', href: longHref, kind: 'nav' });
+  assertEquals(fallback.label, longHref.slice(0, COMMAND_PALETTE_RECENT_LIMITS.label));
+  assertEquals(validateCommandPaletteRecents([fallback]).ok, true);
+});
+
 Deno.test('recentKindLabel and isEditableTarget', () => {
   assertEquals(recentKindLabel('custom_format'), 'Custom format');
   assertEquals(recentKindLabel('toString'), null);
@@ -281,8 +295,8 @@ function putBody(call: FetchCall): CommandPaletteRecent[] {
 }
 
 Deno.test('loadRecents distinguishes loaded, expired session and unavailable API', async () => {
-  const ok = fakeFetch(() => json(200, { recents: [RECENT, { bogus: true }] }));
-  assertEquals(await loadRecents('api', ok.fetchFn), { status: 'loaded', recents: [RECENT] });
+  const ok = fakeFetch(() => json(200, { recents: [RECENT, { bogus: true }], updatedAt: 'tok-1' }));
+  assertEquals(await loadRecents('api', ok.fetchFn), { status: 'loaded', recents: [RECENT], updatedAt: 'tok-1' });
   assertEquals(ok.calls[0].url, COMMAND_PALETTE_RECENTS_ENDPOINT);
 
   assertEquals(await loadRecents('api', fakeFetch(() => json(401)).fetchFn), { status: 'unauthorized' });
@@ -291,10 +305,11 @@ Deno.test('loadRecents distinguishes loaded, expired session and unavailable API
   assertEquals(await loadRecents('api', offline), { status: 'unavailable' });
 });
 
-Deno.test('saveRecents classifies 401, 429, 5xx, 400 and network errors', async () => {
+Deno.test('saveRecents classifies 401, 409, 429, 5xx, 400 and network errors', async () => {
   const cases: Array<[Response | Error, string]> = [
-    [json(200, { recents: [] }), 'saved'],
+    [json(200, { recents: [], updatedAt: 'tok' }), 'saved'],
     [json(401), 'unauthorized'],
+    [json(409), 'conflict'],
     [json(429), 'retry'],
     [json(502), 'retry'],
     [json(400), 'rejected'],
@@ -303,12 +318,19 @@ Deno.test('saveRecents classifies 401, 429, 5xx, 400 and network errors', async 
   for (const [answer, expected] of cases) {
     const fetchFn = (() =>
       answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)) as typeof fetch;
-    assertEquals(await saveRecents([RECENT], 'api', fetchFn), expected);
+    assertEquals((await saveRecents([RECENT], 'api', fetchFn)).status, expected);
   }
+  const saved = fakeFetch(() => json(200, { recents: [RECENT], updatedAt: 'tok-2' }));
+  assertEquals(await saveRecents([RECENT], 'api', saved.fetchFn, { expectedUpdatedAt: 'tok-1' }), {
+    status: 'saved',
+    updatedAt: 'tok-2',
+  });
+  assertEquals(JSON.parse(String(saved.calls[0].init?.body)).expectedUpdatedAt, 'tok-1');
   const keepalive = fakeFetch(() => json(200));
   await saveRecents([RECENT], 'api', keepalive.fetchFn, { keepalive: true });
   assertEquals(keepalive.calls[0].init?.keepalive, true);
   assertEquals(putBody(keepalive.calls[0]), [RECENT]);
+  assertEquals('expectedUpdatedAt' in JSON.parse(String(keepalive.calls[0].init?.body)), false);
 });
 
 Deno.test('recents sync: activation while loading is merged and saved once after load', async () => {
@@ -407,6 +429,236 @@ Deno.test('recents sync: teardown flushes a pending save with keepalive', async 
   assertEquals(timers.delays(), []);
 });
 
+/** Deferred response so a test can hold a request in flight. */
+function deferred() {
+  let resolve: (response: Response) => void = () => {};
+  const promise = new Promise<Response>((done) => (resolve = done));
+  return { promise, resolve };
+}
+
+const SETTINGS = { key: 'nav:/settings', label: 'Settings', href: '/settings', kind: 'nav' };
+const ARR = { key: 'nav:/arr', label: 'Arr', href: '/arr', kind: 'nav' };
+
+/** In-memory recents API with an `updatedAt` token, enforcing `expectedUpdatedAt` like the route. */
+function fakeRecentsServer(initial: CommandPaletteRecent[] = [], token: string | null = null) {
+  const store = { recents: initial, updatedAt: token, version: 0 };
+  const api = fakeFetch((call) => {
+    if (call.init?.method !== 'PUT') return json(200, { recents: store.recents, updatedAt: store.updatedAt });
+    const body = JSON.parse(String(call.init.body)) as {
+      recents: CommandPaletteRecent[];
+      expectedUpdatedAt?: string | null;
+    };
+    if (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== store.updatedAt) {
+      return json(409, { error: 'Concurrency conflict: expected_updated_at does not match' });
+    }
+    store.recents = body.recents;
+    store.updatedAt = `tok-${++store.version}`;
+    return json(200, { recents: store.recents, updatedAt: store.updatedAt });
+  });
+  return { store, ...api };
+}
+
+Deno.test('recents sync: sends the loaded token and the token from each save', async () => {
+  const server = fakeRecentsServer([RECENT], 'tok-0');
+  const timers = manualTimers();
+  const sync = createRecentsSync({ backend: 'api', onChange: () => {}, fetchFn: server.fetchFn, ...timers });
+  await sync.ensureLoaded();
+
+  sync.record(SETTINGS);
+  await timers.runAll();
+  sync.record(ARR);
+  await timers.runAll();
+
+  const tokens = server.puts().map((call) => JSON.parse(String(call.init?.body)).expectedUpdatedAt);
+  assertEquals(tokens, ['tok-0', 'tok-1']);
+  assertEquals(
+    server.store.recents.map((recent) => recent.key),
+    ['nav:/arr', 'nav:/settings', 'nav:/databases']
+  );
+});
+
+Deno.test("recents sync: 409 re-reads, merges only this page's activations, and saves once", async () => {
+  const server = fakeRecentsServer([RECENT], 'tok-0');
+  const timers = manualTimers();
+  let shown: CommandPaletteRecent[] = [];
+  const sync = createRecentsSync({
+    backend: 'api',
+    onChange: (next) => (shown = next),
+    fetchFn: server.fetchFn,
+    ...timers,
+  });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+
+  // Another tab writes before this page's debounced save fires.
+  const otherTab = { ...RECENT, key: 'nav:/other', label: 'Other', href: '/other' };
+  server.store.recents = [otherTab, RECENT];
+  server.store.updatedAt = 'tok-other';
+
+  await timers.runAll(); // PUT -> 409 -> state idle, re-read starts
+  assertEquals(server.puts().length, 1);
+  await flushMicrotasks(); // re-read settles, merge schedules one save
+  assertEquals(sync.state, 'loaded');
+  await timers.runAll();
+
+  const puts = server.puts();
+  assertEquals(puts.length, 2, 'one resave after the conflict');
+  assertEquals(JSON.parse(String(puts[1].init?.body)).expectedUpdatedAt, 'tok-other');
+  assertEquals(
+    server.store.recents.map((recent) => recent.key),
+    ['nav:/settings', 'nav:/other', 'nav:/databases']
+  );
+  assertEquals(shown, server.store.recents);
+  assertEquals(timers.delays(), []);
+});
+
+Deno.test('recents sync: repeated 409s stop after a bounded number of rounds', async () => {
+  const api = fakeFetch((call) =>
+    call.init?.method === 'PUT' ? json(409) : json(200, { recents: [], updatedAt: 'tok' })
+  );
+  const timers = manualTimers();
+  const sync = createRecentsSync({
+    backend: 'api',
+    onChange: () => {},
+    fetchFn: api.fetchFn,
+    maxConflictRetries: 2,
+    ...timers,
+  });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  for (let round = 0; round < 5; round++) {
+    await timers.runAll();
+    await flushMicrotasks();
+  }
+  assertEquals(api.puts().length, 3, 'initial save plus two conflict retries');
+  assertEquals(timers.delays(), []);
+});
+
+Deno.test('recents sync: activation during an in-flight save is saved after it', async () => {
+  const pending = deferred();
+  let putCount = 0;
+  const api = fakeFetch((call) => {
+    if (call.init?.method !== 'PUT') return json(200, { recents: [], updatedAt: null });
+    putCount += 1;
+    return putCount === 1 ? pending.promise : json(200, { recents: [], updatedAt: 'tok-2' });
+  });
+  const timers = manualTimers();
+  const sync = createRecentsSync({ backend: 'api', onChange: () => {}, fetchFn: api.fetchFn, ...timers });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  await timers.runAll(); // first PUT in flight
+
+  sync.record(ARR);
+  await timers.runAll(); // flush skipped while saving
+  assertEquals(api.puts().length, 1);
+
+  pending.resolve(json(200, { recents: [], updatedAt: 'tok-1' }));
+  await flushMicrotasks();
+  await timers.runAll();
+
+  const puts = api.puts();
+  assertEquals(puts.length, 2);
+  assertEquals(
+    putBody(puts[1]).map((recent) => recent.key),
+    ['nav:/arr', 'nav:/settings']
+  );
+  assertEquals(JSON.parse(String(puts[1].init?.body)).expectedUpdatedAt, 'tok-1');
+});
+
+Deno.test('recents sync: a rejected save is dropped but a later change still saves', async () => {
+  let putStatus = 400;
+  const api = fakeFetch((call) =>
+    call.init?.method === 'PUT' ? json(putStatus, { recents: [], updatedAt: 'tok-1' }) : json(200, { recents: [] })
+  );
+  const timers = manualTimers();
+  const sync = createRecentsSync({ backend: 'api', onChange: () => {}, fetchFn: api.fetchFn, ...timers });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  await timers.runAll();
+  assertEquals(api.puts().length, 1);
+  assertEquals(timers.delays(), [], 'a rejected list is not retried');
+
+  putStatus = 200;
+  sync.record(ARR);
+  await timers.runAll();
+  assertEquals(api.puts().length, 2);
+});
+
+Deno.test('recents sync: after giving up, the next open resumes the pending save', async () => {
+  let putStatus = 503;
+  const api = fakeFetch((call) =>
+    call.init?.method === 'PUT' ? json(putStatus, { recents: [], updatedAt: 'tok' }) : json(200, { recents: [] })
+  );
+  const timers = manualTimers();
+  const sync = createRecentsSync({
+    backend: 'api',
+    onChange: () => {},
+    fetchFn: api.fetchFn,
+    maxSaveAttempts: 2,
+    ...timers,
+  });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  await timers.runAll();
+  await timers.runAll();
+  assertEquals(api.puts().length, 2);
+  assertEquals(timers.delays(), [], 'gave up');
+
+  putStatus = 200;
+  await sync.ensureLoaded(); // palette opened again
+  assertEquals(timers.delays().length, 1);
+  await timers.runAll();
+  assertEquals(api.puts().length, 3);
+  assertEquals(putBody(api.puts()[2])[0].key, 'nav:/settings');
+});
+
+Deno.test('recents sync: flushOnDestroy during an in-flight save flushes after it, in order', async () => {
+  const pending = deferred();
+  let putCount = 0;
+  const api = fakeFetch((call) => {
+    if (call.init?.method !== 'PUT') return json(200, { recents: [], updatedAt: null });
+    putCount += 1;
+    return putCount === 1 ? pending.promise : json(200, { recents: [], updatedAt: 'tok-2' });
+  });
+  const timers = manualTimers();
+  const sync = createRecentsSync({ backend: 'api', onChange: () => {}, fetchFn: api.fetchFn, ...timers });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  await timers.runAll(); // first PUT in flight
+  sync.record(ARR);
+
+  sync.flushOnDestroy();
+  await flushMicrotasks();
+  assertEquals(api.puts().length, 1, 'no concurrent write while a save is in flight');
+
+  pending.resolve(json(200, { recents: [], updatedAt: 'tok-1' }));
+  await flushMicrotasks();
+  const puts = api.puts();
+  assertEquals(puts.length, 2);
+  assertEquals(puts[1].init?.keepalive, true);
+  assertEquals(JSON.parse(String(puts[1].init?.body)).expectedUpdatedAt, 'tok-1');
+  assertEquals(
+    putBody(puts[1]).map((recent) => recent.key),
+    ['nav:/arr', 'nav:/settings']
+  );
+  assertEquals(timers.delays(), []);
+});
+
+Deno.test('recents sync: flushOnDestroy during an in-flight save with nothing new sends nothing more', async () => {
+  const pending = deferred();
+  const api = fakeFetch((call) => (call.init?.method === 'PUT' ? pending.promise : json(200, { recents: [] })));
+  const timers = manualTimers();
+  const sync = createRecentsSync({ backend: 'api', onChange: () => {}, fetchFn: api.fetchFn, ...timers });
+  await sync.ensureLoaded();
+  sync.record(SETTINGS);
+  await timers.runAll();
+  sync.flushOnDestroy();
+  pending.resolve(json(200, { recents: [], updatedAt: 'tok-1' }));
+  await flushMicrotasks();
+  assertEquals(api.puts().length, 1);
+  assertEquals(timers.delays(), []);
+});
+
 Deno.test('href checks: navigation has no length cap, stored recents do', () => {
   const longHref = `/delay-profiles/1/${'x'.repeat(COMMAND_PALETTE_RECENT_LIMITS.href)}`;
   assertEquals(isSafeRelativeHref(longHref), true);
@@ -472,6 +724,11 @@ Deno.test('isPaletteShortcut: Cmd+K on Apple, Ctrl+K elsewhere, no Shift/Alt', (
   assertEquals(isPaletteShortcut(key({ ctrlKey: true, key: 'л' }), false), true);
   assertEquals(isPaletteShortcut(key({ ctrlKey: true, key: 'K', code: '' }), false), true);
   assertEquals(isPaletteShortcut(key({ ctrlKey: true, key: 'j', code: 'KeyJ' }), false), false);
+  // A remapped Latin layout (Dvorak types `e` on the physical K key) is not the shortcut.
+  assertEquals(isPaletteShortcut(key({ ctrlKey: true, key: 'e', code: 'KeyK' }), false), false);
+  // Typed `k` on another physical key (Dvorak) is.
+  assertEquals(isPaletteShortcut(key({ ctrlKey: true, key: 'k', code: 'KeyV' }), false), true);
+  assertEquals(isPaletteShortcut(key({ metaKey: true, key: 'л', code: 'KeyK' }), true), true);
   assertEquals(isApplePlatform('MacIntel'), true);
   assertEquals(isApplePlatform('Win32'), false);
 });

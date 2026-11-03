@@ -69,7 +69,7 @@
   <PageNav version={data.version} navShell={data.navShell} />
   <BottomNav navShell={data.navShell} />
   {#if data.navShell}
-    <CommandPalette navShell={data.navShell} recentsBackend={data.recentsBackend ?? 'local'} />
+    <CommandPalette navShell={data.navShell} recentsBackend={data.recentsBackend} />
   {/if}
 {/if}
 <AlertContainer />

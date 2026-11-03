@@ -287,7 +287,8 @@ Response shape on success:
 
 ### `GET /ui-preferences/command-palette-recents`
 
-Returns the signed-in user's command palette recents, most recent first.
+Returns the signed-in user's command palette recents, most recent first, and
+the `updatedAt` optimistic concurrency token (`null` when nothing is stored).
 
 ```json
 {
@@ -299,7 +300,8 @@ Returns the signed-in user's command palette recents, most recent first.
       "kind": "custom_format",
       "usedAt": "2026-11-02T10:00:00.000Z"
     }
-  ]
+  ],
+  "updatedAt": "2026-11-02T10:00:00.400Z"
 }
 ```
 
@@ -313,13 +315,14 @@ Semantics:
   `praxrr:command-palette:recents`. For a signed-in user a `401` means the
   session expired.
 - An API token without the `read` scope receives `403` before that check.
-- Nothing stored returns `{ "recents": [] }`. Stored data that is malformed or
+- Nothing stored returns `{ "recents": [], "updatedAt": null }`. Stored data that is malformed or
   fails validation degrades to the valid subset (possibly `[]`) instead of
   erroring.
 
 ### `PUT /ui-preferences/command-palette-recents`
 
-Request body: `{ "recents": CommandPaletteRecent[] }`, a full replacement list.
+Request body: `{ "recents": CommandPaletteRecent[], "expectedUpdatedAt"?: string | null }`,
+a full replacement list.
 
 - At most 10 entries, each with a unique `key`.
 - `key` and `label` 1–200 characters, `kind` 1–40 characters, no control
@@ -328,6 +331,10 @@ Request body: `{ "recents": CommandPaletteRecent[] }`, a full replacement list.
   `/`, must not start with `//`, and must not contain `\` or control
   characters.
 - `usedAt` is an ISO 8601 timestamp.
+- `expectedUpdatedAt` (optional) is the `updatedAt` token from the last `GET`
+  or `PUT`. A string applies the write only while the stored token still
+  matches; `null` applies it only while nothing is stored; omitted writes
+  unconditionally.
 
 Semantics:
 
@@ -337,7 +344,12 @@ Semantics:
   parsing.
 - Any invalid entry rejects the whole body with `400` (nothing is stored).
 - More than 8 writes per user within 30s returns `429`.
-- Success returns `{ "recents": [...] }` with the stored list.
+- A stale `expectedUpdatedAt` (another tab or session wrote since, or the token
+  belongs to another user's list) returns `409` with `{ "error": "..." }` and
+  stores nothing. The palette then re-reads, merges its own unsaved activations
+  ahead of the stored list, and saves once more.
+- Success returns `{ "recents": [...], "updatedAt": "..." }` with the stored
+  list and its new token.
 
 ## Search
 

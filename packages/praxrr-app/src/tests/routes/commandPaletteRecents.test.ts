@@ -90,9 +90,16 @@ function recent(index: number, overrides: Partial<CommandPaletteRecent> = {}): C
   };
 }
 
+/**
+ * Write rate limits live in process memory keyed by user id, while every test gets a fresh database
+ * whose ids restart at 1; ids unique across the whole file keep each test's write budget separate.
+ */
+let nextUserId = 1000;
+
 function createUser(username = `user-${crypto.randomUUID()}`): number {
-  const id = usersQueries.create(username, 'hash');
-  assert(id > 0);
+  const id = nextUserId++;
+  db.execute('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)', id, username, 'hash');
+  assert(usersQueries.getById(id));
   return id;
 }
 
@@ -124,7 +131,7 @@ migratedTest('recents GET returns an empty list when nothing is stored', async (
 
   // Assert
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { recents: [] });
+  assertEquals(await response.json(), { recents: [], updatedAt: null });
 });
 
 migratedTest('recents PUT then GET round-trips per user', async () => {
@@ -142,11 +149,15 @@ migratedTest('recents PUT then GET round-trips per user', async () => {
 
   // Assert
   assertEquals(put.status, 200);
-  assertEquals(await put.json(), { recents });
-  assertEquals(await get.json(), { recents });
-  assertEquals(await other.json(), { recents: [] });
+  const putBody = (await put.json()) as { recents: CommandPaletteRecent[]; updatedAt: string };
+  assertEquals(putBody.recents, recents);
+  assertEquals(typeof putBody.updatedAt, 'string');
+  assertEquals(await get.json(), { recents, updatedAt: putBody.updatedAt });
+  assertEquals(await other.json(), { recents: [], updatedAt: null });
   assertEquals(replaced.status, 200);
-  assertEquals(await afterReplace.json(), { recents: [recent(3)] });
+  const afterReplaceBody = (await afterReplace.json()) as { recents: CommandPaletteRecent[]; updatedAt: string };
+  assertEquals(afterReplaceBody.recents, [recent(3)]);
+  assert(afterReplaceBody.updatedAt !== putBody.updatedAt, 'every write issues a new token');
 });
 
 migratedTest('recents PUT rejects unsafe hrefs, oversized lists, and malformed bodies', async () => {
@@ -165,6 +176,9 @@ migratedTest('recents PUT rejects unsafe hrefs, oversized lists, and malformed b
     { recents: [recent(1, { label: 'x'.repeat(201) })] },
     { recents: [recent(1, { kind: '' })] },
     { recents: 'nope' },
+    { recents: [recent(1)], expectedUpdatedAt: 42 },
+    { recents: [recent(1)], expectedUpdatedAt: '' },
+    { recents: [recent(1)], expectedUpdatedAt: 'x'.repeat(65) },
     [recent(1)],
     '{not json',
   ];
@@ -175,7 +189,7 @@ migratedTest('recents PUT rejects unsafe hrefs, oversized lists, and malformed b
     assertEquals(response.status, 400, `expected 400 for ${JSON.stringify(body).slice(0, 80)}`);
     assertEquals(typeof ((await response.json()) as { error: unknown }).error, 'string');
   }
-  assertEquals(await (await GET(getEvent(userId))).json(), { recents: [] });
+  assertEquals(await (await GET(getEvent(userId))).json(), { recents: [], updatedAt: null });
 });
 
 migratedTest('recents PUT rejects an oversized declared content-length before reading the body', async () => {
@@ -197,7 +211,101 @@ migratedTest('recents PUT rejects an oversized declared content-length before re
   assertEquals(response.status, 400);
   assertEquals(await response.json(), { error: 'Request body too large' });
   assertEquals(event.request.bodyUsed, false);
-  assertEquals(await (await GET(getEvent(userId))).json(), { recents: [] });
+  assertEquals(await (await GET(getEvent(userId))).json(), { recents: [], updatedAt: null });
+});
+
+type RecentsBody = { recents: CommandPaletteRecent[]; updatedAt: string | null };
+
+migratedTest('recents PUT with expectedUpdatedAt null succeeds only for the first write', async () => {
+  // Arrange
+  const userId = createUser();
+
+  // Act
+  const first = await PUT(putEvent(userId, { recents: [recent(1)], expectedUpdatedAt: null }));
+  const second = await PUT(putEvent(userId, { recents: [recent(2)], expectedUpdatedAt: null }));
+
+  // Assert
+  assertEquals(first.status, 200);
+  const firstBody = (await first.json()) as RecentsBody;
+  assertEquals(typeof firstBody.updatedAt, 'string');
+  assertEquals(second.status, 409);
+  assertEquals(typeof ((await second.json()) as { error: unknown }).error, 'string');
+  assertEquals(await (await GET(getEvent(userId))).json(), { recents: [recent(1)], updatedAt: firstBody.updatedAt });
+});
+
+migratedTest('recents PUT with a matching expectedUpdatedAt succeeds and rotates the token', async () => {
+  // Arrange
+  const userId = createUser();
+  const seeded = (await (await PUT(putEvent(userId, { recents: [recent(1)] }))).json()) as RecentsBody;
+  const read = (await (await GET(getEvent(userId))).json()) as RecentsBody;
+
+  // Act
+  const response = await PUT(putEvent(userId, { recents: [recent(2), recent(1)], expectedUpdatedAt: read.updatedAt }));
+
+  // Assert
+  assertEquals(read.updatedAt, seeded.updatedAt);
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as RecentsBody;
+  assertEquals(body.recents, [recent(2), recent(1)]);
+  assert(body.updatedAt !== null && body.updatedAt !== read.updatedAt);
+});
+
+migratedTest('recents PUT with a stale expectedUpdatedAt returns 409 and writes nothing', async () => {
+  // Arrange: two tabs read the same token; tab A writes first.
+  const userId = createUser();
+  await PUT(putEvent(userId, { recents: [recent(1)] }));
+  const { updatedAt: token } = (await (await GET(getEvent(userId))).json()) as RecentsBody;
+  const tabA = (await (
+    await PUT(putEvent(userId, { recents: [recent(2), recent(1)], expectedUpdatedAt: token }))
+  ).json()) as RecentsBody;
+
+  // Act: tab B writes with the now-stale token.
+  const tabB = await PUT(putEvent(userId, { recents: [recent(3), recent(1)], expectedUpdatedAt: token }));
+
+  // Assert
+  assertEquals(tabB.status, 409);
+  assertEquals(typeof ((await tabB.json()) as { error: unknown }).error, 'string');
+  assertEquals(await (await GET(getEvent(userId))).json(), {
+    recents: [recent(2), recent(1)],
+    updatedAt: tabA.updatedAt,
+  });
+});
+
+migratedTest("recents PUT with another user's token returns 409 (re-login on a shared browser)", async () => {
+  // Arrange: a tab still holds the previous user's token after someone else signs in.
+  const previousUser = createUser();
+  const nextUser = createUser();
+  const insert = 'INSERT INTO user_command_palette_recents (user_id, recents_json, updated_at) VALUES (?, ?, ?)';
+  db.execute(insert, previousUser, JSON.stringify([recent(1)]), '2026-11-02T10:00:00.000Z');
+  db.execute(insert, nextUser, JSON.stringify([recent(5)]), '2026-11-02T11:00:00.000Z');
+  const { updatedAt: previousToken } = (await (await GET(getEvent(previousUser))).json()) as RecentsBody;
+  const freshUser = createUser();
+
+  // Act
+  const stale = await PUT(putEvent(nextUser, { recents: [recent(1)], expectedUpdatedAt: previousToken }));
+  const staleOnEmpty = await PUT(putEvent(freshUser, { recents: [recent(1)], expectedUpdatedAt: previousToken }));
+
+  // Assert
+  assertEquals(stale.status, 409);
+  assertEquals(staleOnEmpty.status, 409);
+  assertEquals(((await (await GET(getEvent(nextUser))).json()) as RecentsBody).recents, [recent(5)]);
+  assertEquals(await (await GET(getEvent(freshUser))).json(), { recents: [], updatedAt: null });
+});
+
+migratedTest('recents PUT returns 429 after 8 writes in the rate-limit window', async () => {
+  // Arrange
+  const userId = createUser();
+  const statuses: number[] = [];
+
+  // Act
+  for (let index = 0; index < 9; index++) {
+    statuses.push((await PUT(putEvent(userId, { recents: [recent(index)] }))).status);
+  }
+
+  // Assert
+  assertEquals(statuses.slice(0, 8), Array(8).fill(200));
+  assertEquals(statuses[8], 429);
+  assertEquals(((await (await GET(getEvent(userId))).json()) as RecentsBody).recents, [recent(7)]);
 });
 
 migratedTest('recents GET degrades malformed stored JSON to an empty or sanitized list', async () => {
@@ -221,8 +329,8 @@ migratedTest('recents GET degrades malformed stored JSON to an empty or sanitize
 
   // Assert
   assertEquals(broken.status, 200);
-  assertEquals(await broken.json(), { recents: [] });
-  assertEquals(await mixed.json(), { recents: [recent(2)] });
+  assertEquals(((await broken.json()) as { recents: unknown }).recents, []);
+  assertEquals(((await mixed.json()) as { recents: unknown }).recents, [recent(2)]);
 });
 
 migratedTest('recents rows are removed with their user', () => {

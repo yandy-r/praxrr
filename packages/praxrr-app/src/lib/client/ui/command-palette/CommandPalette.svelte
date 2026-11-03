@@ -30,8 +30,8 @@
   import { createRecentsSync, type RecentsBackend, type RecentsSync, type TimerHandle } from './recents.ts';
 
   export let navShell: NavShell;
-  /** From root layout data: `api` for a signed-in user, `local` for auth-bypass sessions. */
-  export let recentsBackend: RecentsBackend = 'local';
+  /** From root layout data (required): `api` for a signed-in user, `local` for auth-bypass sessions. */
+  export let recentsBackend: RecentsBackend;
 
   const SEARCH_DEBOUNCE_MS = 150;
   // Only announce "Searching…" for slow searches; fast ones go straight to the result count.
@@ -299,8 +299,24 @@
     }
   }
 
+  // Page teardown (navigation away, closed or backgrounded tab) skips onDestroy; flush there too.
+  function flushRecents() {
+    recentsSync?.flushOnDestroy();
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') flushRecents();
+  }
+
   onMount(() => {
     applePlatform = isApplePlatform(navigator.platform);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', flushRecents);
+    // Runs on destroy (browser only).
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', flushRecents);
+    };
   });
 
   afterNavigate(({ type }) => {

@@ -17,6 +17,8 @@ export interface CommandPaletteRecent {
 
 export interface CommandPaletteRecentsResponse {
   recents: CommandPaletteRecent[];
+  /** Optimistic concurrency token for the next PUT (`expectedUpdatedAt`); `null` when nothing is stored. */
+  updatedAt: string | null;
 }
 
 /** Maximum number of recents stored per user. */

@@ -228,11 +228,16 @@ export function isApplePlatform(platform: string): boolean {
 
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>;
 
-/** True for the palette toggle: Cmd+K on Apple platforms, Ctrl+K elsewhere, with no Shift/Alt. */
+/**
+ * True for the palette toggle: Cmd+K on Apple platforms, Ctrl+K elsewhere, with no Shift/Alt.
+ * The typed key wins on Latin layouts (Dvorak Ctrl+`e` sits on the physical K key and is not the
+ * shortcut); the physical `KeyK` only counts when the layout types a non-Latin character there.
+ */
 export function isPaletteShortcut(event: ShortcutEvent, apple: boolean): boolean {
   if (event.shiftKey || event.altKey) return false;
   if (apple ? !event.metaKey || event.ctrlKey : !event.ctrlKey || event.metaKey) return false;
-  return event.code === 'KeyK' || event.key.toLowerCase() === 'k';
+  const key = event.key.toLowerCase();
+  return key === 'k' || (!/^[a-z]$/.test(key) && event.code === 'KeyK');
 }
 
 function parseSource(value: unknown): SearchResultSource | null | undefined {

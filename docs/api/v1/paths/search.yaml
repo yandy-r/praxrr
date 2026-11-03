@@ -98,7 +98,8 @@ commandPaletteRecents:
     operationId: getCommandPaletteRecents
     summary: Read command palette recents
     description: |
-      Returns the signed-in user's command palette recents, most recent first. Returns an empty list
+      Returns the signed-in user's command palette recents, most recent first, plus the `updatedAt`
+      concurrency token (`null` when nothing is stored). Returns an empty list
       when nothing is stored. Requires a real user session: auth-bypass sessions and API tokens
       receive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and
       keeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.
@@ -138,9 +139,11 @@ commandPaletteRecents:
     description: |
       Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`
       must be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual
-      bytes) are rejected with 400. Writes are rate-limited per user. Requires a real user session:
-      an API token without the `admin` scope is rejected with 403, and any API token holding it
-      receives 401.
+      bytes) are rejected with 400. Writes are rate-limited per user (8 per 30 seconds). Optional
+      `expectedUpdatedAt` makes the write conditional (optimistic concurrency): a stale token, or
+      `null` when a list is already stored, returns 409 and nothing is written. Requires a real user
+      session: an API token without the `admin` scope is rejected with 403, and any API token holding
+      it receives 401.
     tags:
       - User Preferences
     requestBody:
@@ -172,6 +175,14 @@ commandPaletteRecents:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '403':
         description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: |
+          Concurrency conflict: `expectedUpdatedAt` no longer matches the stored list (another tab or
+          session wrote it). Re-read, merge, and retry.
         content:
           application/json:
             schema:

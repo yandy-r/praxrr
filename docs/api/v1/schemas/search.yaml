@@ -112,11 +112,14 @@ CommandPaletteRecent:
       type: string
       minLength: 1
       maxLength: 200
-      description: Stable item key (for entity results, the search result id).
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+      description: Stable item key (for entity results, the search result id). Must not contain control characters.
     label:
       type: string
       minLength: 1
       maxLength: 200
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+      description: Display label. Must not contain control characters.
     href:
       type: string
       minLength: 1
@@ -126,7 +129,8 @@ CommandPaletteRecent:
       type: string
       minLength: 1
       maxLength: 40
-      description: Item kind (a search result type, `nav`, or `action`).
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+      description: Item kind (a search result type, `nav`, or `action`). Must not contain control characters.
     usedAt:
       type: string
       format: date-time
@@ -136,12 +140,20 @@ CommandPaletteRecentsResponse:
   type: object
   required:
     - recents
+    - updatedAt
   properties:
     recents:
       type: array
       maxItems: 10
       items:
         $ref: '#/CommandPaletteRecent'
+    updatedAt:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: |
+        Opaque optimistic concurrency token for the stored list (`null` when nothing is stored).
+        Send it back as `expectedUpdatedAt` on the next PUT.
 
 CommandPaletteRecentsUpdateRequest:
   type: object
@@ -154,3 +166,13 @@ CommandPaletteRecentsUpdateRequest:
       description: Full replacement list, most recent first. Keys must be unique.
       items:
         $ref: '#/CommandPaletteRecent'
+    expectedUpdatedAt:
+      oneOf:
+        - type: string
+          minLength: 1
+          maxLength: 64
+        - type: 'null'
+      description: |
+        Optional optimistic concurrency token: the `updatedAt` from the last GET/PUT. A string
+        applies the write only while the stored token still matches; `null` applies it only while
+        nothing is stored. Omit for an unconditional write. A mismatch returns 409.

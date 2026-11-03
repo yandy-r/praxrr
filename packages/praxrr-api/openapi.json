@@ -1187,7 +1187,7 @@
       "get": {
         "operationId": "getCommandPaletteRecents",
         "summary": "Read command palette recents",
-        "description": "Returns the signed-in user's command palette recents, most recent first. Returns an empty list\nwhen nothing is stored. Requires a real user session: auth-bypass sessions and API tokens\nreceive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and\nkeeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.\nAn API token without the `read` scope is rejected with 403 before this check.\n",
+        "description": "Returns the signed-in user's command palette recents, most recent first, plus the `updatedAt`\nconcurrency token (`null` when nothing is stored). Returns an empty list\nwhen nothing is stored. Requires a real user session: auth-bypass sessions and API tokens\nreceive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and\nkeeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.\nAn API token without the `read` scope is rejected with 403 before this check.\n",
         "tags": ["User Preferences"],
         "responses": {
           "200": {
@@ -1235,7 +1235,7 @@
       "put": {
         "operationId": "putCommandPaletteRecents",
         "summary": "Replace command palette recents",
-        "description": "Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`\nmust be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual\nbytes) are rejected with 400. Writes are rate-limited per user. Requires a real user session:\nan API token without the `admin` scope is rejected with 403, and any API token holding it\nreceives 401.\n",
+        "description": "Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`\nmust be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual\nbytes) are rejected with 400. Writes are rate-limited per user (8 per 30 seconds). Optional\n`expectedUpdatedAt` makes the write conditional (optimistic concurrency): a stale token, or\n`null` when a list is already stored, returns 409 and nothing is written. Requires a real user\nsession: an API token without the `admin` scope is rejected with 403, and any API token holding\nit receives 401.\n",
         "tags": ["User Preferences"],
         "requestBody": {
           "required": true,
@@ -1280,6 +1280,16 @@
           },
           "403": {
             "description": "The API token lacks the `admin` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrency conflict: `expectedUpdatedAt` no longer matches the stored list (another tab or\nsession wrote it). Re-read, merge, and retry.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -17945,12 +17955,15 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Stable item key (for entity results, the search result id)."
+            "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$",
+            "description": "Stable item key (for entity results, the search result id). Must not contain control characters."
           },
           "label": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$",
+            "description": "Display label. Must not contain control characters."
           },
           "href": {
             "type": "string",
@@ -17962,7 +17975,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 40,
-            "description": "Item kind (a search result type, `nav`, or `action`)."
+            "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$",
+            "description": "Item kind (a search result type, `nav`, or `action`). Must not contain control characters."
           },
           "usedAt": {
             "type": "string",
@@ -17973,7 +17987,7 @@
       },
       "CommandPaletteRecentsResponse": {
         "type": "object",
-        "required": ["recents"],
+        "required": ["recents", "updatedAt"],
         "properties": {
           "recents": {
             "type": "array",
@@ -17981,6 +17995,17 @@
             "items": {
               "$ref": "#/components/schemas/CommandPaletteRecent"
             }
+          },
+          "updatedAt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque optimistic concurrency token for the stored list (`null` when nothing is stored).\nSend it back as `expectedUpdatedAt` on the next PUT.\n"
           }
         }
       },
@@ -17995,6 +18020,19 @@
             "items": {
               "$ref": "#/components/schemas/CommandPaletteRecent"
             }
+          },
+          "expectedUpdatedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional optimistic concurrency token: the `updatedAt` from the last GET/PUT. A string\napplies the write only while the stored token still matches; `null` applies it only while\nnothing is stored. Omit for an unconditional write. A mismatch returns 409.\n"
           }
         }
       }
