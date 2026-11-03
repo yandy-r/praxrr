@@ -104,8 +104,8 @@ async function loadEditorData(seedSql: string, profileName: string) {
   const fixture = createCacheFixture(`${SCHEMA_SQL}\n${seedSql}`);
   try {
     const ladder = await qualityProfileQueries.qualities(fixture.cache, 1, profileName);
-    const candidates = await qualityProfileQueries.availableQualityCandidates(fixture.cache, profileName, ladder);
-    return { ladder, available: candidates.map((quality) => quality.name) };
+    const result = await qualityProfileQueries.availableQualityCandidates(fixture.cache, profileName, ladder);
+    return { ladder, result, available: result.candidates.map((quality) => quality.name) };
   } finally {
     await fixture.destroy();
   }
@@ -143,7 +143,7 @@ VALUES
 });
 
 Deno.test('availableQualityCandidates: radarr+sonarr profile offers the union of both apps', async () => {
-  const { available } = await loadEditorData(
+  const { result, available } = await loadEditorData(
     `
 INSERT INTO quality_profiles (id, name) VALUES (1, 'Shared HD');
 INSERT INTO quality_profile_qualities
@@ -158,6 +158,14 @@ VALUES
   // DVDSCR is Radarr-only yet offered: the profile syncs to Radarr, so it is a valid addition there.
   assertEquals(available, ['DVDSCR', 'Remux-1080p', 'WEBDL-1080p']);
   assertFalse(available.includes('FLAC'));
+  assertEquals(result.targetArrTypes, ['radarr', 'sonarr']);
+  // Each candidate lists the target apps supporting it (DVDSCR is Radarr-only).
+  assertEquals(result.candidates, [
+    { name: 'DVDSCR', arrTypes: ['radarr'] },
+    { name: 'Remux-1080p', arrTypes: ['radarr', 'sonarr'] },
+    { name: 'WEBDL-1080p', arrTypes: ['radarr', 'sonarr'] },
+  ]);
+  assertFalse(result.arrTargetUnresolved);
 });
 
 Deno.test('availableQualityCandidates: sonarr score-only profile resolves support via api_name mapping', async () => {
@@ -215,8 +223,44 @@ VALUES
   }
 });
 
-Deno.test('availableQualityCandidates: profile without determinable arr type offers no additions', async () => {
-  const { ladder, available } = await loadEditorData(
+Deno.test(
+  'availableQualityCandidates: all-disabled ladder without scores resolves apps from stored names',
+  async () => {
+    const { result, available } = await loadEditorData(
+      `
+INSERT INTO quality_profiles (id, name) VALUES (1, 'Disabled Movies');
+INSERT INTO quality_profile_qualities
+	(quality_profile_name, quality_name, quality_group_name, position, enabled, upgrade_until)
+VALUES
+	('Disabled Movies', 'Bluray-1080p', NULL, 1, 0, 0),
+	('Disabled Movies', 'DVDSCR', NULL, 2, 0, 0);
+`,
+      'Disabled Movies'
+    );
+
+    // No enabled qualities and no arr-specific scores: Radarr is the only app supporting every stored name.
+    assertEquals(result.targetArrTypes, ['radarr']);
+    assertEquals(available, ['HDTV-720p', 'Remux-1080p', 'WEBDL-1080p']);
+    assertFalse(result.arrTargetUnresolved);
+  }
+);
+
+Deno.test('availableQualityCandidates: empty ladder with only all-app scores is unresolved', async () => {
+  const { ladder, result } = await loadEditorData(
+    `
+INSERT INTO quality_profiles (id, name) VALUES (1, 'Blank');
+INSERT INTO quality_profile_custom_formats (quality_profile_name, custom_format_name, arr_type, score) VALUES
+	('Blank', 'Shared CF', 'all', 50);
+`,
+    'Blank'
+  );
+
+  assertEquals(ladder.orderedItems, []);
+  assertEquals(result, { candidates: [], targetArrTypes: [], arrTargetUnresolved: true });
+});
+
+Deno.test('availableQualityCandidates: mixed-app ladder resolves no app and offers no additions', async () => {
+  const { ladder, result, available } = await loadEditorData(
     `
 INSERT INTO quality_profiles (id, name) VALUES (1, 'Mixed');
 INSERT INTO quality_profile_qualities
@@ -229,7 +273,9 @@ VALUES
     'Mixed'
   );
 
+  // The stored-name fallback cannot rescue a ladder no single app fully supports.
   assertEquals(available, []);
+  assertEquals(result.arrTargetUnresolved, true);
   assertEquals(
     ladder.orderedItems.map((item) => ({ name: item.name, enabled: item.enabled })),
     [
@@ -258,5 +304,5 @@ Deno.test('availableQualityCandidates: no unused qualities short-circuits withou
     allQualities: [{ name: 'Bluray-1080p' }, { name: 'WEBDL-1080p' }],
   });
 
-  assertEquals(candidates, []);
+  assertEquals(candidates, { candidates: [], targetArrTypes: [], arrTargetUnresolved: false });
 });

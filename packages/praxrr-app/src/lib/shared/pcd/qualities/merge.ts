@@ -3,6 +3,7 @@
  */
 
 import type { OrderedItem, QualitiesEditorData } from '$shared/pcd/display.ts';
+import { getArrAppMetadata } from '$shared/arr/capabilities.ts';
 
 /** Dirty-tracking form shape of the qualities editor */
 export interface QualitiesFormData {
@@ -40,4 +41,20 @@ export function buildQualitiesFormData(
   qualities: Pick<QualitiesEditorData, 'orderedItems' | 'availableQualities'>
 ): QualitiesFormData {
   return { orderedItems: buildMergedOrderedItems(qualities) };
+}
+
+/**
+ * "<App> only" badge labels for addable qualities that only some of the profile's target Arr apps
+ * support, keyed by quality name. Qualities every target app supports get no label.
+ */
+export function buildAppScopeLabels(
+  qualities: Pick<QualitiesEditorData, 'availableQualities' | 'targetArrTypes'>
+): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const candidate of qualities.availableQualities) {
+    if (candidate.arrTypes.length >= qualities.targetArrTypes.length) continue;
+    const apps = candidate.arrTypes.map((arrType) => getArrAppMetadata(arrType).label).join(' + ');
+    labels.set(candidate.name, `${apps} only`);
+  }
+  return labels;
 }

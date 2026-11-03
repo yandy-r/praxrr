@@ -38,6 +38,10 @@ Define the quality ladder:
 Profiles with all qualities disabled may still appear in sync selection when
 app-compatible quality names match via `quality_api_mappings`.
 
+Qualities the profile does not list yet are appended as disabled, but only those supported by
+the profile's target Arr apps; when no target app can be determined (for example an empty ladder
+with only `all` scores), none are offered until you add an Arr-specific score or import qualities.
+
 ## Scoring tab
 
 Assign custom format scores:
