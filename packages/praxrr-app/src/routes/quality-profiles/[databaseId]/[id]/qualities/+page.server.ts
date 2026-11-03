@@ -4,6 +4,7 @@ import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
+import type { QualitiesEditorData } from '$shared/pcd/display.ts';
 
 export const load: ServerLoad = async ({ params }) => {
   const { databaseId, id } = params;
@@ -48,7 +49,11 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Quality profile not found');
   }
 
-  const qualitiesData = await qualityProfileQueries.qualities(cache, currentDatabaseId, profile.name);
+  const ladder = await qualityProfileQueries.qualities(cache, currentDatabaseId, profile.name);
+  const qualitiesData: QualitiesEditorData = {
+    ...ladder,
+    availableQualities: await qualityProfileQueries.availableQualityCandidates(cache, profile.name, ladder),
+  };
 
   return {
     currentDatabase,

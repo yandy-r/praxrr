@@ -110,12 +110,16 @@ export interface QualitiesGroup {
   members: QualityMember[];
 }
 
-/** Qualities page data */
+/** Stored quality ladder of a profile (no Arr-compatibility work) */
 export interface QualitiesPageData {
   orderedItems: OrderedItem[];
-  availableQualities: QualityMember[];
   allQualities: QualityMember[];
   groups: QualitiesGroup[];
+}
+
+/** Qualities editor data: stored ladder plus the unused qualities the profile may add */
+export interface QualitiesEditorData extends QualitiesPageData {
+  availableQualities: QualityMember[];
 }
 
 export type CustomFormatScoresByArrType = Record<RequiredCustomFormatScoreApp, number | null> &

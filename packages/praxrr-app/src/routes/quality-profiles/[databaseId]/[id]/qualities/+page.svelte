@@ -10,61 +10,19 @@
   import { enhance } from '$app/forms';
   import { current, isDirty, initEdit, update } from '$lib/client/stores/dirty';
   import type { PageData } from './$types';
+  import { buildQualitiesFormData } from '$shared/pcd/qualities/merge.ts';
 
   export let data: PageData;
 
   let showInfoModal = false;
 
   type OrderedItem = PageData['qualities']['orderedItems'][number];
-  // Form data shape
-  interface QualitiesFormData {
-    orderedItems: OrderedItem[];
-    [key: string]: unknown;
-  }
 
-  // Build initial data from server
-  $: initialData = buildInitialData(data.qualities);
-
-  function buildInitialData(qualities: typeof data.qualities): QualitiesFormData {
-    return {
-      orderedItems: structuredClone(qualities.orderedItems),
-    };
-  }
-
-  function buildMergedOrderedItems(qualities: typeof data.qualities): OrderedItem[] {
-    const orderedItems = structuredClone(qualities.orderedItems);
-    const additional = qualities.availableQualities.map((quality, index) => ({
-      type: 'quality' as const,
-      name: quality.name,
-      position: orderedItems.length + index,
-      enabled: false,
-      upgradeUntil: false,
-    }));
-
-    const merged = [...orderedItems, ...additional];
-    merged.forEach((item, index) => {
-      item.position = index;
-    });
-
-    return merged;
-  }
+  // Dirty-tracking baseline = the rendered list (stored ladder + disabled additions).
+  $: initialData = buildQualitiesFormData(data.qualities);
 
   // Initialize dirty tracking
   $: initEdit(initialData);
-
-  let lastAutoMergeKey = '';
-  let lastQualitiesRef: typeof data.qualities | null = null;
-  $: if (data.qualities) {
-    if (data.qualities !== lastQualitiesRef) {
-      lastAutoMergeKey = '';
-      lastQualitiesRef = data.qualities;
-    }
-    const availableNames = data.qualities.availableQualities.map((q) => q.name).join('|');
-    if (availableNames && availableNames !== lastAutoMergeKey) {
-      update('orderedItems', buildMergedOrderedItems(data.qualities));
-    }
-    lastAutoMergeKey = availableNames;
-  }
 
   // Reactive getters for current values
   $: mainBucket = ($current.orderedItems ?? []) as OrderedItem[];
