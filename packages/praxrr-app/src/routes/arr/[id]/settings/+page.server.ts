@@ -4,7 +4,7 @@ import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
 import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
-import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
+import { deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { decryptArrInstanceApiKey, encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
@@ -266,35 +266,27 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid instance ID' });
     }
 
-    // Fetch the instance to verify it exists
-    const instance = arrInstancesQueries.getById(id);
+    const result = deleteArrInstance(id);
 
-    if (!instance) {
-      await logger.warn('Delete failed: Instance not found', {
-        source: 'arr/[id]/settings',
-        meta: { id },
-      });
-      return fail(404, { error: 'Instance not found' });
-    }
-
-    if ((instance.source ?? 'ui') === 'env') {
-      return fail(403, {
-        error: 'Environment-managed instances cannot be deleted. Remove the environment variables and restart.',
-      });
-    }
-
-    cleanupJobsForArrInstance(id);
-
-    // Delete the instance
-    const deleted = arrInstancesQueries.delete(id);
-
-    if (!deleted) {
+    if (!result.ok) {
+      if (result.reason === 'not_found') {
+        await logger.warn('Delete failed: Instance not found', {
+          source: 'arr/[id]/settings',
+          meta: { id },
+        });
+        return fail(404, { error: 'Instance not found' });
+      }
+      if (result.reason === 'env_managed') {
+        return fail(403, { error: ENV_MANAGED_DELETE_ERROR });
+      }
       await logger.error('Failed to delete instance', {
         source: 'arr/[id]/settings',
-        meta: { id, name: instance.name, type: instance.type },
+        meta: { id, name: result.instance?.name, type: result.instance?.type },
       });
       return fail(500, { error: 'Failed to delete instance' });
     }
+
+    const { instance } = result;
 
     await logger.info(`Deleted ${instance.type} instance: ${instance.name}`, {
       source: 'arr/[id]/settings',

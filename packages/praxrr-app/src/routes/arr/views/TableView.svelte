@@ -126,12 +126,14 @@
         title="Open in {getAppLabel(row.type)}"
         on:click={(e) => handleExternalClick(e, row)}
       />
-      <TableActionButton
-        icon={Trash2}
-        title="Delete instance"
-        variant="danger"
-        on:click={(e) => handleDeleteClick(e, row)}
-      />
+      {#if (row.source ?? 'ui') !== 'env'}
+        <TableActionButton
+          icon={Trash2}
+          title="Delete instance"
+          variant="danger"
+          on:click={(e) => handleDeleteClick(e, row)}
+        />
+      {/if}
     </div>
   </svelte:fragment>
 </Table>

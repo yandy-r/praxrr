@@ -70,6 +70,12 @@ Increment the index (`_2`, `_3`, …) for additional instances.
 Set `PRAXRR_VALIDATE_INSTANCES=true` to verify each env-managed instance during
 startup.
 
+Env-managed instances are marked `(ENV)` in the UI and cannot be deleted there:
+deleting one would only lose its sync, upgrade and rename settings, because the
+instance is recreated from the variables on the next restart. To remove one,
+delete its `*_INSTANCE_*` variables and restart. Instances whose variables are
+gone are disabled.
+
 ## API key security
 
 - Keys are encrypted with `ARR_CREDENTIAL_MASTER_KEY` before persistence.

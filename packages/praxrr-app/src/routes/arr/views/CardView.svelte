@@ -117,14 +117,16 @@
         >
           <ExternalLink size={16} />
         </button>
-        <button
-          type="button"
-          aria-label={`Delete ${instance.name}`}
-          on:click={(e) => handleDeleteClick(e, instance)}
-          class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
-        >
-          <Trash2 size={16} />
-        </button>
+        {#if (instance.source ?? 'ui') !== 'env'}
+          <button
+            type="button"
+            aria-label={`Delete ${instance.name}`}
+            on:click={(e) => handleDeleteClick(e, instance)}
+            class="rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+          >
+            <Trash2 size={16} />
+          </button>
+        {/if}
       </div>
     </div>
   {/each}

@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
-import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
+import { deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
 import { logger } from '$logger/logger.ts';
 
 type ArrInstanceListItem = ArrInstance & {
@@ -45,13 +45,20 @@ export const actions = {
     }
 
     try {
-      cleanupJobsForArrInstance(id);
-      const deleted = arrInstancesQueries.delete(id);
+      const result = deleteArrInstance(id);
 
-      if (!deleted) {
-        return fail(404, {
-          error: 'Instance not found',
+      if (!result.ok) {
+        if (result.reason === 'env_managed') {
+          return fail(403, { error: ENV_MANAGED_DELETE_ERROR });
+        }
+        if (result.reason === 'not_found') {
+          return fail(404, { error: 'Instance not found' });
+        }
+        await logger.error('Failed to delete arr instance', {
+          source: 'arr',
+          meta: { id },
         });
+        return fail(500, { error: 'Failed to delete instance' });
       }
 
       await logger.info(`Deleted arr instance: ${id}`, {
