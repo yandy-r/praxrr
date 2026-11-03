@@ -248,6 +248,25 @@ export const trashGuideEntityCacheQueries = {
   },
 
   /**
+   * Get only the normalized trash id and name of cached entities by source and section; for
+   * name-only lookups (quick search) that must not load `json_data`.
+   */
+  getNamesBySourceAndType(
+    sourceId: number,
+    entityType: TrashGuideEntityType
+  ): Array<{ trashId: string; name: string }> {
+    return db
+      .query<{ trash_id: string; name: string }>(
+        `SELECT trash_id, name
+         FROM trash_guide_entity_cache
+         WHERE source_id = ? AND entity_type = ?`,
+        sourceId,
+        entityType
+      )
+      .map((row) => ({ trashId: normalizeTrashId(row.trash_id), name: row.name }));
+  },
+
+  /**
    * Get cached entities by source, section, and a scoped set of TRaSH ids.
    */
   getBySourceTypeAndTrashIds(

@@ -13,44 +13,47 @@ This page is a reader-oriented companion to `docs/api/v1/openapi.yaml`.
 
 ## Endpoint index
 
-| Method | Path                                                     | Purpose                                |
-| ------ | -------------------------------------------------------- | -------------------------------------- |
-| GET    | `/health`                                                | Service/component health check         |
-| GET    | `/openapi.json`                                          | Runtime OpenAPI JSON                   |
-| GET    | `/events`                                                | Live event stream (SSE)                |
-| HEAD   | `/events`                                                | Event stream availability probe        |
-| GET    | `/ui-preferences`                                        | Read per-user section disclosure mode  |
-| PATCH  | `/ui-preferences`                                        | Save per-user section disclosure mode  |
-| GET    | `/complexity-tiers`                                      | Read per-user section complexity tier  |
-| PATCH  | `/complexity-tiers`                                      | Save per-user section complexity tier  |
-| GET    | `/plugins`                                               | List redacted durable plugin state     |
-| POST   | `/plugins/reload`                                        | Reconcile the plugin registry          |
-| GET    | `/plugins/{apiVersion}/{id}`                             | Read one durable plugin record         |
-| POST   | `/plugins/{apiVersion}/{id}/enable`                      | Save enabled plugin intent             |
-| POST   | `/plugins/{apiVersion}/{id}/disable`                     | Save disabled plugin intent            |
-| POST   | `/entity-testing/evaluate`                               | Parse titles and evaluate CF matches   |
-| GET    | `/arr/library`                                           | Paginated arr app library view         |
-| DELETE | `/arr/library`                                           | Invalidate Arr library cache           |
-| GET    | `/arr/library/episodes`                                  | Sonarr-only series episode details     |
-| GET    | `/arr/releases`                                          | Interactive release search             |
-| POST   | `/arr/cleanup`                                           | Scan/execute stale config cleanup      |
-| GET    | `/pcd/export`                                            | Export portable entity or bundle       |
-| POST   | `/pcd/import`                                            | Import portable entity or bundle       |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`             | List metadata profiles                 |
-| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`             | Create metadata profile                |
-| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Read metadata profile                  |
-| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Update metadata profile                |
-| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Delete metadata profile                |
-| GET    | `/pcd/{databaseId}/overrides`                            | List local overrides and latest action |
-| POST   | `/pcd/{databaseId}/overrides/{entityType}/{name}/revert` | Revert an entity's local operations    |
-| POST   | `/pcd/{databaseId}/overrides/undo`                       | Undo the latest local action           |
-| GET    | `/trash-guide/sources`                                   | List all configured TRaSH sources      |
-| POST   | `/trash-guide/sources`                                   | Create a new TRaSH source              |
-| GET    | `/trash-guide/sources/:id`                               | Get a specific TRaSH source            |
-| PUT    | `/trash-guide/sources/:id`                               | Update a TRaSH source                  |
-| DELETE | `/trash-guide/sources/:id`                               | Delete a TRaSH source                  |
-| POST   | `/trash-guide/sources/:id/sync`                          | Trigger manual sync for a source       |
-| GET    | `/trash-guide/sources/:id/entities`                      | List cached entities for a source      |
+| Method | Path                                                     | Purpose                                  |
+| ------ | -------------------------------------------------------- | ---------------------------------------- |
+| GET    | `/health`                                                | Service/component health check           |
+| GET    | `/openapi.json`                                          | Runtime OpenAPI JSON                     |
+| GET    | `/events`                                                | Live event stream (SSE)                  |
+| HEAD   | `/events`                                                | Event stream availability probe          |
+| GET    | `/ui-preferences`                                        | Read per-user section disclosure mode    |
+| PATCH  | `/ui-preferences`                                        | Save per-user section disclosure mode    |
+| GET    | `/ui-preferences/command-palette-recents`                | Read per-user command palette recents    |
+| PUT    | `/ui-preferences/command-palette-recents`                | Replace per-user command palette recents |
+| GET    | `/search`                                                | Cross-entity quick search (palette)      |
+| GET    | `/complexity-tiers`                                      | Read per-user section complexity tier    |
+| PATCH  | `/complexity-tiers`                                      | Save per-user section complexity tier    |
+| GET    | `/plugins`                                               | List redacted durable plugin state       |
+| POST   | `/plugins/reload`                                        | Reconcile the plugin registry            |
+| GET    | `/plugins/{apiVersion}/{id}`                             | Read one durable plugin record           |
+| POST   | `/plugins/{apiVersion}/{id}/enable`                      | Save enabled plugin intent               |
+| POST   | `/plugins/{apiVersion}/{id}/disable`                     | Save disabled plugin intent              |
+| POST   | `/entity-testing/evaluate`                               | Parse titles and evaluate CF matches     |
+| GET    | `/arr/library`                                           | Paginated arr app library view           |
+| DELETE | `/arr/library`                                           | Invalidate Arr library cache             |
+| GET    | `/arr/library/episodes`                                  | Sonarr-only series episode details       |
+| GET    | `/arr/releases`                                          | Interactive release search               |
+| POST   | `/arr/cleanup`                                           | Scan/execute stale config cleanup        |
+| GET    | `/pcd/export`                                            | Export portable entity or bundle         |
+| POST   | `/pcd/import`                                            | Import portable entity or bundle         |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles`             | List metadata profiles                   |
+| POST   | `/pcd/{databaseId}/lidarr-metadata-profiles`             | Create metadata profile                  |
+| GET    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Read metadata profile                    |
+| PUT    | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Update metadata profile                  |
+| DELETE | `/pcd/{databaseId}/lidarr-metadata-profiles/{id}`        | Delete metadata profile                  |
+| GET    | `/pcd/{databaseId}/overrides`                            | List local overrides and latest action   |
+| POST   | `/pcd/{databaseId}/overrides/{entityType}/{name}/revert` | Revert an entity's local operations      |
+| POST   | `/pcd/{databaseId}/overrides/undo`                       | Undo the latest local action             |
+| GET    | `/trash-guide/sources`                                   | List all configured TRaSH sources        |
+| POST   | `/trash-guide/sources`                                   | Create a new TRaSH source                |
+| GET    | `/trash-guide/sources/:id`                               | Get a specific TRaSH source              |
+| PUT    | `/trash-guide/sources/:id`                               | Update a TRaSH source                    |
+| DELETE | `/trash-guide/sources/:id`                               | Delete a TRaSH source                    |
+| POST   | `/trash-guide/sources/:id/sync`                          | Trigger manual sync for a source         |
+| GET    | `/trash-guide/sources/:id/entities`                      | List cached entities for a source        |
 
 ## System
 
@@ -281,6 +284,159 @@ Response shape on success:
   "persisted": true
 }
 ```
+
+### `GET /ui-preferences/command-palette-recents`
+
+Returns the signed-in user's command palette recents, most recent first.
+
+```json
+{
+  "recents": [
+    {
+      "key": "pcd:1:custom_format:12",
+      "label": "HDR10+",
+      "href": "/custom-formats/1/12",
+      "kind": "custom_format",
+      "usedAt": "2026-11-02T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+Semantics:
+
+- Requires a real user session. Unauthenticated requests (no valid session, or
+  a missing, invalid, revoked, or expired API token), auth-bypass sessions
+  (`AUTH=off`, local bypass) and valid API tokens (synthetic user id `0`)
+  receive `401`. The palette does not call this endpoint for auth-bypass
+  sessions (no user id); it keeps their recents in `localStorage` under
+  `praxrr:command-palette:recents`. For a signed-in user a `401` means the
+  session expired.
+- An API token without the `read` scope receives `403` before that check.
+- Nothing stored returns `{ "recents": [] }`. Stored data that is malformed or
+  fails validation degrades to the valid subset (possibly `[]`) instead of
+  erroring.
+
+### `PUT /ui-preferences/command-palette-recents`
+
+Request body: `{ "recents": CommandPaletteRecent[] }`, a full replacement list.
+
+- At most 10 entries, each with a unique `key`.
+- `key` and `label` 1–200 characters, `kind` 1–40 characters, no control
+  characters.
+- `href` 1–500 characters and a same-origin relative path: it must start with
+  `/`, must not start with `//`, and must not contain `\` or control
+  characters.
+- `usedAt` is an ISO 8601 timestamp.
+
+Semantics:
+
+- Same `401` rules as `GET`; an API token without the `admin` scope receives
+  `403` first.
+- A declared `Content-Length` or actual body over 64 KiB returns `400` before
+  parsing.
+- Any invalid entry rejects the whole body with `400` (nothing is stored).
+- More than 8 writes per user within 30s returns `429`.
+- Success returns `{ "recents": [...] }` with the stored list.
+
+## Search
+
+### `GET /search`
+
+Cross-entity quick search used by the global command palette. Searches entity
+names across every linked PCD database (custom formats, quality profiles,
+regular expressions, delay profiles, metadata profiles), cached TRaSH Guide
+custom formats and quality profiles, Arr instances, and linked databases.
+Unauthenticated requests (no valid session, or a missing, invalid, revoked, or
+expired API token) receive `401`; API tokens need the `read` scope (else `403`).
+Responses are sent with `Cache-Control: no-store`.
+
+Query params:
+
+- `q` (required string): trimmed; 1–100 characters after trimming. Matching is
+  case-insensitive and literal (`%` and `_` are ordinary characters).
+- `types` (optional, comma list): any of `custom_format`, `quality_profile`,
+  `regular_expression`, `delay_profile`, `metadata_profile`, `arr_instance`,
+  `database`. Default: all.
+- `arrType` (optional): `all` (default), `radarr`, `sonarr`, `lidarr`.
+  - Quality profiles are filtered by Arr compatibility of their qualities
+    (the same rule as the sync selection UI).
+  - Metadata profiles are returned only for `lidarr` or `all`.
+  - TRaSH sources and Arr instances of other Arr types are excluded.
+- `databaseId` (optional positive integer): restrict PCD entity results to one
+  linked database. TRaSH entities are excluded when set; Arr instances and
+  databases are unaffected.
+- `limit` (optional integer 1–50, default 20).
+
+Ranking: exact match, then prefix, then word-prefix (match starts after a
+non-alphanumeric character), then substring; ties are ordered by name
+(case-insensitive, numeric-aware).
+
+Capping: at most `limit` results. Each requested type first gets up to
+`max(3, ceil(limit / requestedTypeCount))` slots in rank order
+(`requestedTypeCount` is the number of `types`, or 7 when omitted), then the
+remaining slots are backfilled in rank order; results stay in rank order. With
+the defaults (20 results, 7 types) each type is guaranteed 3 slots, so 30
+matching custom formats cannot hide a matching Arr instance. `truncated` is
+`true` iff any match was omitted.
+
+```bash
+curl -sS -H 'X-Api-Key: <token>' \
+  'http://localhost:5173/api/v1/search?q=hdr&types=custom_format,quality_profile&arrType=radarr' | jq
+```
+
+```json
+{
+  "query": "hdr",
+  "results": [
+    {
+      "type": "custom_format",
+      "id": "pcd:1:custom_format:12",
+      "name": "HDR",
+      "href": "/custom-formats/1/12",
+      "source": { "type": "pcd", "id": 1, "name": "Praxrr-DB" }
+    },
+    {
+      "type": "custom_format",
+      "id": "trash:2:custom_format:e23edd2482476e595fb990b12e7c609c",
+      "name": "HDR10+",
+      "href": "/databases/trash/2/custom-formats/e23edd2482476e595fb990b12e7c609c/",
+      "source": {
+        "type": "trash",
+        "id": 2,
+        "name": "TRaSH Radarr",
+        "arrType": "radarr"
+      },
+      "arrType": "radarr"
+    }
+  ],
+  "truncated": false
+}
+```
+
+Result `href` formats:
+
+| Type                    | `href`                                                       |
+| ----------------------- | ------------------------------------------------------------ |
+| Custom format (PCD)     | `/custom-formats/{databaseId}/{id}`                          |
+| Custom format (TRaSH)   | `/databases/trash/{sourceId}/custom-formats/{trashId}/`      |
+| Quality profile (PCD)   | `/quality-profiles/{databaseId}/{id}/general`                |
+| Quality profile (TRaSH) | `/databases/trash/{sourceId}/quality-profiles/{trashId}/`    |
+| Regular expression      | `/regular-expressions/{databaseId}/{id}`                     |
+| Delay profile           | `/delay-profiles/{databaseId}/{encodeURIComponent(name)}`    |
+| Metadata profile        | `/metadata-profiles/{databaseId}/{encodeURIComponent(name)}` |
+| Arr instance            | `/arr/{id}`                                                  |
+| Database                | `/databases/{id}`                                            |
+
+Semantics:
+
+- Arr instance results carry only `id`, `name`, `type`; URLs and API keys are
+  never returned. `source` is `null` for Arr instances and databases.
+- Databases whose in-memory cache is not loaded, or whose cache fails
+  mid-query (for example during a concurrent rebuild), are skipped; the failure
+  is logged and the rest of the search still returns `200`.
+- Invalid parameters return `400 { "error": "..." }`; unexpected failures
+  return `500 { "error": "Failed to search" }`.
 
 ## Complexity Tiers
 

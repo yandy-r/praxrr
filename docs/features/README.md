@@ -19,6 +19,8 @@ relevant API behavior.
   bundles between databases, with dry run, collision policies, and atomic apply.
 - [TRaSH Guide Sync](./trash-guide-sync.md): import and sync TRaSH Guides community configurations
   from git repositories into Arr instances.
+- [Command Palette](./command-palette.md): open pages, quick actions, and entities from every
+  linked database with Ctrl/Cmd+K or `/`, with per-user recents.
 
 ## Recommended reading order
 
@@ -29,6 +31,7 @@ relevant API behavior.
 5. [Plugin Management](./plugin-management.md)
 6. [Portable Import/Export](./portable-import-export.md)
 7. [TRaSH Guide Sync](./trash-guide-sync.md)
+8. [Command Palette](./command-palette.md)
 
 ## Related documentation
 

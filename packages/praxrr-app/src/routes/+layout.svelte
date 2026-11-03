@@ -7,6 +7,7 @@
   import AlertContainer from '$alerts/AlertContainer.svelte';
   import AlertLiveRegion from '$alerts/AlertLiveRegion.svelte';
   import SetupChecklist from '$ui/setup/SetupChecklist.svelte';
+  import CommandPalette from '$ui/command-palette/CommandPalette.svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -64,9 +65,12 @@
 </a>
 
 {#if !isAuthPage}
-  <Navbar />
+  <Navbar showSearch={Boolean(data.navShell)} />
   <PageNav version={data.version} navShell={data.navShell} />
   <BottomNav navShell={data.navShell} />
+  {#if data.navShell}
+    <CommandPalette navShell={data.navShell} recentsBackend={data.recentsBackend ?? 'local'} />
+  {/if}
 {/if}
 <AlertContainer />
 <AlertLiveRegion />

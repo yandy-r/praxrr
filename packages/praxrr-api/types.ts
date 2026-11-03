@@ -390,6 +390,38 @@ export interface paths {
     patch: operations['upsertUiPreference'];
     trace?: never;
   };
+  '/ui-preferences/command-palette-recents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read command palette recents
+     * @description Returns the signed-in user's command palette recents, most recent first. Returns an empty list
+     *     when nothing is stored. Requires a real user session: auth-bypass sessions and API tokens
+     *     receive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and
+     *     keeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.
+     *     An API token without the `read` scope is rejected with 403 before this check.
+     */
+    get: operations['getCommandPaletteRecents'];
+    /**
+     * Replace command palette recents
+     * @description Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`
+     *     must be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual
+     *     bytes) are rejected with 400. Writes are rate-limited per user. Requires a real user session:
+     *     an API token without the `admin` scope is rejected with 403, and any API token holding it
+     *     receives 401.
+     */
+    put: operations['putCommandPaletteRecents'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/complexity-tiers': {
     parameters: {
       query?: never;
@@ -2170,6 +2202,41 @@ export interface paths {
      * @description Author-gated (403 for non-authors unless in AUTH-bypass mode).
      */
     patch: operations['updateTimelineAnnotation'];
+    trace?: never;
+  };
+  '/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Cross-entity quick search
+     * @description Searches entity names across every linked PCD database (custom formats, quality profiles,
+     *     regular expressions, delay profiles, metadata profiles), cached TRaSH Guide custom formats and
+     *     quality profiles, Arr instances, and linked databases. Matching is case-insensitive and
+     *     literal (`%` and `_` have no wildcard meaning). Results are ranked exact > prefix >
+     *     word-prefix > substring, then by name.
+     *
+     *     At most `limit` results are returned. Each requested result type first receives up to
+     *     `max(3, ceil(limit / requestedTypeCount))` slots in rank order (`requestedTypeCount` is the
+     *     number of entries in `types`, or 7 when omitted), then remaining slots are backfilled in rank
+     *     order; results stay in rank order. `truncated` is `true` iff any match was omitted.
+     *
+     *     Arr instances are returned without URL or API key. Quality profiles are filtered by Arr
+     *     compatibility (enabled qualities mapped for the Arr) when `arrType` is not `all`; metadata
+     *     profiles are only returned for `lidarr` or `all`. Databases whose cache is not loaded, or
+     *     whose cache fails mid-query (for example during a concurrent rebuild), are skipped. Responses
+     *     are sent with `Cache-Control: no-store`. API tokens need the `read` scope.
+     */
+    get: operations['searchEntities'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/auth/webauthn/registration/options': {
@@ -6094,6 +6161,84 @@ export interface components {
        */
       occurredAt: string;
     };
+    /**
+     * @description Kind of entity a search result points to.
+     * @enum {string}
+     */
+    SearchResultType:
+      | 'custom_format'
+      | 'quality_profile'
+      | 'regular_expression'
+      | 'delay_profile'
+      | 'metadata_profile'
+      | 'arr_instance'
+      | 'database';
+    /**
+     * @description Arr filter. `all` disables Arr-specific filtering.
+     * @default all
+     * @enum {string}
+     */
+    SearchArrType: 'all' | 'radarr' | 'sonarr' | 'lidarr';
+    /** @description Provenance of a PCD or TRaSH entity result. */
+    SearchResultSource: {
+      /** @enum {string} */
+      type: 'pcd' | 'trash';
+      /** @description PCD database id or TRaSH source id. */
+      id: number;
+      name: string;
+      /**
+       * @description Arr type of a TRaSH source. Absent for PCD sources.
+       * @enum {string}
+       */
+      arrType?: 'radarr' | 'sonarr';
+    };
+    SearchResult: {
+      type: components['schemas']['SearchResultType'];
+      /**
+       * @description Stable result key, e.g. `pcd:3:custom_format:12`, `trash:5:custom_format:<trashId>`,
+       *     `arr:2`, `database:3`.
+       */
+      id: string;
+      name: string;
+      /** @description Relative edit route for the entity (always starts with `/`). */
+      href: string;
+      /** @description Entity provenance; `null` for Arr instances and databases. */
+      source: components['schemas']['SearchResultSource'] | null;
+      /**
+       * @description Arr instance type, or the Arr type of a TRaSH source.
+       * @enum {string}
+       */
+      arrType?: 'radarr' | 'sonarr' | 'lidarr';
+    };
+    SearchResponse: {
+      /** @description The trimmed query that was searched. */
+      query: string;
+      /** @description Matches ranked exact > prefix > word-prefix > substring (case-insensitive), then by name. */
+      results: components['schemas']['SearchResult'][];
+      /** @description True when more entities matched than `limit` allowed. */
+      truncated: boolean;
+    };
+    CommandPaletteRecent: {
+      /** @description Stable item key (for entity results, the search result id). */
+      key: string;
+      label: string;
+      /** @description Same-origin relative path. Must start with `/`, must not start with `//`, and must not contain `\` or control characters. */
+      href: string;
+      /** @description Item kind (a search result type, `nav`, or `action`). */
+      kind: string;
+      /**
+       * Format: date-time
+       * @description ISO 8601 timestamp of the last use.
+       */
+      usedAt: string;
+    };
+    CommandPaletteRecentsResponse: {
+      recents: components['schemas']['CommandPaletteRecent'][];
+    };
+    CommandPaletteRecentsUpdateRequest: {
+      /** @description Full replacement list, most recent first. Keys must be unique. */
+      recents: components['schemas']['CommandPaletteRecent'][];
+    };
     SqliteHealth: {
       status: components['schemas']['ComponentStatus'];
       /** @description Database query response time in milliseconds */
@@ -7446,6 +7591,128 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+    };
+  };
+  getCommandPaletteRecents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Stored recents. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CommandPaletteRecentsResponse'];
+        };
+      };
+      /**
+       * @description No real user session: unauthenticated (no valid session, or missing, invalid, revoked, or
+       *     expired API token), auth bypass, or any API token that holds the `read` scope.
+       */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to read recents. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  putCommandPaletteRecents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CommandPaletteRecentsUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Recents persisted. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CommandPaletteRecentsResponse'];
+        };
+      };
+      /** @description Invalid body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /**
+       * @description No real user session: unauthenticated (no valid session, or missing, invalid, revoked, or
+       *     expired API token), auth bypass, or any API token that holds the `admin` scope.
+       */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `admin` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Recents updates are being rate-limited. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to save recents. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
     };
@@ -11964,6 +12231,72 @@ export interface operations {
         };
       };
       /** @description Failed to update annotation */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  searchEntities: {
+    parameters: {
+      query: {
+        /** @description Search text. Trimmed; must be 1-100 characters after trimming. */
+        q: string;
+        /** @description Restrict to these result types. Comma-separated (form, non-exploded). */
+        types?: components['schemas']['SearchResultType'][];
+        arrType?: components['schemas']['SearchArrType'];
+        /** @description Restrict PCD entity results to one linked database. TRaSH entities are excluded when set. */
+        databaseId?: number;
+        /** @description Maximum results returned. */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Ranked search results. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SearchResponse'];
+        };
+      };
+      /** @description Invalid query parameter. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unauthenticated (no valid session, or missing, invalid, revoked, or expired API token). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `read` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Search failed. */
       500: {
         headers: {
           [name: string]: unknown;

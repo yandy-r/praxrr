@@ -7,6 +7,11 @@ export interface RootLayoutData {
   version: string;
   navShell?: NavShell;
   setupChecklist?: SetupChecklist | null;
+  /**
+   * Where the command palette keeps recents: `api` for a real signed-in user (id > 0), `local`
+   * (`localStorage`) for auth-bypass sessions, which the per-user recents API rejects.
+   */
+  recentsBackend?: 'api' | 'local';
 }
 
 interface ResolveRootLayoutDataInput {
@@ -49,5 +54,6 @@ export function resolveRootLayoutData({
     version,
     navShell: resolveNavShell({ user: resolvedUser }),
     setupChecklist: resolveSetupChecklist(pathname),
+    recentsBackend: user && user.id > 0 ? 'api' : 'local',
   };
 }

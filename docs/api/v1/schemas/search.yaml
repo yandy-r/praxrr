@@ -1,0 +1,156 @@
+SearchResultType:
+  type: string
+  description: Kind of entity a search result points to.
+  enum:
+    - custom_format
+    - quality_profile
+    - regular_expression
+    - delay_profile
+    - metadata_profile
+    - arr_instance
+    - database
+
+SearchArrType:
+  type: string
+  description: Arr filter. `all` disables Arr-specific filtering.
+  enum:
+    - all
+    - radarr
+    - sonarr
+    - lidarr
+  default: all
+
+SearchResultSource:
+  type: object
+  description: Provenance of a PCD or TRaSH entity result.
+  required:
+    - type
+    - id
+    - name
+  properties:
+    type:
+      type: string
+      enum:
+        - pcd
+        - trash
+    id:
+      type: integer
+      description: PCD database id or TRaSH source id.
+    name:
+      type: string
+    arrType:
+      type: string
+      description: Arr type of a TRaSH source. Absent for PCD sources.
+      enum:
+        - radarr
+        - sonarr
+
+SearchResult:
+  type: object
+  required:
+    - type
+    - id
+    - name
+    - href
+    - source
+  properties:
+    type:
+      $ref: '#/SearchResultType'
+    id:
+      type: string
+      description: |
+        Stable result key, e.g. `pcd:3:custom_format:12`, `trash:5:custom_format:<trashId>`,
+        `arr:2`, `database:3`.
+    name:
+      type: string
+    href:
+      type: string
+      description: Relative edit route for the entity (always starts with `/`).
+    source:
+      description: Entity provenance; `null` for Arr instances and databases.
+      oneOf:
+        - $ref: '#/SearchResultSource'
+        - type: 'null'
+    arrType:
+      type: string
+      description: Arr instance type, or the Arr type of a TRaSH source.
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+
+SearchResponse:
+  type: object
+  required:
+    - query
+    - results
+    - truncated
+  properties:
+    query:
+      type: string
+      description: The trimmed query that was searched.
+    results:
+      type: array
+      description: |
+        Matches ranked exact > prefix > word-prefix > substring (case-insensitive), then by name.
+      items:
+        $ref: '#/SearchResult'
+    truncated:
+      type: boolean
+      description: True when more entities matched than `limit` allowed.
+
+CommandPaletteRecent:
+  type: object
+  required:
+    - key
+    - label
+    - href
+    - kind
+    - usedAt
+  properties:
+    key:
+      type: string
+      minLength: 1
+      maxLength: 200
+      description: Stable item key (for entity results, the search result id).
+    label:
+      type: string
+      minLength: 1
+      maxLength: 200
+    href:
+      type: string
+      minLength: 1
+      maxLength: 500
+      description: Same-origin relative path. Must start with `/`, must not start with `//`, and must not contain `\` or control characters.
+    kind:
+      type: string
+      minLength: 1
+      maxLength: 40
+      description: Item kind (a search result type, `nav`, or `action`).
+    usedAt:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp of the last use.
+
+CommandPaletteRecentsResponse:
+  type: object
+  required:
+    - recents
+  properties:
+    recents:
+      type: array
+      maxItems: 10
+      items:
+        $ref: '#/CommandPaletteRecent'
+
+CommandPaletteRecentsUpdateRequest:
+  type: object
+  required:
+    - recents
+  properties:
+    recents:
+      type: array
+      maxItems: 10
+      description: Full replacement list, most recent first. Keys must be unique.
+      items:
+        $ref: '#/CommandPaletteRecent'

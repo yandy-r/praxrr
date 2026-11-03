@@ -7,7 +7,7 @@ The navigation shell is the app chrome that frames every page — a fixed top na
 
 ## Navbar
 
-Fixed top navigation bar (app chrome). On mobile it shows a hamburger that opens the mobile nav plus a centered latest-alert toast; on desktop it shows the praxrr logo and wordmark. The right side always renders the `AccentPicker` and `ThemeToggle`.
+Fixed top navigation bar (app chrome). On mobile it shows a hamburger that opens the mobile nav plus a centered latest-alert toast; on desktop it shows the praxrr logo and wordmark. The right side renders the optional command palette trigger, then the `AccentPicker` and `ThemeToggle`.
 
 Import:
 
@@ -15,28 +15,72 @@ Import:
 import Navbar from '$ui/navigation/navbar/navbar.svelte';
 ```
 
-This component takes no props.
+Props:
+
+| Prop         | Type      | Default | Required | Description                                                                                                                   |
+| ------------ | --------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `showSearch` | `boolean` | `false` | No       | Renders the command palette trigger. The root layout passes `Boolean(data.navShell)`, matching where `CommandPalette` mounts. |
 
 Usage:
 
 ```svelte
 <script>
   import Navbar from '$ui/navigation/navbar/navbar.svelte';
+  export let data;
 </script>
 
-<Navbar />
+<Navbar showSearch={Boolean(data.navShell)} />
 ```
 
 Notes:
 
 - The hamburger button calls `mobileNavOpen.open()` (from `$stores/mobileNav`) to open the mobile page nav. It sets `aria-expanded={$mobileNavOpen}` and `aria-controls="page-nav"`. There are no callback props.
-- Depends on `$stores/mobileNav`, `$alerts/store` (`$alertStore`), `$assets/logo.svg`, and the child components `AccentPicker` and `ThemeToggle`.
+- The search trigger calls `commandPaletteOpen.open()` (from `$stores/commandPalette`). It has `aria-label="Open command palette"`, `aria-keyshortcuts` (`Control+K`, or `Meta+K` after mount on Apple platforms), `aria-haspopup="dialog"`, and `aria-expanded={$commandPaletteOpen}`. On `md+` it shows a `Ctrl K` hint, switched to `⌘K` after mount on Apple platforms (`isApplePlatform` from `$ui/command-palette/sources.ts`).
+- Depends on `$stores/mobileNav`, `$stores/commandPalette`, `$alerts/store` (`$alertStore`), `$assets/logo.svg`, and the child components `AccentPicker` and `ThemeToggle`.
 - Reactively derives `latestAlert` from the last item in `$alertStore`. Uses Svelte 4 style (`$:` and `on:click`).
 
 Variants:
 
 - Responsive — hamburger plus a centered `MobileNavAlert` on mobile (`<md`); logo plus wordmark on desktop (`md+`).
 - Fixed, `z-50` (`md z-80`), full width on mobile and `w-80` on desktop.
+
+## CommandPalette
+
+Global search dialog opened with Ctrl/Cmd+K, `/` (outside editable fields), or the navbar trigger. It combines recents, navigation pages, quick actions, and entity matches from `GET /api/v1/search` into one grouped, keyboard-navigable list.
+
+Import:
+
+```svelte
+import CommandPalette from '$ui/command-palette/CommandPalette.svelte';
+```
+
+Props:
+
+| Prop       | Type       | Default | Required | Description                                                                                      |
+| ---------- | ---------- | ------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `navShell` | `NavShell` | —       | Yes      | The resolved navigation shell; its groups (items and children) become the palette's Pages group. |
+
+Usage (root layout; mount once, only when a session exists):
+
+```svelte
+{#if !isAuthPage && data.navShell}
+  <CommandPalette navShell={data.navShell} />
+{/if}
+```
+
+Notes:
+
+- Open state lives in `$stores/commandPalette` (`commandPaletteOpen` with `open`, `close`, `toggle`, mirroring `mobileNav`). A `svelte:window` keydown handler toggles on `isPaletteShortcut` (Cmd+K on Apple platforms, Ctrl+K elsewhere, never with Shift/Alt; matches `code === 'KeyK'` or `key` `k`) and opens on `/` unless the event target is an input, textarea, select, or contenteditable. Neither shortcut opens the palette over another `aria-modal` dialog. Panel keys are ignored during IME composition.
+- Dialog markup copies `Modal` (backdrop click closes, `role="dialog"`, `aria-modal`, `aria-labelledby` on a visually hidden title) but has no footer. `use:focusTrap` focuses the search input and restores focus on close. Escape is handled on the panel with `preventDefault` and `stopPropagation`.
+- The input is a `combobox` with `aria-controls`, `aria-autocomplete="list"`, `aria-expanded`, and `aria-activedescendant`. The listbox contains one `role="group"` per section labelled by its heading; options have ids that stay stable per item key (`createOptionIdMap`), `aria-selected`, and `data-href`. ArrowUp/ArrowDown wrap via `wrapIndex`; Enter activates the highlighted option (the first by default); the active option scrolls into view; hover highlights and click activates.
+- Group order: Recent, Pages, Actions, then Custom formats, Quality profiles, Regular expressions, Delay profiles, Metadata profiles, Arr instances, Databases. Pure helpers live in `$ui/command-palette/sources.ts` (`flattenNavItems` skips `/auth/logout` and applies the `$navScope` filter like `PageNav`; `buildPaletteGroups`; `parseSearchResults` validates API responses).
+- Entity search is debounced 150 ms, cancels stale requests with `AbortController`, ignores out-of-date responses, passes `arrType` when `$navScope` is not `all`, and re-runs when `$navScope` changes while open. Entity results are shown only while their query equals the current trimmed query (`currentResults`). Entity options show `SourceBadge` when `source` is set, or the Arr badge for Arr instances. Result count, "No results", and errors go to an always-mounted polite `role="status"` region ("Searching…" only after 500 ms); errors also render inline (no alert toasts).
+- Recents (`$ui/command-palette/recents.ts`, `createRecentsSync`): activation records `{ key, label, href, kind, usedAt }` (deduped, newest first, max 10; hrefs over 500 chars are not stored). The backend comes from root layout data `recentsBackend`: `api` (`GET`/`PUT /api/v1/ui-preferences/command-palette-recents`) for a real user, `local` (`localStorage` key `praxrr:command-palette:recents`) for auth-bypass sessions. Saves wait until the load succeeds (activations during loading merge and save once), a failed load retries on the next open, a `401` drops the write, `429`/5xx retry with bounded backoff, and teardown flushes with `keepalive`. Nav logout clears the `localStorage` key. Recent actions re-resolve their context-aware href. All reads pass through `sanitizeCommandPaletteRecents` from `$shared/search/recents.ts`, and navigation uses `goto` only for safe relative hrefs.
+- Closes after any client navigation.
+
+Variants:
+
+- Fixed `z-[100]` overlay; panel `max-w-xl`, placed at 10vh from the top, list scrolls inside the panel.
 
 ## ThemeToggle
 
