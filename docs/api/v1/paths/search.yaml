@@ -1,0 +1,201 @@
+search:
+  get:
+    operationId: searchEntities
+    summary: Cross-entity quick search
+    description: |
+      Searches entity names across every linked PCD database (custom formats, quality profiles,
+      regular expressions, delay profiles, metadata profiles), cached TRaSH Guide custom formats and
+      quality profiles, Arr instances, and linked databases. Matching is case-insensitive and
+      literal (`%` and `_` have no wildcard meaning). Results are ranked exact > prefix >
+      word-prefix > substring, then by name.
+
+      At most `limit` results are returned. Each requested result type first receives up to
+      `max(3, ceil(limit / requestedTypeCount))` slots in rank order (`requestedTypeCount` is the
+      number of entries in `types`, or 7 when omitted), then remaining slots are backfilled in rank
+      order; results stay in rank order. `truncated` is `true` iff any match was omitted.
+
+      Arr instances are returned without URL or API key. Quality profiles are filtered by Arr
+      compatibility (enabled qualities mapped for the Arr) when `arrType` is not `all`; metadata
+      profiles are only returned for `lidarr` or `all`. Databases whose cache is not loaded, or
+      whose cache fails mid-query (for example during a concurrent rebuild), are skipped. Responses
+      are sent with `Cache-Control: no-store`. API tokens need the `read` scope.
+    tags:
+      - Search
+    parameters:
+      - name: q
+        in: query
+        required: true
+        description: Search text. Trimmed; must be 1-100 characters after trimming.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: types
+        in: query
+        required: false
+        description: Restrict to these result types. Comma-separated (form, non-exploded).
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            $ref: '../schemas/search.yaml#/SearchResultType'
+      - name: arrType
+        in: query
+        required: false
+        schema:
+          $ref: '../schemas/search.yaml#/SearchArrType'
+      - name: databaseId
+        in: query
+        required: false
+        description: Restrict PCD entity results to one linked database. TRaSH entities are excluded when set.
+        schema:
+          type: integer
+          minimum: 1
+      - name: limit
+        in: query
+        required: false
+        description: Maximum results returned.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+    responses:
+      '200':
+        description: Ranked search results.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/search.yaml#/SearchResponse'
+      '400':
+        description: Invalid query parameter.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: Unauthenticated (no valid session, or missing, invalid, revoked, or expired API token).
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `read` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Search failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+commandPaletteRecents:
+  get:
+    operationId: getCommandPaletteRecents
+    summary: Read command palette recents
+    description: |
+      Returns the signed-in user's command palette recents, most recent first, plus the `updatedAt`
+      concurrency token (`null` when nothing is stored). Returns an empty list
+      when nothing is stored. Requires a real user session: auth-bypass sessions and API tokens
+      receive 401. The palette never calls this endpoint for auth-bypass sessions (no user id) and
+      keeps their recents in `localStorage`; for a signed-in user a 401 means the session expired.
+      An API token without the `read` scope is rejected with 403 before this check.
+    tags:
+      - User Preferences
+    responses:
+      '200':
+        description: Stored recents.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/search.yaml#/CommandPaletteRecentsResponse'
+      '401':
+        description: |
+          No real user session: unauthenticated (no valid session, or missing, invalid, revoked, or
+          expired API token), auth bypass, or any API token that holds the `read` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `read` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read recents.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  put:
+    operationId: putCommandPaletteRecents
+    summary: Replace command palette recents
+    description: |
+      Replaces the signed-in user's recents list. At most 10 entries with unique keys; each `href`
+      must be a same-origin relative path. Bodies over 64 KiB (declared `Content-Length` or actual
+      bytes) are rejected with 400. Writes are rate-limited per user (8 per 30 seconds). Optional
+      `expectedUpdatedAt` makes the write conditional (optimistic concurrency): a stale token, or
+      `null` when a list is already stored, returns 409 and nothing is written. Requires a real user
+      session: an API token without the `admin` scope is rejected with 403, and any API token holding
+      it receives 401.
+    tags:
+      - User Preferences
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/search.yaml#/CommandPaletteRecentsUpdateRequest'
+    responses:
+      '200':
+        description: Recents persisted.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/search.yaml#/CommandPaletteRecentsResponse'
+      '400':
+        description: Invalid body.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '401':
+        description: |
+          No real user session: unauthenticated (no valid session, or missing, invalid, revoked, or
+          expired API token), auth bypass, or any API token that holds the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: |
+          Concurrency conflict: `expectedUpdatedAt` no longer matches the stored list (another tab or
+          session wrote it). Re-read, merge, and retry.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '429':
+        description: Recents updates are being rate-limited.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to save recents.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

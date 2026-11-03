@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { userInterfacePreferencesStore } from '$stores/userInterfacePreferences.ts';
+  import { clearLocalRecents } from '$ui/command-palette/recents.ts';
 
   export let label: string;
   export let href: string;
@@ -29,6 +30,7 @@
     if (href === '/auth/logout') {
       e.preventDefault();
       userInterfacePreferencesStore.clearOnAuthChange();
+      clearLocalRecents();
       goto(href);
     }
   }

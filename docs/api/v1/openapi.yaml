@@ -60,6 +60,8 @@ tags:
     description: Non-blocking security posture "Shield Check" — auth, transport, and credential exposure audit
   - name: Timeline
     description: Sync-archaeology timeline — merged read-only feed of syncs, snapshots, rollbacks, and canary rollouts, with annotations
+  - name: Search
+    description: Cross-entity quick search for the global command palette
   - name: MCP
     description: Model Context Protocol server — read-only tools, resources, and prompts over Praxrr's configuration and observability surface
   - name: Plugins
@@ -204,6 +206,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PcdErrorResponse'
+  /ui-preferences/command-palette-recents:
+    $ref: './paths/search.yaml#/commandPaletteRecents'
   /complexity-tiers:
     get:
       operationId: getComplexityTier
@@ -758,6 +762,8 @@ paths:
     $ref: './paths/timeline.yaml#/annotations'
   /timeline/annotations/{id}:
     $ref: './paths/timeline.yaml#/annotation'
+  /search:
+    $ref: './paths/search.yaml#/search'
   /auth/webauthn/registration/options:
     $ref: './paths/webauthn.yaml#/registrationOptions'
   /auth/webauthn/registration/verify:
@@ -2026,3 +2032,20 @@ components:
     # Notifications
     NotificationWebhookPayload:
       $ref: './schemas/notifications.yaml#/NotificationWebhookPayload'
+    # Search
+    SearchResultType:
+      $ref: './schemas/search.yaml#/SearchResultType'
+    SearchArrType:
+      $ref: './schemas/search.yaml#/SearchArrType'
+    SearchResultSource:
+      $ref: './schemas/search.yaml#/SearchResultSource'
+    SearchResult:
+      $ref: './schemas/search.yaml#/SearchResult'
+    SearchResponse:
+      $ref: './schemas/search.yaml#/SearchResponse'
+    CommandPaletteRecent:
+      $ref: './schemas/search.yaml#/CommandPaletteRecent'
+    CommandPaletteRecentsResponse:
+      $ref: './schemas/search.yaml#/CommandPaletteRecentsResponse'
+    CommandPaletteRecentsUpdateRequest:
+      $ref: './schemas/search.yaml#/CommandPaletteRecentsUpdateRequest'

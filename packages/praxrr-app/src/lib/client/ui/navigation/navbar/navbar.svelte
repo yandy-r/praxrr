@@ -1,13 +1,30 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import AccentPicker from './accentPicker.svelte';
   import ThemeToggle from './themeToggle.svelte';
-  import { Menu } from 'lucide-svelte';
+  import { Menu, Search } from 'lucide-svelte';
   import { mobileNavOpen } from '$stores/mobileNav';
+  import { commandPaletteOpen } from '$stores/commandPalette';
   import logo from '$assets/logo.svg';
   import { alertStore } from '$alerts/store';
   import MobileNavAlert from '$alerts/MobileNavAlert.svelte';
+  import { isApplePlatform } from '$ui/command-palette/sources.ts';
+
+  /** Show the command palette trigger; the palette is only mounted for authenticated or bypass sessions. */
+  export let showSearch = false;
 
   $: latestAlert = $alertStore.length > 0 ? $alertStore[$alertStore.length - 1] : null;
+
+  // SSR cannot know the platform; default to Ctrl and switch to Cmd on Apple platforms after mount.
+  // Must match the palette's shortcut matcher (Cmd+K on Apple, Ctrl+K elsewhere).
+  let shortcutHint = 'Ctrl K';
+  let shortcutKeys = 'Control+K';
+  onMount(() => {
+    if (isApplePlatform(navigator.platform)) {
+      shortcutHint = '⌘K';
+      shortcutKeys = 'Meta+K';
+    }
+  });
 </script>
 
 <nav
@@ -44,8 +61,25 @@
       {/if}
     </div>
 
-    <!-- Right: Accent picker and Theme toggle -->
+    <!-- Right: Command palette trigger, accent picker and theme toggle -->
     <div class="flex items-center justify-end gap-1">
+      {#if showSearch}
+        <button
+          type="button"
+          on:click={() => commandPaletteOpen.open()}
+          class="flex h-9 items-center gap-1.5 rounded-md px-2 text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+          aria-label="Open command palette"
+          aria-keyshortcuts={shortcutKeys}
+          aria-haspopup="dialog"
+          aria-expanded={$commandPaletteOpen}
+        >
+          <Search size={18} aria-hidden="true" />
+          <kbd
+            class="hidden rounded border border-neutral-300 px-1 font-mono text-[10px] leading-4 text-neutral-500 md:inline dark:border-neutral-700 dark:text-neutral-400"
+            aria-hidden="true">{shortcutHint}</kbd
+          >
+        </button>
+      {/if}
       <AccentPicker />
       <ThemeToggle />
     </div>

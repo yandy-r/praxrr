@@ -3,11 +3,27 @@ import type { NavShell } from '$shared/navigation/types.ts';
 import { resolveSetupChecklist, type SetupChecklist } from '$server/setup/progress.ts';
 import { resolveNavShell } from './resolver.ts';
 
-export interface RootLayoutData {
+/** Root layout payload without the app shell (auth pages, unauthenticated requests). */
+interface ShellLessLayoutData {
   version: string;
-  navShell?: NavShell;
-  setupChecklist?: SetupChecklist | null;
+  navShell?: undefined;
+  setupChecklist?: undefined;
+  recentsBackend?: undefined;
 }
+
+/** Root layout payload for an authenticated user or a bypass session: shell fields come together. */
+interface ShellLayoutData {
+  version: string;
+  navShell: NavShell;
+  setupChecklist: SetupChecklist | null;
+  /**
+   * Where the command palette keeps recents: `api` for a real signed-in user (id > 0), `local`
+   * (`localStorage`) for auth-bypass sessions, which the per-user recents API rejects.
+   */
+  recentsBackend: 'api' | 'local';
+}
+
+export type RootLayoutData = ShellLessLayoutData | ShellLayoutData;
 
 interface ResolveRootLayoutDataInput {
   version: string;
@@ -49,5 +65,6 @@ export function resolveRootLayoutData({
     version,
     navShell: resolveNavShell({ user: resolvedUser }),
     setupChecklist: resolveSetupChecklist(pathname),
+    recentsBackend: user && user.id > 0 ? 'api' : 'local',
   };
 }

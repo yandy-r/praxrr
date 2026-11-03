@@ -54,6 +54,8 @@ const aliases: Record<string, string> = {
     'packages/praxrr-app/src/tests/db/timelineFeedQueries.test.ts,packages/praxrr-app/src/tests/routes/timeline.test.ts',
   'url-state': 'packages/praxrr-app/src/tests/routes/scoreSimulatorUrlState.test.ts',
   'what-if': 'packages/praxrr-app/src/tests/routes/scoreSimulatorPhase3Helpers.test.ts',
+  search:
+    'packages/praxrr-app/src/tests/routes/search.test.ts,packages/praxrr-app/src/tests/routes/commandPaletteRecents.test.ts,packages/praxrr-app/src/tests/base/commandPalette.test.ts',
 
   // Directories
   jobs: 'packages/praxrr-app/src/tests/jobs',

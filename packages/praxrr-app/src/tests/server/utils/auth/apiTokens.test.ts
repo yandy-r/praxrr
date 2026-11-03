@@ -274,6 +274,9 @@ Deno.test('requiredScopeFor maps routes to scopes and fails closed', () => {
     ['POST', '/api/v1/canary/rollouts', 'sync:apply'],
     ['POST', '/api/v1/canary/rollouts/4/proceed', 'sync:apply'],
     ['POST', '/api/v1/canary/rollouts/4/abort', 'sync:apply'],
+    ['GET', '/api/v1/search', 'read'],
+    ['GET', '/api/v1/ui-preferences/command-palette-recents', 'read'],
+    ['PUT', '/api/v1/ui-preferences/command-palette-recents', 'admin'],
     // Anchored segments: siblings and deeper paths do not inherit a weaker scope.
     ['POST', '/api/v1/sync/preview/x/apply/extra', 'admin'],
     ['POST', '/api/v1/goals/preview-and-apply', 'admin'],

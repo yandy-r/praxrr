@@ -98,6 +98,7 @@ import { migration as migration20261026HashSessionIds } from './migrations/20261
 import { migration as migration20261027CreateOidcAllowlistState } from './migrations/20261027_create_oidc_allowlist_state.ts';
 import { migration as migration20261028ScrubSyncErrorText } from './migrations/20261028_scrub_sync_error_text.ts';
 import { migration as migration20261029NormalizeBackupSchedules } from './migrations/20261029_normalize_backup_schedules.ts';
+import { migration as migration20261030CreateUserCommandPaletteRecents } from './migrations/20261030_create_user_command_palette_recents.ts';
 
 export interface Migration {
   version: number;
@@ -430,6 +431,7 @@ export function loadMigrations(): Migration[] {
     migration20261027CreateOidcAllowlistState,
     migration20261028ScrubSyncErrorText,
     migration20261029NormalizeBackupSchedules,
+    migration20261030CreateUserCommandPaletteRecents,
   ];
 
   // Sort by version number

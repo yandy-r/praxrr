@@ -931,6 +931,20 @@ CREATE INDEX idx_user_interface_preferences_user_id
     ON user_interface_preferences(user_id);
 
 -- ==============================================================================
+-- TABLE: user_command_palette_recents
+-- Purpose: Store the per-user command palette recents list (JSON array, validated server-side, max 10)
+-- Migration: 20261030_create_user_command_palette_recents.ts
+-- ==============================================================================
+
+CREATE TABLE user_command_palette_recents (
+    user_id INTEGER PRIMARY KEY,
+    recents_json TEXT NOT NULL,                       -- JSON array of CommandPaletteRecent
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ==============================================================================
 -- TABLE: sessions
 -- Purpose: Store user sessions (allows login from multiple devices)
 -- Migration: 036_create_auth_tables.ts, 037_add_session_metadata.ts

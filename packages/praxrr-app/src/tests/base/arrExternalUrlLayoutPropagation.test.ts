@@ -106,6 +106,9 @@ Deno.test('auth routes omit navShell while auth-bypass sessions keep navShell in
     assertEquals('navShell' in authBypassSession, true);
     assertEquals('navShell' in authenticated, true);
     assertEquals(authenticated.setupChecklist, null);
+    // Command palette recents: per-user API for real users, localStorage for bypass sessions.
+    assertEquals(authenticated.recentsBackend, 'api');
+    assertEquals(authBypassSession.recentsBackend, 'local');
   } finally {
     for (const restore of restores.reverse()) restore();
   }
