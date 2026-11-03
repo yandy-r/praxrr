@@ -47,8 +47,21 @@ interface DeserializeOptions<T> {
   cache: PCDCache;
   layer: OperationLayer;
   portable: T;
-  presenceCache?: PCDCache;
+  skippedNames?: SkippedEntityNames;
+  dropLogLevel?: DropLogLevel;
 }
+
+/**
+ * Exact names of upstream entities a repo base import skipped because a user entity already holds
+ * the name, per referenced table. Only the tables CF/QP references can point at are tracked.
+ */
+export interface SkippedEntityNames {
+  regular_expressions: Set<string>;
+  custom_formats: Set<string>;
+}
+
+/** `warn` for a real import; `debug` for the read-only incoming preview, which replays it. */
+export type DropLogLevel = 'warn' | 'debug';
 
 export interface EntityDeserializerOptions {
   databaseId: number;
@@ -56,12 +69,13 @@ export interface EntityDeserializerOptions {
   layer: OperationLayer;
   data: unknown;
   /**
-   * Repo base import only: the registered cache (all layers) the import's skip rule consults. A
-   * reference absent from `cache` but present here names an entity the import skipped because a
-   * user entity already holds that name; it cannot be written in the base layer, so the reference
-   * is dropped with a warning instead of failing the whole import. Omit everywhere else.
+   * Repo base import only: names the import skipped because a user entity already holds them. A
+   * reference to one of these exact names cannot be written in the base layer, so it is dropped
+   * and logged instead of failing the whole import. Omit everywhere else.
    */
-  presenceCache?: PCDCache;
+  skippedNames?: SkippedEntityNames;
+  /** Log level for dropped references (default `warn`). */
+  dropLogLevel?: DropLogLevel;
 }
 
 export type EntityDeserializer = (options: EntityDeserializerOptions) => Promise<unknown>;
@@ -93,7 +107,8 @@ const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
       cache: options.cache,
       layer: options.layer,
       portable: asPortableData<PortableCustomFormat>(options.data),
-      presenceCache: options.presenceCache,
+      skippedNames: options.skippedNames,
+      dropLogLevel: options.dropLogLevel,
     });
   },
   quality_profile: (options) => {
@@ -102,7 +117,8 @@ const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
       cache: options.cache,
       layer: options.layer,
       portable: asPortableData<PortableQualityProfile>(options.data),
-      presenceCache: options.presenceCache,
+      skippedNames: options.skippedNames,
+      dropLogLevel: options.dropLogLevel,
     });
   },
   radarr_naming: (options) => {
@@ -255,11 +271,10 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
 
   // 0. Refuse before any write when a condition references an entity the database lacks: the
   // condition steps run after the format is created, so a late FK failure would leave it partial.
-  const droppedRegexes = await userOnlyReferences(cache, options.presenceCache, {
-    label: 'regular expression',
-    table: 'regular_expressions',
-    names: options.portable.conditions.flatMap(conditionRegexNames),
-  });
+  const droppedRegexes = skippedReferences(
+    options.skippedNames?.regular_expressions,
+    options.portable.conditions.flatMap(conditionRegexNames)
+  );
   const referencesDropped = (condition: ConditionData) =>
     conditionRegexNames(condition).some((name) => droppedRegexes.has(name));
   const portable: PortableCustomFormat = {
@@ -267,7 +282,7 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
     conditions: options.portable.conditions.filter((condition) => !referencesDropped(condition)),
   };
   if (droppedRegexes.size > 0) {
-    await logger.warn('Dropping custom format conditions on regular expressions that exist only in the user layer', {
+    await logger[options.dropLogLevel ?? 'warn']('Dropping custom format conditions on skipped regular expressions', {
       source: 'PCDImporter',
       meta: {
         databaseId,
@@ -344,11 +359,10 @@ export async function deserializeQualityProfile(
   // 0. Refuse before any write when the profile references an entity the database lacks: the
   // qualities and scoring steps run after the profile is created, so a late FK failure would
   // leave a profile with default qualities and no scores.
-  const droppedFormats = await userOnlyReferences(cache, options.presenceCache, {
-    label: 'custom format',
-    table: 'custom_formats',
-    names: options.portable.customFormatScores.map((score) => score.customFormatName),
-  });
+  const droppedFormats = skippedReferences(
+    options.skippedNames?.custom_formats,
+    options.portable.customFormatScores.map((score) => score.customFormatName)
+  );
   const portable: PortableQualityProfile = {
     ...options.portable,
     customFormatScores: options.portable.customFormatScores.filter(
@@ -356,7 +370,7 @@ export async function deserializeQualityProfile(
     ),
   };
   if (droppedFormats.size > 0) {
-    await logger.warn('Dropping quality profile scores for custom formats that exist only in the user layer', {
+    await logger[options.dropLogLevel ?? 'warn']('Dropping quality profile scores for skipped custom formats', {
       source: 'PCDImporter',
       meta: {
         databaseId,
@@ -462,44 +476,15 @@ function conditionLanguageNames(condition: ConditionData): string[] {
   return (condition.languages ?? []).map((language) => language.name);
 }
 
-/** ASCII-only fold, matching SQLite's built-in `lower()`. */
-function foldAscii(value: string): string {
-  return value.replace(/[A-Z]/g, (char) => char.toLowerCase());
-}
-
-/** Folded (`lower(name)`) names in `table` that match any of `names` case-insensitively. */
-async function foldedNamesIn(cache: PCDCache, table: ReferenceSet['table'], names: string[]): Promise<Set<string>> {
-  const rows = await cache.kb
-    .selectFrom(table)
-    .select((eb) => eb.fn<string>('lower', [eb.ref('name')]).as('folded'))
-    .where((eb) => eb.fn('lower', [eb.ref('name')]), 'in', names.map(foldAscii))
-    .execute();
-  return new Set(rows.map((row) => row.folded));
-}
-
 /**
- * Repo base import only (`presenceCache` set): names in `reference` with no match at all, not even
- * case-insensitively, in the import cache but a case-insensitive match in `presenceCache`. The
- * import skipped those upstream entities because a user entity already holds the name (its skip
- * rule matches case-insensitively, so this does too), so a base-layer reference to them can never
- * be written; the caller drops just those references, logged, instead of failing the whole
- * link/sync. A name the import cache knows under different case is a repo typo and is not
- * dropped, so the reference pre-check rejects it the same way on link and on sync.
+ * Repo base import only: the subset of `names` the import skipped because a user entity already
+ * holds the name (`skipped`, exact names). A base-layer reference to a skipped entity can never be
+ * written, so the caller drops just those references, logged, instead of failing the whole
+ * link/sync. Matching is exact, so any other missing name, including a case typo, still reaches
+ * the reference pre-check and fails the same way on link and on sync.
  */
-async function userOnlyReferences(
-  cache: PCDCache,
-  presenceCache: PCDCache | undefined,
-  reference: ReferenceSet
-): Promise<Set<string>> {
-  const wanted = [...new Set(reference.names)];
-  if (!presenceCache || wanted.length === 0) return new Set();
-
-  const inImport = await foldedNamesIn(cache, reference.table, wanted);
-  const absent = wanted.filter((name) => !inImport.has(foldAscii(name)));
-  if (absent.length === 0) return new Set();
-
-  const inPresence = await foldedNamesIn(presenceCache, reference.table, absent);
-  return new Set(absent.filter((name) => inPresence.has(foldAscii(name))));
+function skippedReferences(skipped: ReadonlySet<string> | undefined, names: string[]): Set<string> {
+  return new Set(skipped ? names.filter((name) => skipped.has(name)) : []);
 }
 
 /**

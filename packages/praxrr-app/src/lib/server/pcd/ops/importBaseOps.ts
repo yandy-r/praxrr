@@ -15,6 +15,7 @@ import { sortMigrationCandidatesByImportOrder } from '$pcd/migration/migrationIm
 import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { withRepoImportWriteContext } from './writer.ts';
+import type { SkippedEntityNames } from '../entities/deserialize.ts';
 
 let compileForTests: typeof compile = compile;
 let getCacheForTests = getCache;
@@ -239,12 +240,41 @@ export function hasBaseEntityByStableIdentity(cache: PCDCache, stableIdentity: M
     return false;
   }
 
+  // Fold both sides with SQLite's built-in lower() (ASCII only) so the skip rule and
+  // `conflictIdentityKey` agree on which names collide.
   const row = rawDb
-    .prepare(`SELECT 1 AS exists_in_cache FROM ${table} WHERE lower(name) = ? LIMIT 1`)
-    .get(stableIdentity.value.toLowerCase());
+    .prepare(`SELECT 1 AS exists_in_cache FROM ${table} WHERE lower(name) = lower(?) LIMIT 1`)
+    .get(stableIdentity.value);
 
   return !!row;
 }
+
+export function createSkippedEntityNames(): SkippedEntityNames {
+  return { regular_expressions: new Set(), custom_formats: new Set() };
+}
+
+/**
+ * After the skip rule skipped `candidate`: when the import cache has no entity of that name, the
+ * name is held only outside the base layer being imported (a user entity or a base draft), so record
+ * its exact name. CF/QP deserializers drop references to recorded names instead of failing.
+ * Only the referenceable tables (regular expressions, custom formats) are tracked.
+ */
+export function recordUserHeldSkip(
+  skippedNames: SkippedEntityNames,
+  candidate: MigrationEntityCandidate,
+  importCache: PCDCache
+): void {
+  const target =
+    candidate.entityType === 'regular_expression'
+      ? skippedNames.regular_expressions
+      : candidate.entityType === 'custom_format'
+        ? skippedNames.custom_formats
+        : null;
+  if (target && !hasBaseEntityByStableIdentity(importCache, candidate.stableIdentity)) {
+    target.add(candidate.stableIdentity.value);
+  }
+}
+
 type DeserializeResult = {
   success: boolean;
   filepath?: string;
@@ -272,9 +302,10 @@ function formatConflictIdentity(identity: MigrationEntityStableIdentity): string
 }
 
 /**
- * Conflict key for two migration entries. `hasBaseEntityByStableIdentity` compares the stored name
- * with SQLite `lower(name)`, whose built-in `lower()` folds ASCII only, so fold exactly A-Z → a-z:
- * names differing only in non-ASCII case stay distinct, as SQLite keeps them.
+ * Conflict key for two migration entries. `hasBaseEntityByStableIdentity` matches names with
+ * SQLite `lower(name) = lower(?)`, and SQLite's built-in `lower()` folds ASCII only, so fold exactly
+ * A-Z → a-z: entries the skip rule would treat as one entity collide here, and names differing only
+ * in non-ASCII case stay distinct on both sides.
  */
 function conflictIdentityKey(identity: MigrationEntityStableIdentity): string {
   return `${identity.key}=${identity.value.replace(/[A-Z]/g, (char) => char.toLowerCase())}`;
@@ -308,23 +339,29 @@ export function validateStableIdentityConflicts(
     readonly sourcePath: string;
   }>
 ): void {
-  const migrationSeen = new Map<string, SourceConflictRef>();
+  const migrationSeen = new Map<string, { identity: MigrationEntityStableIdentity; sourcePath: SourceConflictRef }>();
 
   for (const entry of migrationEntries) {
     if (!entry.stableIdentity) continue;
-    const identity = conflictIdentityKey(entry.stableIdentity);
-    if (migrationSeen.has(identity)) {
-      const other = migrationSeen.get(identity);
-      if (!other) continue;
+    const key = conflictIdentityKey(entry.stableIdentity);
+    const other = migrationSeen.get(key);
+    if (other) {
+      if (other.identity.value === entry.stableIdentity.value) {
+        throw new Error(
+          `Ambiguous duplicate base import identity (migration/duplicate): ${formatConflictPath(
+            [other.sourcePath, entry.sourcePath],
+            entry.stableIdentity
+          )}`
+        );
+      }
       throw new Error(
-        `Ambiguous duplicate base import identity (migration/duplicate): ${formatConflictPath(
-          [other, entry.sourcePath],
-          entry.stableIdentity
-        )}`
+        `Ambiguous duplicate base import identity (migration/duplicate): ${entry.stableIdentity.key} ` +
+          `"${other.identity.value}" (${other.sourcePath}) and "${entry.stableIdentity.value}" (${entry.sourcePath}) ` +
+          'differ only by case'
       );
     }
 
-    migrationSeen.set(identity, entry.sourcePath);
+    migrationSeen.set(key, { identity: entry.stableIdentity, sourcePath: entry.sourcePath });
   }
 }
 
@@ -474,6 +511,7 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
 
     try {
       const sortedCandidates = sortMigrationCandidatesByImportOrder(migrationCandidates);
+      const skippedNames = createSkippedEntityNames();
       // Record every op/history row this import's async context inserts (including
       // the final compile's auto-override writes) so a failure deletes exactly those;
       // pre-existing rows are covered by `snapshot`.
@@ -493,6 +531,7 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
             const isRefresh = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate).length > 0;
             const presenceCache = isRefresh ? cache : (registeredCache ?? cache);
             if (hasBaseEntityByStableIdentity(presenceCache, candidate.stableIdentity)) {
+              recordUserHeldSkip(skippedNames, candidate, cache);
               await logger.warn(`Skipping existing base import entity "${candidate.relativePath}"`, {
                 source: 'PCDImporter',
                 meta: {
@@ -517,9 +556,9 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
                   cache,
                   layer: 'base',
                   data: candidate.portable,
-                  // References to entities the skip rule above found only in the registered cache
-                  // (user-held names) are dropped with a warning rather than failing the import.
-                  presenceCache: registeredCache,
+                  // References to entities skipped above because a user entity holds the name are
+                  // dropped with a warning rather than failing the import.
+                  skippedNames,
                 });
 
                 if (!isDeserializeResult(result)) {

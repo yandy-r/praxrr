@@ -152,10 +152,10 @@ Deno.test('importBaseOps: validateStableIdentityConflicts rejects identities dif
     Error,
     'migration/duplicate'
   );
-  // The message keeps the original (unfolded) name and both source paths.
+  // A case-only collision names both spellings with their source paths.
   assertEquals(
     error.message,
-    'Ambiguous duplicate base import identity (migration/duplicate): custom_format_name=foo in /path/Foo.yaml and /path/foo.yaml'
+    'Ambiguous duplicate base import identity (migration/duplicate): custom_format_name "Foo" (/path/Foo.yaml) and "foo" (/path/foo.yaml) differ only by case'
   );
 });
 

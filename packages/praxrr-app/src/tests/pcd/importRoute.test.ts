@@ -1,4 +1,5 @@
-import { assert, assertEquals, assertNotEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
+import type { ConditionData } from '$shared/pcd/display.ts';
 import type { RequestEvent } from '@sveltejs/kit';
 import { POST as importPost } from '../../routes/api/v1/pcd/import/+server.ts';
 import { withWriterScope } from '$pcd/bundles/writerRedirect.ts';
@@ -71,6 +72,74 @@ bundleTest('pcd import: QP with resolvable references still imports qualities an
   assertEquals(scoredFormatNames(liveCache(databaseId), 'QP One'), ['CF One']);
 });
 
+/** A minimal language condition (the writer stores one language per condition). */
+function languageCondition(language: string): ConditionData {
+  return {
+    name: 'lang',
+    type: 'language',
+    arrType: 'all',
+    negate: false,
+    required: true,
+    languages: [{ name: language, except: false }],
+  };
+}
+
+const missingReferenceCases: Array<{ name: string; entityType: string; data: PortableEntityData; missing: string }> = [
+  {
+    name: 'CF language condition on a missing language',
+    entityType: 'custom_format',
+    data: { ...customFormatData('CF Lang', 'unused'), conditions: [languageCondition('Klingon')] },
+    missing: 'language "Klingon"',
+  },
+  {
+    name: 'QP with a missing language',
+    entityType: 'quality_profile',
+    data: { ...qualityProfileData('QP Lang', []), language: 'Klingon' },
+    missing: 'language "Klingon"',
+  },
+  {
+    name: 'QP orderedItems naming a missing quality',
+    entityType: 'quality_profile',
+    data: {
+      ...qualityProfileData('QP Quality', []),
+      orderedItems: [{ type: 'quality', name: 'HoloDeck-8K', position: 1, enabled: true, upgradeUntil: true }],
+    },
+    missing: 'quality "HoloDeck-8K"',
+  },
+  {
+    name: 'QP group naming a missing quality member',
+    entityType: 'quality_profile',
+    data: {
+      ...qualityProfileData('QP Group', []),
+      orderedItems: [
+        {
+          type: 'group',
+          name: 'Future',
+          position: 1,
+          enabled: true,
+          upgradeUntil: true,
+          members: [{ name: 'Bluray-1080p' }, { name: 'HoloDeck-8K' }],
+        },
+      ],
+    },
+    missing: 'quality "HoloDeck-8K"',
+  },
+];
+
+for (const testCase of missingReferenceCases) {
+  bundleTest(`pcd import: ${testCase.name} is a 400 naming it and persists nothing`, async () => {
+    const databaseId = await createPcd();
+    const before = snapshotOps(databaseId);
+
+    const response = await postImport(databaseId, testCase.entityType, testCase.data);
+    const body = await response.json();
+
+    assertEquals(response.status, 400);
+    assert(body.error.includes(`missing ${testCase.missing}`), body.error);
+    assertEquals(snapshotOps(databaseId), before);
+  });
+}
+
 /** Persist every write normally except those whose description starts with `prefix`, which fail. */
 function failingWrites(prefix: string) {
   return (options: WriteOptions): Promise<WriteResult> =>
@@ -88,7 +157,7 @@ bundleTest('pcd import: a QP qualities write failing after create is reported an
   );
   const body = await response.json();
 
-  assertNotEquals(response.status, 200);
+  assertEquals(response.status, 500);
   assertEquals(body.error, 'injected');
   assertEquals(snapshotOps(databaseId), before);
   assertEquals(namesIn(liveCache(databaseId), 'quality_profiles'), []);
@@ -104,7 +173,7 @@ bundleTest('pcd import: a CF conditions write failing after create is reported a
   );
   const body = await response.json();
 
-  assertNotEquals(response.status, 200);
+  assertEquals(response.status, 500);
   assertEquals(body.error, 'injected');
   assertEquals(snapshotOps(databaseId), before);
   assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), []);

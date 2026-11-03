@@ -32,9 +32,11 @@ import { getPcdSyncDedupeKey } from '../../jobs/helpers/pcdSyncDedupeKey.ts';
 import { syncDependencies } from '../git/dependencies.ts';
 import {
   buildPublishedRepoBaseOpIndex,
+  createSkippedEntityNames,
   ENTITY_OP_FILENAME_PREFIX,
   hasBaseEntityByStableIdentity,
   matchingPublishedRepoBaseOpIds,
+  recordUserHeldSkip,
   type RepoOpIndex,
   validateStableIdentityConflicts,
   YAML_SEQUENCE_BASE,
@@ -167,6 +169,7 @@ async function captureIncomingBaseOps(
 
   try {
     const sorted = sortMigrationCandidatesByImportOrder(candidates);
+    const skippedNames = createSkippedEntityNames();
     await withScopedCache(databaseId, importCache, async () => {
       for (let i = 0; i < sorted.length; i++) {
         const candidate = sorted[i];
@@ -178,6 +181,7 @@ async function captureIncomingBaseOps(
         const isRefresh = matchingPublishedRepoBaseOpIds(repoOpIndex, candidate).length > 0;
         const presenceCache = isRefresh ? cache : (registeredCache ?? cache);
         if (hasBaseEntityByStableIdentity(presenceCache, candidate.stableIdentity)) {
+          recordUserHeldSkip(skippedNames, candidate, cache);
           continue;
         }
 
@@ -195,7 +199,9 @@ async function captureIncomingBaseOps(
                 cache,
                 layer: 'base',
                 data: candidate.portable,
-                presenceCache: registeredCache,
+                skippedNames,
+                // A read-only replay of the import: dropped references are not news here.
+                dropLogLevel: 'debug',
               })
             );
             const outcome = result as { success?: unknown; error?: unknown } | null;
