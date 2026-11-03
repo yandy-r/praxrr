@@ -91,24 +91,8 @@ export async function qualities(cache: PCDCache, _databaseId: number, profileNam
     return orderedItem;
   });
 
-  // 5. Find available qualities (not in ordered list and not in any group)
-  const usedQualityNames = new Set<string>();
-
-  // Mark qualities in ordered list
-  for (const item of orderedItems) {
-    if (item.type === 'quality') {
-      usedQualityNames.add(item.name);
-    } else {
-      // Mark all members of groups as used
-      item.members?.forEach((member) => usedQualityNames.add(member.name));
-    }
-  }
-
-  const availableQualities = allQualities.filter((q) => !usedQualityNames.has(q.name)).map((q) => ({ name: q.name }));
-
   return {
     orderedItems,
-    availableQualities,
     allQualities: allQualities.map((q) => ({ name: q.name })),
     groups: Array.from(groupsMap.values()),
   };

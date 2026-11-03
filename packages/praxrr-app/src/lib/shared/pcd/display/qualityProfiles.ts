@@ -110,12 +110,32 @@ export interface QualitiesGroup {
   members: QualityMember[];
 }
 
-/** Qualities page data */
+/** Stored quality ladder of a profile (no Arr-compatibility work) */
 export interface QualitiesPageData {
   orderedItems: OrderedItem[];
-  availableQualities: QualityMember[];
   allQualities: QualityMember[];
   groups: QualitiesGroup[];
+}
+
+/** Unused quality the profile may add, with the profile's target Arr apps that support it */
+export interface QualityCandidate extends QualityMember {
+  arrTypes: ArrAppType[];
+}
+
+/** Addable qualities for a profile and the target Arr apps they were resolved against */
+export interface QualityCandidates {
+  candidates: QualityCandidate[];
+  /** Target Arr apps resolved for the profile (empty when nothing was left to add or none resolved) */
+  targetArrTypes: ArrAppType[];
+  /** True when unused qualities exist but no target Arr app could be resolved */
+  arrTargetUnresolved: boolean;
+}
+
+/** Qualities editor data: stored ladder plus the unused qualities the profile may add */
+export interface QualitiesEditorData extends QualitiesPageData {
+  availableQualities: QualityCandidate[];
+  targetArrTypes: ArrAppType[];
+  arrTargetUnresolved: boolean;
 }
 
 export type CustomFormatScoresByArrType = Record<RequiredCustomFormatScoreApp, number | null> &

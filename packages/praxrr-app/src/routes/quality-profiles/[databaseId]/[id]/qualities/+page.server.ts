@@ -1,11 +1,12 @@
 import { error, fail } from '@sveltejs/kit';
-import type { ServerLoad, Actions } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 import { pcdManager } from '$pcd/index.ts';
 import { canWriteToBase } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
+import type { QualitiesEditorData } from '$shared/pcd/display.ts';
 
-export const load: ServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params }) => {
   const { databaseId, id } = params;
 
   // Validate params exist
@@ -48,7 +49,18 @@ export const load: ServerLoad = async ({ params }) => {
     throw error(404, 'Quality profile not found');
   }
 
-  const qualitiesData = await qualityProfileQueries.qualities(cache, currentDatabaseId, profile.name);
+  const ladder = await qualityProfileQueries.qualities(cache, currentDatabaseId, profile.name);
+  const { candidates, targetArrTypes, arrTargetUnresolved } = await qualityProfileQueries.availableQualityCandidates(
+    cache,
+    profile.name,
+    ladder
+  );
+  const qualitiesData: QualitiesEditorData = {
+    ...ladder,
+    availableQualities: candidates,
+    targetArrTypes,
+    arrTargetUnresolved,
+  };
 
   return {
     currentDatabase,

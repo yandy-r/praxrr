@@ -6,65 +6,26 @@
   import GroupModal from './components/GroupModal.svelte';
   import StickyCard from '$ui/card/StickyCard.svelte';
   import Button from '$ui/button/Button.svelte';
+  import Badge from '$ui/badge/Badge.svelte';
   import { alertStore } from '$lib/client/alerts/store';
   import { enhance } from '$app/forms';
   import { current, isDirty, initEdit, update } from '$lib/client/stores/dirty';
   import type { PageData } from './$types';
+  import { buildAppScopeLabels, buildQualitiesFormData } from '$shared/pcd/qualities/merge.ts';
 
   export let data: PageData;
 
   let showInfoModal = false;
 
   type OrderedItem = PageData['qualities']['orderedItems'][number];
-  // Form data shape
-  interface QualitiesFormData {
-    orderedItems: OrderedItem[];
-    [key: string]: unknown;
-  }
 
-  // Build initial data from server
-  $: initialData = buildInitialData(data.qualities);
-
-  function buildInitialData(qualities: typeof data.qualities): QualitiesFormData {
-    return {
-      orderedItems: structuredClone(qualities.orderedItems),
-    };
-  }
-
-  function buildMergedOrderedItems(qualities: typeof data.qualities): OrderedItem[] {
-    const orderedItems = structuredClone(qualities.orderedItems);
-    const additional = qualities.availableQualities.map((quality, index) => ({
-      type: 'quality' as const,
-      name: quality.name,
-      position: orderedItems.length + index,
-      enabled: false,
-      upgradeUntil: false,
-    }));
-
-    const merged = [...orderedItems, ...additional];
-    merged.forEach((item, index) => {
-      item.position = index;
-    });
-
-    return merged;
-  }
+  // Dirty-tracking baseline = the rendered list (stored ladder + disabled additions).
+  $: initialData = buildQualitiesFormData(data.qualities);
+  // "Radarr only"-style labels for additions not supported by every target app of the profile.
+  $: appScopeLabels = buildAppScopeLabels(data.qualities);
 
   // Initialize dirty tracking
   $: initEdit(initialData);
-
-  let lastAutoMergeKey = '';
-  let lastQualitiesRef: typeof data.qualities | null = null;
-  $: if (data.qualities) {
-    if (data.qualities !== lastQualitiesRef) {
-      lastAutoMergeKey = '';
-      lastQualitiesRef = data.qualities;
-    }
-    const availableNames = data.qualities.availableQualities.map((q) => q.name).join('|');
-    if (availableNames && availableNames !== lastAutoMergeKey) {
-      update('orderedItems', buildMergedOrderedItems(data.qualities));
-    }
-    lastAutoMergeKey = availableNames;
-  }
 
   // Reactive getters for current values
   $: mainBucket = ($current.orderedItems ?? []) as OrderedItem[];
@@ -576,6 +537,15 @@
 </form>
 
 <div class="mt-6 space-y-6 md:px-4">
+  {#if data.qualities.arrTargetUnresolved}
+    <div
+      class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200"
+      role="status"
+    >
+      No target Arr app could be determined for this profile, so no qualities can be added here. Add an Arr-specific
+      custom format score or import qualities to choose target apps.
+    </div>
+  {/if}
   <div class="space-y-4">
     {#each mainBucket as item, index (item.type === 'quality' ? `quality-${item.name}-${index}` : `group-${item.name}-${index}`)}
       <div
@@ -626,6 +596,9 @@
                 </span>
               {:else}
                 {item.name}
+                {#if appScopeLabels.has(item.name)}
+                  <Badge variant="neutral">{appScopeLabels.get(item.name)}</Badge>
+                {/if}
               {/if}
             </div>
             {#if item.type === 'group' && item.members}
@@ -748,7 +721,8 @@
       <div class="mt-1">
         Define the order, grouping, and configuration of qualities. In previous versions, only enabled qualities were
         tracked. The new system stores all qualities (enabled and disabled) to maintain proper ordering across your
-        entire quality profile. Missing qualities are automatically appended as disabled.
+        entire quality profile. Missing qualities supported by this profile's Arr apps are appended as disabled; none
+        are added when no target Arr app can be determined.
       </div>
     </div>
 

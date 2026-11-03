@@ -6,6 +6,7 @@
 
 // Queries
 export { qualities } from './read.ts';
+export { availableQualityCandidates } from './available.ts';
 
 // Mutations
 export { updateQualities } from './update.ts';

@@ -16,7 +16,7 @@ export { allCfScores, QualityProfileScoringNotFoundError, scoring } from './scor
 export { updateScoring } from './scoring/index.ts';
 
 // Qualities queries and mutations
-export { qualities } from './qualities/index.ts';
+export { availableQualityCandidates, qualities } from './qualities/index.ts';
 export { updateQualities } from './qualities/index.ts';
 
 // Create and delete

@@ -12,22 +12,13 @@ import { ARR_APP_TYPES, type ArrAppType } from '$shared/arr/capabilities.ts';
 import { QUALITIES } from '$sync/mappings.ts';
 
 /**
- * Compute the set of quality profile names compatible with a given Arr type.
+ * Lower-cased PCD quality names supported by `arrType`.
  *
- * A profile is compatible when either:
- * - all of its enabled qualities (direct or via quality groups) are supported by
- *   `arrType` (per `QUALITIES[arrType]` and `quality_api_mappings`), or
- * - it has no enabled qualities but owns an arr-specific custom format score for
- *   `arrType` (never falls back to `arr_type = 'all'` scores).
+ * A quality is supported when its name (case-insensitive) is a `QUALITIES[arrType]` key, or it
+ * has a `quality_api_mappings` row for `arrType` whose `api_name` is a `QUALITIES[arrType]` key.
  */
-export async function computeCompatibleProfileNames(
-  cache: PCDCache,
-  arrType: ArrAppType,
-  knownProfileNames?: readonly string[]
-): Promise<Set<string>> {
-  const db = cache.kb;
-
-  const supportedRows = await db
+export async function getSupportedQualityNames(cache: PCDCache, arrType: ArrAppType): Promise<Set<string>> {
+  const supportedRows = await cache.kb
     .selectFrom('quality_api_mappings')
     .select(['quality_name', 'api_name'])
     .where('arr_type', '=', arrType)
@@ -50,6 +41,31 @@ export async function computeCompatibleProfileNames(
 
     supportedQualityNames.add(qualityName.toLowerCase());
   }
+
+  return supportedQualityNames;
+}
+
+/**
+ * Compute the set of quality profile names compatible with a given Arr type.
+ *
+ * A profile is compatible when either:
+ * - all of its enabled qualities (direct or via quality groups) are supported by
+ *   `arrType` (per `QUALITIES[arrType]` and `quality_api_mappings`), or
+ * - it has no enabled qualities but owns an arr-specific custom format score for
+ *   `arrType` (never falls back to `arr_type = 'all'` scores).
+ *
+ * Callers that already resolved `getSupportedQualityNames(cache, arrType)` may pass it as
+ * `supportedQualityNames` to skip re-querying `quality_api_mappings`.
+ */
+export async function computeCompatibleProfileNames(
+  cache: PCDCache,
+  arrType: ArrAppType,
+  knownProfileNames?: readonly string[],
+  supportedQualityNames?: ReadonlySet<string>
+): Promise<Set<string>> {
+  const db = cache.kb;
+
+  supportedQualityNames ??= await getSupportedQualityNames(cache, arrType);
 
   if (supportedQualityNames.size === 0) {
     return new Set();
