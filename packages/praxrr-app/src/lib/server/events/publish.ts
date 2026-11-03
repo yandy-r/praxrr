@@ -8,7 +8,7 @@
 import { logger } from '$logger/logger.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
-import type { UpsertDriftStatusInput } from '$db/queries/driftStatus.ts';
+import { driftStatusQueries, type UpsertDriftStatusInput } from '$db/queries/driftStatus.ts';
 import { buildJobDisplayName } from '$jobs/display.ts';
 import type { JobQueueRecord, JobRunStatus, JobStatus } from '$jobs/queueTypes.ts';
 import type { JobFailureCode } from '$shared/jobs/evidence.ts';
@@ -237,6 +237,31 @@ export function publishDriftUpdated(input: UpsertDriftStatusInput): void {
       unmanagedCount: input.unmanagedCount,
       pruneCount: input.changes.filter((change) => change.category === 'prune').length,
       checkedAt: rfc3339(input.checkedAt),
+    });
+  } catch (error) {
+    logPublishFailure('drift.updated', error);
+  }
+}
+
+/**
+ * Re-read the stored drift row and emit the existing `drift.updated` event (schema unchanged)
+ * so live views refresh after a suppression, policy or remediation change. No-op when the
+ * instance has no drift row. Never emits `reason` text or `changes`.
+ */
+export function publishDriftRowUpdated(instanceId: number): void {
+  try {
+    const row = driftStatusQueries.getById(instanceId);
+    if (!row || !isSyncPreviewArrType(row.arrType)) return;
+    eventBus.publish({
+      type: 'drift.updated',
+      instanceId: row.arrInstanceId,
+      arrType: row.arrType,
+      status: row.status,
+      driftedCount: row.counts.drifted,
+      missingCount: row.counts.missing,
+      unmanagedCount: row.counts.unmanaged,
+      pruneCount: row.counts.prune,
+      checkedAt: rfc3339(row.checkedAt),
     });
   } catch (error) {
     logPublishFailure('drift.updated', error);

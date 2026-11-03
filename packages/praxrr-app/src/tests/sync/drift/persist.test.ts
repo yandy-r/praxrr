@@ -5,11 +5,25 @@ import { runMigrations } from '$db/migrations.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { driftStatusQueries, type DriftInstanceStatusDetail } from '$db/queries/driftStatus.ts';
 import { checkAndPersistInstance, shouldNotify, type CheckAndPersistOutcome } from '$sync/drift/persist.ts';
-import type { DriftCheckDeps } from '$sync/drift/check.ts';
+import { driftEntityKey, signatureOfKeys, type DriftCheckDeps } from '$sync/drift/check.ts';
 import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
 import type { EntityChange, SyncPreviewSection } from '$sync/preview/types.ts';
-import type { InstanceDriftResult } from '$sync/drift/types.ts';
+import type { DriftEntityAck, InstanceDriftResult } from '$sync/drift/types.ts';
+import { driftContentSignature, entityAcksFor } from '$sync/drift/suppression.ts';
 import { resetPreviewCreateRateLimitForTests } from '$sync/preview/limits.ts';
+import { toDriftFacts } from '$lib/server/health/gather.ts';
+import { PUT as PUT_SUPPRESSION } from '../../../routes/api/v1/drift/[instanceId]/suppression/+server.ts';
+
+type SuppressionPutEvent = Parameters<typeof PUT_SUPPRESSION>[0];
+
+function suppressionEvent(instanceId: number, payload: unknown): SuppressionPutEvent {
+  const request = new Request(`http://localhost/api/v1/drift/${instanceId}/suppression`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return { params: { instanceId: String(instanceId) }, request } as unknown as SuppressionPutEvent;
+}
 
 /**
  * Integration coverage for the drift "persist + notify" shell (design §10) against a REAL
@@ -246,27 +260,56 @@ function priorDetail(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftI
     checkedAt: '2026-07-08T10:00:00.000Z',
     contentCheckedAt: '2026-07-08T10:00:00.000Z',
     durationMs: 5,
+    driftDetectedAt: null,
+    acknowledgedSignature: null,
+    acknowledgedAt: null,
+    acknowledgedEntities: [],
+    snoozedUntil: null,
+    lastRemediation: { trigger: null, status: null, signature: null, at: null, syncHistoryId: null },
+    lastAutoAttemptSignature: null,
     createdAt: '2026-07-08T10:00:00.000Z',
     updatedAt: '2026-07-08T10:00:00.000Z',
     ...overrides,
   };
 }
 
+/** `shouldNotify` with no acknowledgement/snooze: the effective signature is the raw signature. */
+function notifiesUnsuppressed(prior: DriftInstanceStatusDetail | undefined, next: InstanceDriftResult): boolean {
+  return shouldNotify(prior, next, { effectiveSignature: next.status === 'drifted' ? next.driftSignature : null });
+}
+
+/** Content signature of the stored alerting changes (what an instance ack covers). */
+function storedContentSignature(instanceId: number): string | null {
+  return driftContentSignature(driftStatusQueries.getById(instanceId)?.changes ?? []);
+}
+
+/** Content-fingerprinted acks for `keys` at the stored content. */
+function storedAcks(instanceId: number, keys: readonly string[]): DriftEntityAck[] {
+  return entityAcksFor(driftStatusQueries.getById(instanceId)?.changes ?? [], keys);
+}
+
+/** Alerting entity key of a stored change by name (keys are computed, never stored). */
+function storedKey(instanceId: number, name: string): string {
+  const change = driftStatusQueries.getById(instanceId)?.changes.find((c) => c.name === name);
+  assertExists(change);
+  return driftEntityKey(change);
+}
+
 Deno.test('shouldNotify fires on newly detected drift (no prior notified signature)', () => {
   // No prior row at all → fire.
-  assert(shouldNotify(undefined, driftResult({ driftSignature: 'sig-a' })));
+  assert(notifiesUnsuppressed(undefined, driftResult({ driftSignature: 'sig-a' })));
   // Prior row exists but nothing was ever notified (null signature) → fire.
-  assert(shouldNotify(priorDetail({ notifiedSignature: null }), driftResult({ driftSignature: 'sig-a' })));
+  assert(notifiesUnsuppressed(priorDetail({ notifiedSignature: null }), driftResult({ driftSignature: 'sig-a' })));
 });
 
 Deno.test('shouldNotify does NOT re-fire when the notified signature already matches', () => {
   const prior = priorDetail({ status: 'drifted', notifiedSignature: 'sig-a' });
-  assertEquals(shouldNotify(prior, driftResult({ driftSignature: 'sig-a' })), false);
+  assertEquals(notifiesUnsuppressed(prior, driftResult({ driftSignature: 'sig-a' })), false);
 });
 
 Deno.test('shouldNotify re-fires when the alerting drift set changes', () => {
   const prior = priorDetail({ status: 'drifted', notifiedSignature: 'sig-a' });
-  assert(shouldNotify(prior, driftResult({ driftSignature: 'sig-b' })));
+  assert(notifiesUnsuppressed(prior, driftResult({ driftSignature: 'sig-b' })));
 });
 
 Deno.test('shouldNotify dedups purely on notified signature, ignoring prior status', () => {
@@ -274,15 +317,15 @@ Deno.test('shouldNotify dedups purely on notified signature, ignoring prior stat
   // status=error, but its notified_signature is still sig-a, so the returning identical drift
   // must NOT re-fire. Dedup keys on notified_signature ONLY, never on prior.status.
   const priorError = priorDetail({ status: 'error', reason: 'invalid_response', notifiedSignature: 'sig-a' });
-  assertEquals(shouldNotify(priorError, driftResult({ driftSignature: 'sig-a' })), false);
+  assertEquals(notifiesUnsuppressed(priorError, driftResult({ driftSignature: 'sig-a' })), false);
   // A DIFFERENT signature returning after that same error DOES fire.
-  assert(shouldNotify(priorError, driftResult({ driftSignature: 'sig-c' })));
+  assert(notifiesUnsuppressed(priorError, driftResult({ driftSignature: 'sig-c' })));
 });
 
 Deno.test('shouldNotify never fires on a non-drifted status', () => {
   // Unmanaged-only resolves to in-sync with a null signature: non-alerting.
   assertEquals(
-    shouldNotify(
+    notifiesUnsuppressed(
       priorDetail(),
       driftResult({
         status: 'in-sync',
@@ -294,13 +337,13 @@ Deno.test('shouldNotify never fires on a non-drifted status', () => {
   );
   // Recovery drifted → in-sync must never notify.
   assertEquals(
-    shouldNotify(priorDetail({ status: 'drifted' }), driftResult({ status: 'in-sync', driftSignature: null })),
+    notifiesUnsuppressed(priorDetail({ status: 'drifted' }), driftResult({ status: 'in-sync', driftSignature: null })),
     false
   );
   // Reachability/error statuses never notify, even with no prior row.
-  assertEquals(shouldNotify(undefined, driftResult({ status: 'unreachable', reason: 'timeout' })), false);
+  assertEquals(notifiesUnsuppressed(undefined, driftResult({ status: 'unreachable', reason: 'timeout' })), false);
   assertEquals(
-    shouldNotify(
+    notifiesUnsuppressed(
       priorDetail({ notifiedSignature: null }),
       driftResult({ status: 'error', reason: 'invalid_response', driftSignature: null })
     ),
@@ -568,7 +611,7 @@ migratedTest('drifted → transient error → drifted with the SAME set does NOT
   // The persist path's decision on the error row is definitively non-firing: the returning
   // identical drift's signature already equals the row's notified_signature.
   assertEquals(
-    shouldNotify(errorRow, driftResult({ instanceId: instance.id, driftSignature: errorRow.driftSignature })),
+    notifiesUnsuppressed(errorRow, driftResult({ instanceId: instance.id, driftSignature: errorRow.driftSignature })),
     false
   );
 
@@ -646,4 +689,269 @@ migratedTest('an already-in-flight instance returns { kind: in_flight } without 
   const first = expectOk(await blocked);
   assertEquals(first.status, 'drifted');
   assertEquals(driftRowCount(), 1);
+});
+
+// ---------------------------------------------------------------------------
+// Suppression (YAN-514): ack/snooze mute notifications until signature change / expiry
+// ---------------------------------------------------------------------------
+
+migratedTest('Signature change clears ack; a stale ack never revives after recovery', async () => {
+  const instance = createInstance('Radarr Ack Lifecycle');
+  const t1 = '2026-07-08T10:00:00.000Z';
+
+  const first = expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], t1)));
+  const sigA = first.driftSignature;
+  assertExists(sigA);
+  assertEquals(await awaitNotified(instance.id, sigA), sigA);
+  assertEquals(driftStatusQueries.getById(instance.id)?.driftDetectedAt, t1);
+
+  // Acknowledge sig-a, then forget the notification so an UNSUPPRESSED re-check would re-alert.
+  assert(
+    driftStatusQueries.setSuppression(instance.id, sigA, {
+      acknowledgedSignature: storedContentSignature(instance.id),
+      acknowledgedEntities: [],
+      snoozedUntil: null,
+      acknowledgedAt: t1,
+    })
+  );
+  driftStatusQueries.markNotified(instance.id, null);
+
+  // Same signature → still acknowledged, no notification, drift event identity unchanged.
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:30:00.000Z')));
+  await flush();
+  const acked = driftStatusQueries.getById(instance.id);
+  assertExists(acked);
+  assertExists(acked.acknowledgedSignature);
+  assertEquals(acked.notifiedSignature, null);
+  assertEquals(acked.driftDetectedAt, t1);
+
+  // New signature → ack cleared, notification fires, drift_detected_at advances.
+  const t3 = '2026-07-08T11:00:00.000Z';
+  const changed = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], t3))
+  );
+  const sigB = changed.driftSignature;
+  assertExists(sigB);
+  assert(sigB !== sigA);
+  assertEquals(await awaitNotified(instance.id, sigB), sigB);
+  const cleared = driftStatusQueries.getById(instance.id);
+  assertExists(cleared);
+  assertEquals(cleared.acknowledgedSignature, null);
+  assertEquals(cleared.acknowledgedAt, null);
+  assertEquals(cleared.driftDetectedAt, t3);
+
+  // Genuine recovery resets the drift event; the identical sig-a returning is NOT acked and alerts.
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [], '2026-07-08T12:00:00.000Z')));
+  assertEquals(driftStatusQueries.getById(instance.id)?.driftDetectedAt, null);
+  const t5 = '2026-07-08T13:00:00.000Z';
+  const returned = expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], t5)));
+  assertEquals(returned.driftSignature, sigA);
+  assertEquals(await awaitNotified(instance.id, sigA), sigA);
+  const final = driftStatusQueries.getById(instance.id);
+  assertExists(final);
+  assertEquals(final.acknowledgedSignature, null);
+  assertEquals(final.driftDetectedAt, t5);
+});
+
+migratedTest('shouldNotify respects suppression: partial ack alerts on the effective signature', async () => {
+  const instance = createInstance('Radarr Partial Ack');
+  const first = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-08T10:00:00.000Z')
+    )
+  );
+  assertExists(first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+
+  // Acknowledge only HD-1080p; the un-acked UHD-2160p still alerts once, keyed on the
+  // EFFECTIVE signature (hash of the un-acked keys), not the raw drift signature.
+  const ackedKey = storedKey(instance.id, UPDATE_ENTITY.name);
+  const otherKey = storedKey(instance.id, OTHER_UPDATE_ENTITY.name);
+  assert(
+    driftStatusQueries.setSuppression(instance.id, first.driftSignature, {
+      acknowledgedSignature: null,
+      acknowledgedEntities: storedAcks(instance.id, [ackedKey]),
+      snoozedUntil: null,
+      acknowledgedAt: '2026-07-08T10:00:00.000Z',
+    })
+  );
+  driftStatusQueries.markNotified(instance.id, null);
+
+  expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-08T10:30:00.000Z')
+    )
+  );
+  const effective = signatureOfKeys([otherKey]);
+  assertExists(effective);
+  assert(effective !== first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, effective), effective);
+
+  // HD-1080p no longer drifts → its stale entity ack is pruned; the effective set is unchanged
+  // (still only UHD-2160p), so nothing re-alerts.
+  expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z'))
+  );
+  await flush();
+  const pruned = driftStatusQueries.getById(instance.id);
+  assertExists(pruned);
+  assertEquals(pruned.acknowledgedEntities, []);
+  assertEquals(pruned.acknowledgedAt, null);
+  assertEquals(pruned.notifiedSignature, effective);
+});
+
+migratedTest('shouldNotify respects suppression: a snooze mutes even a changed signature until expiry', async () => {
+  const instance = createInstance('Radarr Snoozed');
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, [UPDATE_ENTITY], '2026-07-08T10:00:00.000Z'))
+  );
+  assertExists(first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+  assert(
+    driftStatusQueries.setSuppression(instance.id, first.driftSignature, {
+      acknowledgedSignature: null,
+      acknowledgedEntities: [],
+      snoozedUntil: '2026-07-09T10:00:00.000Z',
+      acknowledgedAt: null,
+    })
+  );
+
+  // Signature changes while snoozed: the snooze survives and nothing alerts.
+  const changed = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z')
+    )
+  );
+  await flush();
+  const snoozed = driftStatusQueries.getById(instance.id);
+  assertExists(snoozed);
+  assertEquals(snoozed.snoozedUntil, '2026-07-09T10:00:00.000Z');
+  assertEquals(snoozed.notifiedSignature, first.driftSignature);
+
+  // After expiry the same drift alerts on its (now unsuppressed) signature.
+  expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [UPDATE_ENTITY, OTHER_UPDATE_ENTITY], '2026-07-09T10:00:00.000Z')
+    )
+  );
+  assertEquals(await awaitNotified(instance.id, changed.driftSignature), changed.driftSignature);
+});
+
+migratedTest('acking part of an already-notified drift never re-alerts the rest; a NEW entity does', async () => {
+  const instance = createInstance('Radarr Narrowing Ack');
+  const third: EntityChange = { ...OTHER_UPDATE_ENTITY, name: 'Remux-2160p', remoteId: 11 };
+  const ab = [UPDATE_ENTITY, OTHER_UPDATE_ENTITY];
+
+  // Notified for {a, b}.
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, ab, '2026-07-08T10:00:00.000Z'))
+  );
+  assertExists(first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+
+  // Acknowledge a through the real route (the write path carries the dedup key).
+  const ackA = storedKey(instance.id, UPDATE_ENTITY.name);
+  const response = await PUT_SUPPRESSION(
+    suppressionEvent(instance.id, {
+      expectedSignature: first.driftSignature,
+      acknowledgeInstance: false,
+      acknowledgedEntityKeys: [ackA],
+      snoozedUntil: null,
+    })
+  );
+  assertEquals(response.status, 200);
+  const effectiveB = signatureOfKeys([storedKey(instance.id, OTHER_UPDATE_ENTITY.name)]);
+  assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, effectiveB);
+
+  // Refresh with the same {a, b}: b was already notified → no re-alert.
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, ab, '2026-07-08T10:30:00.000Z')));
+  await flush();
+  assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, effectiveB);
+
+  // A NEW un-acked entity c appears → alert on the new effective set {b, c}.
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, [...ab, third], '2026-07-08T11:00:00.000Z')));
+  const effectiveBC = signatureOfKeys([
+    storedKey(instance.id, OTHER_UPDATE_ENTITY.name),
+    storedKey(instance.id, third.name),
+  ]);
+  assertExists(effectiveBC);
+  assertEquals(await awaitNotified(instance.id, effectiveBC), effectiveBC);
+});
+
+migratedTest('clearing a partial ack re-exposes the entity, which alerts again on refresh', async () => {
+  const instance = createInstance('Radarr Clear Ack');
+  const ab = [UPDATE_ENTITY, OTHER_UPDATE_ENTITY];
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, ab, '2026-07-08T10:00:00.000Z'))
+  );
+  assertExists(first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+
+  const body = {
+    expectedSignature: first.driftSignature,
+    acknowledgeInstance: false,
+    acknowledgedEntityKeys: [storedKey(instance.id, UPDATE_ENTITY.name)],
+    snoozedUntil: null,
+  };
+  assertEquals((await PUT_SUPPRESSION(suppressionEvent(instance.id, body))).status, 200);
+  const narrowed = driftStatusQueries.getById(instance.id)?.notifiedSignature;
+
+  // Clear the ack: the dedup key is NOT moved back, so the full set alerts on the next refresh.
+  assertEquals(
+    (await PUT_SUPPRESSION(suppressionEvent(instance.id, { ...body, acknowledgedEntityKeys: [] }))).status,
+    200
+  );
+  assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, narrowed);
+  expectOk(await checkAndPersistInstance(instance, driftedDeps(instance, ab, '2026-07-08T10:30:00.000Z')));
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+});
+
+migratedTest('content-aware ack: an acked entity whose fields change again alerts and is not suppressed', async () => {
+  const instance = createInstance('Radarr Content Ack');
+  const ab = [UPDATE_ENTITY, OTHER_UPDATE_ENTITY];
+  const first = expectOk(
+    await checkAndPersistInstance(instance, driftedDeps(instance, ab, '2026-07-08T10:00:00.000Z'))
+  );
+  assertExists(first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+
+  // Acknowledge a (HD-1080p) at its current content through the route.
+  const keyA = storedKey(instance.id, UPDATE_ENTITY.name);
+  const keyB = storedKey(instance.id, OTHER_UPDATE_ENTITY.name);
+  const response = await PUT_SUPPRESSION(
+    suppressionEvent(instance.id, {
+      expectedSignature: first.driftSignature,
+      acknowledgeInstance: false,
+      acknowledgedEntityKeys: [keyA],
+      snoozedUntil: null,
+    })
+  );
+  assertEquals(response.status, 200);
+  const effectiveB = signatureOfKeys([keyB]);
+  assertEquals(driftStatusQueries.getById(instance.id)?.notifiedSignature, effectiveB);
+
+  // a drifts FURTHER: same key (same remoteId/action), different field diff.
+  const editedA: EntityChange = {
+    ...UPDATE_ENTITY,
+    fields: [{ field: 'cutoff', type: 'changed', current: 1, desired: 5 }],
+  };
+  const edited = expectOk(
+    await checkAndPersistInstance(
+      instance,
+      driftedDeps(instance, [editedA, OTHER_UPDATE_ENTITY], '2026-07-08T11:00:00.000Z')
+    )
+  );
+  // Key-only drift signature is unchanged, yet the stale ack no longer suppresses a.
+  assertEquals(edited.driftSignature, first.driftSignature);
+  assertEquals(await awaitNotified(instance.id, first.driftSignature), first.driftSignature);
+  const row = driftStatusQueries.getById(instance.id);
+  assertExists(row);
+  assertEquals(row.acknowledgedEntities, []); // pruned: fingerprint changed
+  const facts = toDriftFacts(row, Date.parse('2026-07-08T11:00:00.000Z'));
+  assertEquals(facts.suppression, null);
+  assertEquals(facts.drifted, 2);
 });

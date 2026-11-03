@@ -7,7 +7,12 @@
   import EmptyState from '$ui/state/EmptyState.svelte';
   import { alertStore } from '$alerts/store';
   import { eventsStore } from '$stores/events';
-  import { DRIFT_STATUS_LABEL, driftStatusVariant } from '$ui/drift/driftStatus.ts';
+  import {
+    DRIFT_STATUS_LABEL,
+    DRIFT_SUPPRESSION_LABEL,
+    driftStatusVariant,
+    driftSuppressionVariant,
+  } from '$ui/drift/driftStatus.ts';
   import type { DriftInstanceSummary, DriftSettingsResponse } from '$sync/drift/responses.ts';
   import type { PageData } from './$types';
 
@@ -232,6 +237,14 @@
                   <span class="font-medium text-neutral-900 dark:text-neutral-100">{instance.instanceName}</span>
                   <Badge variant={instance.arrType}>{instance.arrType}</Badge>
                   <Badge variant={driftStatusVariant(instance.status)}>{DRIFT_STATUS_LABEL[instance.status]}</Badge>
+                  {#if instance.suppression !== 'none'}
+                    <Badge variant={driftSuppressionVariant(instance.suppression)}>
+                      {DRIFT_SUPPRESSION_LABEL[instance.suppression]}
+                    </Badge>
+                  {/if}
+                  {#if instance.remediationMode === 'auto'}
+                    <Badge variant="accent">Auto</Badge>
+                  {/if}
                 </div>
                 <div class="flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
                   <span>Drifted {instance.counts.drifted}</span>

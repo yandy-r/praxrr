@@ -120,6 +120,242 @@ instance:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
 
+reconcile:
+  post:
+    operationId: reconcileDrift
+    summary: Create a drift-tagged reviewed preview for the drifted sections
+    description: |
+      Builds a reviewed sync preview limited to the instance's drifted sections (those with
+      `drift` or `missing` changes that are configured and version-available). The optional
+      `sections` body narrows that set; it never widens it. The returned preview carries a
+      server-owned `driftRemediation` link, so applying it through
+      `POST /sync/preview/{previewId}/apply` records a sync history entry linked to the drift
+      event. Performs no Arr writes (dry run, `read` token scope).
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/drift.yaml#/DriftReconcileRequest'
+    responses:
+      '200':
+        description: Drift-tagged preview generated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
+      '400':
+        description: |
+          Invalid instance id or body, unsupported or disabled instance, or a requested section
+          that is not drifted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `read` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: The instance is not `drifted` or its stored drift content is stale
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '429':
+        description: Preview creation is rate-limited or preview-store capacity is exhausted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: |
+          Preview generation failed. The failed preview snapshot is returned with
+          `status: failed` and a typed, safe `failure` reason — no raw exception text.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/sync.yaml#/SyncPreviewResult'
+
+suppression:
+  put:
+    operationId: updateDriftSuppression
+    summary: Acknowledge or snooze drift for one instance
+    description: |
+      Replaces the instance's acknowledgement and snooze state. An instance acknowledgement
+      lasts until the drift signature changes; per-entity acknowledgements are pruned when the
+      entity stops drifting; a snooze lasts until `snoozedUntil` regardless of signature
+      changes. Suppression mutes drift notifications and the health penalty only — the stored
+      drift status is unchanged. Requires the `admin` token scope.
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/drift.yaml#/DriftSuppressionUpdateRequest'
+    responses:
+      '200':
+        description: Updated drift detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftDetailResponse'
+      '400':
+        description: |
+          Invalid instance id or body: unknown entity key, snooze in the past or more than 90
+          days ahead, or an acknowledgement while the instance is not drifted
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: The stored drift signature no longer matches `expectedSignature`
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update drift suppression
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+remediationPolicy:
+  get:
+    operationId: getDriftRemediationPolicy
+    summary: Get the drift remediation policy for one instance
+    description: |
+      Returns the instance's drift remediation policy. When no policy is stored the default
+      (`mode: off`, no sections, `updatedAt: null`) is returned.
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    responses:
+      '200':
+        description: Drift remediation policy
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftRemediationPolicy'
+      '400':
+        description: Invalid instance id or unsupported instance type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to read drift remediation policy
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  put:
+    operationId: updateDriftRemediationPolicy
+    summary: Update the drift remediation policy for one instance
+    description: |
+      Sets the remediation mode and the sections auto-remediation may write. `auto` requires a
+      non-empty `allowedSections`; every section must be supported for the instance's Arr type.
+      Requires the `admin` token scope.
+    tags:
+      - Drift Detection
+    parameters:
+      - name: instanceId
+        in: path
+        required: true
+        description: Arr instance ID
+        schema:
+          type: integer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/drift.yaml#/DriftRemediationPolicyUpdateRequest'
+    responses:
+      '200':
+        description: Updated drift remediation policy
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/drift.yaml#/DriftRemediationPolicy'
+      '400':
+        description: |
+          Invalid instance id or body: `auto` with no sections, a section unsupported for the
+          instance's Arr type, or duplicate sections
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
+      '404':
+        description: Instance not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update drift remediation policy
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
 settings:
   put:
     operationId: updateDriftSettings

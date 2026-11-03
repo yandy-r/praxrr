@@ -271,6 +271,41 @@ Notification services are rows in `notification_services`:
 `notification_history` stores `status`, masked `error`, `attempts`, and
 `metadata` (`severity` and instance `context`) for every recorded delivery.
 
+## Drift notifications
+
+All drift events are under the **Drift** category in a service's event list. Like every
+other type, a service receives one only after you select it. Each event carries
+`instanceId`, `instanceName`, and `arrType`, and links to `/drift/{instanceId}`.
+
+| Type                        | Label                          | Severity  | Sent when                                                                                                                                   |
+| --------------------------- | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drift.detected`            | Drift Detected                 | `warning` | A fresh check finds un-acknowledged alerting drift whose effective signature differs from the last one notified                             |
+| `drift.remediation.applied` | Drift Auto-Remediation Applied | `success` | An opt-in `auto` policy applied a reviewed plan to the drifted sections                                                                     |
+| `drift.remediation.failed`  | Drift Auto-Remediation Failed  | `error`   | An auto apply ran but did not fully succeed (a partial run uses `warning` and "partially applied" copy), or it failed after writing started |
+| `drift.remediation.held`    | Drift Auto-Remediation Held    | `warning` | Canary gating applies to the instance, so auto wrote nothing and left the drift for a human to reconcile                                    |
+
+- `drift.detected` respects acknowledge and snooze. An instance that is acknowledged or
+  snoozed never alerts. An entity ack covers the reviewed field diff, so an acknowledged
+  entity that drifts further is un-acknowledged and alerts again. Acknowledging part of a
+  drift that was already notified does not alert again for the rest. A new un-acknowledged
+  entity alerts, and clearing or shrinking an ack re-exposes those entities on the next
+  refresh. With a `notify` remediation policy, the message adds
+  `Reconcile suggested: <sections> — /drift/{id}`.
+- The `drift.remediation.*` messages list the remediated sections. When a Sync History run
+  exists, they also link to `/sync-history/{id}`.
+- An auto attempt that wrote something happens at most once per drift signature, so each of
+  these events is sent at most once per signature. A new signature, or a genuine recovery
+  followed by a returning drift, arms it again. A retriable precondition that wrote nothing
+  (preview rate limit or capacity, an apply rejected before execution) sends no notification
+  and is retried on the next drift refresh. An attempt that is cancelled because the preview
+  no longer matches the stored drift, or because every target section contains managed
+  deletes, records `skipped` on the drift page and sends no notification.
+- The type IDs are registered in `$shared/notifications/types.ts`, the client-safe list
+  behind the subscription checkboxes, and in `$notifications/types.ts`.
+
+See [Drift Remediation](/app/sync-pipeline/#drift-remediation) for the reconcile,
+suppression, and policy rules.
+
 ## Config Health Decreased
 
 `health.degraded` is an explicitly opted-in event. A notification service
@@ -357,6 +392,8 @@ and the webhook payload by a contract test against the OpenAPI schema.
 - `packages/praxrr-app/src/lib/server/notifications/base/delivery.ts`
 - `packages/praxrr-app/src/lib/server/notifications/notifiers/`
 - `packages/praxrr-app/src/lib/shared/notifications/providers.ts`
+- `packages/praxrr-app/src/lib/server/sync/drift/persist.ts` (`drift.detected`)
+- `packages/praxrr-app/src/lib/server/sync/drift/remediation.ts` (`drift.remediation.*`)
 - `packages/praxrr-app/src/routes/settings/notifications/`
 - `docs/api/v1/schemas/notifications.yaml`
 

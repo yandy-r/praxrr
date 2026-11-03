@@ -41,6 +41,8 @@ import type { SyncPreviewSummary } from '$sync/preview/types.ts';
 import { LIVE_DEPENDENCY_KEYS } from '$shared/events/types.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { canaryRolloutQueries } from '$db/queries/canaryRollouts.ts';
+import { driftRemediationPolicyQueries } from '$db/queries/driftRemediationPolicy.ts';
+import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import type { ArrSyncSection, JobQueueRecord, JobType } from '$jobs/queueTypes.ts';
 
 const METADATA_PROFILES_SURFACE: ArrSyncSurface = 'metadata_profiles';
@@ -304,8 +306,20 @@ function resolveCanaryRolloutSections(job: JobQueueRecord, instanceId: number): 
 }
 
 /**
- * Reconciles persisted section sync status with the instance's active `arr.sync*` jobs and any
- * active canary rollout batch that includes the instance.
+ * Sections a running `drift.remediate` job covers on this instance. The handler applies a reviewed
+ * plan through the shared apply core (no per-section queue row), restricted to the instance's
+ * remediable ∩ allowed drift sections; a running job is treated as covering its policy's allowed
+ * sections, mirroring how the canary resolver reports an in-flight batch.
+ */
+function resolveDriftRemediateSections(job: JobQueueRecord, instance: { id: number; type: string }) {
+  if (job.status !== 'running' || Number(job.payload.instanceId) !== instance.id) return [];
+  if (!isSyncPreviewArrType(instance.type)) return [];
+  return driftRemediationPolicyQueries.get(instance.id, instance.type).allowedSections.filter(isArrSyncSection);
+}
+
+/**
+ * Reconciles persisted section sync status with the instance's active `arr.sync*` jobs, any
+ * active canary rollout batch that includes the instance, and a running `drift.remediate` job.
  *
  * A job is marked `running` when the dispatcher claims it, but the section only flips to
  * `in_progress` later inside the handler, so a running job covering a `pending` section reports it
@@ -328,6 +342,12 @@ function deriveSectionStatus(instanceId: number, persisted: SectionStatusMap): S
   for (const job of jobQueueQueries.listByJobTypes(['sync.canary.rollout'])) {
     if (job.status !== 'running' && !isDueQueuedJob(job, now)) continue;
     cover(job, resolveCanaryRolloutSections(job, instanceId));
+  }
+  const instance = arrInstancesQueries.getById(instanceId);
+  if (instance) {
+    for (const job of jobQueueQueries.listActiveByJobTypesAndInstanceId(['drift.remediate'], instanceId)) {
+      cover(job, resolveDriftRemediateSections(job, instance));
+    }
   }
 
   const derived = { ...persisted };

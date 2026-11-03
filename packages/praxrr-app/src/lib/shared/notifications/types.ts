@@ -133,6 +133,24 @@ export const notificationTypes: NotificationType[] = [
     category: 'Drift',
     description: 'Notification when an Arr instance diverges from its desired configuration',
   },
+  {
+    id: 'drift.remediation.applied',
+    label: 'Drift Auto-Remediation Applied',
+    category: 'Drift',
+    description: 'Notification when opt-in auto-remediation applies a reviewed plan to a drifted Arr instance',
+  },
+  {
+    id: 'drift.remediation.failed',
+    label: 'Drift Auto-Remediation Failed',
+    category: 'Drift',
+    description: 'Notification when an auto-remediation attempt for a drifted Arr instance fails',
+  },
+  {
+    id: 'drift.remediation.held',
+    label: 'Drift Auto-Remediation Held',
+    category: 'Drift',
+    description: 'Notification when auto-remediation is held for human review because Canary gating applies',
+  },
 
   // Config Health
   {

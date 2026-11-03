@@ -44,6 +44,9 @@ const inSyncDrift: DriftFacts = {
   prune: 0,
   checkedAt: '2026-07-14T00:00:00Z',
   contentCheckedAt: '2026-07-14T00:00:00Z',
+  suppression: null,
+  snoozedUntil: null,
+  acknowledged: 0,
 };
 
 function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
@@ -130,6 +133,9 @@ Deno.test('computeHealthReport: all-null criteria yield band "unknown" and score
         prune: 0,
         checkedAt: null,
         contentCheckedAt: null,
+        suppression: null,
+        snoozedUntil: null,
+        acknowledged: 0,
       },
     })
   );
@@ -157,6 +163,9 @@ Deno.test('computeHealthReport: a null sub-score is excluded, not treated as 0',
         prune: 0,
         checkedAt: null,
         contentCheckedAt: null,
+        suppression: null,
+        snoozedUntil: null,
+        acknowledged: 0,
       },
     })
   );

@@ -190,6 +190,19 @@ export const JOB_TRANSPARENCY_AUDIT = {
     failureReasons: ['Closed drift reason codes and handler errors preserve user-facing recovery evidence.'],
     userSurface: '/drift and /settings/jobs',
   }),
+  'drift.remediate': queuedPass({
+    inputs: [
+      'The payload pins the Arr instance and drift signature; the per-instance remediation policy is inspectable.',
+    ],
+    decisions: [
+      'The handler records not-drifted, signature-moved, suppressed, already-attempted, canary, and stale decisions.',
+    ],
+    outputs: [
+      'Linked Sync History rows, the drift detail last-remediation record, and job history expose the outcome.',
+    ],
+    failureReasons: ['Preview creation, verification, and apply failures retain explicit decisions and reasons.'],
+    userSurface: '/drift/{instanceId}, /sync-history and /settings/jobs',
+  }),
   'sync.history.cleanup': queuedPass({
     inputs: ['Sync History retention settings and job source expose age/count policy and trigger.'],
     decisions: ['The handler records history-disabled, no-rows, retained, and pruned branches.'],

@@ -1,7 +1,7 @@
 -- Praxrr Database Schema
 -- This file documents the current database schema after all migrations
 -- DO NOT execute this file directly - use migrations instead
--- Last updated: 2026-02-20
+-- Last updated: 2026-11-03
 
 -- ==============================================================================
 -- TABLE: migrations
@@ -1049,8 +1049,9 @@ CREATE TABLE drift_check_settings (
 
 -- ==============================================================================
 -- TABLE: drift_instance_status
--- Purpose: Latest-state, one upserted row per Arr instance; entity detail in `changes` JSON
--- Migration: 20260709_create_drift_tables.ts
+-- Purpose: Latest-state, one upserted row per Arr instance; entity detail in `changes` JSON;
+--          suppression (ack/snooze) and last-remediation state for drift remediation
+-- Migration: 20260709_create_drift_tables.ts, 20261103_add_drift_remediation.ts
 -- ==============================================================================
 
 CREATE TABLE drift_instance_status (
@@ -1072,8 +1073,82 @@ CREATE TABLE drift_instance_status (
     content_checked_at TEXT,
     duration_ms        INTEGER,
     created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    drift_detected_at                TEXT,                       -- ISO; first refresh that saw the current signature
+    acknowledged_signature           TEXT,                       -- instance-level ack: alerting CONTENT signature (key + fields) it covers
+    acknowledged_at                  TEXT,
+    acknowledged_entity_keys         TEXT NOT NULL DEFAULT '[]', -- JSON [{key, fingerprint}] per-entity acks (driftEntityKey + content fingerprint)
+    snoozed_until                    TEXT,                       -- ISO; snooze active while > now
+    last_remediation_trigger         TEXT CHECK (last_remediation_trigger IN ('reconcile', 'auto') OR last_remediation_trigger IS NULL),
+    last_remediation_status          TEXT CHECK (
+        last_remediation_status IN ('success', 'partial', 'failed', 'skipped', 'held_canary')
+        OR last_remediation_status IS NULL
+    ),
+    last_remediation_signature       TEXT,
+    last_remediation_at              TEXT,
+    last_remediation_sync_history_id INTEGER REFERENCES sync_history(id) ON DELETE SET NULL,
+    last_auto_attempt_signature      TEXT                        -- auto-remediation idempotency key
 );
+
+-- ==============================================================================
+-- TABLE: drift_remediation_policy
+-- Purpose: Per-instance drift remediation mode; no row == 'off' (default off, no backfill)
+-- Migration: 20261103_add_drift_remediation.ts
+-- ==============================================================================
+
+CREATE TABLE drift_remediation_policy (
+    arr_instance_id  INTEGER PRIMARY KEY REFERENCES arr_instances(id) ON DELETE CASCADE,
+    arr_type         TEXT NOT NULL CHECK (arr_type IN ('radarr', 'sonarr', 'lidarr')),
+    mode             TEXT NOT NULL DEFAULT 'off' CHECK (mode IN ('off', 'notify', 'auto')),
+    allowed_sections TEXT NOT NULL DEFAULT '[]',  -- JSON SectionType[], validated per arr_type in app code
+    created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- TABLE: sync_history
+-- Purpose: Append-only audit trail, one row per Arr sync run (per instance)
+-- Migration: 20260710_create_sync_history_tables.ts, 20260720_add_sync_history_entity_outcomes.ts,
+--            20261028_scrub_sync_error_text.ts (data only), 20261103_add_drift_remediation.ts
+-- ==============================================================================
+
+CREATE TABLE sync_history (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    arr_instance_id      INTEGER REFERENCES arr_instances(id) ON DELETE SET NULL,
+    instance_name        TEXT NOT NULL,
+    arr_type             TEXT NOT NULL CHECK (arr_type IN ('radarr', 'sonarr', 'lidarr')),
+    job_id               INTEGER,
+    trigger              TEXT NOT NULL CHECK (trigger IN ('manual', 'schedule', 'system')),
+    trigger_event        TEXT CHECK (trigger_event IN ('on_pull', 'on_change') OR trigger_event IS NULL),
+    sections_attempted   TEXT NOT NULL DEFAULT '[]',
+    status               TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed', 'skipped')),
+    sections_run         INTEGER NOT NULL DEFAULT 0,
+    items_synced         INTEGER NOT NULL DEFAULT 0,
+    failure_count        INTEGER NOT NULL DEFAULT 0,
+    entity_change_count  INTEGER NOT NULL DEFAULT 0,
+    section_results      TEXT NOT NULL DEFAULT '[]',
+    changes              TEXT NOT NULL DEFAULT '[]',
+    error                TEXT,
+    started_at           TEXT NOT NULL,
+    finished_at          TEXT,
+    duration_ms          INTEGER,
+    created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    entity_outcomes      TEXT NOT NULL DEFAULT '[]',
+    entity_outcome_count INTEGER NOT NULL DEFAULT 0,
+    preview_id           TEXT,
+    drift_signature      TEXT,  -- server-owned drift link (reviewed drift remediation runs only)
+    drift_detected_at    TEXT,
+    remediation_trigger  TEXT CHECK (remediation_trigger IN ('reconcile', 'auto') OR remediation_trigger IS NULL)
+);
+
+CREATE INDEX idx_sync_history_started_at ON sync_history(started_at DESC);
+CREATE INDEX idx_sync_history_instance ON sync_history(arr_instance_id);
+CREATE INDEX idx_sync_history_status ON sync_history(status);
+CREATE INDEX idx_sync_history_trigger ON sync_history(trigger);
+CREATE INDEX idx_sync_history_arr_type ON sync_history(arr_type);
+CREATE INDEX idx_sync_history_preview ON sync_history(preview_id);
+CREATE INDEX idx_sync_history_drift ON sync_history(arr_instance_id, drift_signature)
+    WHERE drift_signature IS NOT NULL;
 
 -- ==============================================================================
 -- TABLE: canary_rollouts

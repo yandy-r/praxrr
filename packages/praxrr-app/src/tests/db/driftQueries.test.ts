@@ -1,9 +1,11 @@
 import { assert, assertEquals, assertExists } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
-import { runMigrations } from '$db/migrations.ts';
+import { migration as addDriftRemediationMigration } from '$db/migrations/20261103_add_drift_remediation.ts';
+import { migrationRunner, runMigrations } from '$db/migrations.ts';
 import { driftSettingsQueries } from '$db/queries/driftSettings.ts';
 import { driftStatusQueries, type UpsertDriftStatusInput } from '$db/queries/driftStatus.ts';
+import { driftRemediationPolicyQueries } from '$db/queries/driftRemediationPolicy.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import type { DriftEntityChange } from '$sync/drift/types.ts';
 
@@ -63,6 +65,7 @@ function makeUpsertInput(instanceId: number, overrides: Partial<UpsertDriftStatu
     checkedAt: '2026-07-08T10:00:00.000Z',
     contentCheckedAt: '2026-07-08T10:00:00.000Z',
     durationMs: 123,
+    driftDetectedAt: null,
     ...overrides,
   };
 }
@@ -266,4 +269,364 @@ migratedTest('driftStatus.getById returns undefined for an instance with no drif
   assert(driftStatusQueries.getById(999_999) === undefined);
   // And markNotified reports no rows affected when there is nothing to stamp.
   assertEquals(driftStatusQueries.markNotified(999_999, 'sig'), false);
+});
+
+// ---------------------------------------------------------------------------
+// 20261103_add_drift_remediation (migration + suppression/remediation queries)
+// ---------------------------------------------------------------------------
+
+interface ColumnInfo {
+  name: string;
+  dflt_value: string | null;
+}
+
+function columnNames(table: string): string[] {
+  return db.query<ColumnInfo>(`PRAGMA table_info(${table})`).map((column) => column.name);
+}
+
+const DRIFT_REMEDIATION_STATUS_COLUMNS = [
+  'drift_detected_at',
+  'acknowledged_signature',
+  'acknowledged_at',
+  'acknowledged_entity_keys',
+  'snoozed_until',
+  'last_remediation_trigger',
+  'last_remediation_status',
+  'last_remediation_signature',
+  'last_remediation_at',
+  'last_remediation_sync_history_id',
+  'last_auto_attempt_signature',
+];
+const DRIFT_REMEDIATION_HISTORY_COLUMNS = ['drift_signature', 'drift_detected_at', 'remediation_trigger'];
+
+migratedTest('migration 20261103: up adds columns with NULL/[] defaults and the policy table', async () => {
+  assert(migrationRunner.isApplied(20261103));
+  const statusColumns = columnNames('drift_instance_status');
+  for (const column of DRIFT_REMEDIATION_STATUS_COLUMNS) {
+    assert(statusColumns.includes(column), `drift_instance_status.${column} must exist`);
+  }
+  const historyColumns = columnNames('sync_history');
+  for (const column of DRIFT_REMEDIATION_HISTORY_COLUMNS) {
+    assert(historyColumns.includes(column), `sync_history.${column} must exist`);
+  }
+  assertEquals(columnNames('drift_remediation_policy'), [
+    'arr_instance_id',
+    'arr_type',
+    'mode',
+    'allowed_sections',
+    'created_at',
+    'updated_at',
+  ]);
+  const index = db.queryFirst<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_sync_history_drift'"
+  );
+  assertExists(index);
+
+  // A pre-existing-shaped row (written without any remediation column) reads as no ack,
+  // no snooze, no remediation.
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId));
+  const detail = driftStatusQueries.getById(instanceId);
+  assertExists(detail);
+  assertEquals(detail.driftDetectedAt, null);
+  assertEquals(detail.acknowledgedSignature, null);
+  assertEquals(detail.acknowledgedAt, null);
+  assertEquals(detail.acknowledgedEntities, []);
+  assertEquals(detail.snoozedUntil, null);
+  assertEquals(detail.lastRemediation, { trigger: null, status: null, signature: null, at: null, syncHistoryId: null });
+  assertEquals(detail.lastAutoAttemptSignature, null);
+  const raw = db.queryFirst<{ acknowledged_entity_keys: string }>(
+    'SELECT acknowledged_entity_keys FROM drift_instance_status WHERE arr_instance_id = ?',
+    instanceId
+  );
+  assertEquals(raw?.acknowledged_entity_keys, '[]');
+
+  // Absent policy row synthesizes `off`.
+  assertEquals(driftRemediationPolicyQueries.get(instanceId, 'radarr'), {
+    instanceId,
+    arrType: 'radarr',
+    mode: 'off',
+    allowedSections: [],
+    updatedAt: null,
+  });
+});
+
+migratedTest('migration 20261103: down reverts every column, the table and the index', async () => {
+  await migrationRunner.down([addDriftRemediationMigration], 20261102);
+  assertEquals(migrationRunner.isApplied(20261103), false);
+  const statusColumns = columnNames('drift_instance_status');
+  for (const column of DRIFT_REMEDIATION_STATUS_COLUMNS) {
+    assert(!statusColumns.includes(column), `drift_instance_status.${column} must be dropped`);
+  }
+  const historyColumns = columnNames('sync_history');
+  for (const column of DRIFT_REMEDIATION_HISTORY_COLUMNS) {
+    assert(!historyColumns.includes(column), `sync_history.${column} must be dropped`);
+  }
+  assertEquals(columnNames('drift_remediation_policy'), []);
+  const index = db.queryFirst<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_sync_history_drift'"
+  );
+  assertEquals(index, undefined);
+
+  // Re-applying up after down succeeds (round-trip).
+  await runMigrations();
+  assert(migrationRunner.isApplied(20261103));
+  assert(columnNames('drift_instance_status').includes('acknowledged_entity_keys'));
+});
+
+migratedTest('driftStatus.upsert persists driftDetectedAt and never touches suppression/remediation', async () => {
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(
+    makeUpsertInput(instanceId, { driftSignature: 'sig-a', driftDetectedAt: '2026-11-01T00:00:00.000Z' })
+  );
+  assert(
+    driftStatusQueries.setSuppression(instanceId, 'sig-a', {
+      acknowledgedSignature: 'sig-a',
+      acknowledgedEntities: [{ key: 'k1', fingerprint: 'f1' }],
+      snoozedUntil: '2026-11-10T00:00:00.000Z',
+      acknowledgedAt: '2026-11-02T00:00:00.000Z',
+    })
+  );
+  assert(
+    driftStatusQueries.recordRemediation(instanceId, {
+      trigger: 'reconcile',
+      status: 'success',
+      signature: 'sig-a',
+      at: '2026-11-02T01:00:00.000Z',
+      syncHistoryId: null,
+    })
+  );
+  assert(driftStatusQueries.markAutoAttempt(instanceId, 'sig-a'));
+
+  await driftStatusQueries.upsert(
+    makeUpsertInput(instanceId, { driftSignature: 'sig-a', driftDetectedAt: '2026-11-01T00:00:00.000Z' })
+  );
+
+  const detail = driftStatusQueries.getById(instanceId);
+  assertExists(detail);
+  assertEquals(detail.driftDetectedAt, '2026-11-01T00:00:00.000Z');
+  assertEquals(detail.acknowledgedSignature, 'sig-a');
+  assertEquals(detail.acknowledgedEntities, [{ key: 'k1', fingerprint: 'f1' }]);
+  assertEquals(detail.snoozedUntil, '2026-11-10T00:00:00.000Z');
+  assertEquals(detail.acknowledgedAt, '2026-11-02T00:00:00.000Z');
+  assertEquals(detail.lastRemediation.trigger, 'reconcile');
+  assertEquals(detail.lastRemediation.status, 'success');
+  assertEquals(detail.lastAutoAttemptSignature, 'sig-a');
+});
+
+migratedTest('driftStatus.setSuppression value guard returns false when the signature changed', async () => {
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-b' }));
+
+  const input = {
+    acknowledgedSignature: 'sig-a',
+    acknowledgedEntities: [],
+    snoozedUntil: null,
+    acknowledgedAt: '2026-11-02T00:00:00.000Z',
+  };
+  // Caller reviewed sig-a, but the stored signature is now sig-b → 409.
+  assertEquals(driftStatusQueries.setSuppression(instanceId, 'sig-a', input), false);
+  assertEquals(driftStatusQueries.getById(instanceId)?.acknowledgedSignature, null);
+  // A null expectation never matches a non-null signature.
+  assertEquals(driftStatusQueries.setSuppression(instanceId, null, input), false);
+  // Unknown instance.
+  assertEquals(driftStatusQueries.setSuppression(999_999, 'sig-b', input), false);
+
+  assertEquals(
+    driftStatusQueries.setSuppression(instanceId, 'sig-b', { ...input, acknowledgedSignature: 'sig-b' }),
+    true
+  );
+  assertEquals(driftStatusQueries.getById(instanceId)?.acknowledgedSignature, 'sig-b');
+
+  // `IS` semantics: a null expectation matches a null stored signature.
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { status: 'in-sync', driftSignature: null }));
+  assertEquals(
+    driftStatusQueries.setSuppression(instanceId, null, {
+      acknowledgedSignature: null,
+      acknowledgedEntities: [],
+      snoozedUntil: '2026-11-10T00:00:00.000Z',
+      acknowledgedAt: null,
+    }),
+    true
+  );
+  assertEquals(driftStatusQueries.getById(instanceId)?.snoozedUntil, '2026-11-10T00:00:00.000Z');
+});
+
+migratedTest(
+  'driftStatus.clearStaleAcknowledgements clears a stale ack and prunes gone or changed entity acks',
+  async () => {
+    const instanceId = seedInstance();
+    await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-a' }));
+    driftStatusQueries.setSuppression(instanceId, 'sig-a', {
+      acknowledgedSignature: 'content-a',
+      acknowledgedEntities: [
+        { key: 'keep', fingerprint: 'f-keep' },
+        { key: 'gone', fingerprint: 'f-gone' },
+        { key: 'edited', fingerprint: 'f-old' },
+      ],
+      snoozedUntil: '2026-11-10T00:00:00.000Z',
+      acknowledgedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    // Same content, every ack still matching → no-op.
+    driftStatusQueries.clearStaleAcknowledgements(instanceId, 'content-a', [
+      { key: 'keep', fingerprint: 'f-keep' },
+      { key: 'gone', fingerprint: 'f-gone' },
+      { key: 'edited', fingerprint: 'f-old' },
+    ]);
+    let detail = driftStatusQueries.getById(instanceId);
+    assertEquals(detail?.acknowledgedSignature, 'content-a');
+    assertEquals(detail?.acknowledgedEntities.length, 3);
+
+    // Content changed → instance ack cleared; a gone key AND a same-key/changed-fingerprint ack are
+    // pruned; snooze untouched.
+    driftStatusQueries.clearStaleAcknowledgements(instanceId, 'content-b', [
+      { key: 'keep', fingerprint: 'f-keep' },
+      { key: 'edited', fingerprint: 'f-new' },
+      { key: 'other', fingerprint: 'f-other' },
+    ]);
+    detail = driftStatusQueries.getById(instanceId);
+    assertEquals(detail?.acknowledgedSignature, null);
+    assertEquals(detail?.acknowledgedEntities, [{ key: 'keep', fingerprint: 'f-keep' }]);
+    assertEquals(detail?.acknowledgedAt, '2026-11-02T00:00:00.000Z');
+    assertEquals(detail?.snoozedUntil, '2026-11-10T00:00:00.000Z');
+
+    // Nothing acked remains → acknowledged_at cleared too.
+    driftStatusQueries.clearStaleAcknowledgements(instanceId, null, []);
+    detail = driftStatusQueries.getById(instanceId);
+    assertEquals(detail?.acknowledgedEntities, []);
+    assertEquals(detail?.acknowledgedAt, null);
+    assertEquals(detail?.snoozedUntil, '2026-11-10T00:00:00.000Z');
+  }
+);
+
+migratedTest('driftStatus.recordRemediation stamps the outcome and the sync_history back-pointer', async () => {
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-a' }));
+  db.execute(
+    `INSERT INTO sync_history (arr_instance_id, instance_name, arr_type, trigger, status, started_at)
+		VALUES (?, 'Radarr Drift', 'radarr', 'manual', 'success', '2026-11-02T00:00:00.000Z')`,
+    instanceId
+  );
+  const historyId = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() AS id')?.id ?? 0;
+
+  assert(
+    driftStatusQueries.recordRemediation(instanceId, {
+      trigger: 'auto',
+      status: 'partial',
+      signature: 'sig-a',
+      at: '2026-11-02T00:00:01.000Z',
+      syncHistoryId: historyId,
+    })
+  );
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastRemediation, {
+    trigger: 'auto',
+    status: 'partial',
+    signature: 'sig-a',
+    at: '2026-11-02T00:00:01.000Z',
+    syncHistoryId: historyId,
+  });
+
+  // ON DELETE SET NULL: retention pruning the history row nulls the back-pointer.
+  db.execute('DELETE FROM sync_history WHERE id = ?', historyId);
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastRemediation.syncHistoryId, null);
+
+  assertEquals(
+    driftStatusQueries.recordRemediation(999_999, {
+      trigger: 'auto',
+      status: 'failed',
+      signature: null,
+      at: '2026-11-02T00:00:01.000Z',
+      syncHistoryId: null,
+    }),
+    false
+  );
+});
+
+migratedTest('driftStatus.markAutoAttempt claims each signature exactly once', async () => {
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-a' }));
+
+  assertEquals(driftStatusQueries.markAutoAttempt(instanceId, 'sig-a'), true);
+  assertEquals(driftStatusQueries.markAutoAttempt(instanceId, 'sig-a'), false);
+  // Value guard: a signature that is not the stored drift signature is never claimed.
+  assertEquals(driftStatusQueries.markAutoAttempt(instanceId, 'sig-b'), false);
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastAutoAttemptSignature, 'sig-a');
+  // A new stored signature re-arms auto.
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-b' }));
+  assertEquals(driftStatusQueries.markAutoAttempt(instanceId, 'sig-b'), true);
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastAutoAttemptSignature, 'sig-b');
+  assertEquals(driftStatusQueries.markAutoAttempt(999_999, 'sig-a'), false);
+
+  // releaseAutoAttempt is value-guarded on the current claim.
+  assertEquals(driftStatusQueries.releaseAutoAttempt(instanceId, 'sig-a'), false);
+  assertEquals(driftStatusQueries.releaseAutoAttempt(instanceId, 'sig-b'), true);
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastAutoAttemptSignature, null);
+});
+
+migratedTest('driftStatus.recordRemediation never overwrites a newer outcome with an older signature', async () => {
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(makeUpsertInput(instanceId, { driftSignature: 'sig-a' }));
+  const rec = { trigger: 'auto' as const, at: '2026-11-02T00:00:00.000Z', syncHistoryId: null };
+
+  // First record for any signature is allowed (nothing recorded yet).
+  assert(driftStatusQueries.recordRemediation(instanceId, { ...rec, status: 'failed', signature: 'sig-old' }));
+  // Current signature always records.
+  assert(driftStatusQueries.recordRemediation(instanceId, { ...rec, status: 'success', signature: 'sig-a' }));
+  // A late outcome for an older drift event is dropped.
+  assertEquals(
+    driftStatusQueries.recordRemediation(instanceId, { ...rec, status: 'failed', signature: 'sig-old' }),
+    false
+  );
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastRemediation.status, 'success');
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastRemediation.signature, 'sig-a');
+});
+
+migratedTest('driftRemediationPolicy: upsert/get round-trip, per arr_type', () => {
+  const radarrId = seedInstance('Radarr Policy');
+  const sonarrId = arrInstancesQueries.create({
+    name: 'Sonarr Policy',
+    type: 'sonarr',
+    url: 'http://localhost:8989',
+    apiKey: 'test-api-key',
+  });
+
+  const stored = driftRemediationPolicyQueries.upsert({
+    instanceId: radarrId,
+    arrType: 'radarr',
+    mode: 'auto',
+    allowedSections: ['qualityProfiles', 'mediaManagement'],
+  });
+  assertEquals(stored.mode, 'auto');
+  assertEquals(stored.allowedSections, ['qualityProfiles', 'mediaManagement']);
+  assert(stored.updatedAt !== null);
+  assertEquals(driftRemediationPolicyQueries.get(radarrId, 'radarr'), stored);
+  // A row stored for a different arr_type is never reused across Arr apps.
+  assertEquals(driftRemediationPolicyQueries.get(radarrId, 'sonarr').mode, 'off');
+
+  driftRemediationPolicyQueries.upsert({
+    instanceId: sonarrId,
+    arrType: 'sonarr',
+    mode: 'notify',
+    allowedSections: [],
+  });
+  assertEquals(driftRemediationPolicyQueries.get(sonarrId, 'sonarr').mode, 'notify');
+
+  // Upsert replaces (no second row) and can turn auto off.
+  driftRemediationPolicyQueries.upsert({ instanceId: radarrId, arrType: 'radarr', mode: 'off', allowedSections: [] });
+  assertEquals(driftRemediationPolicyQueries.get(radarrId, 'radarr').mode, 'off');
+  const count = db.queryFirst<{ count: number }>('SELECT COUNT(*) AS count FROM drift_remediation_policy');
+  assertEquals(count?.count, 2);
+
+  // Invalid mode is rejected by the CHECK constraint.
+  let threw = false;
+  try {
+    db.execute(
+      "INSERT INTO drift_remediation_policy (arr_instance_id, arr_type, mode) VALUES (?, 'radarr', 'always')",
+      radarrId + sonarrId + 1000
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw);
 });

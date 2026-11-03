@@ -727,6 +727,7 @@ SyncPreviewResult:
     - failure
     - sections
     - sectionOutcomes
+    - driftRemediation
     - qualityProfiles
     - delayProfiles
     - mediaManagement
@@ -793,5 +794,13 @@ SyncPreviewResult:
       oneOf:
         - $ref: '#/MetadataProfilesPreview'
         - type: null
+    driftRemediation:
+      oneOf:
+        - $ref: '../schemas/drift.yaml#/DriftRemediationLink'
+        - type: 'null'
+      description: |
+        Server-owned drift link, set only when the preview was created by
+        `POST /drift/{instanceId}/reconcile` or auto-remediation; null otherwise. Applying the
+        preview records the link on the resulting sync history entry. Never accepted from clients.
     summary:
       $ref: '#/SyncPreviewSummary'

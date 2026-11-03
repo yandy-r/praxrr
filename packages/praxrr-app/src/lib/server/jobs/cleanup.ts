@@ -38,6 +38,7 @@ export function deleteJobsForArrInstance(instanceId: number): JobQueueRecord[] {
     'arr.sync.delayProfiles',
     'arr.sync.mediaManagement',
     'arr.sync.metadataProfiles',
+    'drift.remediate',
   ];
 
   const jobs = jobQueueQueries

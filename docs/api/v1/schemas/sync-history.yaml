@@ -111,6 +111,9 @@ SyncHistoryEntry:
     - entityChangeCount
     - entityOutcomeCount
     - previewId
+    - driftSignature
+    - driftDetectedAt
+    - remediationTrigger
     - error
     - startedAt
     - finishedAt
@@ -169,6 +172,22 @@ SyncHistoryEntry:
         - type: string
         - type: 'null'
       description: The reviewed sync preview this run applied, when known (plan↔run correlation).
+    driftSignature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Drift signature this run remediated; null when the run was not a drift remediation.
+    driftDetectedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: When the remediated drift event was first detected; null when not a drift remediation.
+    remediationTrigger:
+      oneOf:
+        - $ref: '../schemas/drift.yaml#/DriftRemediationTrigger'
+        - type: 'null'
+      description: How the drift remediation was initiated; null when not a drift remediation.
     error:
       oneOf:
         - type: string

@@ -1,33 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
-import { getArrInstanceReviewClient, type ArrInstanceReviewClient } from '$arr/arrInstanceClients.ts';
-import { logger } from '$logger/logger.ts';
-import { isPluginsEnabled, pluginHost } from '$server/plugins/index.ts';
-import { buildCapabilityInput } from '$server/plugins/hostContext.ts';
-import { previewStore } from '$sync/preview/store.ts';
-import { PREVIEW_STATUS_FAILED, PREVIEW_STATUS_GENERATING } from '$sync/preview/store.ts';
-import {
-  generatePreview,
-  type GeneratePreviewInput,
-  type GeneratePreviewReviewOptions,
-  type GeneratePreviewWithReviewContextResult,
-} from '$sync/preview/orchestrator.ts';
-import { buildPreviewFailure, classifyPreviewFailure } from '$sync/preview/failureReason.ts';
-import { buildSyncPreviewReviewBinding, syncPreviewReviewTarget } from '$sync/preview/reviewBinding.ts';
 import { parseMediaManagementPreviewConfig, parseNamedProfilePreviewConfig } from '$sync/preview/sectionConfigs.ts';
 import { SYNC_SECTION_ORDER } from '$sync/mappings.ts';
+import { PREVIEW_REQUEST_BODY_LIMIT_BYTES } from '$sync/preview/limits.ts';
 import {
-  PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS,
-  PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS,
-  PREVIEW_MAX_SNAPSHOTS,
-  PREVIEW_REQUEST_BODY_LIMIT_BYTES,
-  registerPreviewCreateAttempt,
-} from '$sync/preview/limits.ts';
+  createReviewedPreview,
+  type CreateReviewedPreviewOutcome,
+  DEFAULT_SYNC_PREVIEW_CREATE_DEPENDENCIES,
+  type SyncPreviewCreateDependencies,
+} from '$sync/preview/create.ts';
 import type { SectionType } from '$sync/types.ts';
-import type { SyncPreviewArrType, SyncPreviewResult, SyncPreviewSummary } from '$sync/preview/types.ts';
-import { isSyncPreviewArrType } from '$sync/preview/types.ts';
-import { uuid } from '$shared/utils/uuid.ts';
+
+export type { SyncPreviewCreateDependencies };
 
 type ErrorResponse = {
   error: string;
@@ -41,36 +25,10 @@ type CreateRequestBody = {
   sectionConfigs?: unknown;
 };
 
-type CreatePreviewResult = {
-  previewId: string;
+type CreatePreviewRequest = {
   instanceId: number;
-  instanceName: string;
-  arrType: SyncPreviewArrType;
   sections: SectionType[] | undefined;
   sectionConfigs?: Partial<Record<SectionType, unknown>>;
-};
-
-/**
- * Injectable dependencies for the create handler. Mirrors the apply route's DI pattern so
- * tests can force secret-shaped / free-form generation failures without monkeypatching an
- * immutable ESM binding. Defaults call through dynamically so the existing tests that
- * reassign `arrInstancesQueries.getById` keep working.
- */
-export interface SyncPreviewCreateDependencies {
-  readonly generatePreview: (
-    input: GeneratePreviewInput,
-    options: GeneratePreviewReviewOptions
-  ) => Promise<GeneratePreviewWithReviewContextResult>;
-  readonly getInstanceById: typeof arrInstancesQueries.getById;
-  readonly getReviewClient: typeof getArrInstanceReviewClient;
-  readonly now: () => number;
-}
-
-const DEFAULT_CREATE_DEPENDENCIES: SyncPreviewCreateDependencies = {
-  generatePreview,
-  getInstanceById: (id: number) => arrInstancesQueries.getById(id),
-  getReviewClient: getArrInstanceReviewClient,
-  now: Date.now,
 };
 
 function parseSectionOrderValue(rawSections: unknown): SectionType[] | undefined {
@@ -142,7 +100,12 @@ function parseSectionConfigs(rawSectionConfigs: unknown): Partial<Record<Section
   return parsed;
 }
 
-function parseCreateRequest(body: unknown): CreatePreviewResult {
+/**
+ * Parse the public create body. Only `instanceId`, `sections` and `sectionConfigs` are read; any
+ * other key — notably a client-supplied `driftRemediation` — is ignored, because the drift link
+ * is server-owned (set only by the drift reconcile endpoint and the auto-remediation job).
+ */
+function parseCreateRequest(body: unknown): CreatePreviewRequest {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new Error('Request body must be an object');
   }
@@ -153,41 +116,9 @@ function parseCreateRequest(body: unknown): CreatePreviewResult {
   }
 
   return {
-    previewId: `preview_${instanceId}_${Date.now()}_${uuid()}`,
     instanceId,
-    instanceName: '',
-    arrType: 'radarr',
     sections: parseSectionOrderValue(sections),
     sectionConfigs: parseSectionConfigs(sectionConfigs),
-  };
-}
-
-function createInitialSummary(): SyncPreviewSummary {
-  return {
-    totalCreates: 0,
-    totalUpdates: 0,
-    totalDeletes: 0,
-    totalUnchanged: 0,
-  };
-}
-
-function createInitialPreview(request: CreatePreviewResult): SyncPreviewResult {
-  return {
-    id: request.previewId,
-    instanceId: request.instanceId,
-    instanceName: request.instanceName,
-    arrType: request.arrType,
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    status: PREVIEW_STATUS_GENERATING,
-    failure: null,
-    sections: request.sections ?? [],
-    sectionOutcomes: [],
-    qualityProfiles: null,
-    delayProfiles: null,
-    mediaManagement: null,
-    metadataProfiles: null,
-    summary: createInitialSummary(),
   };
 }
 
@@ -240,6 +171,18 @@ async function parseRequestBody(
   }
 }
 
+/** Map a {@link createReviewedPreview} outcome to its HTTP response (shared contract). */
+function outcomeResponse(outcome: CreateReviewedPreviewOutcome): Response {
+  switch (outcome.kind) {
+    case 'ok':
+      return json(outcome.preview);
+    case 'failed':
+      return json(outcome.preview, { status: 500 });
+    case 'rejected':
+      return json({ error: outcome.error } satisfies ErrorResponse, { status: outcome.status });
+  }
+}
+
 /**
  * POST /api/v1/sync/preview
  *
@@ -253,14 +196,14 @@ async function parseRequestBody(
  */
 export async function _handleSyncPreviewCreateRequest(
   request: Request,
-  dependencies: SyncPreviewCreateDependencies = DEFAULT_CREATE_DEPENDENCIES
+  dependencies: SyncPreviewCreateDependencies = DEFAULT_SYNC_PREVIEW_CREATE_DEPENDENCIES
 ): Promise<Response> {
   const requestBody = await parseRequestBody(request);
   if (!requestBody.ok) {
     return requestBody.response;
   }
 
-  let requestPayload: CreatePreviewResult;
+  let requestPayload: CreatePreviewRequest;
   try {
     requestPayload = parseCreateRequest(requestBody.body);
   } catch (error) {
@@ -268,168 +211,15 @@ export async function _handleSyncPreviewCreateRequest(
     return json({ error: message } satisfies ErrorResponse, { status: 400 });
   }
 
-  const instance = dependencies.getInstanceById(requestPayload.instanceId);
-  if (!instance) {
-    return json({ error: 'Instance not found' } satisfies ErrorResponse, { status: 404 });
-  }
-
-  if (!isSyncPreviewArrType(instance.type)) {
-    return json({ error: `Unsupported instance type: ${instance.type}` } satisfies ErrorResponse, { status: 400 });
-  }
-
-  if (!instance.enabled) {
-    return json({ error: 'Instance is disabled' } satisfies ErrorResponse, { status: 400 });
-  }
-
-  const nowMs = dependencies.now();
-  previewStore.cleanup(nowMs);
-  if (previewStore.getSize() >= PREVIEW_MAX_SNAPSHOTS) {
-    return json(
-      {
-        error: `Preview store is at capacity (${PREVIEW_MAX_SNAPSHOTS}). Retry after previews expire.`,
-      } satisfies ErrorResponse,
-      { status: 429 }
-    );
-  }
-
-  const isRateLimited = !registerPreviewCreateAttempt(requestPayload.instanceId, nowMs);
-  if (isRateLimited) {
-    const windowSeconds = Math.floor(PREVIEW_CREATE_RATE_LIMIT_WINDOW_MS / 1000);
-    return json(
-      {
-        error: `Too many preview requests. Limit is ${PREVIEW_CREATE_RATE_LIMIT_MAX_REQUESTS} per ${windowSeconds} seconds.`,
-      } satisfies ErrorResponse,
-      { status: 429 }
-    );
-  }
-
-  requestPayload = {
-    ...requestPayload,
-    instanceName: instance.name,
-    arrType: instance.type,
-  };
-
-  const initialPreview = createInitialPreview(requestPayload);
-  let storedPreview = previewStore.create(initialPreview, nowMs);
-
-  await logger.info('Generating sync preview', {
-    source: 'SyncPreview',
-    meta: {
-      previewId: storedPreview.id,
+  const outcome = await createReviewedPreview(
+    {
       instanceId: requestPayload.instanceId,
-      instanceName: requestPayload.instanceName,
-      instanceType: instance.type,
+      sections: requestPayload.sections,
+      sectionConfigs: requestPayload.sectionConfigs,
     },
-  });
-
-  const requestedSections = requestPayload.sections?.length ? requestPayload.sections : undefined;
-
-  let reviewClient: ArrInstanceReviewClient | null = null;
-  try {
-    reviewClient = await dependencies.getReviewClient(instance.type, instance);
-    const { preview: generated, reviewContext } = await dependencies.generatePreview(
-      {
-        instance,
-        sections: requestedSections,
-        sectionConfigs: requestPayload.sectionConfigs,
-        nowMs,
-      },
-      { captureReviewContext: true, client: reviewClient.client }
-    );
-
-    if (isPluginsEnabled()) {
-      try {
-        await pluginHost.notifyObservers('sync.previewComputed.observe', () =>
-          buildCapabilityInput('read:sync-preview', generated)
-        );
-      } catch (error) {
-        await logger.warn('sync.previewComputed.observe dispatch failed at call-site', {
-          source: 'Plugins',
-          meta: { previewId: storedPreview.id, instanceId: requestPayload.instanceId, error: String(error) },
-        });
-      }
-    }
-
-    // Preserve successful-section evidence: a partial generation stays `ready` (successful
-    // sections keep their diffs) but carries a typed top-level `sectionErrors` reason so apply
-    // requires a clean regenerate — mirroring the prior top-level error-count gate, without raw text.
-    const hasFailedSection = generated.sectionOutcomes.some((outcome) => outcome.failure !== null);
-    const topLevelFailure = hasFailedSection ? buildPreviewFailure('sectionErrors', requestPayload.arrType) : null;
-
-    const eligibleSections = generated.sections.filter((section) =>
-      generated.sectionOutcomes.some(
-        (outcome) => outcome.section === section && outcome.failure === null && !outcome.skipped
-      )
-    );
-    const generationPatch = {
-      sections: generated.sections,
-      sectionOutcomes: generated.sectionOutcomes,
-      qualityProfiles: generated.qualityProfiles,
-      delayProfiles: generated.delayProfiles,
-      mediaManagement: generated.mediaManagement,
-      metadataProfiles: generated.metadataProfiles,
-      summary: generated.summary,
-      failure: topLevelFailure,
-      instanceName: generated.instanceName,
-    };
-
-    if (eligibleSections.length === 0 && hasFailedSection) {
-      storedPreview = previewStore.updateResult(storedPreview.id, {
-        ...generationPatch,
-        status: PREVIEW_STATUS_FAILED,
-      })!;
-      if (!storedPreview) {
-        return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
-      }
-      return json(storedPreview, { status: 500 });
-    }
-
-    if (eligibleSections.length === 0) {
-      storedPreview = previewStore.completeNonApplicableGeneration(storedPreview.id, generationPatch)!;
-    } else {
-      const binding = await buildSyncPreviewReviewBinding({
-        instanceId: generated.instanceId,
-        arrType: generated.arrType,
-        target: syncPreviewReviewTarget(instance, reviewClient.credentialIdentity),
-        sections: eligibleSections,
-        sectionConfigs: reviewContext.sectionConfigs,
-        evidence: reviewContext.evidence,
-      });
-
-      storedPreview = previewStore.completeGeneration(storedPreview.id, generationPatch, binding)!;
-    }
-
-    if (!storedPreview) {
-      return json({ error: 'Failed to persist preview result' } satisfies ErrorResponse, { status: 500 });
-    }
-
-    return json(storedPreview);
-  } catch (error) {
-    // Classify by error TYPE only; the raw message never reaches the response or the
-    // stored snapshot — it is recorded solely on the sanitized logger boundary below.
-    const failure = classifyPreviewFailure(error, requestPayload.arrType);
-
-    const failedPreview = previewStore.updateResult(storedPreview.id, {
-      status: PREVIEW_STATUS_FAILED,
-      failure,
-    });
-
-    await logger.error('Failed to generate sync preview', {
-      source: 'SyncPreview',
-      meta: {
-        previewId: storedPreview.id,
-        instanceId: requestPayload.instanceId,
-        instanceName: requestPayload.instanceName,
-        failureCode: failure.code,
-        error: error instanceof Error ? error.message : String(error),
-      },
-    });
-
-    // Return the failed snapshot (status 'failed' + typed, safe failure) — never raw text.
-    return json(failedPreview ?? { ...storedPreview, status: PREVIEW_STATUS_FAILED, failure }, { status: 500 });
-  } finally {
-    reviewClient?.client.close();
-  }
+    dependencies
+  );
+  return outcomeResponse(outcome);
 }
 
 export const POST: RequestHandler = ({ request }) => _handleSyncPreviewCreateRequest(request);

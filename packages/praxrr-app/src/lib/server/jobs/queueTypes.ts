@@ -22,6 +22,7 @@ export const JOB_TYPES = [
   'backup.cleanup',
   'logs.cleanup',
   'drift.check',
+  'drift.remediate',
   'sync.history.cleanup',
   'sync.canary.rollout',
   'config-health.snapshot',
@@ -174,6 +175,15 @@ export interface DriftCheckJobPayload {
   cursor?: number;
 }
 
+/**
+ * Payload for one opt-in drift auto-remediation attempt. `driftSignature` pins the drift
+ * event the job was queued for; the handler cancels when the stored signature has moved on.
+ */
+export interface DriftRemediateJobPayload {
+  instanceId: number;
+  driftSignature: string;
+}
+
 export interface CanaryRolloutJobPayload {
   rolloutId: number;
 }
@@ -193,6 +203,7 @@ export interface JobPayloadByType {
   'backup.cleanup': ArrSyncCleanupOnlyPayload;
   'logs.cleanup': ArrSyncCleanupOnlyPayload;
   'drift.check': DriftCheckJobPayload;
+  'drift.remediate': DriftRemediateJobPayload;
   'sync.history.cleanup': ArrSyncCleanupOnlyPayload;
   'sync.canary.rollout': CanaryRolloutJobPayload;
   'config-health.snapshot': ArrSyncCleanupOnlyPayload;

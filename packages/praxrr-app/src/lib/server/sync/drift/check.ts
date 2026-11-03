@@ -276,26 +276,62 @@ function stableHash(input: string): string {
 }
 
 /**
- * Stable hash over the sorted ALERTING (update+create) changes only, each remoteId-qualified
- * so two same-named managed entities from different databases do not collapse. `null` when
- * there is no alerting drift. `prune` and `unmanaged` deletes are excluded so planned removal
- * and unmanaged churn never perturb the notification dedup key.
+ * Stable per-entity drift token, remoteId-qualified so two same-named managed entities from
+ * different databases do not collapse. Used as the signature token and as the ack key.
  */
-export function driftSignature(changes: readonly DriftEntityChange[]): string | null {
-  const tokens = changes
-    .filter(
-      (change) =>
-        (change.category === 'drift' || change.category === 'missing') &&
-        (change.action === 'update' || change.action === 'create')
-    )
-    .map(
-      (change) => `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`
-    )
-    .sort();
-  if (tokens.length === 0) {
+export function driftEntityKey(change: DriftEntityChange): string {
+  return `${change.section}|${change.entityType}|${change.name}|${change.remoteId ?? 'new'}|${change.action}`;
+}
+
+/** Stable hash over a set of entity keys (order-insensitive); `null` when the set is empty. */
+export function signatureOfKeys(keys: readonly string[]): string | null {
+  if (keys.length === 0) {
     return null;
   }
-  return stableHash(tokens.join('\n'));
+  return stableHash([...keys].sort().join('\n'));
+}
+
+/** Deterministic JSON (sorted object keys; `undefined` dropped / `null` in arrays, as JSON does). */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value) ?? 'null';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const entries = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`);
+  return `{${entries.join(',')}}`;
+}
+
+/**
+ * Content fingerprint of one change: its {@link driftEntityKey} plus its field-level diff. An entity
+ * acknowledgement stays valid only while the fingerprint matches, so a NEW field change on an
+ * acknowledged entity (same key) is no longer suppressed. Stable across the JSON round-trip of the
+ * stored `changes` blob.
+ */
+export function driftEntityFingerprint(change: DriftEntityChange): string {
+  return stableHash(`${driftEntityKey(change)}\n${canonicalJson(change.fields)}`);
+}
+
+/**
+ * Stable hash over the sorted ALERTING (update+create) changes only (see {@link driftEntityKey}).
+ * `null` when there is no alerting drift. `prune` and `unmanaged` deletes are excluded so planned
+ * removal and unmanaged churn never perturb the notification dedup key.
+ */
+export function driftSignature(changes: readonly DriftEntityChange[]): string | null {
+  return signatureOfKeys(
+    changes
+      .filter(
+        (change) =>
+          (change.category === 'drift' || change.category === 'missing') &&
+          (change.action === 'update' || change.action === 'create')
+      )
+      .map(driftEntityKey)
+  );
 }
 
 // ============================================================================

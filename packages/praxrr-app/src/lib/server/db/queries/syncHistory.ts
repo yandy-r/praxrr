@@ -1,5 +1,6 @@
 import { db } from '../db.ts';
 import type {
+  DriftRemediationTrigger,
   SyncEntityChange,
   SyncEntityOutcome,
   SyncHistoryInput,
@@ -39,6 +40,9 @@ export interface SyncHistoryRow {
   finished_at: string | null;
   duration_ms: number | null;
   created_at: string;
+  drift_signature: string | null;
+  drift_detected_at: string | null;
+  remediation_trigger: string | null;
 }
 
 /**
@@ -66,6 +70,10 @@ export interface SyncHistorySummary {
   finishedAt: string | null;
   durationMs: number | null;
   createdAt: string;
+  /** Drift link (reconcile/auto remediation runs only; null otherwise). */
+  driftSignature: string | null;
+  driftDetectedAt: string | null;
+  remediationTrigger: DriftRemediationTrigger | null;
 }
 
 /**
@@ -100,7 +108,8 @@ export interface Pagination {
 
 const SUMMARY_COLUMNS = `id, arr_instance_id, instance_name, arr_type, job_id, trigger, trigger_event,
 	sections_attempted, status, sections_run, items_synced, failure_count, entity_change_count,
-	entity_outcome_count, preview_id, error, started_at, finished_at, duration_ms, created_at`;
+	entity_outcome_count, preview_id, error, started_at, finished_at, duration_ms, created_at,
+	drift_signature, drift_detected_at, remediation_trigger`;
 
 function parseJsonArray<T>(raw: string): T[] {
   try {
@@ -133,6 +142,9 @@ function rowToSummary(row: SyncHistoryRow): SyncHistorySummary {
     finishedAt: row.finished_at,
     durationMs: row.duration_ms,
     createdAt: row.created_at,
+    driftSignature: row.drift_signature,
+    driftDetectedAt: row.drift_detected_at,
+    remediationTrigger: (row.remediation_trigger as DriftRemediationTrigger | null) ?? null,
   };
 }
 
@@ -213,8 +225,9 @@ export const syncHistoryQueries = {
 				arr_instance_id, instance_name, arr_type, job_id, trigger, trigger_event,
 				sections_attempted, status, sections_run, items_synced, failure_count,
 				entity_change_count, entity_outcome_count, section_results, changes, entity_outcomes,
-				preview_id, error, started_at, finished_at, duration_ms
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				preview_id, error, started_at, finished_at, duration_ms,
+				drift_signature, drift_detected_at, remediation_trigger
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       safe.arrInstanceId,
       safe.instanceName,
       safe.arrType,
@@ -235,7 +248,10 @@ export const syncHistoryQueries = {
       safe.error,
       safe.startedAt,
       safe.finishedAt,
-      safe.durationMs
+      safe.durationMs,
+      safe.driftLink?.driftSignature ?? null,
+      safe.driftLink?.driftDetectedAt ?? null,
+      safe.driftLink?.trigger ?? null
     );
     const row = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() AS id');
     return row?.id ?? 0;

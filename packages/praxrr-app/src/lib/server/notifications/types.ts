@@ -39,6 +39,9 @@ export const NotificationTypes = {
 
   // Drift
   DRIFT_DETECTED: 'drift.detected',
+  DRIFT_REMEDIATION_APPLIED: 'drift.remediation.applied',
+  DRIFT_REMEDIATION_FAILED: 'drift.remediation.failed',
+  DRIFT_REMEDIATION_HELD: 'drift.remediation.held',
 
   // Config Health
   HEALTH_DEGRADED: 'health.degraded',

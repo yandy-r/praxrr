@@ -41,10 +41,16 @@ const SYNC_APPLY_ROUTES: readonly RegExp[] = [
 ];
 
 /**
- * Dry-run POST routes that change no Arr instance, PCD op, or setting: sync preview create stores
- * only an ephemeral in-memory preview; goals preview compiles into a throwaway sandbox cache.
+ * Dry-run POST routes that change no Arr instance, PCD op, or setting: sync preview create and
+ * drift reconcile store only an ephemeral in-memory preview; goals preview compiles into a
+ * throwaway sandbox cache. Applying a reconcile preview still needs `sync:apply`. Drift
+ * suppression / remediation-policy PUTs deliberately match no rule (fail-closed `admin`).
  */
-const READ_POST_ROUTES: readonly RegExp[] = [/^\/api\/v1\/sync\/preview\/?$/, /^\/api\/v1\/goals\/preview\/?$/];
+const READ_POST_ROUTES: readonly RegExp[] = [
+  /^\/api\/v1\/sync\/preview\/?$/,
+  /^\/api\/v1\/goals\/preview\/?$/,
+  new RegExp(`^/api/v1/drift/${SEGMENT}/reconcile/?$`),
+];
 
 /** Scope a token needs for this request. Fail-closed: unknown mutating routes need `admin`. */
 export function requiredScopeFor(method: string, pathname: string): ApiTokenScope {

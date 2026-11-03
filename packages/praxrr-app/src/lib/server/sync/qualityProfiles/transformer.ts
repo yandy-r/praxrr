@@ -77,7 +77,8 @@ export interface QualityProfileComparablePayload {
   minFormatScore: number;
   cutoffFormatScore: number;
   minUpgradeFormatScore: number;
-  formatItems: QualityProfileFormatItem[];
+  /** Keyed by `format` id; `name` is excluded (see `normalizeQualityProfileForPreview`). */
+  formatItems: { format: number; score: number }[];
 }
 
 // =============================================================================
@@ -264,14 +265,41 @@ export function transformQualityProfileWithSuffix(
 }
 
 /**
- * Normalize quality profile payloads for deterministic preview diffing.
+ * Radarr GET returns `quality.modifier` on every profile item, but the transformer never emits it
+ * (it is Arr-owned quality metadata, not a profile setting). Sonarr qualities have no modifier, so
+ * nothing is stripped for Sonarr and any unexpected field there still diffs.
+ */
+function normalizeQualityItemForPreview(item: ArrQualityProfileItem, arrType: SyncArrType): ArrQualityProfileItem {
+  const children = Array.isArray(item.items) ? item.items : [];
+  let quality = item.quality;
+  if (arrType === 'radarr' && quality && 'modifier' in quality) {
+    const { modifier: _modifier, ...rest } = quality as typeof quality & { modifier?: unknown };
+    quality = rest;
+  }
+  return {
+    ...item,
+    ...(quality && { quality }),
+    items: children.map((child) => normalizeQualityItemForPreview(child, arrType)),
+  };
+}
+
+/**
+ * Normalize a desired payload or an Arr GET quality profile for deterministic preview diffing.
+ *
+ * `formatItems` compare by `format` id and `score` only: desired explicit scores carry the bare PCD
+ * CF name while Arr reports the namespaced Arr name, and Arr resolves format items by id (the name
+ * is ignored on write). Score changes and added/removed formats stay detectable through the
+ * `formatItems` key strategy.
  */
 export function normalizeQualityProfileForPreview(
-  profile: QualityProfileComparableInput
+  profile: QualityProfileComparableInput,
+  arrType: SyncArrType
 ): QualityProfileComparablePayload {
+  const items = Array.isArray(profile.items) ? (profile.items as ArrQualityProfileItem[]) : [];
+  const formatItems = Array.isArray(profile.formatItems) ? (profile.formatItems as QualityProfileFormatItem[]) : [];
   return {
     name: profile.name ?? '',
-    items: Array.isArray(profile.items) ? profile.items : [],
+    items: items.map((item) => normalizeQualityItemForPreview(item, arrType)),
     language: profile.language,
     upgradeAllowed: profile.upgradeAllowed ?? false,
     cutoff: profile.cutoff ?? 0,
@@ -279,7 +307,7 @@ export function normalizeQualityProfileForPreview(
     cutoffFormatScore: profile.cutoffFormatScore ?? 0,
     minUpgradeFormatScore:
       profile.minUpgradeFormatScore && profile.minUpgradeFormatScore > 0 ? profile.minUpgradeFormatScore : 1,
-    formatItems: Array.isArray(profile.formatItems) ? profile.formatItems : [],
+    formatItems: formatItems.map((item) => ({ format: item.format, score: item.score })),
   };
 }
 

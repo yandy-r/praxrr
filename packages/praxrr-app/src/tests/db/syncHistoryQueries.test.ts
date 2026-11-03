@@ -75,6 +75,7 @@ function makeInput(instanceId: number, overrides: Partial<SyncHistoryInput> = {}
     startedAt: '2026-07-08T10:00:00.000Z',
     finishedAt: '2026-07-08T10:00:05.000Z',
     durationMs: 5000,
+    driftLink: null,
     ...overrides,
   };
 }
@@ -113,6 +114,9 @@ migratedTest('sync_history migration registers all columns via PRAGMA table_info
     'finished_at',
     'duration_ms',
     'created_at',
+    'drift_signature',
+    'drift_detected_at',
+    'remediation_trigger',
   ];
   for (const name of expected) {
     assert(byName.has(name), `expected sync_history to have column ${name}`);

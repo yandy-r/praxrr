@@ -277,6 +277,12 @@ Deno.test('requiredScopeFor maps routes to scopes and fails closed', () => {
     ['GET', '/api/v1/search', 'read'],
     ['GET', '/api/v1/ui-preferences/command-palette-recents', 'read'],
     ['PUT', '/api/v1/ui-preferences/command-palette-recents', 'admin'],
+    // Drift remediation (YAN-514): reconcile is a dry-run preview; suppression/policy writes are admin.
+    ['POST', '/api/v1/drift/7/reconcile', 'read'],
+    ['GET', '/api/v1/drift/7/remediation-policy', 'read'],
+    ['PUT', '/api/v1/drift/7/remediation-policy', 'admin'],
+    ['PUT', '/api/v1/drift/7/suppression', 'admin'],
+    ['POST', '/api/v1/drift/7', 'admin'],
     // Anchored segments: siblings and deeper paths do not inherit a weaker scope.
     ['POST', '/api/v1/sync/preview/x/apply/extra', 'admin'],
     ['POST', '/api/v1/goals/preview-and-apply', 'admin'],
@@ -284,6 +290,8 @@ Deno.test('requiredScopeFor maps routes to scopes and fails closed', () => {
     ['DELETE', '/api/v1/sync/preview/abc', 'admin'],
     ['PUT', '/api/v1/canary/settings', 'admin'],
     ['POST', '/api/v1/goals/reconcile', 'admin'],
+    ['POST', '/api/v1/drift/7/reconcile/extra', 'admin'],
+    ['PUT', '/api/v1/drift/7/reconcile', 'admin'],
     ['POST', '/api/v1/unknown', 'admin'],
     ['POST', '/api/databases/1/generate-commit-message', 'admin'],
   ];

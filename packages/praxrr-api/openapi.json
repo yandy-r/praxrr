@@ -4731,6 +4731,338 @@
         }
       }
     },
+    "/drift/{instanceId}/reconcile": {
+      "post": {
+        "operationId": "reconcileDrift",
+        "summary": "Create a drift-tagged reviewed preview for the drifted sections",
+        "description": "Builds a reviewed sync preview limited to the instance's drifted sections (those with\n`drift` or `missing` changes that are configured and version-available). The optional\n`sections` body narrows that set; it never widens it. The returned preview carries a\nserver-owned `driftRemediation` link, so applying it through\n`POST /sync/preview/{previewId}/apply` records a sync history entry linked to the drift\nevent. Performs no Arr writes (dry run, `read` token scope).\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriftReconcileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Drift-tagged preview generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or body, unsupported or disabled instance, or a requested section\nthat is not drifted\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API token lacks the `read` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The instance is not `drifted` or its stored drift content is stale",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Preview creation is rate-limited or preview-store capacity is exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Preview generation failed. The failed preview snapshot is returned with\n`status: failed` and a typed, safe `failure` reason — no raw exception text.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPreviewResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drift/{instanceId}/suppression": {
+      "put": {
+        "operationId": "updateDriftSuppression",
+        "summary": "Acknowledge or snooze drift for one instance",
+        "description": "Replaces the instance's acknowledgement and snooze state. An instance acknowledgement\nlasts until the drift signature changes; per-entity acknowledgements are pruned when the\nentity stops drifting; a snooze lasts until `snoozedUntil` regardless of signature\nchanges. Suppression mutes drift notifications and the health penalty only — the stored\ndrift status is unchanged. Requires the `admin` token scope.\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriftSuppressionUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated drift detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or body: unknown entity key, snooze in the past or more than 90\ndays ahead, or an acknowledgement while the instance is not drifted\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API token lacks the `admin` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The stored drift signature no longer matches `expectedSignature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update drift suppression",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drift/{instanceId}/remediation-policy": {
+      "get": {
+        "operationId": "getDriftRemediationPolicy",
+        "summary": "Get the drift remediation policy for one instance",
+        "description": "Returns the instance's drift remediation policy. When no policy is stored the default\n(`mode: off`, no sections, `updatedAt: null`) is returned.\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Drift remediation policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftRemediationPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or unsupported instance type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to read drift remediation policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateDriftRemediationPolicy",
+        "summary": "Update the drift remediation policy for one instance",
+        "description": "Sets the remediation mode and the sections auto-remediation may write. `auto` requires a\nnon-empty `allowedSections`; every section must be supported for the instance's Arr type.\nRequires the `admin` token scope.\n",
+        "tags": ["Drift Detection"],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "description": "Arr instance ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriftRemediationPolicyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated drift remediation policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftRemediationPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid instance id or body: `auto` with no sections, a section unsupported for the\ninstance's Arr type, or duplicate sections\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API token lacks the `admin` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update drift remediation policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/drift/settings": {
       "put": {
         "operationId": "updateDriftSettings",
@@ -10342,6 +10674,7 @@
           "failure",
           "sections",
           "sectionOutcomes",
+          "driftRemediation",
           "qualityProfiles",
           "delayProfiles",
           "mediaManagement",
@@ -10443,6 +10776,17 @@
                 "type": null
               }
             ]
+          },
+          "driftRemediation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftRemediationLink"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Server-owned drift link, set only when the preview was created by\n`POST /drift/{instanceId}/reconcile` or auto-remediation; null otherwise. Applying the\npreview records the link on the resulting sync history entry. Never accepted from clients.\n"
           },
           "summary": {
             "$ref": "#/components/schemas/SyncPreviewSummary"
@@ -10552,8 +10896,12 @@
       },
       "DriftEntityChange": {
         "type": "object",
-        "required": ["section", "entityType", "name", "action", "category", "remoteId", "fields"],
+        "required": ["key", "section", "entityType", "name", "action", "category", "remoteId", "fields"],
         "properties": {
+          "key": {
+            "type": "string",
+            "description": "Stable per-entity drift key (`section|entityType|name|remoteId|action`), computed at\nresponse time. Used as the per-entity acknowledgement identifier in\n`DriftSuppressionUpdateRequest.acknowledgedEntityKeys`.\n"
+          },
           "section": {
             "$ref": "#/components/schemas/SyncPreviewSection"
           },
@@ -10597,7 +10945,9 @@
           "detectedVersion",
           "counts",
           "checkedAt",
-          "contentCheckedAt"
+          "contentCheckedAt",
+          "suppression",
+          "remediationMode"
         ],
         "properties": {
           "instanceId": {
@@ -10657,6 +11007,12 @@
                 "type": "null"
               }
             ]
+          },
+          "suppression": {
+            "$ref": "#/components/schemas/DriftSuppressionState"
+          },
+          "remediationMode": {
+            "$ref": "#/components/schemas/DriftRemediationMode"
           }
         }
       },
@@ -10728,7 +11084,13 @@
           "drift",
           "missing",
           "unmanaged",
-          "prune"
+          "prune",
+          "driftSignature",
+          "driftDetectedAt",
+          "suppression",
+          "remediationPolicy",
+          "lastRemediation",
+          "reconcilableSections"
         ],
         "properties": {
           "instanceId": {
@@ -10816,6 +11178,45 @@
             "items": {
               "$ref": "#/components/schemas/DriftEntityChange"
             }
+          },
+          "driftSignature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable hash of the stored alerting changes; null when nothing alerts."
+          },
+          "driftDetectedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First content refresh that observed the current `driftSignature`. Together with the\ninstance id and signature it identifies the drift event a remediation is linked to.\n"
+          },
+          "suppression": {
+            "$ref": "#/components/schemas/DriftSuppression"
+          },
+          "remediationPolicy": {
+            "$ref": "#/components/schemas/DriftRemediationPolicy"
+          },
+          "lastRemediation": {
+            "$ref": "#/components/schemas/DriftRemediationRecord"
+          },
+          "reconcilableSections": {
+            "type": "array",
+            "description": "Sections with drifted or missing changes that are configured and version-available for\nthis instance. Empty when nothing can be reconciled.\n",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
           }
         }
       },
@@ -10829,6 +11230,300 @@
             "type": "integer",
             "minimum": 5,
             "maximum": 525600
+          }
+        }
+      },
+      "DriftRemediationMode": {
+        "type": "string",
+        "enum": ["off", "notify", "auto"],
+        "description": "Per-instance drift remediation policy mode:\n- `off` (default, also when no policy is stored): no remediation; drift notifications are unchanged.\n- `notify`: drift notifications suggest a reconcile for the allowed sections; nothing is written.\n- `auto`: drifted, allowed, un-acknowledged sections are reconciled through a reviewed\n  preview and apply. Never deletes, never writes unless the instance is `drifted`, and\n  holds for a human when Canary gating applies.\n"
+      },
+      "DriftRemediationTrigger": {
+        "type": "string",
+        "enum": ["reconcile", "auto"],
+        "description": "How a drift remediation was initiated (manual reconcile or auto-remediation)."
+      },
+      "DriftRemediationStatus": {
+        "type": "string",
+        "enum": ["success", "partial", "failed", "skipped", "held_canary"],
+        "description": "Outcome of the latest drift remediation. `held_canary` means auto-remediation was held\nfor a human because Canary gating applies to this instance.\n"
+      },
+      "DriftSuppressionState": {
+        "type": "string",
+        "enum": ["none", "acknowledged", "snoozed", "partially_acknowledged"],
+        "description": "Derived suppression overlay. The stored drift status stays `drifted`; suppression only\nmutes notifications and the health penalty.\n"
+      },
+      "DriftSuppression": {
+        "type": "object",
+        "required": [
+          "state",
+          "acknowledgedSignature",
+          "acknowledgedAt",
+          "acknowledgedEntityKeys",
+          "snoozedUntil",
+          "effectiveDrifted",
+          "effectiveMissing",
+          "effectiveSignature"
+        ],
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/DriftSuppressionState"
+          },
+          "acknowledgedSignature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active instance-level acknowledgement: a content signature over the alerting changes\n(entity keys plus field-level diffs) the user reviewed. Null when no instance ack is\nactive; it ends when any alerting change is added, removed, or edited.\n"
+          },
+          "acknowledgedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "acknowledgedEntityKeys": {
+            "type": "array",
+            "description": "Keys (`DriftEntityChange.key`) of the active per-entity acknowledgements. An entity ack\ncovers the field-level diff reviewed at ack time and ends when that entity's diff changes.\n",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snoozedUntil": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snooze expiry; only present while still in the future."
+          },
+          "effectiveDrifted": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Drifted changes not covered by an acknowledgement or snooze."
+          },
+          "effectiveMissing": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Missing changes not covered by an acknowledgement or snooze."
+          },
+          "effectiveSignature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hash over un-acknowledged alerting keys; null when nothing alerts."
+          }
+        }
+      },
+      "DriftRemediationPolicy": {
+        "type": "object",
+        "required": ["instanceId", "arrType", "mode", "allowedSections", "updatedAt"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "arrType": {
+            "type": "string",
+            "enum": ["radarr", "sonarr", "lidarr"]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/DriftRemediationMode"
+          },
+          "allowedSections": {
+            "type": "array",
+            "description": "Sections auto-remediation may write; validated per `arrType`.",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          },
+          "updatedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when no policy is stored and the default (`off`) is synthesized."
+          }
+        }
+      },
+      "DriftRemediationPolicyUpdateRequest": {
+        "type": "object",
+        "required": ["mode", "allowedSections"],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/DriftRemediationMode"
+          },
+          "allowedSections": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Sections auto-remediation may write. Must be non-empty when `mode` is `auto`; every\nsection must be supported for the instance's `arrType`; duplicates are rejected.\n",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
+          }
+        }
+      },
+      "DriftRemediationRecord": {
+        "type": "object",
+        "required": ["trigger", "status", "signature", "at", "syncHistoryId"],
+        "properties": {
+          "trigger": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftRemediationTrigger"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftRemediationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Drift signature the latest remediation targeted."
+          },
+          "at": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "syncHistoryId": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Linked sync history entry; null when none was recorded or it was pruned."
+          }
+        }
+      },
+      "DriftRemediationLink": {
+        "type": "object",
+        "required": ["instanceId", "driftSignature", "driftDetectedAt", "trigger"],
+        "properties": {
+          "instanceId": {
+            "type": "integer"
+          },
+          "driftSignature": {
+            "type": "string"
+          },
+          "driftDetectedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/DriftRemediationTrigger"
+          }
+        },
+        "description": "Server-owned link from a reviewed preview (and the sync history it produces) to the drift\nevent it remediates. Never accepted from clients.\n"
+      },
+      "DriftSuppressionUpdateRequest": {
+        "type": "object",
+        "required": ["expectedSignature", "acknowledgeInstance", "acknowledgedEntityKeys", "snoozedUntil"],
+        "properties": {
+          "expectedSignature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The `driftSignature` the client reviewed. The update is rejected with 409 when the\nstored signature has changed.\n"
+          },
+          "acknowledgeInstance": {
+            "type": "boolean",
+            "description": "Acknowledge the whole current drift signature (requires status `drifted`)."
+          },
+          "acknowledgedEntityKeys": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Full replacement set of acknowledged entity keys; each must be a current alerting key.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snoozedUntil": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snooze expiry; must be in the future and at most 90 days ahead. Null clears it."
+          }
+        },
+        "description": "Replaces the instance's acknowledgement and snooze state."
+      },
+      "DriftReconcileRequest": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "uniqueItems": true,
+            "minItems": 1,
+            "description": "Optional narrowing of the reconcile to these sections. Each must have drifted or missing\nchanges; it never widens the drifted section set.\n",
+            "items": {
+              "$ref": "#/components/schemas/SyncPreviewSection"
+            }
           }
         }
       },
@@ -10944,6 +11639,9 @@
           "entityChangeCount",
           "entityOutcomeCount",
           "previewId",
+          "driftSignature",
+          "driftDetectedAt",
+          "remediationTrigger",
           "error",
           "startedAt",
           "finishedAt",
@@ -11035,6 +11733,40 @@
               }
             ],
             "description": "The reviewed sync preview this run applied, when known (plan↔run correlation)."
+          },
+          "driftSignature": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Drift signature this run remediated; null when the run was not a drift remediation."
+          },
+          "driftDetectedAt": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the remediated drift event was first detected; null when not a drift remediation."
+          },
+          "remediationTrigger": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DriftRemediationTrigger"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the drift remediation was initiated; null when not a drift remediation."
           },
           "error": {
             "oneOf": [
@@ -11467,6 +12199,7 @@
           "backup.cleanup",
           "logs.cleanup",
           "drift.check",
+          "drift.remediate",
           "sync.history.cleanup",
           "sync.canary.rollout",
           "config-health.snapshot",

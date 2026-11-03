@@ -401,6 +401,8 @@ export class SyncPreviewStore {
       status: nextStatus,
       createdAt: entry.snapshot.createdAt,
       expiresAt: entry.snapshot.expiresAt,
+      // Server-owned drift link is fixed at create; no later patch can attach or rewrite it.
+      driftRemediation: entry.snapshot.driftRemediation ?? null,
     };
   }
 
@@ -409,9 +411,14 @@ export class SyncPreviewStore {
    * Returns the snapshot persisted with explicit createdAt/expiresAt values.
    */
   create(input: SyncPreviewCreateInput, nowMs: number = Date.now()): SyncPreviewResult {
+    const driftRemediation = input.driftRemediation ?? null;
+    if (driftRemediation !== null && driftRemediation.instanceId !== input.instanceId) {
+      throw new TypeError('Drift remediation link must target the preview instance');
+    }
     const createdAt = new Date(nowMs);
     const preview: SyncPreviewResult = {
       ...input,
+      driftRemediation: driftRemediation === null ? null : Object.freeze({ ...driftRemediation }),
       createdAt: createdAt.toISOString(),
       expiresAt: new Date(nowMs + this.ttlMs).toISOString(),
     };

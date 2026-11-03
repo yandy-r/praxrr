@@ -108,6 +108,7 @@ function insertRow(arrInstanceId: number, arrType: SyncPreviewArrType, startedAt
     startedAt,
     finishedAt: startedAt,
     durationMs: 10,
+    driftLink: null,
   });
 }
 

@@ -116,7 +116,9 @@ changes applied. Export as JSON or CSV.
 ### Drift detection
 
 Scheduled checks compare each instance's live configuration with the resolved PCD state and flag
-drifted, missing, or unmanaged entities.
+drifted, missing, or unmanaged entities. On an instance's drift page you can reconcile the drifted
+sections through a reviewed preview, acknowledge or snooze an intentional divergence, and opt in to
+per-instance auto-remediation ([details](/app/sync-pipeline/#drift-remediation)).
 
 ![Drift detection](../../../assets/screenshots/drift.png)
 
