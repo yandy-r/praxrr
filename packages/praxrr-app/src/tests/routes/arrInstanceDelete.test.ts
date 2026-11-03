@@ -41,6 +41,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         await runMigrations();
         await fn();
       } finally {
+        for (const key of ENV_INSTANCE_VARS) Deno.env.delete(key);
         jobDispatcher.stop();
         db.close();
         config.setBasePath(originalBasePath);
@@ -51,9 +52,11 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
   });
 }
 
-function createInstance(source: ArrInstanceSource): number {
+const ENV_INSTANCE_VARS = ['RADARR_INSTANCE_URL_1', 'RADARR_INSTANCE_API_KEY_1', 'RADARR_INSTANCE_NAME_1'];
+
+function createInstance(source: ArrInstanceSource, name = `radarr ${crypto.randomUUID()}`): number {
   const id = arrInstancesQueries.create({
-    name: `radarr ${crypto.randomUUID()}`,
+    name,
     type: 'radarr',
     url: 'http://127.0.0.1:9',
     apiKey: 'test-api-key',
@@ -66,6 +69,15 @@ function createInstance(source: ArrInstanceSource): number {
     dedupeKey: `arr.upgrade:${id}`,
   });
   return id;
+}
+
+/** Env instance still declared by the current environment (matched by name). */
+function createDeclaredEnvInstance(): number {
+  const name = `env radarr ${crypto.randomUUID()}`;
+  Deno.env.set('RADARR_INSTANCE_URL_1', 'http://127.0.0.1:9');
+  Deno.env.set('RADARR_INSTANCE_API_KEY_1', 'declared-env-key');
+  Deno.env.set('RADARR_INSTANCE_NAME_1', name);
+  return createInstance('env', name);
 }
 
 function instanceJobCount(id: number): number {
@@ -95,13 +107,23 @@ async function runAction(action: Action, event: ActionEvent): Promise<ActionFail
 }
 
 migratedTest('/arr list delete refuses env-managed instances and keeps their jobs', async () => {
-  const id = createInstance('env');
+  const id = createDeclaredEnvInstance();
 
   const result = (await runAction(listActions.delete, listDeleteEvent(id))) as ActionFailure;
 
   assertEquals(result.status, 403);
   assert(arrInstancesQueries.getById(id), 'env instance must survive');
   assertEquals(instanceJobCount(id), 1);
+});
+
+migratedTest('/arr list delete allows env rows whose variables were removed', async () => {
+  const id = createInstance('env');
+
+  const result = (await runAction(listActions.delete, listDeleteEvent(id))) as RedirectLike;
+
+  assertEquals(result.status, 303);
+  assertEquals(arrInstancesQueries.getById(id), undefined);
+  assertEquals(instanceJobCount(id), 0);
 });
 
 migratedTest('/arr list delete removes UI-managed instances, their jobs and library cache', async () => {
@@ -124,7 +146,7 @@ migratedTest('/arr list delete returns 404 for unknown instances', async () => {
 });
 
 migratedTest('settings delete refuses env-managed instances and keeps their jobs', async () => {
-  const id = createInstance('env');
+  const id = createDeclaredEnvInstance();
 
   const result = (await runAction(settingsActions.delete, settingsDeleteEvent(id))) as ActionFailure;
 

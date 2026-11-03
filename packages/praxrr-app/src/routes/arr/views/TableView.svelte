@@ -14,7 +14,7 @@
   import lidarrLogo from '$lib/client/assets/Lidarr.png';
   import { createEventDispatcher } from 'svelte';
 
-  export let instances: ArrInstance[];
+  export let instances: Array<ArrInstance & { canDelete: boolean }>;
 
   const dispatch = createEventDispatcher<{
     delete: ArrInstance;
@@ -77,7 +77,7 @@
   }
 
   // Define table columns
-  const columns: Column<ArrInstance>[] = [
+  const columns: Column<ArrInstance & { canDelete: boolean }>[] = [
     { key: 'name', header: 'Name', align: 'left' },
     { key: 'url', header: 'URL', align: 'left' },
     { key: 'enabled', header: 'Enabled', align: 'center', width: 'w-24' },
@@ -126,7 +126,7 @@
         title="Open in {getAppLabel(row.type)}"
         on:click={(e) => handleExternalClick(e, row)}
       />
-      {#if (row.source ?? 'ui') !== 'env'}
+      {#if row.canDelete}
         <TableActionButton
           icon={Trash2}
           title="Delete instance"

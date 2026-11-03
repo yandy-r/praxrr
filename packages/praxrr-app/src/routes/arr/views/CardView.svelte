@@ -11,7 +11,7 @@
   import lidarrLogo from '$lib/client/assets/Lidarr.png';
   import { createEventDispatcher } from 'svelte';
 
-  export let instances: ArrInstance[];
+  export let instances: Array<ArrInstance & { canDelete: boolean }>;
 
   const dispatch = createEventDispatcher<{
     delete: ArrInstance;
@@ -117,7 +117,7 @@
         >
           <ExternalLink size={16} />
         </button>
-        {#if (instance.source ?? 'ui') !== 'env'}
+        {#if instance.canDelete}
           <button
             type="button"
             aria-label={`Delete ${instance.name}`}

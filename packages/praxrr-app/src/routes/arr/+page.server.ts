@@ -1,28 +1,33 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$db/queries/arrInstances.ts';
-import { deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
+import { canDeleteArrInstance, deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
 import { logger } from '$logger/logger.ts';
 
 type ArrInstanceListItem = ArrInstance & {
   source: ArrInstanceSource;
   isEnvManaged: boolean;
+  canDelete: boolean;
 };
 
-export const load: ServerLoad = () => {
-  const instances: ArrInstanceListItem[] = arrInstancesQueries.getAll().map((instance) => {
-    const source: ArrInstanceSource = instance.source ?? 'ui';
-    const { api_key: _redactedApiKey, ...instanceWithoutApiKey } = instance as ArrInstance & {
-      api_key?: string;
-    };
+export const load: ServerLoad = async () => {
+  const instances: ArrInstanceListItem[] = await Promise.all(
+    arrInstancesQueries.getAll().map(async (instance) => {
+      const source: ArrInstanceSource = instance.source ?? 'ui';
+      const canDelete = await canDeleteArrInstance(instance);
+      const { api_key: _redactedApiKey, ...instanceWithoutApiKey } = instance as ArrInstance & {
+        api_key?: string;
+      };
 
-    return {
-      ...instanceWithoutApiKey,
-      api_key: '',
-      source,
-      isEnvManaged: source === 'env',
-    };
-  });
+      return {
+        ...instanceWithoutApiKey,
+        api_key: '',
+        source,
+        isEnvManaged: source === 'env',
+        canDelete,
+      };
+    })
+  );
 
   return {
     instances,
@@ -45,7 +50,7 @@ export const actions = {
     }
 
     try {
-      const result = deleteArrInstance(id);
+      const result = await deleteArrInstance(id);
 
       if (!result.ok) {
         if (result.reason === 'env_managed') {

@@ -70,11 +70,11 @@ Increment the index (`_2`, `_3`, …) for additional instances.
 Set `PRAXRR_VALIDATE_INSTANCES=true` to verify each env-managed instance during
 startup.
 
-Env-managed instances are marked `(ENV)` in the UI and cannot be deleted there:
-deleting one would only lose its sync, upgrade and rename settings, because the
-instance is recreated from the variables on the next restart. To remove one,
-delete its `*_INSTANCE_*` variables and restart. Instances whose variables are
-gone are disabled.
+Env-managed instances are marked `(ENV)` in the UI and cannot be deleted there
+while their variables are set: the instance would be recreated on the next
+restart without its sync, upgrade and rename settings. To remove one, delete its
+`*_INSTANCE_*` variables and restart. Praxrr disables the instance, and you can
+then delete it from the UI.
 
 ## API key security
 

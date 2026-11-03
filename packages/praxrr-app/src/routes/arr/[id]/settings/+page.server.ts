@@ -4,7 +4,7 @@ import { arrInstancesQueries, type ArrInstance, type ArrInstanceSource } from '$
 import { arrInstanceCredentialsQueries } from '$db/queries/arrInstanceCredentials.ts';
 import { loadSectionModes } from '$lib/server/disclosure/loadSectionModes.ts';
 import { ARR_CONNECTION_DETAILS } from '$shared/disclosure/sectionKeys.ts';
-import { deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
+import { canDeleteArrInstance, deleteArrInstance, ENV_MANAGED_DELETE_ERROR } from '$arr/deleteInstance.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
 import { decryptArrInstanceApiKey, encryptArrInstanceApiKey } from '$server/utils/encryption/arr-credentials.ts';
@@ -76,6 +76,7 @@ export const load: ServerLoad = async ({ parent, locals }) => {
       api_key: '',
     },
     canEditCoreConnectionFields: source === 'ui',
+    canDelete: await canDeleteArrInstance(instance),
     hasApiKey: apiKeyState.hasApiKey,
     apiKeyMasked: apiKeyState.apiKeyMasked,
     arrSettingsSectionModes,
@@ -266,7 +267,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid instance ID' });
     }
 
-    const result = deleteArrInstance(id);
+    const result = await deleteArrInstance(id);
 
     if (!result.ok) {
       if (result.reason === 'not_found') {
