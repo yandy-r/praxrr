@@ -25,7 +25,11 @@ function deleteJobs(jobs: JobQueueRecord[]): number {
   return deleted;
 }
 
-export function cleanupJobsForArrInstance(instanceId: number): number {
+/**
+ * Deletes every job for `instanceId` without publishing. Returns the queued jobs the caller must
+ * pass to `publishJobsCancelled` once its surrounding transaction has committed.
+ */
+export function deleteJobsForArrInstance(instanceId: number): JobQueueRecord[] {
   const jobTypes: JobType[] = [
     'arr.upgrade',
     'arr.rename',
@@ -36,8 +40,11 @@ export function cleanupJobsForArrInstance(instanceId: number): number {
     'arr.sync.metadataProfiles',
   ];
 
-  const jobs = jobQueueQueries.listByJobTypes(jobTypes);
-  return deleteJobs(jobs.filter((job) => matchesPayloadId(job, 'instanceId', instanceId)));
+  const jobs = jobQueueQueries
+    .listByJobTypes(jobTypes)
+    .filter((job) => matchesPayloadId(job, 'instanceId', instanceId));
+  jobQueueQueries.deleteByIds(jobs.map((job) => job.id));
+  return jobs.filter((job) => job.status === 'queued');
 }
 
 export function cleanupJobsForDatabase(databaseId: number): number {

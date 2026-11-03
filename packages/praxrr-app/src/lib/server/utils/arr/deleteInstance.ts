@@ -1,6 +1,9 @@
+import { db } from '$db/db.ts';
 import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { cache, getArrLibraryCachePrefix } from '$cache/cache.ts';
-import { cleanupJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
+import { deleteJobsForArrInstance } from '$lib/server/jobs/cleanup.ts';
+import { publishJobsCancelled } from '$lib/server/events/publish.ts';
+import type { JobQueueRecord } from '$lib/server/jobs/queueTypes.ts';
 import { isEnvInstanceDeclared } from '$arr/envInstances.ts';
 
 export const ENV_MANAGED_DELETE_ERROR =
@@ -36,11 +39,25 @@ export async function deleteArrInstance(id: number): Promise<DeleteArrInstanceRe
     return { ok: false, reason: 'env_managed', instance };
   }
 
-  // Jobs first, while the row still exists: their cancel events resolve the instance name/type.
-  cleanupJobsForArrInstance(id);
-  if (!arrInstancesQueries.delete(id)) {
+  // Jobs and row go in one transaction so a failure leaves both intact. Cancel events are
+  // published only after commit, with the instance identity captured above.
+  let cancelledJobs: JobQueueRecord[] = [];
+  const deleted = await db
+    .transaction(() => {
+      cancelledJobs = deleteJobsForArrInstance(id);
+      if (!arrInstancesQueries.delete(id)) {
+        throw new Error('Arr instance row was not deleted');
+      }
+    })
+    .then(
+      () => true,
+      () => false
+    );
+  if (!deleted) {
     return { ok: false, reason: 'delete_failed', instance };
   }
+
+  publishJobsCancelled(cancelledJobs, { id, name: instance.name, type: instance.type });
 
   cache.deleteByPrefix(getArrLibraryCachePrefix(id));
   return { ok: true, instance };

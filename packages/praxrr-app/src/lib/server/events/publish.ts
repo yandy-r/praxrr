@@ -54,15 +54,27 @@ function rfc3339(timestamp: string): string {
   return toUTC(timestamp) ?? timestamp;
 }
 
-/** Shared job fields. `arrType` comes from the instance row only, never from `jobType`. */
-function jobBase(job: JobQueueRecord): LiveJobEventBase {
+/** Identity of an Arr instance captured before its row was deleted. */
+export type DeletedArrInstanceSnapshot = { id: number; name: string; type: string };
+
+/**
+ * Shared job fields. `arrType` comes from the instance row only, never from `jobType`. When the
+ * row is already gone, `deletedInstance` supplies the identity captured before the delete.
+ */
+function jobBase(job: JobQueueRecord, deletedInstance?: DeletedArrInstanceSnapshot): LiveJobEventBase {
   const instanceId = readNumericId(job.payload.instanceId);
-  const instanceType = instanceId !== null ? arrInstancesQueries.getById(instanceId)?.type : undefined;
+  const snapshot = deletedInstance && deletedInstance.id === instanceId ? deletedInstance : undefined;
+  const instanceType =
+    snapshot?.type ?? (instanceId !== null ? arrInstancesQueries.getById(instanceId)?.type : undefined);
   return {
     jobId: job.id,
     jobType: job.jobType,
     source: job.source,
-    displayName: buildJobDisplayName(job.jobType, job.payload),
+    displayName: buildJobDisplayName(
+      job.jobType,
+      job.payload,
+      snapshot ? { arrNameById: new Map([[snapshot.id, snapshot.name]]) } : undefined
+    ),
     instanceId,
     arrType: instanceType && isSyncPreviewArrType(instanceType) ? instanceType : null,
     databaseId: readNumericId(job.payload.databaseId),
@@ -113,9 +125,13 @@ export function publishJobRunning(job: JobQueueRecord): void {
   }
 }
 
-export function publishJobFinished(job: JobQueueRecord, outcome: JobFinishedOutcome): void {
+export function publishJobFinished(
+  job: JobQueueRecord,
+  outcome: JobFinishedOutcome,
+  deletedInstance?: DeletedArrInstanceSnapshot
+): void {
   try {
-    const base = jobBase(job);
+    const base = jobBase(job, deletedInstance);
     eventBus.publish({
       type: 'job.finished',
       jobId: base.jobId,
@@ -145,8 +161,12 @@ export function publishJobFinished(job: JobQueueRecord, outcome: JobFinishedOutc
  * publishes `job.finished` with status/runStatus `cancelled` so other tabs drop the stale active job.
  * No run history row exists, so `runId` is `0` (history ids start at 1) and `durationMs` is `0`.
  * Callers pass the rows they read before the DB write; each row is built and published independently.
+ * `deletedInstance` keeps the instance name/type on events published after its row was deleted.
  */
-export function publishJobsCancelled(jobs: readonly JobQueueRecord[]): void {
+export function publishJobsCancelled(
+  jobs: readonly JobQueueRecord[],
+  deletedInstance?: DeletedArrInstanceSnapshot
+): void {
   const finishedAt = new Date().toISOString();
   for (const job of jobs) {
     publishJobFinished(
@@ -161,7 +181,8 @@ export function publishJobsCancelled(jobs: readonly JobQueueRecord[]): void {
         failureCode: null,
         durationMs: 0,
         finishedAt,
-      }
+      },
+      deletedInstance
     );
   }
 }

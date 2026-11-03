@@ -4,6 +4,7 @@ import {
   parseTagsFromEnv,
   parseEnabledFromEnv,
   reconcileEnvInstances,
+  isEnvInstanceDeclared,
 } from '../../lib/server/utils/arr/envInstances.ts';
 import * as arrCredentialEncryption from '../../lib/server/utils/encryption/arr-credentials.ts';
 import { db } from '../../lib/server/db/db.ts';
@@ -558,5 +559,35 @@ Deno.test('reconcileEnvInstances does not stamp detected_version on the UPDATE b
         restore();
       }
     }
+  });
+});
+
+const DECLARED_ENV = {
+  RADARR_INSTANCE_URL_1: 'http://radarr.local:7878',
+  RADARR_INSTANCE_API_KEY_1: 'declared-key',
+  RADARR_INSTANCE_NAME_1: 'Declared Radarr',
+};
+
+Deno.test('isEnvInstanceDeclared: matches by API-key fingerprint when the name changed', async () => {
+  await withArrCredentialConfig(async () => {
+    const fingerprint = (await arrCredentialEncryption.deriveArrInstanceApiKeyFingerprint('declared-key')).value;
+    await withEnvVarsAsync(DECLARED_ENV, async () => {
+      assertEquals(await isEnvInstanceDeclared({ name: 'Renamed Radarr', api_key_fingerprint: fingerprint }), true);
+    });
+  });
+});
+
+Deno.test('isEnvInstanceDeclared: undeclared when neither name nor key matches', async () => {
+  await withArrCredentialConfig(async () => {
+    const fingerprint = (await arrCredentialEncryption.deriveArrInstanceApiKeyFingerprint('other-key')).value;
+    await withEnvVarsAsync(DECLARED_ENV, async () => {
+      assertEquals(await isEnvInstanceDeclared({ name: 'Gone Radarr', api_key_fingerprint: fingerprint }), false);
+    });
+  });
+});
+
+Deno.test('isEnvInstanceDeclared: fails closed when the env cannot be parsed', async () => {
+  await withEnvVarsAsync({ ...DECLARED_ENV, UNKNOWN_INSTANCE_URL_1: 'http://example.local:1' }, async () => {
+    assertEquals(await isEnvInstanceDeclared({ name: 'Gone Radarr', api_key_fingerprint: null }), true);
   });
 });

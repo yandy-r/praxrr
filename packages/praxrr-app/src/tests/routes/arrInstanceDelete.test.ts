@@ -10,6 +10,8 @@ import { arrInstancesQueries, type ArrInstanceSource } from '$db/queries/arrInst
 import { cache, getArrLibraryCachePrefix } from '$cache/cache.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobDispatcher } from '$jobs/dispatcher.ts';
+import { eventBus } from '$lib/server/events/bus.ts';
+import type { LiveEventEnvelope } from '$lib/server/events/bus.ts';
 import { logger } from '$logger/logger.ts';
 import { actions as listActions } from '../../routes/arr/+page.server.ts';
 import { actions as settingsActions } from '../../routes/arr/[id]/settings/+page.server.ts';
@@ -33,6 +35,10 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
       logger.info = async () => {};
       logger.error = async () => {};
 
+      // Isolate from the developer's own *_INSTANCE_* variables; restored in finally.
+      const savedEnv = Object.entries(Deno.env.toObject()).filter(([key]) => ARR_INSTANCE_ENV_KEY_RE.test(key));
+      for (const [key] of savedEnv) Deno.env.delete(key);
+
       db.close();
       config.setBasePath(tempBasePath);
 
@@ -41,7 +47,10 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
         await runMigrations();
         await fn();
       } finally {
-        for (const key of ENV_INSTANCE_VARS) Deno.env.delete(key);
+        for (const key of Object.keys(Deno.env.toObject())) {
+          if (ARR_INSTANCE_ENV_KEY_RE.test(key)) Deno.env.delete(key);
+        }
+        for (const [key, value] of savedEnv) Deno.env.set(key, value);
         jobDispatcher.stop();
         db.close();
         config.setBasePath(originalBasePath);
@@ -52,7 +61,7 @@ function migratedTest(name: string, fn: () => Promise<void> | void): void {
   });
 }
 
-const ENV_INSTANCE_VARS = ['RADARR_INSTANCE_URL_1', 'RADARR_INSTANCE_API_KEY_1', 'RADARR_INSTANCE_NAME_1'];
+const ARR_INSTANCE_ENV_KEY_RE = /^[A-Z]+_INSTANCE_/;
 
 function createInstance(source: ArrInstanceSource, name = `radarr ${crypto.randomUUID()}`): number {
   const id = arrInstancesQueries.create({
@@ -128,16 +137,54 @@ migratedTest('/arr list delete allows env rows whose variables were removed', as
 
 migratedTest('/arr list delete removes UI-managed instances, their jobs and library cache', async () => {
   const id = createInstance('ui');
+  const name = arrInstancesQueries.getById(id)?.name;
   const cacheKey = `${getArrLibraryCachePrefix(id)}movies`;
   cache.set(cacheKey, ['cached'], 60);
+  const events: LiveEventEnvelope[] = [];
+  const unsubscribe = eventBus.subscribe((envelope) => events.push(envelope));
 
-  const result = (await runAction(listActions.delete, listDeleteEvent(id))) as RedirectLike;
+  try {
+    const result = (await runAction(listActions.delete, listDeleteEvent(id))) as RedirectLike;
 
-  assertEquals(result.status, 303);
-  assertEquals(result.location, '/arr');
-  assertEquals(arrInstancesQueries.getById(id), undefined);
-  assertEquals(instanceJobCount(id), 0);
-  assertEquals(cache.get(cacheKey), undefined);
+    assertEquals(result.status, 303);
+    assertEquals(result.location, '/arr');
+    assertEquals(arrInstancesQueries.getById(id), undefined);
+    assertEquals(instanceJobCount(id), 0);
+    assertEquals(cache.get(cacheKey), undefined);
+
+    // Cancel event is published after the row is gone but still carries the instance identity.
+    const cancelled = events.map((envelope) => envelope.event).find((event) => event.type === 'job.finished');
+    assert(cancelled && cancelled.type === 'job.finished');
+    assertEquals(cancelled.status, 'cancelled');
+    assertEquals(cancelled.arrType, 'radarr');
+    assertEquals(cancelled.displayName.endsWith(` - ${name}`), true);
+  } finally {
+    unsubscribe();
+    cache.deleteByPrefix(getArrLibraryCachePrefix(id));
+  }
+});
+
+migratedTest('/arr list delete rolls back jobs and publishes nothing when the row delete fails', async () => {
+  const id = createInstance('ui');
+  const events: LiveEventEnvelope[] = [];
+  const unsubscribe = eventBus.subscribe((envelope) => events.push(envelope));
+  const originalDelete = arrInstancesQueries.delete;
+  arrInstancesQueries.delete = () => false;
+
+  try {
+    const result = (await runAction(listActions.delete, listDeleteEvent(id))) as ActionFailure;
+
+    assertEquals(result.status, 500);
+    assert(arrInstancesQueries.getById(id));
+    assertEquals(instanceJobCount(id), 1);
+    assertEquals(
+      events.some((envelope) => envelope.event.type === 'job.finished'),
+      false
+    );
+  } finally {
+    arrInstancesQueries.delete = originalDelete;
+    unsubscribe();
+  }
 });
 
 migratedTest('/arr list delete returns 404 for unknown instances', async () => {
