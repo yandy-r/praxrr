@@ -271,6 +271,15 @@ function formatConflictIdentity(identity: MigrationEntityStableIdentity): string
   return `${identity.key}=${identity.value}`;
 }
 
+/**
+ * Conflict key for two migration entries. `hasBaseEntityByStableIdentity` compares the stored name
+ * with SQLite `lower(name)`, whose built-in `lower()` folds ASCII only, so fold exactly A-Z → a-z:
+ * names differing only in non-ASCII case stay distinct, as SQLite keeps them.
+ */
+function conflictIdentityKey(identity: MigrationEntityStableIdentity): string {
+  return `${identity.key}=${identity.value.replace(/[A-Z]/g, (char) => char.toLowerCase())}`;
+}
+
 function formatConflictPath(
   refs: [SourceConflictRef, SourceConflictRef],
   identity: MigrationEntityStableIdentity
@@ -303,7 +312,7 @@ export function validateStableIdentityConflicts(
 
   for (const entry of migrationEntries) {
     if (!entry.stableIdentity) continue;
-    const identity = formatConflictIdentity(entry.stableIdentity);
+    const identity = conflictIdentityKey(entry.stableIdentity);
     if (migrationSeen.has(identity)) {
       const other = migrationSeen.get(identity);
       if (!other) continue;
@@ -508,6 +517,9 @@ export async function importBaseOps(databaseId: number, pcdPath: string): Promis
                   cache,
                   layer: 'base',
                   data: candidate.portable,
+                  // References to entities the skip rule above found only in the registered cache
+                  // (user-held names) are dropped with a warning rather than failing the import.
+                  presenceCache: registeredCache,
                 });
 
                 if (!isDeserializeResult(result)) {

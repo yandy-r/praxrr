@@ -354,10 +354,18 @@ export async function buildQualityLadderOps(
     };
   }
 
-  const ops: QualityLadderRowOp[] = [];
+  // The partial UNIQUE index idx_one_upgrade_until_per_profile allows one upgrade_until=1 row per
+  // profile, so every row that clears or keeps upgrade_until=0 must run before the single row that
+  // sets it, including a newly added row. Order: removals, non-setting updates, additions, then the
+  // setting update. At most one desired row is upgrade_until (more is rejected above), so the
+  // setting row is either one addition or one update and always runs after every clear.
+  const removeOps: QualityLadderRowOp[] = [];
+  const clearingUpdateOps: QualityLadderRowOp[] = [];
+  const addOps: QualityLadderRowOp[] = [];
+  const settingUpdateOps: QualityLadderRowOp[] = [];
 
   for (const item of removedItems) {
-    ops.push({
+    removeOps.push({
       description: `remove-quality-profile-row-${profileName}-${item.type}-${item.name}`,
       queries: buildDeleteQueries(profileName, item),
       desiredState: rowDesiredState('remove', rowKey(item), item, null),
@@ -368,7 +376,7 @@ export async function buildQualityLadderOps(
   }
 
   for (const item of addedItems) {
-    ops.push({
+    addOps.push({
       description: `add-quality-profile-row-${profileName}-${item.type}-${item.name}`,
       queries: buildAddQueries(profileName, item),
       desiredState: rowDesiredState('add', rowKey(item), null, item),
@@ -378,19 +386,12 @@ export async function buildQualityLadderOps(
     });
   }
 
-  // Sort updates so rows clearing upgrade_until (→false) come before rows setting it (→true). The
-  // partial UNIQUE index idx_one_upgrade_until_per_profile only allows one upgrade_until=1 per profile,
-  // so the clear must run first.
-  const sortedUpdates = [...updatedItems].sort((a, b) => {
-    if (a.next.upgradeUntil === b.next.upgradeUntil) return 0;
-    return a.next.upgradeUntil ? 1 : -1;
-  });
-
-  for (const change of sortedUpdates) {
+  for (const change of updatedItems) {
     const queries = buildUpdateQueries(profileName, change.current, change.next);
     if (queries.length === 0) continue;
 
-    ops.push({
+    const target = change.next.upgradeUntil ? settingUpdateOps : clearingUpdateOps;
+    target.push({
       description: `update-quality-profile-row-${profileName}-${change.next.type}-${change.next.name}`,
       queries,
       desiredState: rowDesiredState('update', rowKey(change.next), change.current, change.next),
@@ -399,6 +400,8 @@ export async function buildQualityLadderOps(
       title: `Update ${change.next.type} "${change.next.name}" on quality profile "${profileName}"`,
     });
   }
+
+  const ops = [...removeOps, ...clearingUpdateOps, ...addOps, ...settingUpdateOps];
 
   if (ops.length === 0) {
     return { ops, batched: null };

@@ -190,7 +190,13 @@ async function captureIncomingBaseOps(
           },
           async () => {
             const { result, captured: ops } = await withBaseOpCapture(() =>
-              candidate.deserialize({ databaseId, cache, layer: 'base', data: candidate.portable })
+              candidate.deserialize({
+                databaseId,
+                cache,
+                layer: 'base',
+                data: candidate.portable,
+                presenceCache: registeredCache,
+              })
             );
             const outcome = result as { success?: unknown; error?: unknown } | null;
             if (!outcome || typeof outcome !== 'object' || typeof outcome.success !== 'boolean') {

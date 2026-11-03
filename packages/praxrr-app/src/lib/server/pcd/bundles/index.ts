@@ -8,6 +8,7 @@ export {
   BundlePlanMismatchError,
   _bundleImportDependencies,
   importBundle,
+  importEntityWithRollback,
   planBundle,
   validateBundleEntries,
 } from './import.ts';

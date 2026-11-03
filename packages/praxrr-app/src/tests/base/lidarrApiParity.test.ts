@@ -3,7 +3,11 @@ import { BaseTest, type TestContext } from './BaseTest.ts';
 import { GET as libraryGet } from '../../routes/api/v1/arr/library/+server.ts';
 import { GET as releasesGet } from '../../routes/api/v1/arr/releases/+server.ts';
 import { GET as exportGet, _serializeDependencies } from '../../routes/api/v1/pcd/export/+server.ts';
-import { POST as importPost, _deserializeDependencies } from '../../routes/api/v1/pcd/import/+server.ts';
+import {
+  POST as importPost,
+  _deserializeDependencies,
+  _importDependencies,
+} from '../../routes/api/v1/pcd/import/+server.ts';
 import { type ArrInstance, arrInstancesQueries } from '../../lib/server/db/queries/arrInstances.ts';
 import { pcdManager, type PCDCache as PCDCacheType } from '../../lib/server/pcd/index.ts';
 import { cache } from '../../lib/server/utils/cache/cache.ts';
@@ -24,6 +28,9 @@ import {
   PORTABLE_MIGRATION_MIN_VERSION,
   PORTABLE_MIGRATION_SOURCE_EXPORT,
 } from '../../lib/shared/pcd/portable.ts';
+
+/** No app database here: run the route's single-entity write without its rollback wrapper. */
+const passThroughImport: typeof _importDependencies.importEntityWithRollback = (_databaseId, write) => write();
 
 type Restore = () => void;
 
@@ -750,6 +757,7 @@ class LidarrApiParityTest extends BaseTest {
     this.test('import accepts first-class lidarr_media_settings entity type', async () => {
       const getCacheMock: typeof pcdManager.getCache = () => ({ kb: {} }) as unknown as PCDCacheType;
       this.patch(pcdManager, 'getCache', getCacheMock);
+      this.patch(_importDependencies, 'importEntityWithRollback', passThroughImport);
 
       // Submit a valid lidarr_media_settings payload
       // It will fail at the actual deserialization step (no real DB),
@@ -816,6 +824,7 @@ class LidarrApiParityTest extends BaseTest {
       this.patch(_deserializeDependencies, 'deserializeRegularExpression', async () => {
         return { success: true };
       });
+      this.patch(_importDependencies, 'importEntityWithRollback', passThroughImport);
 
       const response = await importPost({
         request: new Request('http://localhost/api/v1/pcd/import', {

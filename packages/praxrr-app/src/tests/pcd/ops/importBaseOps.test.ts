@@ -141,6 +141,24 @@ Deno.test('importBaseOps: validateStableIdentityConflicts detects migration dupl
   );
 });
 
+Deno.test('importBaseOps: validateStableIdentityConflicts rejects identities differing only by case', () => {
+  const error = assertThrows(
+    () => {
+      __testOnly_validateStableIdentityConflicts([
+        migrationEntry({ key: 'custom_format_name', value: 'Foo', kind: 'stable' }, '/path/Foo.yaml'),
+        migrationEntry({ key: 'custom_format_name', value: 'foo', kind: 'stable' }, '/path/foo.yaml'),
+      ]);
+    },
+    Error,
+    'migration/duplicate'
+  );
+  // The message keeps the original (unfolded) name and both source paths.
+  assertEquals(
+    error.message,
+    'Ambiguous duplicate base import identity (migration/duplicate): custom_format_name=foo in /path/Foo.yaml and /path/foo.yaml'
+  );
+});
+
 Deno.test(
   'importBaseOps: validateStableIdentityConflicts ignores null and allows distinct migration identities',
   () => {

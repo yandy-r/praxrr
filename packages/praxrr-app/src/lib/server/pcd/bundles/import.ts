@@ -444,8 +444,8 @@ function assertCacheReflected(databaseId: number, plan: BundlePlan, justApplied:
 // ============================================================================
 
 function assertWriteOk(result: unknown, context: string): void {
-  if (result && typeof result === 'object' && (result as { success?: unknown }).success === false) {
-    throw new Error((result as { error?: string }).error || `${context} failed`);
+  if (isFailedWriteResult(result)) {
+    throw new Error(result.error || `${context} failed`);
   }
 }
 
@@ -1040,6 +1040,64 @@ function describeIncompleteRollback(rollback: BundleRollbackResult): string {
     return 'rollback was incomplete: operations were restored but the cache rebuild failed; the database was disabled';
   }
   return 'rollback was incomplete: operations were restored but history written by the rollback recompile could not be removed';
+}
+
+/** Type guard for a `{ success: false }` write result; narrows so `error` reads are checked. */
+function isFailedWriteResult(result: unknown): result is { success: false; error?: string } {
+  return !!result && typeof result === 'object' && 'success' in result && result.success === false;
+}
+
+/**
+ * Single-entity import (the legacy `POST /api/v1/pcd/import` body): run `write` under the same
+ * per-database override lock as a bundle import, recording every op/history row it creates. When
+ * `write` throws or returns `{ success: false }` after writing anything, the bundle importer's
+ * compensating rollback restores the pre-import `pcd_ops` snapshot and rebuilds the cache, so a
+ * late step failure never leaves a partially imported entity behind. A failure before any write
+ * (e.g. a reference pre-check) is returned or rethrown unchanged.
+ */
+export function importEntityWithRollback<T>(databaseId: number, write: () => Promise<T>): Promise<T> {
+  return withDatabaseOverrideLock(databaseId, async () => {
+    const instance = databaseInstancesQueries.getById(databaseId);
+    if (!instance) throw new Error(`Database ${databaseId} not found`);
+    const snapshot = pcdOpsQueries.listByDatabase(databaseId);
+    const created: CreatedOpRecord = { opIds: [], historyIds: [], updatedOpIds: [] };
+    const wrote = () => created.opIds.length > 0 || created.historyIds.length > 0 || created.updatedOpIds.length > 0;
+    // Returns null when the rollback is complete, otherwise a description of what was left behind.
+    const rollback = async (cause: string): Promise<string | null> => {
+      await logger.error('Entity import failed after writing; rolling back', {
+        source: SOURCE,
+        meta: { databaseId, createdOps: created.opIds.length, error: cause },
+      });
+      const outcome = await rollbackLiveImport(
+        databaseId,
+        instance.local_path,
+        snapshot,
+        created,
+        instance.enabled === 1
+      );
+      return outcome.restored && outcome.recompiled && !outcome.cleanupFailed
+        ? null
+        : describeIncompleteRollback(outcome);
+    };
+
+    let result: T;
+    try {
+      result = await withOpCreationRecorder(created, write);
+    } catch (error) {
+      if (!wrote()) throw error;
+      const cause = error instanceof Error ? error.message : String(error);
+      const incomplete = await rollback(cause);
+      if (incomplete) throw new Error(`${cause} — ${incomplete}`, { cause: error });
+      throw error;
+    }
+
+    if (isFailedWriteResult(result) && wrote()) {
+      const cause = result.error || 'Import failed';
+      const incomplete = await rollback(cause);
+      if (incomplete) return { ...result, error: `${cause} — ${incomplete}` };
+    }
+    return result;
+  });
 }
 
 /**
