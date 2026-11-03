@@ -37,6 +37,7 @@ const SEED_SQL = `
 
 interface Fixture {
   cache: PCDCache;
+  sqlite: Database;
   destroy: () => Promise<void>;
 }
 
@@ -47,6 +48,7 @@ function createFixture(): Fixture {
   sqlite.exec(SEED_SQL);
   return {
     cache: { kb } as PCDCache,
+    sqlite,
     destroy: async () => {
       await kb.destroy();
       sqlite.close();
@@ -72,7 +74,7 @@ async function build(cache: PCDCache, input: UpdateQualitiesInput, forbidRemoval
 
 Deno.test('buildQualityLadderOps characterization', async (t) => {
   const fixture = createFixture();
-  const { cache } = fixture;
+  const { cache, sqlite } = fixture;
 
   try {
     await t.step('cutoff move emits value-guarded UPDATEs in clear-before-set order', async () => {
@@ -130,6 +132,43 @@ Deno.test('buildQualityLadderOps characterization', async (t) => {
       assert(!('error' in built), 'expected ops');
       assertEquals(built.batched, null);
       assertEquals(built.ops.length, 0);
+    });
+
+    await t.step('a new cutoff row is applied after the old cutoff is cleared', async () => {
+      // Replace the Bluray-1080p cutoff with a NEW group marked upgrade-until while keeping the
+      // old cutoff row (now cleared). The batched SQL must satisfy idx_one_upgrade_until_per_profile.
+      const desired: UpdateQualitiesInput = {
+        orderedItems: [
+          {
+            type: 'group',
+            name: 'HD',
+            position: 1,
+            enabled: true,
+            upgradeUntil: true,
+            members: [{ name: 'Bluray-720p' }],
+          },
+          q('Bluray-2160p', 2, false, false),
+          q('Bluray-1080p', 3, true, false),
+          q('DVD-R', 4, true, false),
+        ],
+      };
+      const built = await build(cache, desired);
+      assert(!('error' in built) && built.batched !== null);
+
+      sqlite.exec('SAVEPOINT ladder_apply');
+      try {
+        for (const query of built.batched.queries) sqlite.exec(query.sql);
+        const cutoff = sqlite
+          .prepare(
+            `SELECT quality_name, quality_group_name FROM quality_profile_qualities
+             WHERE quality_profile_name = 'Primary' AND upgrade_until = 1`
+          )
+          .all();
+        assertEquals(cutoff, [{ quality_name: null, quality_group_name: 'HD' }]);
+      } finally {
+        sqlite.exec('ROLLBACK TO ladder_apply');
+        sqlite.exec('RELEASE ladder_apply');
+      }
     });
 
     await t.step('more than one upgrade_until THROWS', async () => {

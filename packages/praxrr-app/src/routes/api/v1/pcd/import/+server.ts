@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { importEntityWithRollback } from '$pcd/bundles/index.ts';
 import {
   BundleImportFailedError,
   BundleInvalidError,
@@ -8,6 +9,7 @@ import {
   pcdManager,
   canWriteToBase,
   parseOperationLayer,
+  ValidationError,
   type PCDCache,
   type OperationLayer,
   type WriteResult,
@@ -58,6 +60,15 @@ export const _deserializeDependencies = {
   deserializeLidarrQualityDefinitions: deserialize.deserializeLidarrQualityDefinitions,
   deserializeLidarrMetadataProfile: deserialize.deserializeLidarrMetadataProfile,
 } as const;
+
+/**
+ * Test seam (mirrors `_deserializeDependencies`): the single-entity write runs inside
+ * `importEntityWithRollback`, which needs the app database for its `pcd_ops` snapshot. Route tests
+ * that stub the deserializer without an app database replace it with a pass-through.
+ */
+export const _importDependencies = {
+  importEntityWithRollback,
+};
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
 
@@ -169,18 +180,23 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: validationError }, { status: 400 });
   }
 
-  const cache = pcdManager.getCache(databaseId as number);
-  if (!cache) {
+  if (!pcdManager.getCache(databaseId as number)) {
     return json({ error: 'Database cache not available' }, { status: 500 });
   }
 
   try {
-    const result = await deserializeEntity({
-      databaseId: databaseId as number,
-      cache,
-      layer: parsedLayer,
-      entityType: typedEntityType,
-      data: data as Record<string, unknown>,
+    // A step that fails after the entity's first write rolls back every op the import created.
+    // The cache is read under the lock: a write that finished while waiting swaps it.
+    const result = await _importDependencies.importEntityWithRollback(databaseId as number, () => {
+      const cache = pcdManager.getCache(databaseId as number);
+      if (!cache) throw new Error('Database cache not available');
+      return deserializeEntity({
+        databaseId: databaseId as number,
+        cache,
+        layer: parsedLayer,
+        entityType: typedEntityType,
+        data: data as Record<string, unknown>,
+      });
     });
 
     if (!result?.success) {
@@ -439,6 +455,7 @@ function validateLidarrPayload(entityType: EntityType, data: Record<string, unkn
 }
 
 function isValidationError(error: unknown): boolean {
+  if (error instanceof ValidationError) return true;
   const message = getErrorMessage(error).toLowerCase();
   return (
     message.includes('already exists') ||

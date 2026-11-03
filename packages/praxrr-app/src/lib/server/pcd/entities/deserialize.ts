@@ -5,8 +5,8 @@
  * Used by clone (serialize → rename → deserialize) and import.
  */
 
-import type { PCDCache } from '$pcd/index.ts';
-import { getCache, type OperationLayer } from '$pcd/index.ts';
+import type { PCDCache, WriteResult } from '$pcd/index.ts';
+import { getCache, ValidationError, type OperationLayer } from '$pcd/index.ts';
 import type {
   PortableDelayProfile,
   PortableRegularExpression,
@@ -31,6 +31,8 @@ import * as qualityDefsQueries from './mediaManagement/quality-definitions/index
 import * as metadataProfilesQueries from './metadataProfiles/index.ts';
 import { createLidarrNaming } from './mediaManagement/naming/create.ts';
 import type { EntityType } from '$shared/pcd/portable.ts';
+import type { ConditionData } from '$shared/pcd/display.ts';
+import { logger } from '$logger/logger.ts';
 import {
   normalizeLidarrMetadataProfileReleaseStatusRows,
   normalizeLidarrMetadataProfileTypeRows,
@@ -45,13 +47,35 @@ interface DeserializeOptions<T> {
   cache: PCDCache;
   layer: OperationLayer;
   portable: T;
+  skippedNames?: SkippedEntityNames;
+  dropLogLevel?: DropLogLevel;
 }
+
+/**
+ * Exact names of upstream entities a repo base import skipped because a user entity already holds
+ * the name, per referenced table. Only the tables CF/QP references can point at are tracked.
+ */
+export interface SkippedEntityNames {
+  regular_expressions: Set<string>;
+  custom_formats: Set<string>;
+}
+
+/** `warn` for a real import; `debug` for the read-only incoming preview, which replays it. */
+export type DropLogLevel = 'warn' | 'debug';
 
 export interface EntityDeserializerOptions {
   databaseId: number;
   cache: PCDCache;
   layer: OperationLayer;
   data: unknown;
+  /**
+   * Repo base import only: names the import skipped because a user entity already holds them. A
+   * reference to one of these exact names cannot be written in the base layer, so it is dropped
+   * and logged instead of failing the whole import. Omit everywhere else.
+   */
+  skippedNames?: SkippedEntityNames;
+  /** Log level for dropped references (default `warn`). */
+  dropLogLevel?: DropLogLevel;
 }
 
 export type EntityDeserializer = (options: EntityDeserializerOptions) => Promise<unknown>;
@@ -83,6 +107,8 @@ const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
       cache: options.cache,
       layer: options.layer,
       portable: asPortableData<PortableCustomFormat>(options.data),
+      skippedNames: options.skippedNames,
+      dropLogLevel: options.dropLogLevel,
     });
   },
   quality_profile: (options) => {
@@ -91,6 +117,8 @@ const ENTITY_DESERIALIZERS: Record<EntityType, EntityDeserializer> = {
       cache: options.cache,
       layer: options.layer,
       portable: asPortableData<PortableQualityProfile>(options.data),
+      skippedNames: options.skippedNames,
+      dropLogLevel: options.dropLogLevel,
     });
   },
   radarr_naming: (options) => {
@@ -238,8 +266,40 @@ export async function deserializeRegularExpression(options: DeserializeOptions<P
 // CUSTOM FORMATS
 // ============================================================================
 
-export async function deserializeCustomFormat(options: DeserializeOptions<PortableCustomFormat>) {
-  const { databaseId, cache, layer, portable } = options;
+export async function deserializeCustomFormat(options: DeserializeOptions<PortableCustomFormat>): Promise<WriteResult> {
+  const { databaseId, cache, layer } = options;
+
+  // 0. Refuse before any write when a condition references an entity the database lacks: the
+  // condition steps run after the format is created, so a late FK failure would leave it partial.
+  const droppedRegexes = skippedReferences(
+    options.skippedNames?.regular_expressions,
+    options.portable.conditions.flatMap(conditionRegexNames)
+  );
+  const referencesDropped = (condition: ConditionData) =>
+    conditionRegexNames(condition).some((name) => droppedRegexes.has(name));
+  const portable: PortableCustomFormat = {
+    ...options.portable,
+    conditions: options.portable.conditions.filter((condition) => !referencesDropped(condition)),
+  };
+  if (droppedRegexes.size > 0) {
+    await logger[options.dropLogLevel ?? 'warn']('Dropping custom format conditions on skipped regular expressions', {
+      source: 'PCDImporter',
+      meta: {
+        databaseId,
+        entity: portable.name,
+        regularExpressions: [...droppedRegexes],
+        droppedConditions: options.portable.conditions.filter(referencesDropped).map((condition) => condition.name),
+      },
+    });
+  }
+  await assertReferencesExist(cache, 'custom format', portable.name, [
+    {
+      label: 'regular expression',
+      table: 'regular_expressions',
+      names: portable.conditions.flatMap(conditionRegexNames),
+    },
+    { label: 'language', table: 'languages', names: portable.conditions.flatMap(conditionLanguageNames) },
+  ]);
 
   // 1. Create the format
   const createResult = await cfQueries.create({
@@ -253,25 +313,24 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
       tags: portable.tags,
     },
   });
+  if (!createResult.success) return createResult;
 
   // 2. Add conditions (empty originalConditions = all new)
   if (portable.conditions.length > 0) {
-    const freshCache = getCache(databaseId);
-    if (!freshCache) throw new Error('Database cache not available');
-
-    await cfQueries.updateConditions({
+    const conditionsResult = await cfQueries.updateConditions({
       databaseId,
-      cache: freshCache,
+      cache: requireFreshCache(databaseId),
       layer,
       formatName: portable.name,
       originalConditions: [],
       conditions: portable.conditions,
     });
+    if (!conditionsResult.success) return conditionsResult;
   }
 
   // 3. Add tests
   for (const test of portable.tests) {
-    await cfQueries.createTest({
+    const testResult = await cfQueries.createTest({
       databaseId,
       layer,
       formatName: portable.name,
@@ -282,6 +341,7 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
         description: test.description,
       },
     });
+    if (!testResult.success) return testResult;
   }
 
   return createResult;
@@ -291,8 +351,56 @@ export async function deserializeCustomFormat(options: DeserializeOptions<Portab
 // QUALITY PROFILES
 // ============================================================================
 
-export async function deserializeQualityProfile(options: DeserializeOptions<PortableQualityProfile>) {
-  const { databaseId, cache, layer, portable } = options;
+export async function deserializeQualityProfile(
+  options: DeserializeOptions<PortableQualityProfile>
+): Promise<WriteResult> {
+  const { databaseId, cache, layer } = options;
+
+  // 0. Refuse before any write when the profile references an entity the database lacks: the
+  // qualities and scoring steps run after the profile is created, so a late FK failure would
+  // leave a profile with default qualities and no scores.
+  const droppedFormats = skippedReferences(
+    options.skippedNames?.custom_formats,
+    options.portable.customFormatScores.map((score) => score.customFormatName)
+  );
+  const portable: PortableQualityProfile = {
+    ...options.portable,
+    customFormatScores: options.portable.customFormatScores.filter(
+      (score) => !droppedFormats.has(score.customFormatName)
+    ),
+  };
+  if (droppedFormats.size > 0) {
+    await logger[options.dropLogLevel ?? 'warn']('Dropping quality profile scores for skipped custom formats', {
+      source: 'PCDImporter',
+      meta: {
+        databaseId,
+        entity: portable.name,
+        customFormats: [...droppedFormats],
+        droppedScores: options.portable.customFormatScores
+          .filter((score) => droppedFormats.has(score.customFormatName))
+          .map((score) => `${score.customFormatName}:${score.arrType}`),
+      },
+    });
+  }
+  await assertReferencesExist(cache, 'quality profile', portable.name, [
+    {
+      label: 'custom format',
+      table: 'custom_formats',
+      names: portable.customFormatScores.map((score) => score.customFormatName),
+    },
+    {
+      label: 'quality',
+      table: 'qualities',
+      names: portable.orderedItems.flatMap((item) =>
+        item.type === 'quality' ? [item.name] : (item.members ?? []).map((member) => member.name)
+      ),
+    },
+    {
+      label: 'language',
+      table: 'languages',
+      names: portable.language === null ? [] : [portable.language],
+    },
+  ]);
 
   // 1. Create the profile (sets up default qualities)
   const createResult = await qpQueries.create({
@@ -306,26 +414,22 @@ export async function deserializeQualityProfile(options: DeserializeOptions<Port
       language: portable.language,
     },
   });
+  if (!createResult.success) return createResult;
 
   // 2. Update qualities to match portable
-  const freshCache = getCache(databaseId);
-  if (!freshCache) throw new Error('Database cache not available');
-
-  await qpQueries.updateQualities({
+  const qualitiesResult = await qpQueries.updateQualities({
     databaseId,
-    cache: freshCache,
+    cache: requireFreshCache(databaseId),
     layer,
     profileName: portable.name,
     input: { orderedItems: portable.orderedItems },
   });
+  if (!qualitiesResult.success) return qualitiesResult;
 
   // 3. Update scoring
-  const freshCache2 = getCache(databaseId);
-  if (!freshCache2) throw new Error('Database cache not available');
-
-  await qpQueries.updateScoring({
+  const scoringResult = await qpQueries.updateScoring({
     databaseId,
-    cache: freshCache2,
+    cache: requireFreshCache(databaseId),
     layer,
     profileName: portable.name,
     input: {
@@ -335,8 +439,80 @@ export async function deserializeQualityProfile(options: DeserializeOptions<Port
       customFormatScores: portable.customFormatScores,
     },
   });
+  if (!scoringResult.success) return scoringResult;
 
   return createResult;
+}
+
+// ============================================================================
+// REFERENCE CHECKS
+// ============================================================================
+
+interface ReferenceSet {
+  /** Human label used in the error message, e.g. "custom format". */
+  label: string;
+  table: 'custom_formats' | 'regular_expressions' | 'qualities' | 'languages';
+  names: string[];
+}
+
+function requireFreshCache(databaseId: number): PCDCache {
+  const freshCache = getCache(databaseId);
+  if (!freshCache) throw new Error('Database cache not available');
+  return freshCache;
+}
+
+/** Condition types whose regex the condition writer stores in `condition_patterns`. */
+const PATTERN_CONDITION_TYPES: Record<string, true> = { release_title: true, release_group: true, edition: true };
+
+/** Regex names the condition writer stores: pattern condition types only. */
+function conditionRegexNames(condition: ConditionData): string[] {
+  if (PATTERN_CONDITION_TYPES[condition.type] !== true) return [];
+  return (condition.patterns ?? []).map((pattern) => pattern.name);
+}
+
+/** Language names the condition writer stores in `condition_languages`: `language` type only. */
+function conditionLanguageNames(condition: ConditionData): string[] {
+  if (condition.type !== 'language') return [];
+  return (condition.languages ?? []).map((language) => language.name);
+}
+
+/**
+ * Repo base import only: the subset of `names` the import skipped because a user entity already
+ * holds the name (`skipped`, exact names). A base-layer reference to a skipped entity can never be
+ * written, so the caller drops just those references, logged, instead of failing the whole
+ * link/sync. Matching is exact, so any other missing name, including a case typo, still reaches
+ * the reference pre-check and fails the same way on link and on sync.
+ */
+function skippedReferences(skipped: ReadonlySet<string> | undefined, names: string[]): Set<string> {
+  return new Set(skipped ? names.filter((name) => skipped.has(name)) : []);
+}
+
+/**
+ * Throw a {@link ValidationError} naming every referenced entity absent from `cache`.
+ *
+ * Matching is exact (case-sensitive), the same semantics as the name-based foreign keys the later
+ * write steps insert into. Callers pass the cache current at the time of the entity write, so a
+ * dependency created earlier in the same bundle resolves.
+ */
+async function assertReferencesExist(
+  cache: PCDCache,
+  entityLabel: string,
+  entityName: string,
+  references: ReferenceSet[]
+): Promise<void> {
+  const missing: string[] = [];
+  for (const { label, table, names } of references) {
+    const wanted = [...new Set(names)];
+    if (wanted.length === 0) continue;
+    const rows = await cache.kb.selectFrom(table).select('name').where('name', 'in', wanted).execute();
+    const found = new Set(rows.map((row) => row.name));
+    for (const name of wanted) {
+      if (!found.has(name)) missing.push(`${label} "${name}"`);
+    }
+  }
+  if (missing.length > 0) {
+    throw new ValidationError(`Cannot import ${entityLabel} "${entityName}": missing ${missing.join(', ')}`);
+  }
 }
 
 // ============================================================================
