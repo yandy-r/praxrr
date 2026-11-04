@@ -117,6 +117,13 @@ function makePrior(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftIns
     checkedAt: '2026-01-01T00:00:00.000Z',
     contentCheckedAt: '2026-01-01T00:00:00.000Z',
     durationMs: 1,
+    driftDetectedAt: null,
+    acknowledgedSignature: null,
+    acknowledgedAt: null,
+    acknowledgedEntities: [],
+    snoozedUntil: null,
+    lastRemediation: { trigger: null, status: null, signature: null, at: null, syncHistoryId: null },
+    lastAutoAttemptSignature: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -416,27 +423,47 @@ Deno.test('driftSignature returns null when there is no alerting drift', () => {
 // shouldNotify — full transition matrix
 // ============================================================================
 
+/** `shouldNotify` with no acknowledgement/snooze: the effective signature is the raw signature. */
+function notifiesUnsuppressed(prior: DriftInstanceStatusDetail | undefined, next: InstanceDriftResult): boolean {
+  return shouldNotify(prior, next, { effectiveSignature: next.status === 'drifted' ? next.driftSignature : null });
+}
+
+Deno.test('shouldNotify never fires while the effective signature is null (acknowledged or snoozed)', () => {
+  const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
+  assertEquals(shouldNotify(undefined, next, { effectiveSignature: null }), false);
+  assertEquals(shouldNotify(makePrior({ notifiedSignature: null }), next, { effectiveSignature: null }), false);
+});
+
+Deno.test('shouldNotify keys dedup on the effective (un-acknowledged) signature', () => {
+  const prior = makePrior({ status: 'drifted', notifiedSignature: 'eff-1' });
+  const next = makeNext({ status: 'drifted', driftSignature: 'sig-b' });
+  // Raw signature changed but the un-acked set is the one already notified → no re-alert.
+  assertEquals(shouldNotify(prior, next, { effectiveSignature: 'eff-1' }), false);
+  // A new un-acked entity changes the effective signature → alert.
+  assertEquals(shouldNotify(prior, next, { effectiveSignature: 'eff-2' }), true);
+});
+
 Deno.test('shouldNotify fires on first-ever drift (no prior row)', () => {
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
-  assertEquals(shouldNotify(undefined, next), true);
+  assertEquals(notifiesUnsuppressed(undefined, next), true);
 });
 
 Deno.test('shouldNotify fires on in-sync → drifted transition', () => {
   const prior = makePrior({ status: 'in-sync', notifiedSignature: null });
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
-  assertEquals(shouldNotify(prior, next), true);
+  assertEquals(notifiesUnsuppressed(prior, next), true);
 });
 
 Deno.test('shouldNotify does NOT fire on drifted → drifted with unchanged signature', () => {
   const prior = makePrior({ status: 'drifted', notifiedSignature: 'sig-a' });
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
-  assertEquals(shouldNotify(prior, next), false);
+  assertEquals(notifiesUnsuppressed(prior, next), false);
 });
 
 Deno.test('shouldNotify fires on drifted → drifted when the signature changed', () => {
   const prior = makePrior({ status: 'drifted', notifiedSignature: 'sig-a' });
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-b' });
-  assertEquals(shouldNotify(prior, next), true);
+  assertEquals(notifiesUnsuppressed(prior, next), true);
 });
 
 Deno.test(
@@ -448,7 +475,7 @@ Deno.test(
     // after the blip must not re-alert.
     const prior = makePrior({ status: 'error', reason: 'error', notifiedSignature: 'sig-a' });
     const next = makeNext({ status: 'drifted', driftSignature: 'sig-a' });
-    assertEquals(shouldNotify(prior, next), false);
+    assertEquals(notifiesUnsuppressed(prior, next), false);
   }
 );
 
@@ -457,13 +484,13 @@ Deno.test('shouldNotify fires when prior.status=error but the returning drift si
   // the predicate ignores prior.status entirely, the mismatched signature alone drives the fire.
   const prior = makePrior({ status: 'error', reason: 'error', notifiedSignature: 'sig-a' });
   const next = makeNext({ status: 'drifted', driftSignature: 'sig-b' });
-  assertEquals(shouldNotify(prior, next), true);
+  assertEquals(notifiesUnsuppressed(prior, next), true);
 });
 
 Deno.test('shouldNotify does NOT fire on drifted → in-sync recovery', () => {
   const prior = makePrior({ status: 'drifted', notifiedSignature: 'sig-a' });
   const next = makeNext({ status: 'in-sync', driftSignature: null });
-  assertEquals(shouldNotify(prior, next), false);
+  assertEquals(notifiesUnsuppressed(prior, next), false);
 });
 
 Deno.test('shouldNotify does NOT fire on reachability/error statuses (unreachable, unauthorized, error)', () => {
@@ -471,7 +498,7 @@ Deno.test('shouldNotify does NOT fire on reachability/error statuses (unreachabl
 
   for (const status of ['unreachable', 'unauthorized', 'error'] as const) {
     const next = makeNext({ status, reason: 'error', driftSignature: null });
-    assertEquals(shouldNotify(prior, next), false, `status=${status} must not notify`);
+    assertEquals(notifiesUnsuppressed(prior, next), false, `status=${status} must not notify`);
   }
 });
 

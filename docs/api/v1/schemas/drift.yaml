@@ -97,6 +97,7 @@ DriftSettings:
 DriftEntityChange:
   type: object
   required:
+    - key
     - section
     - entityType
     - name
@@ -105,6 +106,12 @@ DriftEntityChange:
     - remoteId
     - fields
   properties:
+    key:
+      type: string
+      description: |
+        Stable per-entity drift key (`section|entityType|name|remoteId|action`), computed at
+        response time. Used as the per-entity acknowledgement identifier in
+        `DriftSuppressionUpdateRequest.acknowledgedEntityKeys`.
     section:
       $ref: '../schemas/sync.yaml#/SyncPreviewSection'
     entityType:
@@ -144,6 +151,8 @@ DriftInstanceSummary:
     - counts
     - checkedAt
     - contentCheckedAt
+    - suppression
+    - remediationMode
   properties:
     instanceId:
       type: integer
@@ -177,6 +186,10 @@ DriftInstanceSummary:
         - type: string
           format: date-time
         - type: 'null'
+    suppression:
+      $ref: '#/DriftSuppressionState'
+    remediationMode:
+      $ref: '#/DriftRemediationMode'
 
 DriftSummaryResponse:
   type: object
@@ -244,6 +257,12 @@ DriftDetailResponse:
     - missing
     - unmanaged
     - prune
+    - driftSignature
+    - driftDetectedAt
+    - suppression
+    - remediationPolicy
+    - lastRemediation
+    - reconcilableSections
   properties:
     instanceId:
       type: integer
@@ -292,12 +311,37 @@ DriftDetailResponse:
       description: Live Arr entities not owned by Praxrr and not in the desired set (action = delete, non-alerting).
       items:
         $ref: '#/DriftEntityChange'
-
     prune:
       type: array
       description: Ledger-owned entities pending reviewed removal (action = delete, non-alerting).
       items:
         $ref: '#/DriftEntityChange'
+    driftSignature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Stable hash of the stored alerting changes; null when nothing alerts.
+    driftDetectedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: |
+        First content refresh that observed the current `driftSignature`. Together with the
+        instance id and signature it identifies the drift event a remediation is linked to.
+    suppression:
+      $ref: '#/DriftSuppression'
+    remediationPolicy:
+      $ref: '#/DriftRemediationPolicy'
+    lastRemediation:
+      $ref: '#/DriftRemediationRecord'
+    reconcilableSections:
+      type: array
+      description: |
+        Sections with drifted or missing changes that are configured and version-available for
+        this instance. Empty when nothing can be reconciled.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'
 
 DriftSettingsUpdateRequest:
   type: object
@@ -308,3 +352,253 @@ DriftSettingsUpdateRequest:
       type: integer
       minimum: 5
       maximum: 525600
+
+DriftRemediationMode:
+  type: string
+  enum:
+    - 'off'
+    - notify
+    - auto
+  description: |
+    Per-instance drift remediation policy mode:
+    - `off` (default, also when no policy is stored): no remediation; drift notifications are unchanged.
+    - `notify`: drift notifications suggest a reconcile for the allowed sections; nothing is written.
+    - `auto`: drifted, allowed, un-acknowledged sections are reconciled through a reviewed
+      preview and apply. Never deletes, never writes unless the instance is `drifted`, and
+      holds for a human when Canary gating applies.
+
+DriftRemediationTrigger:
+  type: string
+  enum:
+    - reconcile
+    - auto
+  description: How a drift remediation was initiated (manual reconcile or auto-remediation).
+
+DriftRemediationStatus:
+  type: string
+  enum:
+    - success
+    - partial
+    - failed
+    - skipped
+    - held_canary
+  description: |
+    Outcome of the latest drift remediation. `held_canary` means auto-remediation was held
+    for a human because Canary gating applies to this instance.
+
+DriftSuppressionState:
+  type: string
+  enum:
+    - none
+    - acknowledged
+    - snoozed
+    - partially_acknowledged
+  description: |
+    Derived suppression overlay. The stored drift status stays `drifted`; suppression only
+    mutes notifications and the health penalty.
+
+DriftSuppression:
+  type: object
+  required:
+    - state
+    - acknowledgedSignature
+    - acknowledgedAt
+    - acknowledgedEntityKeys
+    - snoozedUntil
+    - effectiveDrifted
+    - effectiveMissing
+    - effectiveSignature
+  properties:
+    state:
+      $ref: '#/DriftSuppressionState'
+    acknowledgedSignature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: |
+        Active instance-level acknowledgement: a content signature over the alerting changes
+        (entity keys plus field-level diffs) the user reviewed. Null when no instance ack is
+        active; it ends when any alerting change is added, removed, or edited.
+    acknowledgedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    acknowledgedEntityKeys:
+      type: array
+      description: |
+        Keys (`DriftEntityChange.key`) of the active per-entity acknowledgements. An entity ack
+        covers the field-level diff reviewed at ack time and ends when that entity's diff changes.
+      items:
+        type: string
+    snoozedUntil:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: Snooze expiry; only present while still in the future.
+    effectiveDrifted:
+      type: integer
+      minimum: 0
+      description: Drifted changes not covered by an acknowledgement or snooze.
+    effectiveMissing:
+      type: integer
+      minimum: 0
+      description: Missing changes not covered by an acknowledgement or snooze.
+    effectiveSignature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Hash over un-acknowledged alerting keys; null when nothing alerts.
+
+DriftRemediationPolicy:
+  type: object
+  required:
+    - instanceId
+    - arrType
+    - mode
+    - allowedSections
+    - updatedAt
+  properties:
+    instanceId:
+      type: integer
+    arrType:
+      type: string
+      enum:
+        - radarr
+        - sonarr
+        - lidarr
+    mode:
+      $ref: '#/DriftRemediationMode'
+    allowedSections:
+      type: array
+      description: Sections auto-remediation may write; validated per `arrType`.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+    updatedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: Null when no policy is stored and the default (`off`) is synthesized.
+
+DriftRemediationPolicyUpdateRequest:
+  type: object
+  required:
+    - mode
+    - allowedSections
+  properties:
+    mode:
+      $ref: '#/DriftRemediationMode'
+    allowedSections:
+      type: array
+      uniqueItems: true
+      description: |
+        Sections auto-remediation may write. Must be non-empty when `mode` is `auto`; every
+        section must be supported for the instance's `arrType`; duplicates are rejected.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'
+
+DriftRemediationRecord:
+  type: object
+  required:
+    - trigger
+    - status
+    - signature
+    - at
+    - syncHistoryId
+  properties:
+    trigger:
+      oneOf:
+        - $ref: '#/DriftRemediationTrigger'
+        - type: 'null'
+    status:
+      oneOf:
+        - $ref: '#/DriftRemediationStatus'
+        - type: 'null'
+    signature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: Drift signature the latest remediation targeted.
+    at:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    syncHistoryId:
+      oneOf:
+        - type: integer
+        - type: 'null'
+      description: Linked sync history entry; null when none was recorded or it was pruned.
+
+DriftRemediationLink:
+  type: object
+  required:
+    - instanceId
+    - driftSignature
+    - driftDetectedAt
+    - trigger
+  properties:
+    instanceId:
+      type: integer
+    driftSignature:
+      type: string
+    driftDetectedAt:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+    trigger:
+      $ref: '#/DriftRemediationTrigger'
+  description: |
+    Server-owned link from a reviewed preview (and the sync history it produces) to the drift
+    event it remediates. Never accepted from clients.
+
+DriftSuppressionUpdateRequest:
+  type: object
+  required:
+    - expectedSignature
+    - acknowledgeInstance
+    - acknowledgedEntityKeys
+    - snoozedUntil
+  properties:
+    expectedSignature:
+      oneOf:
+        - type: string
+        - type: 'null'
+      description: |
+        The `driftSignature` the client reviewed. The update is rejected with 409 when the
+        stored signature has changed.
+    acknowledgeInstance:
+      type: boolean
+      description: |
+        Acknowledge the current alerting drift content (every drifted entity's key plus its
+        field-level diff); requires status `drifted`. The acknowledgement ends as soon as any
+        alerting change is added, removed, or edited, even when the drift signature is unchanged.
+    acknowledgedEntityKeys:
+      type: array
+      uniqueItems: true
+      description: Full replacement set of acknowledged entity keys; each must be a current alerting key.
+      items:
+        type: string
+    snoozedUntil:
+      oneOf:
+        - type: string
+          format: date-time
+        - type: 'null'
+      description: Snooze expiry; must be in the future and at most 90 days ahead. Null clears it.
+  description: Replaces the instance's acknowledgement and snooze state.
+
+DriftReconcileRequest:
+  type: object
+  properties:
+    sections:
+      type: array
+      uniqueItems: true
+      minItems: 1
+      description: |
+        Optional narrowing of the reconcile to these sections. Each must have drifted or missing
+        changes; it never widens the drifted section set.
+      items:
+        $ref: '../schemas/sync.yaml#/SyncPreviewSection'

@@ -15,6 +15,11 @@ import {
   type HealthScope,
   type ProfileFacts,
 } from '$shared/health/index.ts';
+import type { DriftInstanceStatusDetail } from '$db/queries/driftStatus.ts';
+import { toDriftFacts } from '$lib/server/health/gather.ts';
+import { driftEntityKey } from '$sync/drift/check.ts';
+import { driftContentSignature, entityAcksFor } from '$sync/drift/suppression.ts';
+import type { DriftEntityChange } from '$sync/drift/types.ts';
 
 const CONFIG: CriterionConfig = { id: 'completeness', enabled: true, weight: 100 };
 
@@ -56,6 +61,9 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
       prune: 0,
       checkedAt: 't',
       contentCheckedAt: 't',
+      suppression: null,
+      snoozedUntil: null,
+      acknowledged: 0,
     },
     profiles: [makeProfile()],
     trashRecommendedCfNames: null,
@@ -110,6 +118,9 @@ Deno.test('drift: in-sync with pending removals still scores 100 and reports the
     prune: 3,
     checkedAt: 't',
     contentCheckedAt: 't',
+    suppression: null,
+    snoozedUntil: null,
+    acknowledged: 0,
   };
   const result = score('drift', makeInputs({ drift }), INSTANCE_SCOPE);
   assertEquals(result.score, 100);
@@ -126,6 +137,9 @@ Deno.test('drift: drifted with a fresh content check is penalized per entity, un
     prune: 10,
     checkedAt: 't',
     contentCheckedAt: 't',
+    suppression: null,
+    snoozedUntil: null,
+    acknowledged: 0,
   };
   // 100 - 8*(2+0) = 84; the 10 unmanaged entities must NOT lower the score.
   assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, 84);
@@ -141,8 +155,138 @@ Deno.test('drift: drifted but stale (no fresh content check) is null, not real d
     prune: 0,
     checkedAt: 't',
     contentCheckedAt: null,
+    suppression: null,
+    snoozedUntil: null,
+    acknowledged: 0,
   };
   assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, null);
+});
+// --- drift suppression (YAN-514): ack/snooze mute the penalty until signature change / expiry ---
+
+const NOW_MS = Date.parse('2026-11-03T12:00:00.000Z');
+
+function driftEntity(name: string, action: 'update' | 'create', fields: DriftEntityChange['fields'] = []) {
+  return {
+    section: 'qualityProfiles' as const,
+    entityType: 'qualityProfile',
+    name,
+    action,
+    category: action === 'create' ? ('missing' as const) : ('drift' as const),
+    remoteId: action === 'create' ? null : 1,
+    fields,
+  };
+}
+
+const DRIFT_CHANGES: DriftEntityChange[] = [
+  driftEntity('A', 'update'),
+  driftEntity('B', 'update'),
+  driftEntity('C', 'create'),
+];
+
+/** Content-fingerprinted acks for the named entities as currently stored. */
+function ackAt(names: readonly string[]) {
+  return entityAcksFor(
+    DRIFT_CHANGES,
+    DRIFT_CHANGES.filter((change) => names.includes(change.name)).map(driftEntityKey)
+  );
+}
+
+/** Stored row with two drifted entities (A, B) and one missing (C); 3 alerting changes. */
+function storedDriftRow(overrides: Partial<DriftInstanceStatusDetail> = {}): DriftInstanceStatusDetail {
+  return {
+    arrInstanceId: 1,
+    arrType: 'radarr',
+    status: 'drifted',
+    reason: null,
+    counts: { drifted: 2, missing: 1, unmanaged: 0, prune: 0 },
+    driftSignature: 'sig-a',
+    notifiedSignature: null,
+    detectedVersion: '5.0.0',
+    changes: DRIFT_CHANGES,
+    checkedAt: 't',
+    contentCheckedAt: 't',
+    durationMs: 1,
+    driftDetectedAt: 't',
+    acknowledgedSignature: null,
+    acknowledgedAt: null,
+    acknowledgedEntities: [],
+    snoozedUntil: null,
+    lastRemediation: { trigger: null, status: null, signature: null, at: null, syncHistoryId: null },
+    lastAutoAttemptSignature: null,
+    createdAt: 't',
+    updatedAt: 't',
+    ...overrides,
+  };
+}
+
+function driftScore(row: DriftInstanceStatusDetail, nowMs = NOW_MS) {
+  return score('drift', makeInputs({ drift: toDriftFacts(row, nowMs) }), INSTANCE_SCOPE);
+}
+
+Deno.test('drift suppression: unsuppressed drift takes the full per-entity penalty', () => {
+  // 100 - 8 * (2 + 1) = 76
+  assertEquals(driftScore(storedDriftRow()).score, 76);
+});
+
+Deno.test('drift suppression: an acknowledged signature scores 100 with an acknowledged note', () => {
+  const result = driftScore(
+    storedDriftRow({ acknowledgedSignature: driftContentSignature(DRIFT_CHANGES), acknowledgedAt: 't' })
+  );
+  assertEquals(result.score, 100);
+  assertEquals(result.suggestions, []);
+  assert(result.detail[0].includes('acknowledged'));
+});
+
+Deno.test('drift suppression: an ack of a different (stale) signature does not suppress', () => {
+  assertEquals(driftScore(storedDriftRow({ acknowledgedSignature: 'sig-old', acknowledgedAt: 't' })).score, 76);
+});
+
+Deno.test('drift suppression: an active snooze scores 100 and names the expiry', () => {
+  const until = new Date(NOW_MS + 60_000).toISOString();
+  const result = driftScore(storedDriftRow({ snoozedUntil: until }));
+  assertEquals(result.score, 100);
+  assertEquals(result.detail, [`Drift snoozed until ${until}`]);
+});
+
+Deno.test('drift suppression: an expired snooze takes the full penalty again', () => {
+  const expired = new Date(NOW_MS).toISOString(); // until == now → no longer active
+  assertEquals(driftScore(storedDriftRow({ snoozedUntil: expired })).score, 76);
+});
+
+Deno.test('drift suppression: a partial entity ack penalizes only the effective count', () => {
+  const result = driftScore(storedDriftRow({ acknowledgedEntities: ackAt(['A']), acknowledgedAt: 't' }));
+  // A acked → 1 drifted + 1 missing effective: 100 - 8 * 2 = 84.
+  assertEquals(result.score, 84);
+  assert(result.detail[0].includes('1 acknowledged'));
+});
+
+Deno.test('drift suppression: acking every alerting entity is a whole-instance acknowledgement', () => {
+  const facts = toDriftFacts(storedDriftRow({ acknowledgedEntities: ackAt(['A', 'B', 'C']) }), NOW_MS);
+  assertEquals(facts.suppression, 'acknowledged');
+  assertEquals([facts.drifted, facts.missing], [0, 0]);
+  assertEquals(driftScore(storedDriftRow({ acknowledgedEntities: ackAt(['A', 'B', 'C']) })).score, 100);
+});
+
+Deno.test('drift suppression: an acked entity whose fields change again is penalized (content-aware ack)', () => {
+  const edited = DRIFT_CHANGES.map((change) =>
+    change.name === 'A'
+      ? driftEntity('A', 'update', [{ field: 'cutoff', type: 'changed', current: 1, desired: 2 }])
+      : change
+  );
+  // Acked at the original content of A; A then drifts further (same key, new fields).
+  const result = driftScore(
+    storedDriftRow({ changes: edited, acknowledgedEntities: ackAt(['A']), acknowledgedAt: 't' })
+  );
+  assertEquals(result.score, 76);
+  // The instance ack over the original content no longer covers the edited drift either.
+  const instance = driftScore(
+    storedDriftRow({
+      changes: edited,
+      acknowledgedSignature: driftContentSignature(DRIFT_CHANGES),
+      acknowledgedAt: 't',
+    })
+  );
+  assertEquals(instance.score, 76);
 });
 
 Deno.test('drift: environment states (unreachable/never-checked) are null, not a config defect', () => {
@@ -156,6 +300,9 @@ Deno.test('drift: environment states (unreachable/never-checked) are null, not a
       prune: 0,
       checkedAt: null,
       contentCheckedAt: null,
+      suppression: null,
+      snoozedUntil: null,
+      acknowledged: 0,
     };
     assertEquals(score('drift', makeInputs({ drift }), INSTANCE_SCOPE).score, null, `status ${status} should be null`);
   }

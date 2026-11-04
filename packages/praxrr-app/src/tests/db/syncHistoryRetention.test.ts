@@ -68,6 +68,7 @@ function makeInput(instanceId: number, arrType: SyncPreviewArrType, startedAt: s
     startedAt,
     finishedAt: startedAt,
     durationMs: 10,
+    driftLink: null,
   };
 }
 

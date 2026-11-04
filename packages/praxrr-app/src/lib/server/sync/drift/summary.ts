@@ -30,14 +30,19 @@ export interface DriftSummaryCore {
   instances: DriftInstanceSummary[];
 }
 
-/** Latest drift status for every enabled, sync-capable Arr instance, plus aggregate totals. */
+/**
+ * Latest drift status for every enabled, sync-capable Arr instance, plus aggregate totals. Each
+ * instance carries its derived suppression state and remediation mode; totals stay on the stored
+ * status (suppression never rewrites `drifted`).
+ */
 export function buildDriftSummary(): DriftSummaryCore {
   const instances = arrInstancesQueries.getEnabled().filter((instance) => isSyncPreviewArrType(instance.type));
 
   const rowsById = new Map(driftStatusQueries.getAllForSummary().map((row) => [row.arrInstanceId, row]));
+  const nowMs = Date.now();
 
   const summaries: DriftInstanceSummary[] = instances.map((instance) =>
-    toInstanceSummary(instance, rowsById.get(instance.id))
+    toInstanceSummary(instance, rowsById.get(instance.id), nowMs)
   );
 
   const totals: DriftSummaryTotals = {

@@ -14,7 +14,7 @@
 import { logger } from '$logger/logger.ts';
 import type { ArrInstance } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries } from '$db/queries/arrSync.ts';
-import { driftStatusQueries } from '$db/queries/driftStatus.ts';
+import { driftStatusQueries, type DriftInstanceStatusDetail } from '$db/queries/driftStatus.ts';
 import { configHealthSettingsQueries } from '$db/queries/configHealthSettings.ts';
 import { trashGuideSyncQueries } from '$db/queries/trashGuideSync.ts';
 import { getCache, type PCDCache } from '$pcd/index.ts';
@@ -24,6 +24,7 @@ import { qualities } from '$pcd/entities/qualityProfiles/qualities/read.ts';
 import { resolveArrCompatibility } from '$shared/arr/compatibility.ts';
 import { isTrashGuideSupportedArrType } from '$shared/trashguide/types.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
+import { resolveDriftSuppression } from '$sync/drift/suppression.ts';
 import type {
   DriftFacts,
   HealthArrType,
@@ -35,9 +36,12 @@ import type {
 
 const SOURCE = 'ConfigHealthGather';
 
-/** Read the latest drift status without recomputing; synthesize `never-checked` when absent. */
-function gatherDrift(instanceId: number): DriftFacts {
-  const detail = driftStatusQueries.getById(instanceId);
+/**
+ * Pure mapping of a stored drift row to {@link DriftFacts} at `nowMs`; synthesizes `never-checked`
+ * when absent. The acknowledge/snooze overlay is applied here so the engine scores EFFECTIVE
+ * counts only (an expired snooze or a stale ack resolves to the full counts).
+ */
+export function toDriftFacts(detail: DriftInstanceStatusDetail | undefined, nowMs: number): DriftFacts {
   if (!detail) {
     return {
       status: 'never-checked',
@@ -48,17 +52,26 @@ function gatherDrift(instanceId: number): DriftFacts {
       prune: 0,
       checkedAt: null,
       contentCheckedAt: null,
+      suppression: null,
+      snoozedUntil: null,
+      acknowledged: 0,
     };
   }
+  const suppression = resolveDriftSuppression(detail, nowMs);
+  const wholeInstance =
+    suppression.state === 'snoozed' || suppression.state === 'acknowledged' ? suppression.state : null;
   return {
     status: detail.status,
     reason: detail.reason,
-    drifted: detail.counts.drifted,
-    missing: detail.counts.missing,
+    drifted: suppression.state === 'none' ? detail.counts.drifted : suppression.effectiveDrifted,
+    missing: suppression.state === 'none' ? detail.counts.missing : suppression.effectiveMissing,
     unmanaged: detail.counts.unmanaged,
     prune: detail.counts.prune,
     checkedAt: detail.checkedAt,
     contentCheckedAt: detail.contentCheckedAt,
+    suppression: wholeInstance,
+    snoozedUntil: suppression.snoozedUntil,
+    acknowledged: suppression.acknowledgedEntityKeys.length,
   };
 }
 
@@ -222,9 +235,10 @@ async function gatherProfiles(instance: ArrInstance, arrType: HealthArrType): Pr
  */
 export async function buildHealthInputs(instance: ArrInstance): Promise<HealthInputs> {
   const arrType = instance.type as HealthArrType; // caller guarantees isSyncPreviewArrType(instance.type)
-  const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
 
-  const drift = gatherDrift(instance.id);
+  const drift = toDriftFacts(driftStatusQueries.getById(instance.id), nowMs);
   const versionSupported = gatherVersionSupported(arrType, instance.detected_version ?? null);
   const trashRecommendedCfNames = gatherTrashRecommendedCfNames(instance.id, arrType);
   const criteria = configHealthSettingsQueries.get().criteria;

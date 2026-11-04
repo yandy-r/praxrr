@@ -159,4 +159,5 @@ export const SYNC_FAMILY_JOB_TYPES: readonly JobType[] = [
   'pcd.sync',
   'trashguide.sync',
   'sync.canary.rollout',
+  'drift.remediate',
 ];

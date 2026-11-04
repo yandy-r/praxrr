@@ -117,6 +117,7 @@ function seedRow(overrides: Partial<SyncHistoryInput> = {}): number {
     startedAt: overrides.startedAt ?? new Date().toISOString(),
     finishedAt: overrides.finishedAt ?? new Date().toISOString(),
     durationMs: overrides.durationMs ?? 100,
+    driftLink: overrides.driftLink ?? null,
   };
   return syncHistoryQueries.insert(input);
 }

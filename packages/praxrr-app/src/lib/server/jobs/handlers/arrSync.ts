@@ -2,6 +2,9 @@ import { jobQueueRegistry } from '../queueRegistry.ts';
 import type { JobHandler, JobHandlerResult, JobQueueRecord, JobRunStatus, JobType } from '../queueTypes.ts';
 import { type ArrInstance, arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { arrSyncQueries, type ReviewedSyncClaim } from '$db/queries/arrSync.ts';
+import { driftStatusQueries } from '$db/queries/driftStatus.ts';
+import { publishDriftRowUpdated } from '$lib/server/events/publish.ts';
+import type { DriftRemediationLink } from '$sync/drift/types.ts';
 import {
   type ArrInstanceReviewClient,
   getArrInstanceClient,
@@ -68,6 +71,12 @@ export interface ExecuteReviewedSyncJobInput {
   readonly previewId: string;
   readonly expiresAt: string;
   readonly source?: 'manual' | 'system' | 'schedule';
+  /**
+   * Server-owned drift link from the reviewed preview snapshot (never from a client body). When
+   * set, the sync history row is linked to the drift event and the drift row at the link's exact
+   * instance gets a `last_remediation_*` back-pointer.
+   */
+  readonly driftLink?: DriftRemediationLink;
   /** Test-only/adversarial seam after every section matches and before the first side effect. */
   readonly beforeWrite?: () => void | Promise<void>;
   readonly dependencies?: Partial<ReviewedSyncExecutionDependencies>;
@@ -116,6 +125,8 @@ export interface ReviewedSyncExecutionDependencies {
   ) => Promise<GeneratePreviewWithReviewContextResult>;
   readonly createSnapshot: typeof snapshotService.createAutoSnapshot;
   readonly recordHistory: typeof recordSyncHistory;
+  readonly recordRemediation: typeof driftStatusQueries.recordRemediation;
+  readonly publishDriftRowUpdated: typeof publishDriftRowUpdated;
   readonly getSectionHandler: typeof getSection;
 }
 
@@ -407,8 +418,48 @@ const DEFAULT_REVIEWED_SYNC_DEPENDENCIES: ReviewedSyncExecutionDependencies = {
     ),
   createSnapshot: (input) => snapshotService.createAutoSnapshot(input),
   recordHistory: recordSyncHistory,
+  recordRemediation: (instanceId, rec) => driftStatusQueries.recordRemediation(instanceId, rec),
+  publishDriftRowUpdated,
   getSectionHandler: getSection,
 };
+
+/**
+ * Stamp the drift row's `last_remediation_*` back-pointer for a drift-linked reviewed run, at the
+ * exact executing instance only (a link for another instance is refused, never redirected). Never
+ * throws: a failed audit back-pointer must not turn a completed Arr write into an error.
+ */
+function recordDriftRemediationOutcome(
+  deps: ReviewedSyncExecutionDependencies,
+  link: DriftRemediationLink | undefined,
+  instanceId: number,
+  status: SyncOperationStatus,
+  at: string,
+  syncHistoryId: number | null
+): void {
+  if (!link) return;
+  if (link.instanceId !== instanceId) {
+    void logger.warn('Drift remediation link does not match the reviewed instance; not recorded', {
+      source: 'ArrSyncJob',
+      meta: { instanceId, linkInstanceId: link.instanceId },
+    });
+    return;
+  }
+  try {
+    deps.recordRemediation(instanceId, {
+      trigger: link.trigger,
+      status,
+      signature: link.driftSignature,
+      at,
+      syncHistoryId,
+    });
+    deps.publishDriftRowUpdated(instanceId);
+  } catch (error) {
+    void logger.error('Failed to record drift remediation outcome', {
+      source: 'ArrSyncJob',
+      meta: { instanceId, error: error instanceof Error ? error.message : String(error) },
+    });
+  }
+}
 
 function invalidatedReviewedSync(
   reason: SyncPreviewReviewInvalidationReason,
@@ -628,6 +679,7 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
   let failures = 0;
   let ranSections = 0;
   let sideEffectsStarted = false;
+  let remediationRecorded = false;
 
   try {
     await input.beforeWrite?.();
@@ -738,7 +790,10 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       startedAt,
       finishedAt,
       durationMs: Date.parse(finishedAt) - Date.parse(startedAt),
+      driftLink: input.driftLink ?? null,
     });
+    recordDriftRemediationOutcome(deps, input.driftLink, instance.id, historyStatus, finishedAt, syncHistoryId);
+    remediationRecorded = true;
     const hasFailedOutcome = allOutcomes.some((outcome) => outcome.status === 'failed');
     const failed = failures > 0 || hasFailedOutcome;
     if (failed) {
@@ -777,6 +832,16 @@ export async function executeReviewedSyncJob(input: ExecuteReviewedSyncJobInput)
       meta: { instanceId: instance.id, sections, ...failure.protectedDetails },
     });
     if (sideEffectsStarted) {
+      if (!remediationRecorded) {
+        recordDriftRemediationOutcome(
+          deps,
+          input.driftLink,
+          instance.id,
+          'failed',
+          new Date(deps.now()).toISOString(),
+          null
+        );
+      }
       deps.failSections(claim, 'Reviewed sync execution failed');
     } else {
       deps.releaseSections(claim);
@@ -878,6 +943,7 @@ const arrSyncHandler = async (job: JobQueueRecord): Promise<SyncJobResult> => {
       startedAt,
       finishedAt,
       durationMs: Date.parse(finishedAt) - Date.parse(startedAt),
+      driftLink: null,
     });
   };
 

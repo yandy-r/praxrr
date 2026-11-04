@@ -43,6 +43,12 @@ Defined in `queueTypes.ts`:
 | `logs.cleanup`                     | `{}`                                          |
 | `config-health.snapshot`           | `{}`                                          |
 | `config-health.cleanup`            | `{}`                                          |
+| `drift.check`                      | `{ sweepStartedAt?, cursor? }`                |
+| `drift.remediate`                  | `{ instanceId, driftSignature }`              |
+
+`drift.remediate` is enqueued only by an opt-in `auto` drift remediation policy (source
+`system`, dedupe key `drift.remediate:{instanceId}`). It re-validates, then applies
+through the reviewed preview path; see [Drift Remediation](/app/sync-pipeline/#drift-remediation).
 
 ## Backups
 

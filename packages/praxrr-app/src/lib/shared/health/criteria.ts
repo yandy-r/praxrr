@@ -168,14 +168,27 @@ const drift: Criterion = {
           [line('Drift measurement is stale', ['The most recent drift check could not refresh the live diff.'], 'info')]
         );
       }
+      // Acknowledged or snoozed drift is intentional divergence: no penalty until the acknowledged
+      // drift content changes (ack) or the snooze expires (gather resolves both against `now`).
+      if (d.suppression !== null) {
+        const note =
+          d.suppression === 'snoozed'
+            ? `Drift snoozed until ${d.snoozedUntil ?? 'expiry'}`
+            : 'Drift acknowledged until the drifted content changes';
+        return result('drift', 'Drift', 100, config, [note], []);
+      }
+      // Partial acknowledgement: `drifted`/`missing` are already the un-acknowledged counts.
       const magnitude = d.drifted + d.missing;
       const score = clamp0100(100 - DRIFT_PER_ENTITY_PENALTY * magnitude);
+      const acknowledgedNote = d.acknowledged > 0 ? `, ${d.acknowledged} acknowledged` : '';
       return result(
         'drift',
         'Drift',
         score,
         config,
-        [`${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged, ${d.prune} pending removal)`],
+        [
+          `${d.drifted} changed, ${d.missing} missing on Arr (${d.unmanaged} unmanaged, ${d.prune} pending removal${acknowledgedNote})`,
+        ],
         [
           line(
             `${magnitude} managed entit${magnitude === 1 ? 'y has' : 'ies have'} drifted from the desired configuration`,

@@ -4,6 +4,7 @@
  */
 
 import type { ArrType } from '$arr/types.ts';
+import type { DriftRemediationLink } from '$sync/drift/types.ts';
 
 export type SyncPreviewStatus = 'generating' | 'ready' | 'applying' | 'applied' | 'failed' | 'expired';
 
@@ -249,4 +250,11 @@ export interface SyncPreviewResult {
   readonly mediaManagement: MediaManagementPreview | null;
   readonly metadataProfiles: MetadataProfilesPreview | null;
   readonly summary: SyncPreviewSummary;
+  /**
+   * Server-owned drift link, set only when the drift reconcile endpoint or the auto-remediation
+   * job creates the preview. The store normalizes it to `null` on create and never lets a later
+   * patch change it; it is never read from a client request body. Optional in the type only so
+   * pre-existing snapshot fixtures stay valid — every stored snapshot carries it.
+   */
+  readonly driftRemediation?: DriftRemediationLink | null;
 }

@@ -38,6 +38,8 @@ export function formatJobTypeLabel(jobType: JobType): string {
       return 'Logs Cleanup';
     case 'drift.check':
       return 'Drift Check';
+    case 'drift.remediate':
+      return 'Drift Auto-Remediation';
     case 'sync.history.cleanup':
       return 'Sync History Cleanup';
     case 'sync.canary.rollout':
@@ -133,7 +135,9 @@ export function buildJobDisplayName(
   }
 
   const isArrSync = jobType === 'arr.sync' || jobType.startsWith('arr.sync.');
-  if ((isArrSync || jobType === 'arr.rename' || jobType === 'arr.upgrade') && instanceId !== null) {
+  const isInstanceScoped =
+    isArrSync || jobType === 'arr.rename' || jobType === 'arr.upgrade' || jobType === 'drift.remediate';
+  if (isInstanceScoped && instanceId !== null) {
     const name = lookups?.arrNameById?.get(instanceId) ?? arrInstancesQueries.getById(instanceId)?.name;
     return name ? `${base} - ${name}` : base;
   }

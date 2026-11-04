@@ -4,6 +4,7 @@
   import SyncHistoryDiff from '$ui/sync-history/SyncHistoryDiff.svelte';
   import SyncOutcomeList from '$ui/sync-history/SyncOutcomeList.svelte';
   import { SYNC_HISTORY_STATUS_LABEL, syncHistoryStatusVariant } from '$ui/sync-history/syncHistoryStatus.ts';
+  import { DRIFT_REMEDIATION_TRIGGER_LABEL } from '$ui/drift/driftStatus.ts';
   import type { SyncHistoryDetail } from '$db/queries/syncHistory.ts';
   import type { PageData } from './$types';
 
@@ -186,6 +187,33 @@
       >
         {detail.error}
       </div>
+    {/if}
+
+    {#if detail.driftSignature}
+      <section
+        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-200"
+        aria-label="Drift remediation"
+      >
+        <div class="space-y-1">
+          <p class="font-medium">
+            Drift remediation{detail.remediationTrigger
+              ? ` (${DRIFT_REMEDIATION_TRIGGER_LABEL[detail.remediationTrigger]})`
+              : ''}
+          </p>
+          <p class="text-xs">
+            Drift detected {formatWhen(detail.driftDetectedAt)} · signature
+            <span class="font-mono" title={detail.driftSignature}>{detail.driftSignature.slice(0, 12)}</span>
+          </p>
+        </div>
+        {#if detail.arrInstanceId !== null}
+          <a
+            href={`/drift/${detail.arrInstanceId}`}
+            class="text-accent-600 dark:text-accent-500 text-xs font-medium hover:underline"
+          >
+            View drift →
+          </a>
+        {/if}
+      </section>
     {/if}
 
     <section class="space-y-3">

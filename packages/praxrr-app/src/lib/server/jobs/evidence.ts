@@ -143,6 +143,7 @@ export const JOB_EVIDENCE_DESCRIPTORS: JobEvidenceDescriptors = {
   'backup.cleanup': { resolveTarget: () => null },
   'logs.cleanup': { resolveTarget: () => null },
   'drift.check': { resolveTarget: () => null },
+  'drift.remediate': { resolveTarget: resolveArrInstance },
   'sync.history.cleanup': { resolveTarget: () => null },
   'sync.canary.rollout': {
     resolveTarget: (payload) => canaryRolloutQueries.getById(payload.rolloutId)?.canaryInstanceName ?? null,

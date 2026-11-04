@@ -108,6 +108,7 @@ Deno.test('sanitizeSyncHistoryInput: error and section errors sanitized, errorCo
     startedAt: new Date().toISOString(),
     finishedAt: new Date().toISOString(),
     durationMs: 5,
+    driftLink: null,
   };
 
   const safe = sanitizeSyncHistoryInput(input);

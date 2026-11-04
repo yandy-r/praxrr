@@ -648,6 +648,20 @@ export const canaryRolloutQueries = {
     return row ? rowToDetail(row) : undefined;
   },
 
+  /**
+   * Whether a rollout of `arrType` is still in flight (`canary_running`, `awaiting_confirmation`,
+   * or `rolling_out`). Scoped to one `arr_type` so a Sonarr rollout never gates Radarr.
+   */
+  hasActiveForArrType(arrType: CanaryArrType): boolean {
+    const row = db.queryFirst<{ id: number }>(
+      `SELECT id FROM canary_rollouts
+			WHERE arr_type = ? AND status IN ('canary_running', 'awaiting_confirmation', 'rolling_out')
+			LIMIT 1`,
+      arrType
+    );
+    return row !== undefined;
+  },
+
   /** Paginated list of summaries, newest first (stable id tiebreak). */
   listRecent(limit: number, offset: number): CanaryRolloutSummary[] {
     const rows = db.query<CanaryRolloutRow>(

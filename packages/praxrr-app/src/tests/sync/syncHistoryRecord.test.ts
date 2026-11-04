@@ -108,6 +108,7 @@ function makeInput(
     startedAt: '2026-07-09T10:00:00.000Z',
     finishedAt: '2026-07-09T10:00:01.000Z',
     durationMs: 1000,
+    driftLink: null,
     ...overrides,
   };
 }
@@ -394,4 +395,72 @@ Deno.test('flattenSyncPreviewChanges keeps delete changes and the managed flag',
   assertEquals(changes[0].managed, true);
   assertEquals(changes[0].section, 'qualityProfiles');
   assertEquals(changes[0].category, 'customFormats');
+});
+
+// ---------------------------------------------------------------------------
+// Drift remediation link pass-through (docs/plans/drift-remediation §3.3)
+// ---------------------------------------------------------------------------
+
+migratedTest('recordSyncHistory persists the drift link columns and surfaces them on summary + detail', () => {
+  const instanceId = seedInstance('sonarr');
+  const id = recordSyncHistory(
+    makeInput(instanceId, 'sonarr', {
+      previewId: 'preview-drift-1',
+      driftLink: {
+        instanceId,
+        driftSignature: 'abc12345',
+        driftDetectedAt: '2026-11-03T09:00:00.000Z',
+        trigger: 'reconcile',
+      },
+    })
+  );
+  assertExists(id);
+
+  const raw = db.queryFirst<{
+    drift_signature: string | null;
+    drift_detected_at: string | null;
+    remediation_trigger: string | null;
+  }>('SELECT drift_signature, drift_detected_at, remediation_trigger FROM sync_history WHERE id = ?', id);
+  assertEquals(raw, {
+    drift_signature: 'abc12345',
+    drift_detected_at: '2026-11-03T09:00:00.000Z',
+    remediation_trigger: 'reconcile',
+  });
+
+  const detail = syncHistoryQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.driftSignature, 'abc12345');
+  assertEquals(detail.driftDetectedAt, '2026-11-03T09:00:00.000Z');
+  assertEquals(detail.remediationTrigger, 'reconcile');
+
+  const [summary] = syncHistoryQueries.search({ instanceId }, { limit: 10, offset: 0 });
+  assertEquals(summary.id, id);
+  assertEquals(summary.driftSignature, 'abc12345');
+  assertEquals(summary.driftDetectedAt, '2026-11-03T09:00:00.000Z');
+  assertEquals(summary.remediationTrigger, 'reconcile');
+});
+
+migratedTest('recordSyncHistory with driftLink: null leaves the drift link columns NULL', () => {
+  const instanceId = seedInstance('radarr');
+  const id = recordSyncHistory(makeInput(instanceId, 'radarr'));
+  assertExists(id);
+  const detail = syncHistoryQueries.getById(id);
+  assertExists(detail);
+  assertEquals(detail.driftSignature, null);
+  assertEquals(detail.driftDetectedAt, null);
+  assertEquals(detail.remediationTrigger, null);
+});
+
+migratedTest('recordSyncHistory: an auto link with a null detected-at persists trigger auto', () => {
+  const instanceId = seedInstance('lidarr');
+  const id = recordSyncHistory(
+    makeInput(instanceId, 'lidarr', {
+      driftLink: { instanceId, driftSignature: 'feedface', driftDetectedAt: null, trigger: 'auto' },
+    })
+  );
+  assertExists(id);
+  const detail = syncHistoryQueries.getById(id);
+  assertEquals(detail?.driftSignature, 'feedface');
+  assertEquals(detail?.driftDetectedAt, null);
+  assertEquals(detail?.remediationTrigger, 'auto');
 });

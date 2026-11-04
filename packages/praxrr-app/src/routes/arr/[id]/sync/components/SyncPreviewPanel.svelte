@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { onMount, tick } from 'svelte';
+  import { createEventDispatcher, onMount, tick } from 'svelte';
   import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import Badge from '$ui/badge/Badge.svelte';
@@ -81,6 +81,15 @@
   export let previewState: SyncPreviewRouteState;
   export let instanceName = '';
   export let focusSection: SectionType | null = null;
+  /**
+   * Endpoint "Generate a new preview" POSTs to after an invalidated apply. Defaults to the plain
+   * sync preview; the drift page passes `/api/v1/drift/{id}/reconcile` so a regenerated preview
+   * stays drift-tagged (the server owns that link — the remembered request body is reused as-is).
+   */
+  export let regenerateEndpoint = '/api/v1/sync/preview';
+
+  /** Fired after a successful apply; existing callers ignore it. */
+  const dispatch = createEventDispatcher<{ applied: { syncHistoryId: number | null } }>();
 
   let preview: SyncPreviewResult | null = null;
   let loading = false;
@@ -530,6 +539,7 @@
       await invalidateAll();
       await loadPreview(preview.id);
       deleteConfirmText = '';
+      dispatch('applied', { syncHistoryId: applySyncHistoryId });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to apply preview.';
       applyError = message;
@@ -550,7 +560,7 @@
       JSON.stringify({ instanceId: preview.instanceId, sections: [...preview.sections] });
 
     try {
-      const response = await fetch('/api/v1/sync/preview', {
+      const response = await fetch(regenerateEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: requestBody,

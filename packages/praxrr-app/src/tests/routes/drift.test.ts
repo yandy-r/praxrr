@@ -21,6 +21,7 @@ import { jobDispatcher } from '$jobs/dispatcher.ts';
 import { GET as GET_SUMMARY } from '../../routes/api/v1/drift/summary/+server.ts';
 import { GET as GET_DETAIL, POST as POST_DETAIL } from '../../routes/api/v1/drift/[instanceId]/+server.ts';
 import { PUT as PUT_SETTINGS } from '../../routes/api/v1/drift/settings/+server.ts';
+import { PUT as PUT_SUPPRESSION } from '../../routes/api/v1/drift/[instanceId]/suppression/+server.ts';
 
 type SummaryGetEvent = Parameters<typeof GET_SUMMARY>[0];
 type DetailGetEvent = Parameters<typeof GET_DETAIL>[0];
@@ -156,6 +157,7 @@ migratedTest(
       checkedAt: new Date().toISOString(),
       contentCheckedAt: null,
       durationMs: 12,
+      driftDetectedAt: null,
     });
 
     const response = await GET_SUMMARY(summaryEvent());
@@ -241,6 +243,7 @@ migratedTest('GET /drift/{instanceId}: groups drift, missing, unmanaged and pend
     checkedAt: new Date().toISOString(),
     contentCheckedAt: new Date().toISOString(),
     durationMs: 42,
+    driftDetectedAt: null,
   });
 
   const response = await GET_DETAIL(detailGetEvent(String(id)));
@@ -430,4 +433,214 @@ migratedTest('PUT /drift/settings: 200 valid update returns the updated settings
   } finally {
     jobDispatcher.notifyJobEnqueued = originalNotify;
   }
+});
+
+// ============================================================================
+// SUPPRESSION ENDPOINT (YAN-514) — PUT /drift/{instanceId}/suppression
+// ============================================================================
+
+type SuppressionPutEvent = Parameters<typeof PUT_SUPPRESSION>[0];
+
+function suppressionPutEvent(instanceId: string, payload: unknown): SuppressionPutEvent {
+  const request = new Request(`http://localhost/api/v1/drift/${instanceId}/suppression`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: typeof payload === 'string' ? payload : JSON.stringify(payload),
+  });
+  return { params: { instanceId }, request } as unknown as SuppressionPutEvent;
+}
+
+/** Seed a fresh `drifted` row with one drifted and one missing alerting change. */
+function seedDrifted(id: number, signature = 'sig-a'): void {
+  driftStatusQueries.upsert({
+    arrInstanceId: id,
+    arrType: 'radarr',
+    status: 'drifted',
+    reason: null,
+    driftedCount: 1,
+    missingCount: 1,
+    unmanagedCount: 0,
+    driftSignature: signature,
+    detectedVersion: '5.14.0.9383',
+    changes: [
+      driftChange({ name: 'Changed CF', action: 'update', category: 'drift', remoteId: 1 }),
+      driftChange({ entityType: 'qualityProfile', name: 'Missing QP', action: 'create', category: 'missing' }),
+    ],
+    checkedAt: new Date().toISOString(),
+    contentCheckedAt: new Date().toISOString(),
+    durationMs: 5,
+    driftDetectedAt: '2026-11-01T00:00:00.000Z',
+  });
+}
+
+const NO_SUPPRESSION_BODY = {
+  expectedSignature: 'sig-a',
+  acknowledgeInstance: false,
+  acknowledgedEntityKeys: [],
+  snoozedUntil: null,
+};
+
+migratedTest('PUT suppression: instance ack returns detail with keys and acknowledged overlay', async () => {
+  const id = createInstance({ name: 'Radarr Ack Route' });
+  seedDrifted(id);
+
+  const response = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(id), { ...NO_SUPPRESSION_BODY, acknowledgeInstance: true })
+  );
+  assertEquals(response.status, 200);
+  const body = (await response.json()) as DriftDetailResponse;
+  // The stored status is never rewritten; suppression is an overlay.
+  assertEquals(body.status, 'drifted');
+  assertEquals(body.suppression.state, 'acknowledged');
+  // The instance ack stores the CONTENT signature (key + fields) the user reviewed.
+  const contentSignature = body.suppression.acknowledgedSignature;
+  assertExists(contentSignature);
+  assert(contentSignature !== 'sig-a');
+  assertEquals(body.suppression.effectiveDrifted, 0);
+  assertEquals(body.suppression.effectiveSignature, null);
+  assertEquals(body.driftSignature, 'sig-a');
+  assertEquals(body.driftDetectedAt, '2026-11-01T00:00:00.000Z');
+  assertEquals(body.remediationPolicy.mode, 'off');
+  assertEquals(body.lastRemediation.status, null);
+  assertEquals(body.drift[0].key, 'qualityProfiles|customFormat|Changed CF|1|update');
+  assertEquals(driftStatusQueries.getById(id)?.acknowledgedSignature, contentSignature);
+  assertEquals(driftStatusQueries.getById(id)?.acknowledgedEntities, []);
+});
+
+migratedTest('PUT suppression: per-entity ack is partial; snooze sets snoozed overlay', async () => {
+  const id = createInstance({ name: 'Radarr Partial Route' });
+  seedDrifted(id);
+
+  const partial = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(id), {
+      ...NO_SUPPRESSION_BODY,
+      acknowledgedEntityKeys: ['qualityProfiles|customFormat|Changed CF|1|update'],
+    })
+  );
+  assertEquals(partial.status, 200);
+  const partialBody = (await partial.json()) as DriftDetailResponse;
+  assertEquals(partialBody.suppression.state, 'partially_acknowledged');
+  assertEquals([partialBody.suppression.effectiveDrifted, partialBody.suppression.effectiveMissing], [0, 1]);
+
+  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const snoozed = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(id), { ...NO_SUPPRESSION_BODY, snoozedUntil: until })
+  );
+  assertEquals(snoozed.status, 200);
+  const snoozedBody = (await snoozed.json()) as DriftDetailResponse;
+  assertEquals(snoozedBody.suppression.state, 'snoozed');
+  assertEquals(snoozedBody.suppression.snoozedUntil, until);
+  // A full replacement: the entity ack was cleared by the second PUT.
+  assertEquals(snoozedBody.suppression.acknowledgedEntityKeys, []);
+
+  const summary = (await (await GET_SUMMARY(summaryEvent())).json()) as SummaryResponse;
+  const entry = summary.instances.find((instance) => instance.instanceId === id);
+  assertExists(entry);
+  assertEquals(entry.suppression, 'snoozed');
+  assertEquals(entry.remediationMode, 'off');
+});
+
+migratedTest('PUT suppression: a changed signature is rejected with 409 (value guard)', async () => {
+  const id = createInstance({ name: 'Radarr Stale Ack' });
+  seedDrifted(id, 'sig-b');
+
+  const response = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(id), { ...NO_SUPPRESSION_BODY, acknowledgeInstance: true })
+  );
+  assertEquals(response.status, 409);
+  assertEquals(driftStatusQueries.getById(id)?.acknowledgedSignature, null);
+});
+
+migratedTest('PUT suppression: invalid input is rejected with 400 and 404 for unknown instances', async () => {
+  const id = createInstance({ name: 'Radarr Invalid Ack' });
+  seedDrifted(id);
+  const day = 24 * 60 * 60 * 1000;
+
+  const cases: [unknown, string][] = [
+    ['{not json', 'Invalid JSON'],
+    [{ ...NO_SUPPRESSION_BODY, acknowledgeInstance: 'yes' }, 'acknowledgeInstance'],
+    [{ ...NO_SUPPRESSION_BODY, acknowledgedEntityKeys: ['nope|x|y|1|update'] }, 'Unknown drift entity keys'],
+    [{ ...NO_SUPPRESSION_BODY, snoozedUntil: new Date(Date.now() - 1000).toISOString() }, 'future'],
+    [{ ...NO_SUPPRESSION_BODY, snoozedUntil: new Date(Date.now() + 91 * day).toISOString() }, '90 days'],
+    [{ ...NO_SUPPRESSION_BODY, snoozedUntil: 'tomorrow' }, 'snoozedUntil'],
+  ];
+  for (const [payload, fragment] of cases) {
+    const response = await PUT_SUPPRESSION(suppressionPutEvent(String(id), payload));
+    assertEquals(response.status, 400, `payload ${JSON.stringify(payload)}`);
+    const body = (await response.json()) as ErrorResponse;
+    assert(body.error.includes(fragment), `${body.error} should include ${fragment}`);
+  }
+
+  // Acknowledging while not drifted is rejected.
+  const inSyncId = createInstance({ name: 'Radarr In Sync Ack' });
+  driftStatusQueries.upsert({
+    arrInstanceId: inSyncId,
+    arrType: 'radarr',
+    status: 'in-sync',
+    reason: null,
+    driftedCount: 0,
+    missingCount: 0,
+    unmanagedCount: 0,
+    driftSignature: null,
+    detectedVersion: null,
+    changes: [],
+    checkedAt: new Date().toISOString(),
+    contentCheckedAt: new Date().toISOString(),
+    durationMs: 1,
+    driftDetectedAt: null,
+  });
+  const notDrifted = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(inSyncId), {
+      ...NO_SUPPRESSION_BODY,
+      expectedSignature: null,
+      acknowledgeInstance: true,
+    })
+  );
+  assertEquals(notDrifted.status, 400);
+
+  // Resending EXISTING acks while snoozing a currently unreachable instance is allowed: only a
+  // growing ack set needs live drift.
+  const ackedId = createInstance({ name: 'Radarr Unreachable Snooze' });
+  seedDrifted(ackedId);
+  const ackKey = 'qualityProfiles|customFormat|Changed CF|1|update';
+  const acked = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(ackedId), { ...NO_SUPPRESSION_BODY, acknowledgedEntityKeys: [ackKey] })
+  );
+  assertEquals(acked.status, 200);
+  const stored = driftStatusQueries.getById(ackedId);
+  assertExists(stored);
+  driftStatusQueries.upsert({
+    arrInstanceId: ackedId,
+    arrType: 'radarr',
+    status: 'unreachable',
+    reason: 'timeout',
+    driftedCount: stored.counts.drifted,
+    missingCount: stored.counts.missing,
+    unmanagedCount: 0,
+    driftSignature: stored.driftSignature,
+    detectedVersion: stored.detectedVersion,
+    changes: stored.changes,
+    checkedAt: new Date().toISOString(),
+    contentCheckedAt: stored.contentCheckedAt,
+    durationMs: 1,
+    driftDetectedAt: stored.driftDetectedAt,
+  });
+  const snoozeWhileDown = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(ackedId), {
+      ...NO_SUPPRESSION_BODY,
+      acknowledgedEntityKeys: [ackKey],
+      snoozedUntil: new Date(Date.now() + day).toISOString(),
+    })
+  );
+  assertEquals(snoozeWhileDown.status, 200);
+  const grows = await PUT_SUPPRESSION(
+    suppressionPutEvent(String(ackedId), {
+      ...NO_SUPPRESSION_BODY,
+      acknowledgedEntityKeys: [ackKey, 'qualityProfiles|qualityProfile|Missing QP|new|create'],
+    })
+  );
+  assertEquals(grows.status, 400);
+
+  const missing = await PUT_SUPPRESSION(suppressionPutEvent('999999', NO_SUPPRESSION_BODY));
+  assertEquals(missing.status, 404);
 });

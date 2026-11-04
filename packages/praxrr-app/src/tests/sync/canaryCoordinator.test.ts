@@ -161,6 +161,7 @@ function seedHistoryRow(instanceId: number, status: SyncHistoryInput['status']):
     startedAt: '2026-07-09T10:00:00.000Z',
     finishedAt: '2026-07-09T10:00:01.000Z',
     durationMs: 1000,
+    driftLink: null,
   };
   return syncHistoryQueries.insert(input);
 }
@@ -188,6 +189,9 @@ function makeSummary(overrides: Partial<SyncHistorySummary>): SyncHistorySummary
     finishedAt: '2026-07-09T10:00:01.000Z',
     durationMs: 1000,
     createdAt: '2026-07-09T10:00:01.000Z',
+    driftSignature: null,
+    driftDetectedAt: null,
+    remediationTrigger: null,
     ...overrides,
   };
 }

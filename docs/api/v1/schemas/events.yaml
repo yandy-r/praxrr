@@ -15,6 +15,7 @@ LiveJobType:
     - backup.cleanup
     - logs.cleanup
     - drift.check
+    - drift.remediate
     - sync.history.cleanup
     - sync.canary.rollout
     - config-health.snapshot

@@ -99,6 +99,7 @@ import { migration as migration20261027CreateOidcAllowlistState } from './migrat
 import { migration as migration20261028ScrubSyncErrorText } from './migrations/20261028_scrub_sync_error_text.ts';
 import { migration as migration20261029NormalizeBackupSchedules } from './migrations/20261029_normalize_backup_schedules.ts';
 import { migration as migration20261030CreateUserCommandPaletteRecents } from './migrations/20261030_create_user_command_palette_recents.ts';
+import { migration as migration20261103AddDriftRemediation } from './migrations/20261103_add_drift_remediation.ts';
 
 export interface Migration {
   version: number;
@@ -432,6 +433,7 @@ export function loadMigrations(): Migration[] {
     migration20261028ScrubSyncErrorText,
     migration20261029NormalizeBackupSchedules,
     migration20261030CreateUserCommandPaletteRecents,
+    migration20261103AddDriftRemediation,
   ];
 
   // Sort by version number

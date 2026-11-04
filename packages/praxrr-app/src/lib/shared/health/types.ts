@@ -116,11 +116,17 @@ export interface ProfileFacts {
   readonly cfScores: readonly HealthCfScore[];
 }
 
-/** The drift signal for this instance, sourced from `driftStatusQueries.getById` (no recompute). */
+/**
+ * The drift signal for this instance, sourced from `driftStatusQueries.getById` (no recompute) with
+ * the acknowledge/snooze overlay already applied (`resolveDriftSuppression`): `drifted`/`missing`
+ * are EFFECTIVE counts (alerting changes not covered by an acknowledgement or snooze).
+ */
 export interface DriftFacts {
   readonly status: 'in-sync' | 'drifted' | 'unreachable' | 'unauthorized' | 'error' | 'never-checked';
   readonly reason: string | null;
+  /** Effective (un-acknowledged, un-snoozed) changed entities. */
   readonly drifted: number;
+  /** Effective (un-acknowledged, un-snoozed) missing entities. */
   readonly missing: number;
   /** Unmanaged (extra-on-Arr) entities — informational only; never lowers the drift sub-score. */
   readonly unmanaged: number;
@@ -129,6 +135,15 @@ export interface DriftFacts {
   readonly checkedAt: string | null;
   /** Freshest successful content diff; `null` => counts are not from a fresh check (drift then skips). */
   readonly contentCheckedAt: string | null;
+  /**
+   * Whole-instance suppression: every alerting change is acknowledged, or the instance is snoozed.
+   * `null` when nothing is suppressed or only some entities are acknowledged (partial).
+   */
+  readonly suppression: 'acknowledged' | 'snoozed' | null;
+  /** Active snooze expiry (ISO) when `suppression === 'snoozed'`, else `null`. */
+  readonly snoozedUntil: string | null;
+  /** Acknowledged alerting entities excluded from `drifted`/`missing`. */
+  readonly acknowledged: number;
 }
 
 /** Fully-materialized engine input. Nothing here is read lazily — the engine performs no I/O. */

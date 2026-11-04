@@ -240,12 +240,12 @@ Programmatic access uses named, scoped, revocable API tokens managed in Settings
 Unknown mutating routes fail closed to `admin`. A token lacking the scope gets 403
 `{ "error": "Forbidden", "requiredScope": "…" }`.
 
-| Scope        | Grants                                                                                                                                                                                                                        |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`       | GET/HEAD/OPTIONS on `/api/v1/*` except GET/HEAD `/api/v1/arr/releases` (live indexer search, `admin`); dry-run POSTs: `/api/v1/sync/preview`, `/api/v1/goals/preview`                                                         |
-| `mcp`        | `/api/v1/mcp` (any method); each MCP tool also declares `requiredScope` (JSON-RPC `-32003` + HTTP 403 when unmet)                                                                                                             |
-| `sync:apply` | POST `/api/v1/sync/preview/{id}/apply`, `/api/v1/trash-guide/sources/{id}/sync`, `/api/v1/goals/apply`, `/api/v1/pcd/{db}/snapshots/{id}/rollback`, `/api/v1/canary/rollouts`, `/api/v1/canary/rollouts/{id}/{proceed,abort}` |
-| `admin`      | Everything, including every other mutating `/api/v1/*` route (e.g. `/api/v1/simulate/*`, `/api/v1/entity-testing/evaluate`, which write persistent caches) and GET `/api/v1/arr/releases`                                     |
+| Scope        | Grants                                                                                                                                                                                                                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`       | GET/HEAD/OPTIONS on `/api/v1/*` (incl. GET `/api/v1/drift/{id}/remediation-policy`) except GET/HEAD `/api/v1/arr/releases` (live indexer search, `admin`); dry-run POSTs: `/api/v1/sync/preview`, `/api/v1/goals/preview`, `/api/v1/drift/{id}/reconcile`                   |
+| `mcp`        | `/api/v1/mcp` (any method); each MCP tool also declares `requiredScope` (JSON-RPC `-32003` + HTTP 403 when unmet)                                                                                                                                                           |
+| `sync:apply` | POST `/api/v1/sync/preview/{id}/apply`, `/api/v1/trash-guide/sources/{id}/sync`, `/api/v1/goals/apply`, `/api/v1/pcd/{db}/snapshots/{id}/rollback`, `/api/v1/canary/rollouts`, `/api/v1/canary/rollouts/{id}/{proceed,abort}`                                               |
+| `admin`      | Everything, including every other mutating `/api/v1/*` route (e.g. `/api/v1/simulate/*`, `/api/v1/entity-testing/evaluate`, which write persistent caches; PUT `/api/v1/drift/{id}/suppression` and `/api/v1/drift/{id}/remediation-policy`) and GET `/api/v1/arr/releases` |
 
 ## Session Management
 

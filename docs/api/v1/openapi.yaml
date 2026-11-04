@@ -690,6 +690,12 @@ paths:
     $ref: './paths/drift.yaml#/summary'
   /drift/{instanceId}:
     $ref: './paths/drift.yaml#/instance'
+  /drift/{instanceId}/reconcile:
+    $ref: './paths/drift.yaml#/reconcile'
+  /drift/{instanceId}/suppression:
+    $ref: './paths/drift.yaml#/suppression'
+  /drift/{instanceId}/remediation-policy:
+    $ref: './paths/drift.yaml#/remediationPolicy'
   /drift/settings:
     $ref: './paths/drift.yaml#/settings'
   /sync-history:
@@ -1021,6 +1027,28 @@ components:
       $ref: './schemas/drift.yaml#/DriftDetailResponse'
     DriftSettingsUpdateRequest:
       $ref: './schemas/drift.yaml#/DriftSettingsUpdateRequest'
+    DriftRemediationMode:
+      $ref: './schemas/drift.yaml#/DriftRemediationMode'
+    DriftRemediationTrigger:
+      $ref: './schemas/drift.yaml#/DriftRemediationTrigger'
+    DriftRemediationStatus:
+      $ref: './schemas/drift.yaml#/DriftRemediationStatus'
+    DriftSuppressionState:
+      $ref: './schemas/drift.yaml#/DriftSuppressionState'
+    DriftSuppression:
+      $ref: './schemas/drift.yaml#/DriftSuppression'
+    DriftRemediationPolicy:
+      $ref: './schemas/drift.yaml#/DriftRemediationPolicy'
+    DriftRemediationPolicyUpdateRequest:
+      $ref: './schemas/drift.yaml#/DriftRemediationPolicyUpdateRequest'
+    DriftRemediationRecord:
+      $ref: './schemas/drift.yaml#/DriftRemediationRecord'
+    DriftRemediationLink:
+      $ref: './schemas/drift.yaml#/DriftRemediationLink'
+    DriftSuppressionUpdateRequest:
+      $ref: './schemas/drift.yaml#/DriftSuppressionUpdateRequest'
+    DriftReconcileRequest:
+      $ref: './schemas/drift.yaml#/DriftReconcileRequest'
 
     # Sync History
     SyncTrigger:

@@ -326,6 +326,65 @@ export function transformCustomFormat(format: PcdCustomFormat, arrType: SyncArrT
   return transformCustomFormatWithDiagnostics(format, arrType).format;
 }
 
+export interface CustomFormatComparableSpecification {
+  name: string;
+  implementation: string;
+  negate: boolean;
+  required: boolean;
+  /** Field name → value; order-insensitive and stripped of Arr UI metadata. */
+  fields: Record<string, unknown>;
+}
+
+export interface CustomFormatComparablePayload {
+  name: string;
+  includeCustomFormatWhenRenaming: boolean;
+  specifications: CustomFormatComparableSpecification[];
+}
+
+/**
+ * Normalize a desired payload or an Arr GET custom format for deterministic preview diffing.
+ *
+ * Arr GET decorates every specification with `implementationName`/`infoLink` and every field with
+ * UI metadata (`order`, `label`, `helpText`, `type`, `advanced`, `privacy`, `isFloat`, ...), and
+ * echoes defaults the transformer omits (`includeCustomFormatWhenRenaming: false`, Language
+ * `exceptLanguage: false`). Only the values sync actually writes are compared, so an Arr that
+ * matches the PCD is `unchanged` while real edits (name, rename flag, spec presence, negate,
+ * required, field values) still diff. Specifications stay keyed by `name:implementation` through
+ * `CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES`.
+ */
+export function normalizeCustomFormatForPreview(format: {
+  name?: unknown;
+  includeCustomFormatWhenRenaming?: unknown;
+  specifications?: unknown;
+}): CustomFormatComparablePayload {
+  const specifications = Array.isArray(format.specifications) ? format.specifications : [];
+  return {
+    name: typeof format.name === 'string' ? format.name : '',
+    includeCustomFormatWhenRenaming: format.includeCustomFormatWhenRenaming === true,
+    specifications: specifications.map((raw) => {
+      const spec = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+      const implementation = typeof spec.implementation === 'string' ? spec.implementation : '';
+      const fields: Record<string, unknown> = {};
+      for (const rawField of Array.isArray(spec.fields) ? spec.fields : []) {
+        const field = (typeof rawField === 'object' && rawField !== null ? rawField : {}) as Record<string, unknown>;
+        if (typeof field.name !== 'string') continue;
+        // The transformer only emits `exceptLanguage` when true; Arr echoes the false default.
+        if (implementation === 'LanguageSpecification' && field.name === 'exceptLanguage' && field.value === false) {
+          continue;
+        }
+        fields[field.name] = field.value;
+      }
+      return {
+        name: typeof spec.name === 'string' ? spec.name : '',
+        implementation,
+        negate: spec.negate === true,
+        required: spec.required === true,
+        fields,
+      };
+    }),
+  };
+}
+
 // =============================================================================
 // PCD Query Functions
 // =============================================================================

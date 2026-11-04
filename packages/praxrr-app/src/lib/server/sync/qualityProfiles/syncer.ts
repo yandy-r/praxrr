@@ -63,7 +63,7 @@ import {
 
 // Custom formats
 import { previewCustomFormats, syncCustomFormats, writeCustomFormatPayload } from '../customFormats/syncer.ts';
-import { fetchCustomFormatFromPcd } from '../customFormats/transformer.ts';
+import { fetchCustomFormatFromPcd, normalizeCustomFormatForPreview } from '../customFormats/transformer.ts';
 import type { PcdCustomFormat } from '../customFormats/transformer.ts';
 import {
   fetchQualityProfileFromPcd,
@@ -615,6 +615,8 @@ export class QualityProfileSyncer extends BaseSyncer {
         currentEntities: allArrCustomFormats as unknown as readonly PreviewComparableCustomFormat[],
         desiredName: (entity) => entity.name,
         currentName: (entity) => entity.name,
+        desiredComparable: normalizeCustomFormatForPreview,
+        currentComparable: normalizeCustomFormatForPreview,
         currentRemoteId: (entity) => entity.id ?? null,
         arrayKeyStrategies: CUSTOM_FORMAT_ARRAY_KEY_STRATEGIES,
       });
@@ -628,8 +630,10 @@ export class QualityProfileSyncer extends BaseSyncer {
         currentEntities: allArrProfiles as unknown as readonly PreviewComparableQualityProfile[],
         desiredName: (entity) => entity.name,
         currentName: (entity) => entity.name,
-        desiredComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
-        currentComparable: (entity) => normalizeQualityProfileForPreview(entity as QualityProfileComparableInput),
+        desiredComparable: (entity) =>
+          normalizeQualityProfileForPreview(entity as QualityProfileComparableInput, this.instanceType),
+        currentComparable: (entity) =>
+          normalizeQualityProfileForPreview(entity as QualityProfileComparableInput, this.instanceType),
         currentRemoteId: (entity) => existingProfilesMap.get(entity.name) ?? null,
         arrayKeyStrategies: QUALITY_PROFILE_ARRAY_KEY_STRATEGIES,
       });

@@ -5,6 +5,7 @@ import './arrPullStartup.ts';
 import './pcdSync.ts';
 import './trashGuideSync.ts';
 import './driftCheck.ts';
+import './driftRemediate.ts';
 import './backupCreate.ts';
 import './backupCleanup.ts';
 import './logsCleanup.ts';

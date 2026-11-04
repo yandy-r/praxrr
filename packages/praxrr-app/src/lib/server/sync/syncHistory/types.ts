@@ -14,10 +14,12 @@
 
 import type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
 import type { SyncEntityOutcome } from '$sync/types.ts';
+import type { DriftRemediationLink, DriftRemediationTrigger } from '$sync/drift/types.ts';
 import type { SyncFailureCode } from '../syncHistoryFailure.ts';
 
 export type { EntityChange, FieldChange, SyncPreviewArrType, SyncPreviewSection };
 export type { SyncEntityOutcome };
+export type { DriftRemediationLink, DriftRemediationTrigger };
 
 /** How the sync run was initiated. Maps from the job's `source`. */
 export type SyncTrigger = 'manual' | 'schedule' | 'system';
@@ -76,4 +78,10 @@ export interface SyncHistoryInput {
   startedAt: string;
   finishedAt: string | null;
   durationMs: number | null;
+  /**
+   * Server-owned drift link (reconcile/auto remediation only; null for every other run). Taken
+   * from the reviewed preview snapshot, never from a client body. Persisted as
+   * `drift_signature`/`drift_detected_at`/`remediation_trigger`.
+   */
+  driftLink: DriftRemediationLink | null;
 }
