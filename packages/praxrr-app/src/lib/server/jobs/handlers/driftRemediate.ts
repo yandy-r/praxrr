@@ -13,10 +13,12 @@
  *      the drift-linked sync history and `last_remediation_*` on the executed path;
  *   6. notify, then re-run the drift check to verify (the attempt claim prevents a loop).
  *
- * A retriable precondition that wrote nothing (preview rejected/failed, apply rejected before the
- * reviewed executor ran, or a throw before apply) RELEASES the claim instead of spending it, sends
- * no failure notification, and lets the next drift refresh re-enqueue. Once apply may have
- * written, the claim is kept.
+ * A retriable precondition that wrote nothing (preview rejected/failed, a preview whose sections
+ * errored so drift could not be compared, apply rejected before the reviewed executor ran, or a
+ * throw before apply) RELEASES the claim instead of spending it, sends no failure notification,
+ * and lets the next drift refresh re-enqueue. Only a verdict a retry cannot change (every target
+ * section has managed deletes, or the preview's signature really differs) or an apply that may
+ * have written keeps the claim.
  */
 
 import { jobQueueRegistry } from '../queueRegistry.ts';
@@ -92,12 +94,13 @@ function toAggregateInput(preview: SyncPreviewResult): GeneratePreviewResult {
 
 type VerifyResult =
   | { readonly ok: true; readonly sections: SyncPreviewSection[] }
-  | { readonly ok: false; readonly reason: 'managed_delete' | 'stale' };
+  | { readonly ok: false; readonly reason: 'managed_delete' | 'stale' | 'unverifiable' };
 
 /**
  * D11/D12: exclude sections containing managed deletes (auto never deletes), then require the
  * preview's alerting signature over the remaining sections to match the stored drift restricted
- * to the same sections. Any section error makes the comparison unverifiable (stale).
+ * to the same sections. A section error (or nothing compared) leaves the comparison
+ * `unverifiable` — a transient read failure, not a verdict — while a real mismatch is `stale`.
  */
 function verifyPreview(
   preview: SyncPreviewResult,
@@ -112,7 +115,7 @@ function verifyPreview(
   const keptSet = new Set<SyncPreviewSection>(kept);
   const aggregate = aggregateDrift(toAggregateInput(preview), keptSet);
   if (aggregate.anySectionErrored || !aggregate.comparedAny) {
-    return { ok: false, reason: 'stale' };
+    return { ok: false, reason: 'unverifiable' };
   }
 
   const previewSignature = driftSignature(aggregate.changes);
@@ -132,6 +135,23 @@ function recordOutcome(instanceId: number, status: DriftRemediationStatus, signa
     syncHistoryId: null,
   });
   publishDriftRowUpdated(instanceId);
+}
+
+/**
+ * The run status the reviewed executor stamped into `last_remediation_*` for this attempt, read
+ * independently of Sync History (which may be disabled, leaving `syncHistoryId` null). Only a
+ * record written after `priorAt` (the stamp before apply) for this signature counts.
+ */
+function executorRecordedStatus(
+  instanceId: number,
+  signature: string,
+  priorAt: string | null
+): DriftRemediationStatus | undefined {
+  const record = driftStatusQueries.getById(instanceId)?.lastRemediation;
+  if (!record || record.signature !== signature || record.at === null || record.at === priorAt) return undefined;
+  return record.status === 'success' || record.status === 'partial' || record.status === 'failed'
+    ? record.status
+    : undefined;
 }
 
 /** Give the attempt back: nothing was written, so the next drift refresh may re-enqueue it. */
@@ -201,8 +221,13 @@ export function createDriftRemediateHandler(overrides: Partial<DriftRemediateDep
         return releaseClaim(instance.id, signature, instance.name, reason);
       }
 
-      // 4. Verify before any write. Retrying cannot change either verdict for this signature.
+      // 4. Verify before any write. A section error is transient (nothing written), so the claim is
+      //    given back; managed deletes or a real signature mismatch cannot change for this
+      //    signature on retry, so those spend the attempt.
       const verified = verifyPreview(created.preview, decision.sections, row.changes);
+      if (!verified.ok && verified.reason === 'unverifiable') {
+        return releaseClaim(instance.id, signature, instance.name, 'preview sections errored; drift unverifiable');
+      }
       if (!verified.ok) {
         recordOutcome(instance.id, 'skipped', signature, deps.now());
         return {
@@ -216,6 +241,7 @@ export function createDriftRemediateHandler(overrides: Partial<DriftRemediateDep
       }
 
       // 5. Apply through the shared reviewed-apply core (records linked history on execution).
+      const priorRemediationAt = driftStatusQueries.getById(instance.id)?.lastRemediation.at ?? null;
       applyStarted = true;
       const applied = await deps.applyReviewedPreview(created.preview.id, {
         sections: [...verified.sections],
@@ -245,12 +271,14 @@ export function createDriftRemediateHandler(overrides: Partial<DriftRemediateDep
         };
       } else if (applied.kind === 'applied') {
         const syncHistoryId = applied.response.syncHistoryId;
-        const historyStatus = syncHistoryId !== null ? syncHistoryQueries.getById(syncHistoryId)?.status : undefined;
-        if (syncHistoryId === null) {
-          // No history row means the executor's linked record may be absent; never leave it stale.
+        const runStatus =
+          executorRecordedStatus(instance.id, signature, priorRemediationAt) ??
+          (syncHistoryId !== null ? syncHistoryQueries.getById(syncHistoryId)?.status : undefined);
+        if (runStatus === undefined) {
+          // Neither the executor's linked record nor a history row exists; never leave it stale.
           recordOutcome(instance.id, 'failed', signature, deps.now());
         }
-        const partial = historyStatus === 'partial';
+        const partial = runStatus === 'partial';
         notifyDriftRemediation({
           ...notifyBase,
           kind: partial ? 'partial' : 'failed',

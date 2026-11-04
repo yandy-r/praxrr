@@ -174,7 +174,11 @@ reconcile:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
       '409':
-        description: The instance is not `drifted` or its stored drift content is stale
+        description: |
+          Nothing to reconcile from the stored drift: the instance is not `drifted`, its stored
+          drift content is stale, the stored drift was recorded for a different Arr type than the
+          instance now has (refresh the drift check), or no drifted section is configured and
+          available to reconcile
         content:
           application/json:
             schema:
@@ -199,11 +203,15 @@ suppression:
     operationId: updateDriftSuppression
     summary: Acknowledge or snooze drift for one instance
     description: |
-      Replaces the instance's acknowledgement and snooze state. An instance acknowledgement
-      lasts until the drift signature changes; per-entity acknowledgements are pruned when the
-      entity stops drifting; a snooze lasts until `snoozedUntil` regardless of signature
-      changes. Suppression mutes drift notifications and the health penalty only — the stored
-      drift status is unchanged. Requires the `admin` token scope.
+      Replaces the instance's acknowledgement and snooze state. Acknowledgements are
+      content-aware: an instance acknowledgement lasts only while the alerting drift content
+      (each drifted entity's key plus its field-level diff) is unchanged, and a per-entity
+      acknowledgement lasts only while that entity's field diff is unchanged. A further field
+      change on an already-drifted entity ends both, even when the drifted entity set stays the
+      same; stale acknowledgements are dropped on the next drift refresh. A snooze lasts until
+      `snoozedUntil` regardless of drift changes. Suppression mutes drift notifications and the
+      health penalty only — the stored drift status is unchanged. Requires the `admin` token
+      scope.
     tags:
       - Drift Detection
     parameters:

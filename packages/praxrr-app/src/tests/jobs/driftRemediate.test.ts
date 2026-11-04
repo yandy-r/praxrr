@@ -446,6 +446,51 @@ migratedTest('precondition: preview rejected 429 → claim released, nothing rec
   assertEquals(driftStatusQueries.getById(instance.id)?.lastAutoAttemptSignature, signature);
 });
 
+migratedTest('precondition: a section errored in the preview → claim released, next run eligible', async () => {
+  const instance = createInstance('Radarr A');
+  const signature = seedRow(instance, { changes: [QP_DRIFT, DP_DRIFT] });
+  enableAuto(instance, ['qualityProfiles', 'delayProfiles']);
+  const h = harness(instance, { qualityProfiles: [QP_ENTITY], delayProfile: DP_ENTITY });
+  let delayErrors = true;
+  const ok = h.deps.createReviewedPreview;
+  const deps: DriftRemediateDependencies = {
+    ...h.deps,
+    createReviewedPreview: async (input) => {
+      const created = await ok(input);
+      if (!delayErrors || created.kind !== 'ok') return created;
+      // One section hit a transient Arr error; the other compared fine.
+      return {
+        kind: 'ok',
+        preview: {
+          ...created.preview,
+          delayProfiles: null,
+          sectionOutcomes: created.preview.sectionOutcomes.map((outcome) =>
+            outcome.section === 'delayProfiles'
+              ? { ...outcome, failure: { code: 'timeout', message: 'timed out', recoveryAction: 'retry' } }
+              : outcome
+          ),
+        },
+      };
+    },
+  };
+  const handler = createDriftRemediateHandler(deps);
+
+  const first = await handler(job(instance.id, signature));
+  assertEquals(first.status, 'cancelled');
+  assertEquals(h.applyCalls.length, 0);
+  assertEquals(h.recheckCalls, 0);
+  const afterFirst = driftStatusQueries.getById(instance.id);
+  assertEquals(afterFirst?.lastAutoAttemptSignature, null);
+  assertEquals(afterFirst?.lastRemediation.status, null);
+
+  delayErrors = false;
+  const second = await handler(job(instance.id, signature));
+  assertEquals(second.status, 'success');
+  assertEquals(h.applyCalls.length, 1);
+  assertEquals(h.applyCalls[0].input.sections, ['qualityProfiles', 'delayProfiles']);
+  assertEquals(driftStatusQueries.getById(instance.id)?.lastAutoAttemptSignature, signature);
+});
+
 migratedTest('precondition: apply rejected 409 before execution → claim released', async () => {
   const instance = createInstance('Radarr A');
   const signature = seedRow(instance);
@@ -500,6 +545,45 @@ migratedTest('write-started failure: apply ran and failed → claim kept, failed
   const second = await handler(job(instance.id, signature));
   assertEquals(second.status, 'cancelled');
   assertEquals(applies, 1);
+});
+
+migratedTest('write-started failure: partial run with Sync History off → partial kept, not failed', async () => {
+  const instance = createInstance('Radarr A');
+  const signature = seedRow(instance);
+  enableAuto(instance);
+  const h = harness(instance);
+  const deps: DriftRemediateDependencies = {
+    ...h.deps,
+    applyReviewedPreview: () => {
+      // The reviewed executor stamps the run status itself; history is disabled so no row id.
+      driftStatusQueries.recordRemediation(instance.id, {
+        trigger: 'auto',
+        status: 'partial',
+        signature,
+        at: new Date().toISOString(),
+        syncHistoryId: null,
+      });
+      return Promise.resolve({
+        kind: 'applied',
+        httpStatus: 500,
+        response: {
+          success: false,
+          results: { status: 'failure', output: 'one section failed' },
+          staleWarning: null,
+          outcomes: [],
+          syncHistoryId: null,
+        },
+      });
+    },
+  };
+
+  const result = await createDriftRemediateHandler(deps)(job(instance.id, signature));
+
+  assertEquals(result.status, 'failure');
+  assertEquals(result.decision, 'Drift remediation partially applied; some sections failed');
+  const row = driftStatusQueries.getById(instance.id);
+  assertEquals(row?.lastAutoAttemptSignature, signature);
+  assertEquals(row?.lastRemediation.status, 'partial');
 });
 
 migratedTest('write-started failure: apply throws → claim kept', async () => {

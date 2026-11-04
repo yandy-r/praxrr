@@ -168,13 +168,13 @@ const drift: Criterion = {
           [line('Drift measurement is stale', ['The most recent drift check could not refresh the live diff.'], 'info')]
         );
       }
-      // Acknowledged or snoozed drift is an intentional divergence: no penalty until the
-      // signature changes (ack) or the snooze expires (gather resolves both against `now`).
+      // Acknowledged or snoozed drift is intentional divergence: no penalty until the acknowledged
+      // drift content changes (ack) or the snooze expires (gather resolves both against `now`).
       if (d.suppression !== null) {
         const note =
           d.suppression === 'snoozed'
             ? `Drift snoozed until ${d.snoozedUntil ?? 'expiry'}`
-            : 'Drift acknowledged until the drifted set changes';
+            : 'Drift acknowledged until the drifted content changes';
         return result('drift', 'Drift', 100, config, [note], []);
       }
       // Partial acknowledgement: `drifted`/`missing` are already the un-acknowledged counts.

@@ -76,7 +76,8 @@ export interface QualityProfileComparablePayload {
   cutoff: number;
   minFormatScore: number;
   cutoffFormatScore: number;
-  minUpgradeFormatScore: number;
+  /** Omitted for Lidarr, whose quality profile resource has no `minUpgradeFormatScore`. */
+  minUpgradeFormatScore?: number;
   /** Keyed by `format` id; `name` is excluded (see `normalizeQualityProfileForPreview`). */
   formatItems: { format: number; score: number }[];
 }
@@ -265,17 +266,32 @@ export function transformQualityProfileWithSuffix(
 }
 
 /**
- * Radarr GET returns `quality.modifier` on every profile item, but the transformer never emits it
- * (it is Arr-owned quality metadata, not a profile setting). Sonarr qualities have no modifier, so
- * nothing is stripped for Sonarr and any unexpected field there still diffs.
+ * Project a quality object onto the fields the target Arr's GET actually returns, so
+ * transformer-only quality metadata never diffs:
+ * - Radarr GET adds `quality.modifier`, which the transformer never emits (Arr-owned metadata);
+ *   it is stripped.
+ * - Lidarr's `Quality` model is `{ id, name }` only (Lidarr `NzbDrone.Core.Qualities.Quality`),
+ *   while the desired items copy `QUALITIES.lidarr` entries carrying `source`/`resolution`; it is
+ *   projected to `{ id, name }`.
+ * - Sonarr is left as-is, so any unexpected field still diffs.
  */
+function normalizeQualityForPreview(
+  quality: NonNullable<ArrQualityProfileItem['quality']>,
+  arrType: SyncArrType
+): NonNullable<ArrQualityProfileItem['quality']> {
+  if (arrType === 'lidarr') {
+    return { id: quality.id, name: quality.name };
+  }
+  if (arrType === 'radarr' && 'modifier' in quality) {
+    const { modifier: _modifier, ...rest } = quality as typeof quality & { modifier?: unknown };
+    return rest;
+  }
+  return quality;
+}
+
 function normalizeQualityItemForPreview(item: ArrQualityProfileItem, arrType: SyncArrType): ArrQualityProfileItem {
   const children = Array.isArray(item.items) ? item.items : [];
-  let quality = item.quality;
-  if (arrType === 'radarr' && quality && 'modifier' in quality) {
-    const { modifier: _modifier, ...rest } = quality as typeof quality & { modifier?: unknown };
-    quality = rest;
-  }
+  const quality = item.quality ? normalizeQualityForPreview(item.quality, arrType) : item.quality;
   return {
     ...item,
     ...(quality && { quality }),
@@ -290,6 +306,10 @@ function normalizeQualityItemForPreview(item: ArrQualityProfileItem, arrType: Sy
  * CF name while Arr reports the namespaced Arr name, and Arr resolves format items by id (the name
  * is ignored on write). Score changes and added/removed formats stay detectable through the
  * `formatItems` key strategy.
+ *
+ * Lidarr's quality profile resource has no `minUpgradeFormatScore` (Lidarr
+ * `QualityProfileResource`), so it is never compared for Lidarr: the desired value is never
+ * persisted and would otherwise diff forever whenever the PCD increment is above 1.
  */
 export function normalizeQualityProfileForPreview(
   profile: QualityProfileComparableInput,
@@ -305,8 +325,10 @@ export function normalizeQualityProfileForPreview(
     cutoff: profile.cutoff ?? 0,
     minFormatScore: profile.minFormatScore ?? 0,
     cutoffFormatScore: profile.cutoffFormatScore ?? 0,
-    minUpgradeFormatScore:
-      profile.minUpgradeFormatScore && profile.minUpgradeFormatScore > 0 ? profile.minUpgradeFormatScore : 1,
+    ...(arrType !== 'lidarr' && {
+      minUpgradeFormatScore:
+        profile.minUpgradeFormatScore && profile.minUpgradeFormatScore > 0 ? profile.minUpgradeFormatScore : 1,
+    }),
     formatItems: formatItems.map((item) => ({ format: item.format, score: item.score })),
   };
 }

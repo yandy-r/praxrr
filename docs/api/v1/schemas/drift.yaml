@@ -572,7 +572,10 @@ DriftSuppressionUpdateRequest:
         stored signature has changed.
     acknowledgeInstance:
       type: boolean
-      description: Acknowledge the whole current drift signature (requires status `drifted`).
+      description: |
+        Acknowledge the current alerting drift content (every drifted entity's key plus its
+        field-level diff); requires status `drifted`. The acknowledgement ends as soon as any
+        alerting change is added, removed, or edited, even when the drift signature is unchanged.
     acknowledgedEntityKeys:
       type: array
       uniqueItems: true

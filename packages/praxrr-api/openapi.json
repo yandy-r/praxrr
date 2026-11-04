@@ -4800,7 +4800,7 @@
             }
           },
           "409": {
-            "description": "The instance is not `drifted` or its stored drift content is stale",
+            "description": "Nothing to reconcile from the stored drift: the instance is not `drifted`, its stored\ndrift content is stale, the stored drift was recorded for a different Arr type than the\ninstance now has (refresh the drift check), or no drifted section is configured and\navailable to reconcile\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -4836,7 +4836,7 @@
       "put": {
         "operationId": "updateDriftSuppression",
         "summary": "Acknowledge or snooze drift for one instance",
-        "description": "Replaces the instance's acknowledgement and snooze state. An instance acknowledgement\nlasts until the drift signature changes; per-entity acknowledgements are pruned when the\nentity stops drifting; a snooze lasts until `snoozedUntil` regardless of signature\nchanges. Suppression mutes drift notifications and the health penalty only — the stored\ndrift status is unchanged. Requires the `admin` token scope.\n",
+        "description": "Replaces the instance's acknowledgement and snooze state. Acknowledgements are\ncontent-aware: an instance acknowledgement lasts only while the alerting drift content\n(each drifted entity's key plus its field-level diff) is unchanged, and a per-entity\nacknowledgement lasts only while that entity's field diff is unchanged. A further field\nchange on an already-drifted entity ends both, even when the drifted entity set stays the\nsame; stale acknowledgements are dropped on the next drift refresh. A snooze lasts until\n`snoozedUntil` regardless of drift changes. Suppression mutes drift notifications and the\nhealth penalty only — the stored drift status is unchanged. Requires the `admin` token\nscope.\n",
         "tags": ["Drift Detection"],
         "parameters": [
           {
@@ -11488,7 +11488,7 @@
           },
           "acknowledgeInstance": {
             "type": "boolean",
-            "description": "Acknowledge the whole current drift signature (requires status `drifted`)."
+            "description": "Acknowledge the current alerting drift content (every drifted entity's key plus its\nfield-level diff); requires status `drifted`. The acknowledgement ends as soon as any\nalerting change is added, removed, or edited, even when the drift signature is unchanged.\n"
           },
           "acknowledgedEntityKeys": {
             "type": "array",

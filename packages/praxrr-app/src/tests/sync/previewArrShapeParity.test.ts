@@ -29,7 +29,7 @@ import type {
 import { QualityProfileSyncer } from '$sync/qualityProfiles/syncer.ts';
 import type { PcdQualityProfile } from '$sync/qualityProfiles/transformer.ts';
 
-type ParityArrType = 'radarr' | 'sonarr';
+type ParityArrType = 'radarr' | 'sonarr' | 'lidarr';
 
 const SUFFIX = '\u200B';
 const INSTANCE_ID = 7;
@@ -96,6 +96,45 @@ function pcdCustomFormats(): Map<string, PcdCustomFormat> {
   ]);
 }
 
+/** Lidarr audio qualities (names resolve through `QUALITIES.lidarr`). */
+function lidarrQualities(): PcdQualityProfile['qualities'] {
+  return [
+    { type: 'quality', referenceId: 1, name: 'FLAC', position: 0, enabled: true, upgradeUntil: true },
+    {
+      type: 'group',
+      referenceId: 2,
+      name: 'Lossless Hi-Res',
+      position: 1,
+      enabled: true,
+      upgradeUntil: false,
+      members: [
+        { id: 3, name: 'FLAC 24bit' },
+        { id: 4, name: 'ALAC' },
+      ],
+    },
+    { type: 'quality', referenceId: 5, name: 'MP3-320', position: 2, enabled: true, upgradeUntil: false },
+  ];
+}
+
+function videoQualities(): PcdQualityProfile['qualities'] {
+  return [
+    { type: 'quality', referenceId: 1, name: 'Remux-1080p', position: 0, enabled: true, upgradeUntil: true },
+    {
+      type: 'group',
+      referenceId: 2,
+      name: 'WEB 1080p',
+      position: 1,
+      enabled: true,
+      upgradeUntil: false,
+      members: [
+        { id: 3, name: 'WEBDL-1080p' },
+        { id: 4, name: 'WEBRip-1080p' },
+      ],
+    },
+    { type: 'quality', referenceId: 5, name: 'Bluray-1080p', position: 2, enabled: true, upgradeUntil: false },
+  ];
+}
+
 function pcdProfile(arrType: ParityArrType): PcdQualityProfile {
   return {
     id: 1,
@@ -103,23 +142,9 @@ function pcdProfile(arrType: ParityArrType): PcdQualityProfile {
     upgradesAllowed: true,
     minimumCustomFormatScore: 0,
     upgradeUntilScore: 500,
-    upgradeScoreIncrement: 1,
-    qualities: [
-      { type: 'quality', referenceId: 1, name: 'Remux-1080p', position: 0, enabled: true, upgradeUntil: true },
-      {
-        type: 'group',
-        referenceId: 2,
-        name: 'WEB 1080p',
-        position: 1,
-        enabled: true,
-        upgradeUntil: false,
-        members: [
-          { id: 3, name: 'WEBDL-1080p' },
-          { id: 4, name: 'WEBRip-1080p' },
-        ],
-      },
-      { type: 'quality', referenceId: 5, name: 'Bluray-1080p', position: 2, enabled: true, upgradeUntil: false },
-    ],
+    // Lidarr has no `minUpgradeFormatScore`; a non-default increment proves it is never compared.
+    upgradeScoreIncrement: arrType === 'lidarr' ? 10 : 1,
+    qualities: arrType === 'lidarr' ? lidarrQualities() : videoQualities(),
     language: arrType === 'radarr' ? { id: 1, name: 'English', type: 'simple' } : null,
     customFormats: [
       { formatId: 1, formatName: 'HDR', score: 100 },
@@ -188,11 +213,17 @@ function arrGetCustomFormat(desired: ArrCustomFormat, id: number): ArrCustomForm
   } as unknown as ArrCustomFormat;
 }
 
+/**
+ * Lidarr's `Quality` model is `{ id, name }` only (Lidarr `NzbDrone.Core.Qualities.Quality`), so
+ * GET never echoes the `source`/`resolution` the desired items copy from `QUALITIES.lidarr`.
+ */
 function arrGetQualityItem(item: ArrQualityProfileItem, arrType: ParityArrType): ArrQualityProfileItem {
   const quality = item.quality
     ? arrType === 'radarr'
       ? { ...item.quality, modifier: RADARR_MODIFIERS[item.quality.name] ?? 'none' }
-      : { ...item.quality }
+      : arrType === 'lidarr'
+        ? { id: item.quality.id, name: item.quality.name }
+        : { ...item.quality }
     : undefined;
   return {
     ...(item.id !== undefined && { id: item.id }),
@@ -210,7 +241,7 @@ function arrGetQualityProfile(
   arrFormats: readonly ArrCustomFormat[]
 ): ArrQualityProfilePayload {
   const arrNameById = new Map(arrFormats.map((format) => [format.id!, format.name]));
-  return {
+  const profile: ArrQualityProfilePayload = {
     ...structuredClone(desired),
     id,
     items: desired.items.map((item) => arrGetQualityItem(item, arrType)),
@@ -219,6 +250,10 @@ function arrGetQualityProfile(
       .map((item) => ({ format: item.format, name: arrNameById.get(item.format) ?? item.name, score: item.score }))
       .reverse(),
   };
+  if (arrType !== 'lidarr') return profile;
+  // Lidarr `QualityProfileResource` has no `minUpgradeFormatScore` (and no `language`).
+  const { minUpgradeFormatScore: _minUpgradeFormatScore, language: _language, ...lidarrProfile } = profile;
+  return lidarrProfile as ArrQualityProfilePayload;
 }
 
 // =============================================================================
@@ -410,3 +445,46 @@ for (const arrType of ['radarr', 'sonarr'] as const) {
     assertEquals(drift.counts.drifted, 3);
   });
 }
+
+// Lidarr GET shape per Lidarr `QualityProfileResource`: quality items carry `quality: { id, name }`
+// only and the profile has no `minUpgradeFormatScore`/`language`. Lidarr custom formats support
+// only a subset of condition types, so the CF assertions above are Radarr/Sonarr-specific.
+dbTest('lidarr: Arr GET quality profile identical to PCD previews unchanged and drifts in-sync', async () => {
+  const state = await syncedArrState('lidarr');
+  const liveItem = state.qualityProfiles[0].items.find((item) => item.quality?.name === 'FLAC')!;
+  assertEquals(liveItem.quality, { id: 6, name: 'FLAC' });
+  assertEquals('minUpgradeFormatScore' in state.qualityProfiles[0], false);
+
+  const { preview } = await runPreview('lidarr', state);
+
+  assertEquals(preview.qualityProfiles.length, 1);
+  assertEquals(pendingWrites(preview.customFormats), [], 'identical custom formats must be unchanged');
+  assertEquals(pendingWrites(preview.qualityProfiles), [], 'identical quality profiles must be unchanged');
+
+  const drift = await driftStatus('lidarr', preview);
+  assertEquals(drift.status, 'in-sync');
+  assertEquals(drift.counts.drifted, 0);
+  assertEquals(drift.counts.missing, 0);
+});
+
+dbTest('lidarr: real quality profile score and quality changes are still detected', async () => {
+  const state = await syncedArrState('lidarr');
+  const hdr = state.customFormats.find((format) => format.name === `HDR${SUFFIX}`)!;
+  const profile = state.qualityProfiles[0];
+  profile.formatItems.find((item) => item.format === hdr.id)!.score = 50;
+  profile.items.find((item) => item.quality?.name === 'MP3-320')!.allowed = false;
+
+  const { preview } = await runPreview('lidarr', state);
+
+  const profileChanges = pendingWrites(preview.qualityProfiles);
+  assertEquals(profileChanges.length, 1);
+  assertEquals(profileChanges[0].action, 'update');
+  const fields = profileChanges[0].fields.map(({ type, current, desired }) => ({ type, current, desired }));
+  assertEquals(fields.length, 2);
+  assert(fields.some((field) => field.type === 'changed' && field.current === 50 && field.desired === 100));
+  assert(fields.some((field) => field.type === 'changed' && field.current === false && field.desired === true));
+
+  const drift = await driftStatus('lidarr', preview);
+  assertEquals(drift.status, 'drifted');
+  assertEquals(drift.counts.drifted, 1);
+});

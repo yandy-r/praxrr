@@ -1379,11 +1379,15 @@ export interface paths {
     get?: never;
     /**
      * Acknowledge or snooze drift for one instance
-     * @description Replaces the instance's acknowledgement and snooze state. An instance acknowledgement
-     *     lasts until the drift signature changes; per-entity acknowledgements are pruned when the
-     *     entity stops drifting; a snooze lasts until `snoozedUntil` regardless of signature
-     *     changes. Suppression mutes drift notifications and the health penalty only — the stored
-     *     drift status is unchanged. Requires the `admin` token scope.
+     * @description Replaces the instance's acknowledgement and snooze state. Acknowledgements are
+     *     content-aware: an instance acknowledgement lasts only while the alerting drift content
+     *     (each drifted entity's key plus its field-level diff) is unchanged, and a per-entity
+     *     acknowledgement lasts only while that entity's field diff is unchanged. A further field
+     *     change on an already-drifted entity ends both, even when the drifted entity set stays the
+     *     same; stale acknowledgements are dropped on the next drift refresh. A snooze lasts until
+     *     `snoozedUntil` regardless of drift changes. Suppression mutes drift notifications and the
+     *     health penalty only — the stored drift status is unchanged. Requires the `admin` token
+     *     scope.
      */
     put: operations['updateDriftSuppression'];
     post?: never;
@@ -3563,7 +3567,11 @@ export interface components {
        *     stored signature has changed.
        */
       expectedSignature: string | null;
-      /** @description Acknowledge the whole current drift signature (requires status `drifted`). */
+      /**
+       * @description Acknowledge the current alerting drift content (every drifted entity's key plus its
+       *     field-level diff); requires status `drifted`. The acknowledgement ends as soon as any
+       *     alerting change is added, removed, or edited, even when the drift signature is unchanged.
+       */
       acknowledgeInstance: boolean;
       /** @description Full replacement set of acknowledged entity keys; each must be a current alerting key. */
       acknowledgedEntityKeys: string[];
@@ -10532,7 +10540,12 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
-      /** @description The instance is not `drifted` or its stored drift content is stale */
+      /**
+       * @description Nothing to reconcile from the stored drift: the instance is not `drifted`, its stored
+       *     drift content is stale, the stored drift was recorded for a different Arr type than the
+       *     instance now has (refresh the drift check), or no drifted section is configured and
+       *     available to reconcile
+       */
       409: {
         headers: {
           [name: string]: unknown;

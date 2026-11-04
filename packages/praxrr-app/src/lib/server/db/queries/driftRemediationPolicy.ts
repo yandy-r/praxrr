@@ -1,6 +1,7 @@
 import { db } from '../db.ts';
 import type { SyncPreviewArrType, SyncPreviewSection } from '$sync/preview/types.ts';
 import type { DriftRemediationMode, DriftRemediationPolicy } from '$sync/drift/types.ts';
+import { toUTC } from '$shared/utils/dates.ts';
 
 /**
  * Row shape for drift_remediation_policy (byte-aligned to the migration columns).
@@ -43,7 +44,8 @@ function toPolicy(row: DriftRemediationPolicyRow): DriftRemediationPolicy {
     arrType: row.arr_type as SyncPreviewArrType,
     mode: row.mode as DriftRemediationMode,
     allowedSections: parseSections(row.allowed_sections),
-    updatedAt: row.updated_at,
+    // SQLite `CURRENT_TIMESTAMP` (`YYYY-MM-DD HH:MM:SS`, UTC) → RFC 3339, as the API contract says.
+    updatedAt: toUTC(row.updated_at),
   };
 }
 
