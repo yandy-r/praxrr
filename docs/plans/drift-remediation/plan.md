@@ -1,6 +1,8 @@
 # Plan — Drift Remediation: Reconcile, Acknowledge/Snooze, Auto-Remediation (YAN-514 / GH #409)
 
-Status: implementation plan, not yet implemented. Research: [`research.md`](./research.md).
+Status: implemented (YAN-514 / GH #409). The current contract lives in
+[`sync-pipeline.md#drift-remediation`](../../site/src/content/docs/app/sync-pipeline.md#drift-remediation);
+this plan is kept as the design record. Research: [`research.md`](./research.md).
 Depends on YAN-446 / GH #408 (drift false positives), which ships in the same PR. Auto mode is only
 safe once identical Arr state diffs as `unchanged`.
 
@@ -74,8 +76,15 @@ CREATE INDEX idx_sync_history_drift ON sync_history(arr_instance_id, drift_signa
   WHERE drift_signature IS NOT NULL;
 
 -- down: DROP INDEX idx_sync_history_drift; DROP TABLE drift_remediation_policy;
---       ALTER TABLE ... DROP COLUMN for every added column (reverse order).
+-- ALTER TABLE ... DROP COLUMN for every added column (reverse order). The column-level
+-- REFERENCES on last_remediation_sync_history_id is dropped with the column (only table-level
+-- FOREIGN KEY clauses block DROP COLUMN); covered by the populated down test.
 ```
+
+> **Shipped:** acknowledgements are content-aware. `acknowledged_entity_keys` stores a JSON array of
+> `{ key, fingerprint }` entries (not a `string[]`), and `acknowledged_signature` holds the
+> `driftContentSignature` of the acknowledged content (not `drift_signature`). This supersedes the
+> key-only comments in the SQL above.
 
 Existing rows get NULL/`'[]'` values: no ack, no snooze, policy off. Existing behavior is unchanged.
 
@@ -167,6 +176,13 @@ export interface DriftRemediationLink {
   instance ack gives effective counts 0 and `effectiveSignature` null. Otherwise acked keys are
   subtracted. The state is `partially_acknowledged` when some, but not all, alerting keys are acked.
 
+  > **Shipped (supersedes the key-only rules above):** acknowledgements are content-aware. The
+  > instance ack is active iff `acknowledgedSignature === driftContentSignature(changes)`, which is a
+  > hash over each alerting change's `driftEntityFingerprint` (its key plus its field-level diff).
+  > Per-entity acks are `{ key, fingerprint }` entries (`acknowledgedEntities`). An entry is active
+  > iff the current alerting change with that key has the same fingerprint. So a further field change
+  > on an already-drifted entity ends the ack even when `driftSignature` is unchanged.
+
 ### 3.3 Queries
 
 - `$db/queries/driftStatus.ts` (A1): extend the Row/`DriftInstanceStatusDetail` with `driftDetectedAt`,
@@ -195,6 +211,10 @@ export interface DriftRemediationLink {
   `remediationTrigger` to `SyncHistorySummary`/`SyncHistoryDetail` (`SUMMARY_COLUMNS`). Every existing
   `recordSyncHistory` caller passes `driftLink: null`, except the reviewed path in Slice C.
   `sanitizeSyncHistoryInput` passes it through.
+
+  > **Shipped:** the Detail field is `acknowledgedEntities: DriftEntityAck[]` (`{ key, fingerprint }`),
+  > not `acknowledgedEntityKeys: string[]`. Stale acks are cleared by content (fingerprint mismatch or
+  > key no longer alerting), not by `drift_signature` alone. See §3.2.
 
 ### 3.4 Preview core (Slice C owns; B/D consume the signatures)
 
@@ -448,9 +468,9 @@ Wave 3 (one agent each, parallel; after wave 2):
   (Acknowledged/Snoozed/Auto badges), `routes/arr/[id]/sync/components/SyncPreviewPanel.svelte` (prop
   `regenerateEndpoint = '/api/v1/sync/preview'`, used only in `handleRegenerate`),
   `routes/sync-history/[id]/+page.svelte` (drift link block), `lib/client/ui/drift/driftStatus.ts`
-  (suppression/remediation labels and variants). Svelte 5 without runes (`export let`, `$:`, `on:click`),
-  `alertStore.add`, existing `$ui` Badge/Button/Modal/DropdownSelect. The auto-mode enable flow uses a
-  `Modal` confirm.
+  (suppression/remediation labels and variants). Svelte 5 without runes (`export let`, `$:`, `onclick`
+  handlers), `alertStore.add`, existing `$ui` Badge/Button/Modal/DropdownSelect. The auto-mode
+  enable flow uses a `Modal` confirm.
 - **F — Docs.** Owns: `docs/site/src/content/docs/app/sync-pipeline.md` (drift remediation section),
   `docs/site/src/content/docs/app/notifications.md` (new types),
   `docs/plans/drift-detection/design.md` §11/§12 (mark the seams as implemented, link this plan). No

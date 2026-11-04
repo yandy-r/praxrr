@@ -352,8 +352,40 @@ migratedTest('migration 20261103: up adds columns with NULL/[] defaults and the 
 });
 
 migratedTest('migration 20261103: down reverts every column, the table and the index', async () => {
+  // Populate every added column — including the sync_history FK back-pointer — so down runs
+  // the real DROP COLUMN path against live data, not an empty table.
+  const instanceId = seedInstance();
+  await driftStatusQueries.upsert(
+    makeUpsertInput(instanceId, { driftSignature: 'sig-a', driftDetectedAt: '2026-11-01T00:00:00.000Z' })
+  );
+  db.execute(
+    `INSERT INTO sync_history (arr_instance_id, instance_name, arr_type, trigger, status, started_at)
+		VALUES (?, 'Radarr Drift', 'radarr', 'manual', 'success', '2026-11-02T00:00:00.000Z')`,
+    instanceId
+  );
+  const historyId = db.queryFirst<{ id: number }>('SELECT MAX(id) AS id FROM sync_history')?.id;
+  assertExists(historyId);
+  assert(
+    driftStatusQueries.recordRemediation(instanceId, {
+      trigger: 'reconcile',
+      status: 'success',
+      signature: 'sig-a',
+      at: '2026-11-02T00:00:00.000Z',
+      syncHistoryId: historyId,
+    })
+  );
+  assertEquals(driftStatusQueries.getById(instanceId)?.lastRemediation.syncHistoryId, historyId);
+  driftRemediationPolicyQueries.upsert({ instanceId, arrType: 'radarr', mode: 'auto', allowedSections: [] });
+
   await migrationRunner.down([addDriftRemediationMigration], 20261102);
   assertEquals(migrationRunner.isApplied(20261103), false);
+  // Pre-existing drift rows survive the rollback and FK integrity holds.
+  const survivor = db.queryFirst<{ drift_signature: string | null }>(
+    'SELECT drift_signature FROM drift_instance_status WHERE arr_instance_id = ?',
+    instanceId
+  );
+  assertEquals(survivor?.drift_signature, 'sig-a');
+  assertEquals(db.query('PRAGMA foreign_key_check'), []);
   const statusColumns = columnNames('drift_instance_status');
   for (const column of DRIFT_REMEDIATION_STATUS_COLUMNS) {
     assert(!statusColumns.includes(column), `drift_instance_status.${column} must be dropped`);

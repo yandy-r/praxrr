@@ -289,14 +289,29 @@ function normalizeQualityForPreview(
   return quality;
 }
 
+/**
+ * Sonarr v5 (`develop`) `QualityProfileQualityItemResource` carries per-item `minSize` /
+ * `maxSize` / `preferredSize` (`double?`, Sonarr "Quality limits are part of Quality Profile");
+ * Sonarr also copies quality-definition sizes into every profile item on definition update. The
+ * transformer never emits them — Praxrr manages sizes via quality definitions only — so they would
+ * otherwise diff forever. Radarr and Lidarr item resources have no such fields, so they are left
+ * untouched there and any unexpected field still diffs.
+ */
+const SONARR_ITEM_SIZE_FIELDS = ['minSize', 'maxSize', 'preferredSize'] as const;
+
 function normalizeQualityItemForPreview(item: ArrQualityProfileItem, arrType: SyncArrType): ArrQualityProfileItem {
   const children = Array.isArray(item.items) ? item.items : [];
   const quality = item.quality ? normalizeQualityForPreview(item.quality, arrType) : item.quality;
-  return {
+  const normalized: ArrQualityProfileItem = {
     ...item,
     ...(quality && { quality }),
     items: children.map((child) => normalizeQualityItemForPreview(child, arrType)),
   };
+  if (arrType === 'sonarr') {
+    const record = normalized as unknown as Record<string, unknown>;
+    for (const field of SONARR_ITEM_SIZE_FIELDS) delete record[field];
+  }
+  return normalized;
 }
 
 /**

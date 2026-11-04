@@ -446,6 +446,50 @@ for (const arrType of ['radarr', 'sonarr'] as const) {
   });
 }
 
+/**
+ * Sonarr v5 `QualityProfileQualityItemResource` returns per-item `minSize`/`maxSize`/
+ * `preferredSize` (`double?`), seeded from quality definitions and user-editable per profile.
+ * Praxrr never emits them, so they are set on every item — groups and nested members alike.
+ */
+function withItemSizes(items: ArrQualityProfileItem[]): void {
+  for (const [index, item] of items.entries()) {
+    Object.assign(item, { minSize: 1 + index, maxSize: 400 + index, preferredSize: 95 + index });
+    withItemSizes(item.items);
+  }
+}
+
+dbTest('sonarr: per-item quality size limits never diff (Praxrr does not manage them)', async () => {
+  const state = await syncedArrState('sonarr');
+  withItemSizes(state.qualityProfiles[0].items);
+  const group = state.qualityProfiles[0].items.find((item) => item.name === 'WEB 1080p')!;
+  assertEquals((group.items[0] as unknown as Record<string, unknown>).maxSize, 400);
+
+  const { preview } = await runPreview('sonarr', state);
+  assertEquals(pendingWrites(preview.qualityProfiles), [], 'Arr-owned item sizes must not produce updates');
+  const drift = await driftStatus('sonarr', preview);
+  assertEquals(drift.status, 'in-sync');
+
+  // A real item change alongside the sizes is still the only field reported.
+  state.qualityProfiles[0].items.find((item) => item.quality?.name === 'Bluray-1080p')!.allowed = false;
+  const changed = pendingWrites((await runPreview('sonarr', state)).preview.qualityProfiles);
+  assertEquals(changed.length, 1);
+  assertEquals(
+    changed[0].fields.map(({ type, current, desired }) => ({ type, current, desired })),
+    [{ type: 'changed', current: false, desired: true }]
+  );
+});
+
+dbTest('radarr: item size fields are not stripped (Radarr item resource has none)', async () => {
+  const state = await syncedArrState('radarr');
+  withItemSizes(state.qualityProfiles[0].items);
+
+  const { preview } = await runPreview('radarr', state);
+  const changed = pendingWrites(preview.qualityProfiles);
+  assertEquals(changed.length, 1);
+  assert(changed[0].fields.length > 0);
+  assert(changed[0].fields.every((field) => /(minSize|maxSize|preferredSize)$/.test(field.field)));
+});
+
 // Lidarr GET shape per Lidarr `QualityProfileResource`: quality items carry `quality: { id, name }`
 // only and the profile has no `minUpgradeFormatScore`/`language`. Lidarr custom formats support
 // only a subset of condition types, so the CF assertions above are Radarr/Sonarr-specific.
