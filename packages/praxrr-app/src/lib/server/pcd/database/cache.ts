@@ -11,6 +11,7 @@ import { validateOperations } from '../utils/operations.ts';
 import { databaseInstancesQueries, disableDatabaseInstance } from '$db/queries/databaseInstances.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
+import { invalidateConflictCounts } from '../conflicts/counts.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { CacheBuildStats, Operation, ValidationResult } from '../core/types.ts';
 
@@ -59,6 +60,7 @@ export class PCDCache {
     });
     const userOpsById = new Map(userOps.map((op) => [op.id, op]));
     const priorConflicts = new Map<number, string | null>();
+    let historyWritten = false;
     try {
       const latestConflicts = pcdOpHistoryQueries.listLatestByDatabaseWithOps(this.databaseInstanceId, [
         'conflicted',
@@ -201,6 +203,7 @@ export class PCDCache {
                 rowcount,
                 conflictReason,
               });
+              historyWritten = true;
             } catch (historyError) {
               await logger.warn('Failed to record op history', {
                 source: 'PCDCache',
@@ -259,6 +262,7 @@ export class PCDCache {
                 filename: operation.filename,
               }),
             });
+            historyWritten = true;
           } catch (historyError) {
             await logger.warn('Failed to record op history', {
               source: 'PCDCache',
@@ -292,6 +296,10 @@ export class PCDCache {
       // Clean up
       this.close();
       throw error;
+    } finally {
+      // Once per compile (not per row): op-history rows change the latest-conflict counts that
+      // feed nav badges / the home dashboard. Nav badge cache is chained off this invalidation.
+      if (historyWritten) invalidateConflictCounts();
     }
   }
 

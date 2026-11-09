@@ -24,8 +24,20 @@ export function getConflictCountsByDatabase(): ReadonlyMap<number, number> {
   return counts;
 }
 
+const invalidationListeners = new Set<() => void>();
+
+/**
+ * Subscribe to conflict-count invalidation so downstream caches (e.g. nav badges) can chain off it
+ * without the pcd layer importing them (navigation/badges.ts imports pcd, so a direct import
+ * from pcd would be a cycle).
+ */
+export function onConflictCountsInvalidated(listener: () => void): void {
+  invalidationListeners.add(listener);
+}
+
 /** Drop the cached counts (call after any conflict resolution / op-history mutation). */
 export function invalidateConflictCounts(): void {
   generation += 1;
   entry = null;
+  for (const listener of invalidationListeners) listener();
 }

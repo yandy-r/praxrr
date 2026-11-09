@@ -16,13 +16,18 @@
     info: 'border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-200 dark:hover:bg-blue-900/30',
   };
   const toneIcon = { warning: AlertTriangle, danger: XCircle, info: Info };
+
+  // Info-tone items (canary rollouts, optional parser) are informational, not action items, so
+  // they must neither count as "needs attention" nor suppress the all-clear state.
+  $: actionable = items.filter((item) => item.tone !== 'info');
+  $: showAllClear = actionable.length === 0 && hasInstances && !degraded;
 </script>
 
-{#if items.length > 0}
+{#if actionable.length > 0}
   <section aria-labelledby="attention-heading" class="space-y-2">
     <h2 id="attention-heading" class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
       Needs attention
-      <span class="ml-1 font-normal text-neutral-500 dark:text-neutral-400">({items.length})</span>
+      <span class="ml-1 font-normal text-neutral-500 dark:text-neutral-400">({actionable.length})</span>
     </h2>
     <ul class="flex flex-wrap gap-2">
       {#each items as item (item.id)}
@@ -41,7 +46,7 @@
       {/each}
     </ul>
   </section>
-{:else if hasInstances && !degraded}
+{:else if showAllClear}
   <div
     class="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-200"
     role="status"
@@ -49,4 +54,23 @@
     <CheckCircle2 size={16} aria-hidden="true" />
     Nothing needs your attention right now.
   </div>
+{/if}
+
+{#if actionable.length === 0 && items.length > 0}
+  <ul class="flex flex-wrap gap-2" aria-label="Notices">
+    {#each items as item (item.id)}
+      <li>
+        <a
+          href={item.href}
+          class="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors {toneClass[
+            item.tone
+          ]}"
+        >
+          <svelte:component this={toneIcon[item.tone]} size={14} aria-hidden="true" />
+          {item.text}
+          <ChevronRight size={14} class="opacity-60" aria-hidden="true" />
+        </a>
+      </li>
+    {/each}
+  </ul>
 {/if}

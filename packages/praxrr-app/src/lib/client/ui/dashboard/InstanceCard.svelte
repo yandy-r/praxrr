@@ -5,10 +5,16 @@
   import { DRIFT_STATUS_LABEL, driftStatusVariant } from '$ui/drift/driftStatus.ts';
   import { HEALTH_BAND_LABEL, HEALTH_BAND_TEXT_CLASS, bandVariant } from '$ui/health/healthStatus.ts';
   import { SYNC_HISTORY_STATUS_LABEL, syncHistoryStatusVariant } from '$ui/sync-history/syncHistoryStatus.ts';
-  import type { DashboardInstanceCard } from '$shared/dashboard/types.ts';
+  import type { DashboardInstanceCard, DashboardSource } from '$shared/dashboard/types.ts';
   import { formatAbsoluteTime, formatRelativeTime } from './dashboardFormat.ts';
 
   export let instance: DashboardInstanceCard;
+  /** Sources that failed to load; their rows show "Unavailable" instead of an empty value. */
+  export let degraded: DashboardSource[] = [];
+
+  $: driftUnavailable = degraded.includes('drift');
+  $: healthUnavailable = degraded.includes('health');
+  $: lastSyncUnavailable = degraded.includes('lastSync');
 
   const rowClass =
     '-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-700/40';
@@ -37,7 +43,9 @@
   <div class="space-y-0.5">
     <a href={instance.links.health} class={rowClass}>
       <span class={labelClass}><HeartPulse size={14} aria-hidden="true" /> Health</span>
-      {#if instance.health}
+      {#if healthUnavailable}
+        <span class="text-neutral-500 dark:text-neutral-400">Unavailable</span>
+      {:else if instance.health}
         <span class="flex items-center gap-2">
           <span class="font-semibold tabular-nums {HEALTH_BAND_TEXT_CLASS[instance.health.band]}">
             {instance.health.score}
@@ -51,20 +59,26 @@
 
     <a href={instance.links.drift} class={rowClass}>
       <span class={labelClass}><GitCompare size={14} aria-hidden="true" /> Drift</span>
-      <span class="flex items-center gap-2">
-        {#if instance.drift.changeCount > 0}
-          <span class="text-xs text-neutral-500 tabular-nums dark:text-neutral-400">
-            {instance.drift.changeCount}
-            {instance.drift.changeCount === 1 ? 'change' : 'changes'}
-          </span>
-        {/if}
-        <Badge variant={driftStatusVariant(instance.drift.status)}>{DRIFT_STATUS_LABEL[instance.drift.status]}</Badge>
-      </span>
+      {#if driftUnavailable}
+        <span class="text-neutral-500 dark:text-neutral-400">Unavailable</span>
+      {:else}
+        <span class="flex items-center gap-2">
+          {#if instance.drift.changeCount > 0}
+            <span class="text-xs text-neutral-500 tabular-nums dark:text-neutral-400">
+              {instance.drift.changeCount}
+              {instance.drift.changeCount === 1 ? 'change' : 'changes'}
+            </span>
+          {/if}
+          <Badge variant={driftStatusVariant(instance.drift.status)}>{DRIFT_STATUS_LABEL[instance.drift.status]}</Badge>
+        </span>
+      {/if}
     </a>
 
     <a href={instance.links.syncHistory} class={rowClass}>
       <span class={labelClass}><History size={14} aria-hidden="true" /> Last sync</span>
-      {#if instance.lastSync}
+      {#if lastSyncUnavailable}
+        <span class="text-neutral-500 dark:text-neutral-400">Unavailable</span>
+      {:else if instance.lastSync}
         <span class="flex items-center gap-2">
           <time
             class="text-xs text-neutral-500 dark:text-neutral-400"

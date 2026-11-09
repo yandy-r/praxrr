@@ -91,17 +91,26 @@ export async function buildInstanceSections(): Promise<InstanceSections> {
     })
   );
 
+  // One batched query for every instance's newest run (was one query per instance).
+  const lastSyncById = track(
+    'lastSync',
+    await degrade('lastSync', new Map<number, DashboardInstanceLastSync>(), () => {
+      const map = new Map<number, DashboardInstanceLastSync>();
+      for (const [instanceId, row] of syncHistoryQueries.getLatestPerInstance()) {
+        map.set(instanceId, {
+          historyId: row.id,
+          status: row.status,
+          startedAt: row.startedAt,
+          finishedAt: row.finishedAt,
+        });
+      }
+      return map;
+    })
+  );
+
   const instances: DashboardInstanceCard[] = [];
   for (const instance of enabled) {
-    const lastSync = track(
-      'lastSync',
-      await degrade<DashboardInstanceLastSync | null>('lastSync', null, () => {
-        const row = syncHistoryQueries.search({ instanceId: instance.id }, { limit: 1, offset: 0 })[0];
-        return row
-          ? { historyId: row.id, status: row.status, startedAt: row.startedAt, finishedAt: row.finishedAt }
-          : null;
-      })
-    );
+    const lastSync = lastSyncById.get(instance.id) ?? null;
     const drift = toDriftCard(driftById.get(instance.id));
     const health = healthById.get(instance.id) ?? null;
     const needsAttention =

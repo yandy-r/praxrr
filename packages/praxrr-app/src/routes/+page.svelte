@@ -74,7 +74,7 @@
       {:else}
         <CardGrid columns={2}>
           {#each dashboard.instances as instance (instance.id)}
-            <InstanceCard {instance} />
+            <InstanceCard {instance} degraded={dashboard.degraded} />
           {/each}
         </CardGrid>
       {/if}

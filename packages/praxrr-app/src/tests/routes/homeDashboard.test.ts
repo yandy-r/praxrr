@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- SvelteKit app ambient types for route tests
 /// <reference path="../../app.d.ts" />
 
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 import { config } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
@@ -18,7 +18,7 @@ import { invalidateConflictCounts } from '$pcd/conflicts/counts.ts';
 import { resetParserCacheForTest } from '$lib/server/dashboard/parser.ts';
 import { cachedShield } from '$lib/server/security/shieldCache.ts';
 import { createDnsTransportResolver, overrideDnsTransportResolverForTest } from '$lib/server/security/dnsTransport.ts';
-import { resetShieldCacheForTest } from '$lib/server/security/shieldCache.ts';
+import { overrideShieldComputeForTest, resetShieldCacheForTest } from '$lib/server/security/shieldCache.ts';
 import type { HomeDashboardData } from '$shared/dashboard/types.ts';
 import { load } from '../../routes/+page.server.ts';
 
@@ -303,6 +303,71 @@ migratedTest('shield cache: keyed by session transport, separate values per tran
   const [x, y] = await Promise.all([cachedShield(insecure), cachedShield(insecure)]);
   assertEquals(x, y);
   assert(typeof b.score === 'number');
+});
+
+migratedTest('shield cache: a failure starts a short cooldown instead of recomputing', async () => {
+  const secure = { url: new URL('https://praxrr.test/') };
+  let calls = 0;
+  const restore = overrideShieldComputeForTest(() => {
+    calls += 1;
+    return Promise.reject(new Error('posture boom'));
+  });
+  try {
+    await assertRejects(() => cachedShield(secure), Error, 'posture boom');
+    await assertRejects(() => cachedShield(secure), Error, 'posture boom');
+    assertEquals(calls, 1); // second call failed fast during the cooldown
+    // A different transport is unaffected by this key's cooldown.
+    await assertRejects(() => cachedShield({ url: new URL('http://praxrr.test/') }), Error, 'posture boom');
+    assertEquals(calls, 2);
+  } finally {
+    restore();
+  }
+  // Cooldown cleared: computation runs again and succeeds with the real implementation.
+  resetShieldCacheForTest();
+  assert(typeof (await cachedShield(secure)).score === 'number');
+});
+
+migratedTest('sync history: batched latest-per-instance matches per-instance search', async () => {
+  const ids = [createInstance('Radarr A'), createInstance('Radarr B'), createInstance('Radarr C')];
+  const base = {
+    instanceName: 'x',
+    arrType: 'radarr' as const,
+    jobId: null,
+    trigger: 'manual' as const,
+    triggerEvent: null,
+    sectionsAttempted: [],
+    sectionsRun: 0,
+    itemsSynced: 0,
+    failureCount: 0,
+    sectionResults: [],
+    changes: [],
+    entityOutcomes: [],
+    previewId: null,
+    error: null,
+    driftLink: null,
+    durationMs: 1,
+  };
+  const insert = (arrInstanceId: number, status: 'success' | 'failed', startedAt: string) =>
+    syncHistoryQueries.insert({
+      ...base,
+      arrInstanceId,
+      status,
+      startedAt,
+      finishedAt: startedAt,
+    } as Parameters<typeof syncHistoryQueries.insert>[0]);
+  insert(ids[0], 'success', '2026-11-01T00:00:00.000Z');
+  insert(ids[0], 'failed', '2026-11-02T00:00:00.000Z');
+  // Same started_at: the higher id must win, exactly like `search` (started_at DESC, id DESC).
+  insert(ids[1], 'failed', '2026-11-03T00:00:00.000Z');
+  insert(ids[1], 'success', '2026-11-03T00:00:00.000Z');
+  // ids[2] has no history.
+
+  const batched = syncHistoryQueries.getLatestPerInstance();
+  assertEquals(batched.size, 2);
+  for (const id of ids) {
+    const single = syncHistoryQueries.search({ instanceId: id }, { limit: 1, offset: 0 })[0];
+    assertEquals(batched.get(id), single);
+  }
 });
 
 migratedTest('home dashboard: only non-terminal canary rollouts are listed', async () => {

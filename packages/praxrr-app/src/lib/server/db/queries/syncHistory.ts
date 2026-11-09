@@ -276,6 +276,26 @@ export const syncHistoryQueries = {
     return rows.map(rowToSummary);
   },
 
+  /**
+   * Newest run per live instance in one query (same ordering as `search`: started_at DESC, id DESC,
+   * so each entry equals `search({ instanceId }, { limit: 1, offset: 0 })[0]`). Rows for deleted
+   * instances (NULL `arr_instance_id`) are excluded. Keyed by instance id.
+   */
+  getLatestPerInstance(): Map<number, SyncHistorySummary> {
+    const rows = db.query<SyncHistoryRow>(
+      `SELECT ${SUMMARY_COLUMNS} FROM (
+				SELECT ${SUMMARY_COLUMNS}, ROW_NUMBER() OVER (
+					PARTITION BY arr_instance_id ORDER BY started_at DESC, id DESC
+				) AS rn FROM sync_history WHERE arr_instance_id IS NOT NULL
+			) WHERE rn = 1`
+    );
+    const latest = new Map<number, SyncHistorySummary>();
+    for (const row of rows) {
+      if (row.arr_instance_id !== null) latest.set(row.arr_instance_id, rowToSummary(row));
+    }
+    return latest;
+  },
+
   /** Total rows matching the filters (shares buildWhere with `search`). */
   count(filters: SyncHistoryFilters): number {
     const { clause, params } = buildWhere(filters);

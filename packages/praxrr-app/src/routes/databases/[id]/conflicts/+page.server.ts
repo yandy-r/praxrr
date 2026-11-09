@@ -79,8 +79,12 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid operation id' });
     }
 
-    const result = await alignConflict({ databaseId, opId });
-    invalidateNavBadges();
+    let result: Awaited<ReturnType<typeof alignConflict>>;
+    try {
+      result = await alignConflict({ databaseId, opId });
+    } finally {
+      invalidateNavBadges();
+    }
     if (!result.success) {
       return fail(400, { error: result.error || 'Failed to align conflict' });
     }
@@ -99,8 +103,12 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid operation id' });
     }
 
-    const result = await overrideConflict({ databaseId, opId });
-    invalidateNavBadges();
+    let result: Awaited<ReturnType<typeof overrideConflict>>;
+    try {
+      result = await overrideConflict({ databaseId, opId });
+    } finally {
+      invalidateNavBadges();
+    }
     if (!result.success) {
       return fail(400, { error: result.error || 'Failed to override conflict' });
     }

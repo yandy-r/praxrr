@@ -333,11 +333,11 @@ export const configHealthSnapshotsQueries = {
    */
   getLatestPerInstance(): ConfigHealthLatestSnapshot[] {
     const rows = db.query<{ arr_instance_id: number; overall_score: number; band: string; generated_at: string }>(
-      `SELECT arr_instance_id, overall_score, band, generated_at FROM (
-				SELECT arr_instance_id, overall_score, band, generated_at, ROW_NUMBER() OVER (
-					PARTITION BY arr_instance_id ORDER BY id DESC
-				) AS rn FROM config_health_snapshots WHERE arr_instance_id IS NOT NULL
-			) WHERE rn = 1`
+      `SELECT arr_instance_id, overall_score, band, generated_at FROM config_health_snapshots
+			 WHERE id IN (
+				SELECT MAX(id) FROM config_health_snapshots
+				WHERE arr_instance_id IS NOT NULL GROUP BY arr_instance_id
+			 )`
     );
     return rows.map((row) => ({
       arrInstanceId: row.arr_instance_id,

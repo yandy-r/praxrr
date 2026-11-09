@@ -9,7 +9,11 @@ import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { driftNeedsAttention } from '$lib/server/dashboard/attention.ts';
-import { getConflictCountsByDatabase, invalidateConflictCounts } from '$pcd/conflicts/counts.ts';
+import {
+  getConflictCountsByDatabase,
+  invalidateConflictCounts,
+  onConflictCountsInvalidated,
+} from '$pcd/conflicts/counts.ts';
 import { resolveDriftSuppression } from '$sync/drift/suppression.ts';
 import { isSyncPreviewArrType } from '$sync/preview/types.ts';
 import type { NavBadge, NavShell } from '$shared/navigation/types.ts';
@@ -28,9 +32,16 @@ export function resetNavBadgeCacheForTest(): void {
   cache = null;
 }
 
+// PCD compiles invalidate only the conflict-count cache (pcd cannot import this module without a
+// cycle); chain the badge cache off that so it never outlives the counts it was built from.
+onConflictCountsInvalidated(() => {
+  cache = null;
+});
+
 /**
  * Drop every cache feeding the nav badges (badge counts + conflict counts). Call after a mutation
- * that changes them: conflict align/override, drift acknowledge/snooze.
+ * that changes them: conflict align/override, drift acknowledge/snooze. PCD compiles that write
+ * op-history rows invalidate the conflict counts directly, which also clears the badge cache.
  */
 export function invalidateNavBadges(): void {
   cache = null;
