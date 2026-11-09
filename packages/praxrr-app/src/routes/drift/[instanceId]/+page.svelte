@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { invalidateAll } from '$app/navigation';
   import { BellOff, Check, Clock, Loader2, RefreshCw, Save, Wrench, X } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
@@ -338,6 +339,8 @@
       const next = (await response.json()) as DriftDetailResponse;
       if (requestId === detailRequestId) setDetail(next);
       alertStore.add('success', successMessage);
+      // Suppression changes drift attention; re-run layout load so the nav badge refreshes.
+      await invalidateAll();
     } catch (err) {
       alertStore.add('error', err instanceof Error ? err.message : 'Failed to update drift suppression');
     } finally {

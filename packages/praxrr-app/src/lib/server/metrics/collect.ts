@@ -11,7 +11,7 @@ import { appInfoQueries } from '$db/queries/appInfo.ts';
 import { driftStatusQueries } from '$db/queries/driftStatus.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/index.ts';
 import { isParserHealthy } from '$lib/server/utils/arr/parser/index.ts';
-import { computeShield } from '$lib/server/security/service.ts';
+import { cachedShield, resetShieldCacheForTest } from '$lib/server/security/shieldCache.ts';
 import { logger } from '$logger/logger.ts';
 import { header, sample } from './format.ts';
 
@@ -21,35 +21,7 @@ const PARSER_PROBE_TIMEOUT_MS = 2000;
 
 const startTimeSeconds = Math.floor(Date.now() / 1000);
 
-interface ShieldCache {
-  value: { score: number; band: string } | null;
-  at: number;
-}
-
-const shieldCache: ShieldCache = { value: null, at: 0 };
-const SHIELD_CACHE_TTL_MS = 60_000;
-
-// ponytail: in-process cache (60s) avoids DNS lookups per scrape; upgrade to a shared
-// cache keyed by instance set when multiple workers serve /metrics concurrently.
-async function cachedShield(): Promise<{ score: number; band: string }> {
-  const now = Date.now();
-  if (shieldCache.value !== null && now - shieldCache.at < SHIELD_CACHE_TTL_MS) {
-    return shieldCache.value;
-  }
-  // Uses the process-wide resolver seam (overridable in tests); the resolver's own
-  // in-process cache plus this 60s cache keep DNS lookups off the scrape path.
-  const report = await computeShield(undefined);
-  const value = { score: report.score, band: report.band };
-  shieldCache.value = value;
-  shieldCache.at = now;
-  return value;
-}
-
-/** Test seam: reset the in-process shield cache. */
-export function resetShieldCacheForTest(): void {
-  shieldCache.value = null;
-  shieldCache.at = 0;
-}
+export { resetShieldCacheForTest };
 
 async function collectBuild(lines: string[]): Promise<void> {
   const version = appInfoQueries.getVersion();

@@ -3,6 +3,7 @@
   import SectionHeader from './sectionHeader.svelte';
   import type { ComponentType } from 'svelte';
   import { slide } from 'svelte/transition';
+  import type { NavBadge } from '$shared/navigation/types.ts';
 
   export let label: string;
   export let href: string;
@@ -10,6 +11,7 @@
   export let initialOpen: boolean = true;
   export let hasItems: boolean = false;
   export let sectionLabel: string | undefined = undefined;
+  export let badge: NavBadge | undefined = undefined;
 
   let isOpen = initialOpen;
   let isRouteOpen = initialOpen;
@@ -35,7 +37,7 @@
     <SectionHeader label={sectionLabel} />
   {/if}
 
-  <GroupHeader {label} {href} {icon} {isOpen} {hasItems} onToggle={toggleOpen} />
+  <GroupHeader {label} {href} {icon} {isOpen} {hasItems} {badge} onToggle={toggleOpen} />
 
   {#if isOpen && hasItems}
     <div class="mt-2 grid grid-cols-[auto_1fr]" transition:slide={{ duration: 200 }}>

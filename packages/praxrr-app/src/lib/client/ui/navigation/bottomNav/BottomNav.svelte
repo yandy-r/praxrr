@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { resolveNavIcon } from '$lib/client/navigation/iconMap';
+  import NavBadgePill from '../NavBadgePill.svelte';
   import { navIconStore } from '$stores/navIcons';
   import { navScope } from '$stores/navScope.ts';
   import { supportsFeature, type ArrFeature } from '$shared/arr/capabilities.ts';
@@ -36,7 +37,7 @@
 
   function isActive(href: string, currentPath: string): boolean {
     if (href === '/') return currentPath === '/';
-    return currentPath.startsWith(href);
+    return currentPath === href || currentPath.startsWith(`${href}/`);
   }
 
   function shortLabel(item: FlattenedNavItem): string {
@@ -95,11 +96,16 @@
           ? 'text-accent-600 dark:text-accent-400'
           : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'}"
       >
-        {#if useEmoji}
-          <span class="text-xl">{item.emoji}</span>
-        {:else if icon}
-          <svelte:component this={icon} size={20} strokeWidth={active ? 2.5 : 2} />
-        {/if}
+        <span class="relative">
+          {#if useEmoji}
+            <span class="text-xl">{item.emoji}</span>
+          {:else if icon}
+            <svelte:component this={icon} size={20} strokeWidth={active ? 2.5 : 2} />
+          {/if}
+          {#if item.badge}
+            <NavBadgePill badge={item.badge} compact />
+          {/if}
+        </span>
         <span class="mt-0.5 text-[10px] font-medium">{shortLabel(item)}</span>
       </a>
     {/each}

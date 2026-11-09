@@ -18,6 +18,14 @@ export interface ConfigHealthSnapshotRow {
   created_at: string;
 }
 
+/** Light latest-snapshot projection per instance (no criteria/profile blobs). */
+export interface ConfigHealthLatestSnapshot {
+  arrInstanceId: number;
+  overallScore: number;
+  band: HealthBand;
+  generatedAt: string;
+}
+
 /** A light per-profile score carried in a snapshot (the full breakdown is recomputed live). */
 export interface SnapshotProfileScore {
   name: string;
@@ -317,6 +325,26 @@ export const configHealthSnapshotsQueries = {
     );
     const row = db.queryFirst<{ id: number }>('SELECT last_insert_rowid() AS id');
     return row?.id ?? 0;
+  },
+
+  /**
+   * Latest stored snapshot per live instance (score/band only; the JSON blobs are not read).
+   * Deleted instances (NULL `arr_instance_id`) are excluded. Cheap enough for the home dashboard.
+   */
+  getLatestPerInstance(): ConfigHealthLatestSnapshot[] {
+    const rows = db.query<{ arr_instance_id: number; overall_score: number; band: string; generated_at: string }>(
+      `SELECT arr_instance_id, overall_score, band, generated_at FROM config_health_snapshots
+			 WHERE id IN (
+				SELECT MAX(id) FROM config_health_snapshots
+				WHERE arr_instance_id IS NOT NULL GROUP BY arr_instance_id
+			 )`
+    );
+    return rows.map((row) => ({
+      arrInstanceId: row.arr_instance_id,
+      overallScore: row.overall_score,
+      band: row.band as HealthBand,
+      generatedAt: row.generated_at,
+    }));
   },
 
   /**

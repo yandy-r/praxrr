@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import type { OperationMetadata } from '$pcd/index.ts';
 import { alignConflict, overrideConflict } from '$pcd/conflicts/index.ts';
+import { invalidateNavBadges } from '$lib/server/navigation/badges.ts';
 
 type ConflictRow = {
   opId: number;
@@ -78,7 +79,12 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid operation id' });
     }
 
-    const result = await alignConflict({ databaseId, opId });
+    let result: Awaited<ReturnType<typeof alignConflict>>;
+    try {
+      result = await alignConflict({ databaseId, opId });
+    } finally {
+      invalidateNavBadges();
+    }
     if (!result.success) {
       return fail(400, { error: result.error || 'Failed to align conflict' });
     }
@@ -97,7 +103,12 @@ export const actions: Actions = {
       return fail(400, { error: 'Invalid operation id' });
     }
 
-    const result = await overrideConflict({ databaseId, opId });
+    let result: Awaited<ReturnType<typeof overrideConflict>>;
+    try {
+      result = await overrideConflict({ databaseId, opId });
+    } finally {
+      invalidateNavBadges();
+    }
     if (!result.success) {
       return fail(400, { error: result.error || 'Failed to override conflict' });
     }

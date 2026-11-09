@@ -53,6 +53,18 @@ export interface ResolvedNavItem {
   children: ResolvedNavChild[];
   iconKey: string;
   emoji?: string;
+  /** Attention count shown next to the label; omitted when zero (see `NavBadgeCounts`). */
+  badge?: NavBadge;
+}
+
+/** Tone of a nav attention badge. */
+export type NavBadgeTone = 'warning' | 'danger';
+
+export interface NavBadge {
+  count: number;
+  tone: NavBadgeTone;
+  /** Accessible description, for example "3 instances drifted". */
+  label: string;
 }
 
 export interface ResolvedNavGroup {
