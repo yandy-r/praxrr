@@ -3,7 +3,7 @@ import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import type { ConflictStrategy } from '$db/queries/databaseInstances.ts';
 import { databaseInstanceCredentialsQueries } from '$db/queries/databaseInstanceCredentials.ts';
-import { pcdManager } from '$pcd/index.ts';
+import { pcdManager, ReenableError } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
 import { schedulePcdSyncForDatabase } from '$lib/server/jobs/init.ts';
 import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs/scheduleUtils.ts';
@@ -302,6 +302,54 @@ export const actions: Actions = {
       });
 
       return fail(500, { error: 'Failed to unlink database' });
+    }
+  },
+
+  /**
+   * Re-enable an auto-disabled database (recompiles first; stays disabled on failure). Returns
+   * `{ enableSuccess, enableStatus }`, or `fail(400|404|422|500, { error })` with a generic message.
+   */
+  enable: async ({ params }) => {
+    const id = /^\d+$/.test(params.id || '') ? Number.parseInt(params.id as string, 10) : NaN;
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      await logger.warn('Enable failed: Invalid database ID', {
+        source: 'databases/[id]/settings',
+        meta: { id: params.id },
+      });
+      return fail(400, { error: 'Invalid database ID' });
+    }
+
+    try {
+      // Recompiles first; the database is only marked enabled when that succeeds.
+      const result = await pcdManager.reenable(id);
+
+      if (result.status === 'enabled') {
+        // Disabled databases have their pcd.sync job unscheduled; restore it. A scheduling failure
+        // must not turn a successful re-enable into an error.
+        try {
+          schedulePcdSyncForDatabase(id);
+        } catch (scheduleError) {
+          await logger.error('Failed to reschedule PCD sync after re-enable', {
+            source: 'databases/[id]/settings',
+            meta: { id, error: scheduleError instanceof Error ? scheduleError.message : String(scheduleError) },
+          });
+        }
+      }
+
+      return { enableSuccess: true, enableStatus: result.status };
+    } catch (err) {
+      if (err instanceof ReenableError) {
+        // The service already logged details; the message is generic and safe to show.
+        return fail(err.code === 'not_found' ? 404 : 422, { error: err.message });
+      }
+
+      await logger.error('Failed to enable database', {
+        source: 'databases/[id]/settings',
+        meta: { id, error: err instanceof Error ? err.message : String(err) },
+      });
+
+      return fail(500, { error: 'Failed to enable database' });
     }
   },
 };

@@ -855,6 +855,33 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/pcd/{databaseId}/enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Re-enable an auto-disabled PCD database
+     * @description Re-enables a database that was automatically disabled after a failed cache build, bundle
+     *     import, conflict override or base-op import rollback. The database is recompiled first
+     *     (base ops re-imported, cache rebuilt) and only marked enabled when that succeeds. If the
+     *     recompile still fails the database stays disabled, no cache is registered or served, and
+     *     422 is returned with a generic message (details are logged server-side only).
+     *
+     *     Calling this on a database that is already enabled is a no-op and returns 200 with
+     *     `status: already_enabled`.
+     */
+    post: operations['enablePcdDatabase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/pcd/{databaseId}/snapshots': {
     parameters: {
       query?: never;
@@ -4682,6 +4709,13 @@ export interface components {
       error: string;
       /** @description Optional machine-readable error code, for example sync_in_progress or preview_stale */
       code?: string;
+    };
+    PcdEnableResponse: {
+      /**
+       * @description `enabled` when the database was re-enabled by this call; `already_enabled` for a no-op
+       * @enum {string}
+       */
+      status: 'enabled' | 'already_enabled';
     };
     /** @description Canonical progressive disclosure section key */
     UiSectionKey: string;
@@ -8928,6 +8962,83 @@ export interface operations {
         content: {
           'application/json':
             components['schemas']['PcdErrorResponse'] | components['schemas']['PcdBundleImportErrorResponse'];
+        };
+      };
+    };
+  };
+  enablePcdDatabase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description PCD database ID */
+        databaseId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Database is enabled (re-enabled now, or already enabled) */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdEnableResponse'];
+        };
+      };
+      /** @description Invalid databaseId */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `admin` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
+      /** @description Database not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Recompile failed; the database remains disabled and is not served */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
+        };
+      };
+      /** @description Unexpected failure while re-enabling */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
     };

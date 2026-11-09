@@ -2624,6 +2624,98 @@
         }
       }
     },
+    "/pcd/{databaseId}/enable": {
+      "post": {
+        "operationId": "enablePcdDatabase",
+        "summary": "Re-enable an auto-disabled PCD database",
+        "description": "Re-enables a database that was automatically disabled after a failed cache build, bundle\nimport, conflict override or base-op import rollback. The database is recompiled first\n(base ops re-imported, cache rebuilt) and only marked enabled when that succeeds. If the\nrecompile still fails the database stays disabled, no cache is registered or served, and\n422 is returned with a generic message (details are logged server-side only).\n\nCalling this on a database that is already enabled is a no-op and returns 200 with\n`status: already_enabled`.\n",
+        "tags": ["PCD Databases"],
+        "parameters": [
+          {
+            "name": "databaseId",
+            "in": "path",
+            "required": true,
+            "description": "PCD database ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Database is enabled (re-enabled now, or already enabled)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdEnableResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid databaseId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API token lacks the `admin` scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeForbiddenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Recompile failed; the database remains disabled and is not served",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected failure while re-enabling",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcdErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/pcd/{databaseId}/snapshots": {
       "post": {
         "operationId": "createPcdSnapshot",
@@ -14873,6 +14965,17 @@
           "code": {
             "type": "string",
             "description": "Optional machine-readable error code, for example sync_in_progress or preview_stale"
+          }
+        }
+      },
+      "PcdEnableResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["enabled", "already_enabled"],
+            "description": "`enabled` when the database was re-enabled by this call; `already_enabled` for a no-op"
           }
         }
       },

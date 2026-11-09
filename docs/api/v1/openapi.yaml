@@ -401,6 +401,8 @@ paths:
     $ref: './paths/pcd.yaml#/export'
   /pcd/import:
     $ref: './paths/pcd.yaml#/import'
+  /pcd/{databaseId}/enable:
+    $ref: './paths/pcd-enable.yaml#/enable'
   /pcd/{databaseId}/snapshots:
     $ref: './paths/pcd-snapshots.yaml#/snapshots'
   /pcd/{databaseId}/snapshots/{snapshotId}:
@@ -1316,6 +1318,8 @@ components:
       $ref: './schemas/pcd.yaml#/ExportResponse'
     PcdErrorResponse:
       $ref: './schemas/pcd.yaml#/PcdErrorResponse'
+    PcdEnableResponse:
+      $ref: './schemas/pcd.yaml#/PcdEnableResponse'
     UiSectionKey:
       type: string
       pattern: '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$'

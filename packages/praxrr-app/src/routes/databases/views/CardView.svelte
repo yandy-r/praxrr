@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
+  import { ExternalLink, Unlink, Lock, Code, AlertTriangle, Power } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import { parseUTC } from '$shared/utils/dates';
   import { createEventDispatcher } from 'svelte';
@@ -128,6 +128,9 @@
           {#if entitySummary}
             <Badge variant="neutral" mono>{entitySummary}</Badge>
           {/if}
+        {/if}
+        {#if item.type === 'pcd' && !item.enabled}
+          <Badge variant="danger" icon={Power} mono>Disabled</Badge>
         {/if}
         {#if item.type === 'pcd' && !item.cacheAvailable}
           <Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>
