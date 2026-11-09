@@ -1,6 +1,7 @@
 import type { User } from '$db/queries/users.ts';
 import type { NavShell } from '$shared/navigation/types.ts';
 import { resolveSetupChecklist, type SetupChecklist } from '$server/setup/progress.ts';
+import { attachNavBadges } from './badges.ts';
 import { resolveNavShell } from './resolver.ts';
 
 /** Root layout payload without the app shell (auth pages, unauthenticated requests). */
@@ -63,7 +64,7 @@ export function resolveRootLayoutData({
 
   return {
     version,
-    navShell: resolveNavShell({ user: resolvedUser }),
+    navShell: attachNavBadges(resolveNavShell({ user: resolvedUser })),
     setupChecklist: resolveSetupChecklist(pathname),
     recentsBackend: user && user.id > 0 ? 'api' : 'local',
   };

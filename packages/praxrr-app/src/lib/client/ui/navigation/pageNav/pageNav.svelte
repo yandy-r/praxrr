@@ -106,7 +106,9 @@
   const isItemActive = (item: ScopeAwareNavItem): boolean =>
     item.activePattern
       ? currentPath.includes(item.activePattern)
-      : currentPath === item.href || currentPath.startsWith(`${item.href}/`);
+      : item.href === '/'
+        ? currentPath === '/'
+        : currentPath === item.href || currentPath.startsWith(`${item.href}/`);
 
   const shouldOpenItem = (groupId: string, itemId: string, item: ScopeAwareNavItem): boolean =>
     isInitiallyOpen(groupId, itemId) || isItemActive(item);
@@ -184,6 +186,7 @@
             sectionLabel={index === 0 ? group.label : undefined}
             initialOpen={shouldOpenItem(group.id, entry.item.id, entry.item)}
             hasItems={entry.item.hasChildren}
+            badge={entry.item.badge}
           >
             {#if entry.item.hasChildren}
               {#each entry.item.children as child (child.id)}

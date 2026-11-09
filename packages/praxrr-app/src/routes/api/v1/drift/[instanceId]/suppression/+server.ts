@@ -1,3 +1,4 @@
+import { invalidateNavBadges } from '$lib/server/navigation/badges.ts';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
@@ -202,6 +203,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       });
     }
 
+    invalidateNavBadges();
     publishDriftRowUpdated(instanceId);
     return json(toDriftDetail(instance, driftStatusQueries.getById(instanceId), nowMs));
   } catch (error) {

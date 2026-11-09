@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import type { ComponentType } from 'svelte';
+  import NavBadgePill from '../NavBadgePill.svelte';
+  import type { NavBadge } from '$shared/navigation/types.ts';
 
   export let label: string;
   export let href: string;
@@ -9,10 +11,13 @@
   export let hasItems: boolean;
   export let onToggle: () => void;
   export let activePattern: string | undefined = undefined;
+  export let badge: NavBadge | undefined = undefined;
 
   $: isActive = activePattern
     ? $page.url.pathname.includes(activePattern)
-    : $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
+    : href === '/'
+      ? $page.url.pathname === '/'
+      : $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
 </script>
 
 <div class="group/header flex items-center">
@@ -29,6 +34,9 @@
       <svelte:component this={icon} class="h-4 w-4" />
     {/if}
     {label}
+    {#if badge}
+      <NavBadgePill {badge} />
+    {/if}
   </a>
 
   <!-- Chevron toggle button (right side) - square left, rounded right -->

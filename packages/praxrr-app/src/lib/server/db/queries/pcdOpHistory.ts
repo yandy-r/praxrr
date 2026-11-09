@@ -198,4 +198,30 @@ export const pcdOpHistoryQueries = {
   listLatestConflictsByDatabase(databaseId: number): PcdOpHistoryWithOp[] {
     return this.listLatestByDatabaseWithOps(databaseId, ['conflicted', 'conflicted_pending']);
   },
+
+  /**
+   * Distinct conflicted-op counts per database in ONE aggregate query (no row materialization,
+   * no full-table window sort). Same semantics as {@link listLatestConflictsByDatabase}: only each
+   * op's LATEST history row (applied_at DESC, id DESC) counts, and its status must be
+   * conflicted/conflicted_pending. Candidates come from the status index; "latest" is decided by a
+   * NOT EXISTS probe against idx_pcd_op_history_op (op_id, applied_at). Databases with zero
+   * conflicts are omitted from the map.
+   */
+  countLatestConflictsByDatabase(): Map<number, number> {
+    const rows = db.query<{ database_id: number; conflict_count: number }>(
+      `SELECT h.database_id AS database_id, COUNT(*) AS conflict_count
+			FROM pcd_op_history h
+			JOIN pcd_ops op ON op.id = h.op_id
+			WHERE h.status IN ('conflicted', 'conflicted_pending')
+				AND NOT EXISTS (
+					SELECT 1 FROM pcd_op_history newer
+					WHERE newer.op_id = h.op_id
+						AND newer.database_id = h.database_id
+						AND (newer.applied_at > h.applied_at
+							OR (newer.applied_at = h.applied_at AND newer.id > h.id))
+				)
+			GROUP BY h.database_id`
+    );
+    return new Map(rows.map((row) => [row.database_id, row.conflict_count]));
+  },
 };

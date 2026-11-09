@@ -217,6 +217,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
   const sidebarOrder = shellWithoutDev.flatMap((group) => group.items.map((item) => item.href));
 
   assertEquals(sidebarOrder, [
+    '/',
     '/databases',
     '/parity-map',
     '/resolved-config',
@@ -242,6 +243,7 @@ Deno.test('bottom nav ordering is deterministic by priority and sidebar traversa
   ]);
 
   assertEquals(buildBottomNavOrder({ ...shell, groups: shellWithoutDev }, 'all'), [
+    '/',
     '/databases',
     '/arr',
     '/quality-profiles',
