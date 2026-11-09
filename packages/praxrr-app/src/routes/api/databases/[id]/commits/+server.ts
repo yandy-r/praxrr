@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { getCommits, getStatus, isNotGitRepositoryError } from '$utils/git/index.ts';
+import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
 /**
  * GET /api/databases/{id}/commits
@@ -23,7 +24,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
   let gitUnavailable = false;
 
   try {
-    const status = await getStatus(database.local_path, { fetch: true });
+    const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(id).catch(() => undefined);
+    const status = await getStatus(database.local_path, { fetch: true, personalAccessToken });
     branch = status.branch;
     const remoteRef = branch ? `origin/${branch}` : null;
     const shouldUseRemote = status.behind > 0 && status.ahead === 0 && remoteRef;

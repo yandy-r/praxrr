@@ -55,7 +55,7 @@ export const GET: RequestHandler = async ({ params }) => {
   try {
     [status, incomingChanges, branches] = await Promise.all([
       getStatus(database.local_path),
-      getIncomingChanges(database.local_path),
+      getIncomingChanges(database.local_path, { personalAccessToken }),
       getBranches(database.local_path),
     ]);
   } catch (gitError) {

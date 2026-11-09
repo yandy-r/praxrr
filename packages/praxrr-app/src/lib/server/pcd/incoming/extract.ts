@@ -7,7 +7,7 @@
  * registration). All commands use argument arrays; no string reaches a shell.
  */
 
-import { execGit } from '$utils/git/exec.ts';
+import { execGit, type GitExecOptions } from '$utils/git/exec.ts';
 import { IncomingPreviewError } from './types.ts';
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
@@ -39,7 +39,11 @@ export function assertSafeBranchName(branch: string): void {
  * Fetch exactly `origin/<branch>`. Unlike the silent `fetch()` helper this THROWS on failure so a
  * stale ref is never previewed as if it were current. Only `refs/remotes/origin/<branch>` moves.
  */
-export async function fetchRemoteBranchStrict(repoPath: string, branch: string): Promise<void> {
+export async function fetchRemoteBranchStrict(
+  repoPath: string,
+  branch: string,
+  options: GitExecOptions = {}
+): Promise<void> {
   assertSafeBranchName(branch);
   try {
     await execGit(
@@ -50,10 +54,12 @@ export async function fetchRemoteBranchStrict(repoPath: string, branch: string):
         '--quiet',
         '--no-tags',
         '--no-write-fetch-head',
+        '--no-prune',
         'origin',
         `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
       ],
-      repoPath
+      repoPath,
+      options
     );
   } catch (error) {
     throw new IncomingPreviewError(

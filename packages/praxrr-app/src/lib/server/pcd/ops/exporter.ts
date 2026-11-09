@@ -3,7 +3,7 @@ import { EXPORT_BATCH_METADATA_KEY, pcdOpsQueries } from '$db/queries/pcdOps.ts'
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
 import { logger } from '$logger/logger.ts';
 import { stage, commit, configureIdentity } from '$utils/git/write.ts';
-import { execGit } from '$utils/git/exec.ts';
+import { execGit, type GitExecOptions } from '$utils/git/exec.ts';
 import { getBranch, getStatus } from '$utils/git/read.ts';
 import { compile } from '../database/compiler.ts';
 import { entityNameToSlug } from '../migration/slug.ts';
@@ -210,14 +210,17 @@ function buildChangeMaps(databaseId: number) {
   return { changes, changeByKey, changeByOpId, groupMap };
 }
 
-function buildRemoteUrl(repositoryUrl: string, personalAccessToken?: string | null): string {
-  if (!personalAccessToken) return repositoryUrl;
-  if (!repositoryUrl.startsWith('https://github.com')) return repositoryUrl;
-  return repositoryUrl.replace('https://github.com', `https://${personalAccessToken}@github.com`);
-}
-
-export async function fetchRemoteBranch(repoPath: string, remoteUrl: string, branch: string): Promise<void> {
-  await execGit(['fetch', '--quiet', remoteUrl, `refs/heads/${branch}:refs/remotes/origin/${branch}`], repoPath);
+export async function fetchRemoteBranch(
+  repoPath: string,
+  remoteUrl: string,
+  branch: string,
+  options: GitExecOptions = {}
+): Promise<void> {
+  await execGit(
+    ['fetch', '--quiet', '--no-prune', remoteUrl, `refs/heads/${branch}:refs/remotes/origin/${branch}`],
+    repoPath,
+    options
+  );
 }
 
 export async function getAheadBehind(repoPath: string, branch: string): Promise<{ ahead: number; behind: number }> {
@@ -300,8 +303,7 @@ async function runPreflight(databaseId: number): Promise<ExportPreflight> {
     if (!branch) {
       errors.push('Repository is not on a branch.');
     } else {
-      const remoteUrl = buildRemoteUrl(database.repository_url, personalAccessToken);
-      await fetchRemoteBranch(database.local_path, remoteUrl, branch);
+      await fetchRemoteBranch(database.local_path, database.repository_url, branch, { personalAccessToken });
       checks.remoteReachable = true;
 
       status = await getStatus(database.local_path);
@@ -471,8 +473,8 @@ async function cloneForExport(sourcePath: string, targetPath: string, workdir: s
   await execGit(['clone', '--quiet', sourcePath, targetPath], workdir);
 }
 
-async function pushHeadToBranch(repoPath: string, branch: string): Promise<void> {
-  await execGit(['push', 'origin', `HEAD:refs/heads/${branch}`], repoPath);
+async function pushHeadToBranch(repoPath: string, branch: string, personalAccessToken?: string): Promise<void> {
+  await execGit(['push', 'origin', `HEAD:refs/heads/${branch}`], repoPath, { personalAccessToken });
 }
 
 export async function previewDraftOps(
@@ -617,7 +619,6 @@ export async function exportDraftOps(
   try {
     const tempDir = await Deno.makeTempDir({ prefix: 'praxrr-export-' });
     const repoDir = `${tempDir}/repo`;
-    const authUrl = buildRemoteUrl(database.repository_url, personalAccessToken);
     let sourcePath = database.local_path;
     try {
       sourcePath = await Deno.realPath(database.local_path);
@@ -635,7 +636,8 @@ export async function exportDraftOps(
 
     try {
       await cloneForExport(sourcePath, repoDir, tempDir);
-      await execGit(['remote', 'set-url', 'origin', authUrl], repoDir);
+      // Clean URL only: the token is supplied per command so it never lands in .git/config.
+      await execGit(['remote', 'set-url', 'origin', database.repository_url], repoDir);
 
       const toStage: string[] = [];
 
@@ -705,7 +707,7 @@ export async function exportDraftOps(
       await stage(repoDir, toStage);
       await configureIdentity(repoDir, gitUserName, gitUserEmail);
       await commit(repoDir, trimmedMessage);
-      await pushHeadToBranch(repoDir, branch);
+      await pushHeadToBranch(repoDir, branch, personalAccessToken);
     } finally {
       try {
         await Deno.remove(tempDir, { recursive: true });
@@ -740,7 +742,7 @@ export async function exportDraftOps(
           }
         }
       }
-      await execGit(['pull', '--ff-only'], database.local_path);
+      await execGit(['pull', '--ff-only'], database.local_path, { personalAccessToken });
     } catch (error) {
       await logger.warn('Failed to update local repo after export', {
         source: 'PCDExporter',

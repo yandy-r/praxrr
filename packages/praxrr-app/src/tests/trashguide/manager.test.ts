@@ -1719,19 +1719,22 @@ async function buildGitSyncFixture(options: { validSecondCommit: boolean }): Pro
 }
 
 /**
- * Hermetic git: a developer's global/system config (e.g. fetch.prune) must not alter the
- * fetch/reset flow under test.
+ * Hermetic git: ignore the developer's system config and run against a temp global config that
+ * sets `fetch.prune=true`, so the fetch/reset flow is proven to work under it (YAN-1697).
  */
 async function withHermeticGit<T>(fn: () => Promise<T>): Promise<T> {
   const previous = {
     global: Deno.env.get('GIT_CONFIG_GLOBAL'),
     noSystem: Deno.env.get('GIT_CONFIG_NOSYSTEM'),
   };
-  Deno.env.set('GIT_CONFIG_GLOBAL', '/dev/null');
+  const globalConfig = await Deno.makeTempFile({ prefix: 'praxrr-gitconfig-' });
+  await Deno.writeTextFile(globalConfig, '[fetch]\n\tprune = true\n');
+  Deno.env.set('GIT_CONFIG_GLOBAL', globalConfig);
   Deno.env.set('GIT_CONFIG_NOSYSTEM', '1');
   try {
     return await fn();
   } finally {
+    await Deno.remove(globalConfig).catch(() => {});
     for (const [name, value] of [
       ['GIT_CONFIG_GLOBAL', previous.global],
       ['GIT_CONFIG_NOSYSTEM', previous.noSystem],

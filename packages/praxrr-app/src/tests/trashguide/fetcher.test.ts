@@ -651,7 +651,7 @@ Deno.test({
       assertEquals(result.branch, 'main');
       assertEquals(result.discovery.total_files, 4);
       assertEquals(invocations, [
-        ['fetch', '--quiet', 'origin', 'main:refs/remotes/origin/main'],
+        ['fetch', '--quiet', '--no-prune', 'origin', 'main:refs/remotes/origin/main'],
         ['reset', '--hard'],
         ['clean', '-fdx'],
         ['checkout', '-B', 'main', 'origin/main'],
