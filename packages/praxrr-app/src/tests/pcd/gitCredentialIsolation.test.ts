@@ -5,6 +5,9 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes, assertThrows } from '@std/assert';
 import { buildGitEnv, GITHUB_CREDENTIAL_SCOPE } from '$utils/git/exec.ts';
 import { clone, scrubRemoteCredentials, stripUrlCredentials } from '$utils/git/write.ts';
+import { scrubStoredGitCredentials } from '$pcd/git/credentialScrub.ts';
+import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
+import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
 
 const TOKEN = 'ghp_TestOnlyToken1234567890abcdef';
 
@@ -19,7 +22,7 @@ async function git(args: string[], cwd?: string, env: Record<string, string> = {
     stdin: 'null',
     stdout: 'piped',
     stderr: 'piped',
-    env: { GIT_CONFIG_NOSYSTEM: '1', ...env },
+    env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', ...env },
   }).output();
   if (code !== 0) throw new Error(new TextDecoder().decode(stderr));
   return new TextDecoder().decode(stdout).trim();
@@ -63,6 +66,18 @@ Deno.test('buildGitEnv scopes the token to GitHub as a per-command header and ke
 
   assertEquals(buildGitEnv({ personalAccessToken: '   ' }).GIT_CONFIG_COUNT, '1');
   assertThrows(() => buildGitEnv({ personalAccessToken: 'abc\nextra' }));
+});
+
+Deno.test('git resolves the per-command header for GitHub URLs only', async () => {
+  const env = buildGitEnv({ personalAccessToken: TOKEN });
+  const lookup = (url: string) =>
+    git(['config', '--get-urlmatch', 'http.extraHeader', url], undefined, env).catch(() => '');
+
+  assertEquals(await lookup('https://github.com/o/r'), env.GIT_CONFIG_VALUE_1);
+  assertEquals(await lookup('https://github.com/o/r.git/info/refs'), env.GIT_CONFIG_VALUE_1);
+  assertEquals(await lookup('https://gitlab.com/o/r'), '');
+  assertEquals(await lookup('https://github.com.evil.example/o/r'), '');
+  assertEquals(await lookup('http://github.com/o/r'), '');
 });
 
 Deno.test('clone with a personal access token stores a token-free remote URL in .git/config', async () => {
@@ -134,6 +149,55 @@ Deno.test('scrubRemoteCredentials ignores repositories without an origin', async
     await createSeedRepository(root);
     assertFalse(await scrubRemoteCredentials(root));
   } finally {
+    await Deno.remove(root, { recursive: true }).catch(() => {});
+  }
+});
+
+Deno.test('scrubStoredGitCredentials cleans PCD, dependency and TRaSH clones and skips non-repos', async () => {
+  const root = tempPath('pat-scrub-all');
+  const pcd = `${root}/pcd`;
+  const dep = `${pcd}/deps/praxrr-schema`;
+  const trash = `${root}/trash`;
+  const notRepo = `${root}/not-a-repo`;
+  const dirty = (repo: string) => `https://x-access-token:${TOKEN}@github.com/praxrr-test/${repo}`;
+  const restoreDb = databaseInstancesQueries.getAll;
+  const restoreTrash = trashGuideSourcesQueries.getAll;
+
+  try {
+    for (const [path, repo] of [
+      [pcd, 'db'],
+      [dep, 'schema'],
+      [trash, 'guides'],
+    ] as const) {
+      await createSeedRepository(path);
+      await git(['remote', 'add', 'origin', dirty(repo)], path);
+    }
+    await Deno.mkdir(notRepo, { recursive: true });
+
+    databaseInstancesQueries.getAll = (() => [
+      { local_path: pcd },
+      { local_path: notRepo },
+    ]) as unknown as typeof databaseInstancesQueries.getAll;
+    trashGuideSourcesQueries.getAll = (() => [
+      { local_path: trash },
+    ]) as unknown as typeof trashGuideSourcesQueries.getAll;
+
+    const result = await scrubStoredGitCredentials();
+
+    assertEquals(result.failed, []);
+    assert(result.scrubbed >= 3);
+    for (const [path, repo] of [
+      [pcd, 'db'],
+      [dep, 'schema'],
+      [trash, 'guides'],
+    ] as const) {
+      assertEquals(await git(['remote', 'get-url', 'origin'], path), `https://github.com/praxrr-test/${repo}`);
+      assertFalse((await Deno.readTextFile(`${path}/.git/config`)).includes(TOKEN));
+    }
+    assertEquals(await Deno.stat(`${notRepo}/.git`).catch(() => null), null);
+  } finally {
+    databaseInstancesQueries.getAll = restoreDb;
+    trashGuideSourcesQueries.getAll = restoreTrash;
     await Deno.remove(root, { recursive: true }).catch(() => {});
   }
 });

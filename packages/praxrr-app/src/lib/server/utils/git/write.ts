@@ -427,7 +427,8 @@ export async function fetch(repoPath: string, options: GitExecOptions = {}): Pro
  * Fetch tags from remote
  */
 export async function fetchTags(repoPath: string, options: GitExecOptions = {}): Promise<void> {
-  await execGitSafe(['fetch', '--tags', '--quiet'], repoPath, options);
+  // --no-prune: with fetch.prune=true, `--tags` would delete local tags missing upstream.
+  await execGitSafe(['fetch', '--tags', '--no-prune', '--quiet'], repoPath, options);
 }
 
 /**

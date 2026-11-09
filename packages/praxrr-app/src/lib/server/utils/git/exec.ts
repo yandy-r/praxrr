@@ -15,7 +15,8 @@ export interface GitExecOptions {
   /**
    * GitHub personal access token for this command only. It is passed to git through
    * environment-scoped config (`http.<scope>.extraHeader`), so it never appears in argv,
-   * `.git/config`, or anything git persists.
+   * `.git/config`, or anything git persists. (It is visible in the git child's environment to the
+   * same OS user for the lifetime of the command.)
    */
   personalAccessToken?: string | null;
 }

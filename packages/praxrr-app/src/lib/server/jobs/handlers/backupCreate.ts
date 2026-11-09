@@ -19,7 +19,18 @@ const backupCreateHandler: JobHandler = async (job) => {
 
   try {
     // Never archive a PAT that an older version embedded in a clone's remote URL (YAN-460).
-    await scrubStoredGitCredentials();
+    const scrub = await scrubStoredGitCredentials();
+    if (scrub.failed.length > 0) {
+      await logger.error('Backup skipped: could not remove credentials from git remote URLs', {
+        source: 'BackupCreateJob',
+        meta: { jobId: job.id, failed: scrub.failed },
+      });
+      return {
+        status: 'failure',
+        failureCode: 'filesystem',
+        rescheduleAt: job.source === 'schedule' ? calculateNextRunFromSchedule(settings.schedule) : undefined,
+      };
+    }
 
     // Snapshot the live WAL database with VACUUM INTO so the archive holds a consistent copy
     // instead of the raw praxrr.db/-wal/-shm files captured mid-write.
