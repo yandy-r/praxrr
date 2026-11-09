@@ -1,0 +1,54 @@
+enable:
+  post:
+    operationId: enablePcdDatabase
+    summary: Re-enable an auto-disabled PCD database
+    description: |
+      Re-enables a database that was automatically disabled after a failed cache build, bundle
+      import, conflict override or base-op import rollback. The database is recompiled first
+      (base ops re-imported, cache rebuilt) and only marked enabled when that succeeds. If the
+      recompile still fails the database stays disabled, no cache is registered or served, and
+      422 is returned with a generic message (details are logged server-side only).
+
+      Calling this on a database that is already enabled is a no-op and returns 200 with
+      `status: already_enabled`.
+    tags:
+      - PCD Databases
+    parameters:
+      - name: databaseId
+        in: path
+        required: true
+        description: PCD database ID
+        schema:
+          type: integer
+          minimum: 1
+    responses:
+      '200':
+        description: Database is enabled (re-enabled now, or already enabled)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdEnableResponse'
+      '400':
+        description: Invalid databaseId
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '404':
+        description: Database not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '422':
+        description: Recompile failed; the database remains disabled and is not served
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '500':
+        description: Unexpected failure while re-enabling
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'

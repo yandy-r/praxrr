@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ExternalLink, Unlink, Lock, Code, AlertTriangle } from 'lucide-svelte';
+  import { ExternalLink, Unlink, Lock, Code, AlertTriangle, Power } from 'lucide-svelte';
   import Table from '$ui/table/Table.svelte';
   import TableActionButton from '$ui/table/TableActionButton.svelte';
   import Badge from '$ui/badge/Badge.svelte';
@@ -78,6 +78,9 @@
           {/if}
           {#if row.type === 'pcd' && row.hasPersonalAccessToken}
             <Badge variant="info" icon={Code} mono>Dev</Badge>
+          {/if}
+          {#if row.type === 'pcd' && !row.enabled}
+            <Badge variant="danger" icon={Power} mono>Disabled</Badge>
           {/if}
           {#if row.type === 'pcd' && !row.cacheAvailable}
             <Badge variant="warning" icon={AlertTriangle} mono>Cache Unavailable</Badge>

@@ -8,6 +8,7 @@
 // ============================================================================
 
 export { pcdManager } from './core/manager.ts';
+export { ReenableError, type ReenableResult, type ReenableStatus } from './core/reenable.ts';
 
 // ============================================================================
 // CACHE

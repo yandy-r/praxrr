@@ -27,6 +27,7 @@ import { triggerSyncs } from '$sync/processor.ts';
 import type { CacheBuildStats, LinkOptions, SyncResult } from './types.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
+import { reenableDatabase, type ReenableResult } from './reenable.ts';
 import { cleanupJobsForDatabase } from '$lib/server/jobs/cleanup.ts';
 import {
   encryptDatabasePersonalAccessToken,
@@ -382,6 +383,14 @@ class PCDManager {
    */
   getAll(): DatabaseInstance[] {
     return databaseInstancesQueries.getAll();
+  }
+
+  /**
+   * Re-enable an auto-disabled database after a successful recompile (stays disabled on failure).
+   * Throws `ReenableError` (`not_found` | `recompile_failed`).
+   */
+  reenable(id: number): Promise<ReenableResult> {
+    return reenableDatabase(id);
   }
 
   /**

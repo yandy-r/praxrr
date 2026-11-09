@@ -399,6 +399,18 @@ PcdErrorResponse:
       type: string
       description: Optional machine-readable error code, for example sync_in_progress or preview_stale
 
+PcdEnableResponse:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum:
+        - enabled
+        - already_enabled
+      description: '`enabled` when the database was re-enabled by this call; `already_enabled` for a no-op'
+
 # --- Portable entity schemas ---
 
 PortableDelayProfile:
