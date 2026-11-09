@@ -8996,6 +8996,24 @@ export interface operations {
           'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description The API token lacks the `admin` scope. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScopeForbiddenResponse'];
+        };
+      };
       /** @description Database not found */
       404: {
         headers: {

@@ -306,9 +306,9 @@ export const actions: Actions = {
   },
 
   enable: async ({ params }) => {
-    const id = parseInt(params.id || '', 10);
+    const id = /^\d+$/.test(params.id || '') ? Number.parseInt(params.id as string, 10) : NaN;
 
-    if (isNaN(id)) {
+    if (!Number.isSafeInteger(id) || id <= 0) {
       await logger.warn('Enable failed: Invalid database ID', {
         source: 'databases/[id]/settings',
         meta: { id: params.id },
@@ -320,8 +320,18 @@ export const actions: Actions = {
       // Recompiles first; the database is only marked enabled when that succeeds.
       const result = await pcdManager.reenable(id);
 
-      // Disabled databases have their pcd.sync job unscheduled; restore it.
-      schedulePcdSyncForDatabase(id);
+      if (result.status === 'enabled') {
+        // Disabled databases have their pcd.sync job unscheduled; restore it. A scheduling failure
+        // must not turn a successful re-enable into an error.
+        try {
+          schedulePcdSyncForDatabase(id);
+        } catch (scheduleError) {
+          await logger.error('Failed to reschedule PCD sync after re-enable', {
+            source: 'databases/[id]/settings',
+            meta: { id, error: scheduleError instanceof Error ? scheduleError.message : String(scheduleError) },
+          });
+        }
+      }
 
       return { enableSuccess: true, enableStatus: result.status };
     } catch (err) {

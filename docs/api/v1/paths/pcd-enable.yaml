@@ -34,6 +34,18 @@ enable:
           application/json:
             schema:
               $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '403':
+        description: The API token lacks the `admin` scope.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ScopeForbiddenResponse'
       '404':
         description: Database not found
         content:

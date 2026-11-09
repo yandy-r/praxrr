@@ -53,7 +53,13 @@ function listPublishedUserConflicts(databaseInstanceId: number): number[] {
   return opIds;
 }
 
-async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise<void> {
+/**
+ * Strategy-driven override resolution for `databaseInstanceId` (a no-op unless the instance is
+ * enabled with `conflict_strategy = 'override'`). `compile()` runs it after every swap; exported
+ * so re-enabling a database, which compiles while still disabled, can run the same step once the
+ * instance is enabled again.
+ */
+export async function autoResolveOverrideConflicts(databaseInstanceId: number): Promise<void> {
   const instance = databaseInstancesQueries.getById(databaseInstanceId);
   if (!instance?.enabled) return;
   if (instance.conflict_strategy !== 'override') return;

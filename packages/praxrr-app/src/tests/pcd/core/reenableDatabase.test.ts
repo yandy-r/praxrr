@@ -2,9 +2,21 @@ import { assert, assertEquals, assertFalse } from '@std/assert';
 import type { RequestEvent } from '@sveltejs/kit';
 import { POST as enablePost } from '../../../routes/api/v1/pcd/[databaseId]/enable/+server.ts';
 import { actions as settingsActions } from '../../../routes/databases/[id]/settings/+page.server.ts';
+import { db } from '$db/db.ts';
+import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import { jobQueueQueries } from '$db/queries/jobQueue.ts';
+import { getPcdSyncDedupeKey } from '$jobs/helpers/pcdSyncDedupeKey.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { getCache, getCachedDatabaseIds } from '$pcd/database/registry.ts';
-import { invalidate } from '$pcd/database/compiler.ts';
+import { compile, invalidate } from '$pcd/database/compiler.ts';
+import { withDatabaseOverrideLock } from '$pcd/conflicts/override.ts';
+import {
+  __testOnly_resetCompile,
+  __testOnly_resetReadMigrationEntitySources,
+  __testOnly_setCompile,
+  __testOnly_setReadMigrationEntitySources,
+} from '$pcd/ops/importBaseOps.ts';
+import type { MigrationEntityCandidate } from '$pcd/migration/reader.ts';
 import { pcdManager, ReenableError } from '$pcd/index.ts';
 import { bundleTest, createPcd, liveCache, namesIn, regexData, seedEntity } from '../bundles/bundleTestHelpers.ts';
 
@@ -161,4 +173,172 @@ bundleTest('settings enable action: success, then failure keeps the database dis
   assertEquals(getCache(databaseId), undefined);
 
   assertEquals(((await run('9999')) as { status: number }).status, 404);
+  // Strict id parsing: parseInt would accept '1abc' as 1.
+  assertEquals(((await run('1abc')) as { status: number }).status, 400);
+});
+
+/** A repo-import candidate that makes `importBaseOps` take the import + compile path. */
+function probeCandidate(deserialize: () => Promise<{ success: boolean; error?: string }>): MigrationEntityCandidate {
+  return {
+    sourcePath: '/tmp/regular-expressions/probe.yaml',
+    relativePath: 'regular-expressions/probe.yaml',
+    entityType: 'regular_expression',
+    migration: { source: 'entities/regular-expressions/probe.yaml', format: 'yaml', version: 1 },
+    portable: { name: 'Rx Probe' },
+    entityName: 'Rx Probe',
+    identity: { kind: 'identity', key: 'migration:regular_expression', value: 'Rx Probe' },
+    stableIdentity: { key: 'regular_expression_name', value: 'Rx Probe', kind: 'stable' },
+    deserialize,
+  } as unknown as MigrationEntityCandidate;
+}
+
+bundleTest('reenable: a stale registered cache is not served when the rebuild fails', async () => {
+  const databaseId = await createPcd();
+  // Auto-disable leaves the previously registered cache in place; it must not survive a failed re-enable.
+  assert(databaseInstancesQueries.disable(databaseId));
+  assert(getCache(databaseId) !== undefined);
+  await breakSchema(databaseId);
+
+  let error: unknown;
+  try {
+    await pcdManager.reenable(databaseId);
+  } catch (e) {
+    error = e;
+  }
+
+  assert(error instanceof ReenableError);
+  assertFalse(isEnabled(databaseId));
+  assertEquals(getCache(databaseId), undefined);
+});
+
+bundleTest('reenable: a failing repo import rolls back and ends disabled with no cache', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+  __testOnly_setReadMigrationEntitySources(() =>
+    Promise.resolve({
+      candidates: [probeCandidate(() => Promise.resolve({ success: false, error: 'boom: secret detail' }))],
+      issues: [],
+    })
+  );
+  try {
+    let error: unknown;
+    try {
+      await pcdManager.reenable(databaseId);
+    } catch (e) {
+      error = e;
+    }
+    assert(error instanceof ReenableError);
+    assertFalse((error as ReenableError).message.includes('secret detail'));
+    assertFalse(isEnabled(databaseId));
+    assertEquals(getCache(databaseId), undefined);
+  } finally {
+    __testOnly_resetReadMigrationEntitySources();
+  }
+});
+
+bundleTest('reenable: the instance stays disabled during import and compile and is enabled only after', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+  const observed: Record<string, boolean> = {};
+  __testOnly_setReadMigrationEntitySources(() =>
+    Promise.resolve({
+      candidates: [
+        probeCandidate(() => {
+          observed.duringImport = isEnabled(databaseId);
+          return Promise.resolve({ success: true });
+        }),
+      ],
+      issues: [],
+    })
+  );
+  __testOnly_setCompile(async (pcdPath, id) => {
+    observed.duringCompile = isEnabled(databaseId);
+    return await compile(pcdPath, id);
+  });
+  try {
+    assertEquals(await pcdManager.reenable(databaseId), { status: 'enabled' });
+  } finally {
+    __testOnly_resetCompile();
+    __testOnly_resetReadMigrationEntitySources();
+  }
+
+  assertEquals(observed, { duringImport: false, duringCompile: false });
+  assert(isEnabled(databaseId));
+  assert(getCache(databaseId) !== undefined);
+});
+
+bundleTest('reenable: waits for the per-database override lock before touching the instance', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let entered!: () => void;
+  const enteredLock = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const holder = withDatabaseOverrideLock(databaseId, async () => {
+    entered();
+    await held;
+  });
+  await enteredLock;
+
+  let settled = false;
+  const pending = pcdManager.reenable(databaseId).finally(() => {
+    settled = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assertFalse(settled);
+  assertFalse(isEnabled(databaseId));
+  assertEquals(getCache(databaseId), undefined);
+
+  release();
+  await holder;
+  assertEquals(await pending, { status: 'enabled' });
+  assert(isEnabled(databaseId));
+});
+
+bundleTest('enable route: reschedules pcd.sync only when it actually re-enabled the database', async () => {
+  const databaseId = await createPcd();
+  db.execute('UPDATE database_instances SET sync_strategy = 60 WHERE id = ?', databaseId);
+  const dedupeKey = getPcdSyncDedupeKey(databaseId);
+  simulateAutoDisable(databaseId);
+  assertEquals(jobQueueQueries.getByDedupeKey(dedupeKey), undefined);
+
+  assertEquals((await postEnable(String(databaseId))).status, 200);
+  assert(jobQueueQueries.getByDedupeKey(dedupeKey) !== undefined);
+
+  // already_enabled is a pure no-op: it must not re-create a job that was removed.
+  jobQueueQueries.unscheduleByDedupeKey(dedupeKey);
+  assertEquals((await postEnable(String(databaseId))).status, 200);
+  assertEquals(jobQueueQueries.getByDedupeKey(dedupeKey), undefined);
+});
+
+bundleTest('reenable: a failure after the enable flip (override resolution) is rolled back to disabled', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+  assertEquals(databaseInstancesQueries.getById(databaseId)?.conflict_strategy, 'override');
+
+  // Resolution only runs once the instance is enabled, so this throws strictly after the flip.
+  const original = pcdOpHistoryQueries.listLatestConflictsByDatabase;
+  pcdOpHistoryQueries.listLatestConflictsByDatabase = () => {
+    throw new Error('conflict listing exploded');
+  };
+  try {
+    let error: unknown;
+    try {
+      await pcdManager.reenable(databaseId);
+    } catch (e) {
+      error = e;
+    }
+    assert(error instanceof ReenableError);
+    assertEquals((error as ReenableError).code, 'recompile_failed');
+    assertFalse((error as ReenableError).message.includes('exploded'));
+    assertFalse(isEnabled(databaseId));
+    assertEquals(getCache(databaseId), undefined);
+  } finally {
+    pcdOpHistoryQueries.listLatestConflictsByDatabase = original;
+  }
 });

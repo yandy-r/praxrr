@@ -29,8 +29,21 @@ export const POST: RequestHandler = async ({ params }) => {
 
   try {
     const result = await pcdManager.reenable(databaseId);
-    // Disabled databases have their pcd.sync job unscheduled; restore it.
-    schedulePcdSyncForDatabase(databaseId);
+    if (result.status === 'enabled') {
+      // Disabled databases have their pcd.sync job unscheduled; restore it. A scheduling failure
+      // must not turn a successful re-enable into an error response.
+      try {
+        schedulePcdSyncForDatabase(databaseId);
+      } catch (scheduleError) {
+        await logger.error('Failed to reschedule PCD sync after re-enable', {
+          source: 'PcdEnableApi',
+          meta: {
+            databaseId,
+            error: scheduleError instanceof Error ? scheduleError.message : String(scheduleError),
+          },
+        });
+      }
+    }
     return json({ status: result.status });
   } catch (error) {
     if (error instanceof ReenableError) {

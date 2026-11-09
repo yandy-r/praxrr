@@ -52,10 +52,10 @@
             );
             await invalidateAll();
           } else if (result.type === 'failure') {
-            const message = (result.data as { error?: string } | undefined)?.error?.trim().replace(/[.!\s]+$/, '');
+            const message = (result.data as { error?: string } | undefined)?.error?.trim();
             alertStore.add(
               'error',
-              `${message || 'Failed to re-enable database'}. The database remains disabled; check the logs for details.`
+              message || 'Failed to re-enable database. It remains disabled; check the server logs for details.'
             );
           } else {
             await applyAction(result);

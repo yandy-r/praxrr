@@ -3,13 +3,24 @@
  *
  * `database_instances.enabled` is cleared by `disableDatabaseInstance()` whenever a compile or
  * rollback fails, and startup skips disabled instances, so without this nothing could restore it.
- * The database is only served again when a fresh import + compile succeeds; otherwise it stays
- * disabled and no cache is left registered.
+ *
+ * The instance stays `enabled = 0` for the whole import + compile so enabled-gated paths (the
+ * pcd.sync job handler, strategy-driven auto-override, writer-side recompiles in other flows) stay
+ * out while the database is being rebuilt. It is flipped to `enabled = 1` only after the compile
+ * succeeds; on any failure it stays disabled and no cache is left registered.
+ *
+ * The run holds the per-database override lock (shared with bundle import / conflict override /
+ * override revert) so it cannot interleave with another writer that snapshots and restores the op
+ * table. Cache serving is NOT gated on `enabled` (`getCache` reads the registry directly), and a
+ * failed build leaves the previously registered cache in place; the stale cache is therefore
+ * invalidated up front so neither readers nor `importBaseOps` (which reads the registered cache
+ * for entity presence checks) see pre-failure state.
  */
 
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
-import { compile, invalidate } from '../database/compiler.ts';
+import { withDatabaseOverrideLock } from '../conflicts/override.ts';
+import { autoResolveOverrideConflicts, compile, invalidate } from '../database/compiler.ts';
 import { getRegisteredCache } from '../database/registry.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
 import { seedBuiltInBaseOps } from '../ops/seedBuiltInBaseOps.ts';
@@ -43,10 +54,28 @@ export const REENABLE_NOT_FOUND_MESSAGE = 'Database not found';
 export const REENABLE_RECOMPILE_FAILED_MESSAGE =
   'Database could not be re-enabled because its configuration failed to compile. It remains disabled; check the server logs for details.';
 
-/** Serializes concurrent re-enables of the same database: later callers share the first run. */
+/** Collapses concurrent re-enables of the same database into one run. */
 const inFlight = new Map<number, Promise<ReenableResult>>();
 
+async function failClosed(databaseId: number, name: string, error: unknown): Promise<never> {
+  invalidate(databaseId);
+  try {
+    databaseInstancesQueries.disable(databaseId);
+  } catch (disableError) {
+    await logger.error('Failed to re-disable database after failed re-enable', {
+      source: 'PCDReenable',
+      meta: { databaseId, error: String(disableError) },
+    });
+  }
+  await logger.error('Failed to re-enable database', {
+    source: 'PCDReenable',
+    meta: { databaseId, name, error: String(error) },
+  });
+  throw new ReenableError('recompile_failed', REENABLE_RECOMPILE_FAILED_MESSAGE, { cause: error });
+}
+
 async function runReenable(databaseId: number): Promise<ReenableResult> {
+  // Re-read inside the lock: another writer may have changed the instance while this call queued.
   const instance = databaseInstancesQueries.getById(databaseId);
   if (!instance) {
     throw new ReenableError('not_found', REENABLE_NOT_FOUND_MESSAGE);
@@ -55,11 +84,7 @@ async function runReenable(databaseId: number): Promise<ReenableResult> {
     return { status: 'already_enabled' };
   }
 
-  // Enable before compiling so compile-time behavior that is gated on `enabled` (strategy-driven
-  // auto-override resolution) matches a normal compile. Any failure below disables it again.
-  databaseInstancesQueries.enable(databaseId);
   try {
-    // A failed build leaves the previously registered cache in place; never serve it.
     invalidate(databaseId);
 
     await seedBuiltInBaseOps(databaseId);
@@ -68,21 +93,23 @@ async function runReenable(databaseId: number): Promise<ReenableResult> {
     if (!getRegisteredCache(databaseId)) {
       await compile(instance.local_path, databaseId);
     }
-  } catch (error) {
-    invalidate(databaseId);
-    try {
-      databaseInstancesQueries.disable(databaseId);
-    } catch (disableError) {
-      await logger.error('Failed to re-disable database after failed re-enable', {
-        source: 'PCDReenable',
-        meta: { databaseId, error: String(disableError) },
-      });
+    if (!getRegisteredCache(databaseId)) {
+      throw new Error('Cache missing after recompile');
     }
-    await logger.error('Failed to re-enable database', {
-      source: 'PCDReenable',
-      meta: { databaseId, name: instance.name, error: String(error) },
-    });
-    throw new ReenableError('recompile_failed', REENABLE_RECOMPILE_FAILED_MESSAGE, { cause: error });
+
+    databaseInstancesQueries.enable(databaseId);
+
+    // The compile above ran while disabled, so compile()'s enabled-gated auto-override resolution
+    // was skipped; run it now through the same entry point. Matching a normal compile, an
+    // individual override failure is logged and non-fatal inside it, while an exception it throws
+    // propagates to the caller as a failed compile; here that fails closed (back to disabled, no
+    // cache). A failed override rebuild disables the instance itself, so re-check afterwards.
+    await autoResolveOverrideConflicts(databaseId);
+    if (!databaseInstancesQueries.getById(databaseId)?.enabled || !getRegisteredCache(databaseId)) {
+      throw new Error('Database disabled during override resolution');
+    }
+  } catch (error) {
+    return await failClosed(databaseId, instance.name, error);
   }
 
   await logger.info(`Re-enabled database: ${instance.name}`, {
@@ -96,7 +123,7 @@ export function reenableDatabase(databaseId: number): Promise<ReenableResult> {
   const existing = inFlight.get(databaseId);
   if (existing) return existing;
 
-  const run = runReenable(databaseId).finally(() => {
+  const run = withDatabaseOverrideLock(databaseId, () => runReenable(databaseId)).finally(() => {
     inFlight.delete(databaseId);
   });
   inFlight.set(databaseId, run);
