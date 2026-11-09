@@ -39,12 +39,12 @@ async function listChildDirectories(dir: string): Promise<string[]> {
 
 /**
  * Scrub embedded credentials from every PCD clone (registered or orphaned under the databases
- * directory), each PCD dependency clone, and every TRaSH source clone.
+ * directory), each PCD dependency clone, and every TRaSH source clone (registered or orphaned).
  * Never throws; per-clone failures are reported in `failed`.
  */
 export async function scrubStoredGitCredentials(): Promise<GitCredentialScrubResult> {
   const pcdPaths = new Set<string>(await listChildDirectories(config.paths.databases));
-  const candidates = new Set<string>();
+  const candidates = new Set<string>(await listChildDirectories(`${config.paths.data}/trashguide`));
   const failed: string[] = [];
   try {
     for (const instance of databaseInstancesQueries.getAll()) {
@@ -54,7 +54,10 @@ export async function scrubStoredGitCredentials(): Promise<GitCredentialScrubRes
       if (source.local_path) candidates.add(source.local_path);
     }
   } catch (error) {
-    await logger.warn('Failed to list registered git clones for credential scrub', {
+    // Registered clones outside the data directory could not be listed: report as a failure so
+    // callers that must not archive credentials (backups) fail closed.
+    failed.push('<registered clones>');
+    await logger.error('Failed to list registered git clones for credential scrub', {
       source: 'GitCredentialScrub',
       meta: { error: error instanceof Error ? error.message : String(error) },
     });
