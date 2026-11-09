@@ -2,7 +2,7 @@
  * Git repository commands
  */
 
-import { execGit, execGitSafe } from './exec.ts';
+import { buildGitEnv, execGit, execGitSafe, type GitExecOptions } from './exec.ts';
 import type { RepoInfo } from './types.ts';
 import { getCachedRepoInfo } from '../github/cache.ts';
 import { logger } from '$logger/logger.ts';
@@ -104,14 +104,7 @@ async function cloneLocalGitRepository(repositoryUrl: string, targetPath: string
     stdin: 'null',
     stdout: 'piped',
     stderr: 'piped',
-    env: {
-      GIT_TERMINAL_PROMPT: '0',
-      GIT_ASKPASS: 'echo',
-      GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
-      GIT_CONFIG_COUNT: '1',
-      GIT_CONFIG_KEY_0: 'credential.helper',
-      GIT_CONFIG_VALUE_0: '',
-    },
+    env: buildGitEnv(),
   }).spawn();
 
   let timedOut = false;
@@ -404,25 +397,15 @@ export async function clone(
   const args = ['clone'];
   if (branch) args.push('--branch', branch);
 
-  let authUrl = repositoryUrl;
-  if (personalAccessToken) {
-    authUrl = repositoryUrl.replace('https://github.com', `https://${personalAccessToken}@github.com`);
-  }
-
-  args.push(authUrl, targetPath);
+  // The token is passed per command (see buildGitEnv), never embedded in the URL: git would
+  // persist an embedded credential as remote.origin.url in the clone's .git/config.
+  args.push(repositoryUrl, targetPath);
 
   const command = new Deno.Command('git', {
     args,
     stdout: 'piped',
     stderr: 'piped',
-    env: {
-      GIT_TERMINAL_PROMPT: '0',
-      GIT_ASKPASS: 'echo',
-      GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
-      GIT_CONFIG_COUNT: '1',
-      GIT_CONFIG_KEY_0: 'credential.helper',
-      GIT_CONFIG_VALUE_0: '',
-    },
+    env: buildGitEnv({ personalAccessToken }),
   });
 
   const { code, stderr } = await command.output();
@@ -436,29 +419,29 @@ export async function clone(
 /**
  * Fetch from remote (silent)
  */
-export async function fetch(repoPath: string): Promise<void> {
-  await execGitSafe(['fetch', '--quiet'], repoPath);
+export async function fetch(repoPath: string, options: GitExecOptions = {}): Promise<void> {
+  await execGitSafe(['fetch', '--quiet'], repoPath, options);
 }
 
 /**
  * Fetch tags from remote
  */
-export async function fetchTags(repoPath: string): Promise<void> {
-  await execGitSafe(['fetch', '--tags', '--quiet'], repoPath);
+export async function fetchTags(repoPath: string, options: GitExecOptions = {}): Promise<void> {
+  await execGitSafe(['fetch', '--tags', '--quiet'], repoPath, options);
 }
 
 /**
  * Pull from remote
  */
-export async function pull(repoPath: string): Promise<void> {
-  await execGit(['pull'], repoPath);
+export async function pull(repoPath: string, options: GitExecOptions = {}): Promise<void> {
+  await execGit(['pull'], repoPath, options);
 }
 
 /**
  * Push to remote
  */
-export async function push(repoPath: string): Promise<void> {
-  await execGit(['push'], repoPath);
+export async function push(repoPath: string, options: GitExecOptions = {}): Promise<void> {
+  await execGit(['push'], repoPath, options);
 }
 
 /**
@@ -471,10 +454,20 @@ export async function checkout(repoPath: string, branch: string): Promise<void> 
 /**
  * Reset repository to match remote (discards local changes)
  */
-export async function resetToRemoteBranch(repoPath: string, branch: string): Promise<void> {
+export async function resetToRemoteBranch(
+  repoPath: string,
+  branch: string,
+  options: GitExecOptions = {}
+): Promise<void> {
   const remoteBranchRef = `origin/${branch}`;
 
-  await execGit(['fetch', '--quiet', 'origin', `${branch}:refs/remotes/origin/${branch}`], repoPath);
+  // --no-prune: a user/system `fetch.prune=true` would otherwise prune the very ref this refspec
+  // writes and fail the fetch (YAN-1697).
+  await execGit(
+    ['fetch', '--quiet', '--no-prune', 'origin', `${branch}:refs/remotes/origin/${branch}`],
+    repoPath,
+    options
+  );
   await execGit(['reset', '--hard'], repoPath);
   await execGit(['clean', '-fdx'], repoPath);
   await execGit(['checkout', '-B', branch, remoteBranchRef], repoPath);
@@ -537,4 +530,41 @@ export async function getRepoInfo(
   personalAccessToken?: string | null
 ): Promise<RepoInfo | null> {
   return getCachedRepoInfo(repositoryUrl, personalAccessToken);
+}
+
+/**
+ * Return `url` without any userinfo (`user:token@`). Non-URL values (local paths, scp-style SSH
+ * remotes) are returned unchanged.
+ */
+export function stripUrlCredentials(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if ((parsed.protocol !== 'https:' && parsed.protocol !== 'http:') || (!parsed.username && !parsed.password)) {
+    return url;
+  }
+  parsed.username = '';
+  parsed.password = '';
+  return parsed.toString();
+}
+
+/**
+ * Remove credentials embedded in a clone's `remote.origin.url` (written by older versions that
+ * cloned with `https://<token>@github.com/...`). Returns true when the URL was rewritten.
+ * Best-effort: a missing repository or remote is not an error.
+ */
+export async function scrubRemoteCredentials(repoPath: string): Promise<boolean> {
+  const current = await execGitSafe(['config', '--local', '--get', 'remote.origin.url'], repoPath);
+  if (!current) {
+    return false;
+  }
+  const clean = stripUrlCredentials(current);
+  if (clean === current) {
+    return false;
+  }
+  await execGit(['remote', 'set-url', 'origin', clean], repoPath);
+  return true;
 }

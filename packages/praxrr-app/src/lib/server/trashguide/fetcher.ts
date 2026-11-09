@@ -174,7 +174,9 @@ async function syncRepository(params: {
   }
 
   try {
-    await resetToRemoteBranch(params.local_path, params.branch);
+    await resetToRemoteBranch(params.local_path, params.branch, {
+      personalAccessToken: params.personal_access_token,
+    });
   } catch (error) {
     throw classifyGitError(error, {
       operation: 'pull',

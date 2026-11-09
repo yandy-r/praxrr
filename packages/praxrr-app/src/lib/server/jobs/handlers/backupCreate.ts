@@ -6,6 +6,7 @@ import { createBackup } from '../logic/createBackup.ts';
 import { calculateNextRunFromSchedule } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
 import { db } from '$db/db.ts';
+import { scrubStoredGitCredentials } from '$pcd/git/credentialScrub.ts';
 
 const backupCreateHandler: JobHandler = async (job) => {
   const settings = backupSettingsQueries.get();
@@ -17,6 +18,9 @@ const backupCreateHandler: JobHandler = async (job) => {
   const backupsDir = config.paths.backups;
 
   try {
+    // Never archive a PAT that an older version embedded in a clone's remote URL (YAN-460).
+    await scrubStoredGitCredentials();
+
     // Snapshot the live WAL database with VACUUM INTO so the archive holds a consistent copy
     // instead of the raw praxrr.db/-wal/-shm files captured mid-write.
     const result = await createBackup(sourceDir, backupsDir, undefined, {

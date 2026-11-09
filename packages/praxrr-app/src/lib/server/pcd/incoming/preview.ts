@@ -375,7 +375,9 @@ async function previewIncomingUncached(databaseId: number): Promise<IncomingPrev
     if (!branch) {
       throw new Error('The clone is not on a branch');
     }
-    await fetchRemoteBranchStrict(repoPath, branch);
+    await fetchRemoteBranchStrict(repoPath, branch, {
+      personalAccessToken: await getDecryptedDatabasePersonalAccessToken(instance.id),
+    });
     // Pin everything that follows to the SHA fetched above: a concurrent push must not make the
     // commit list describe a different commit than the extracted tree.
     incomingHead = await resolveCommit(repoPath, `refs/remotes/origin/${branch}`);

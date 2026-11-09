@@ -32,4 +32,7 @@ export {
   refreshLocalRepositoryClone,
   resetToCommit,
   resetToRemoteBranch,
+  scrubRemoteCredentials,
+  stripUrlCredentials,
 } from './write.ts';
+export type { GitExecOptions } from './exec.ts';

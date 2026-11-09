@@ -182,9 +182,9 @@ async function getInstalledVersion(depPath: string): Promise<string | null> {
 /**
  * Update a dependency to a new ref using fetch + checkout
  */
-async function updateDependency(depPath: string, version: string): Promise<void> {
-  await fetch(depPath);
-  await fetchTags(depPath);
+async function updateDependency(depPath: string, version: string, personalAccessToken?: string): Promise<void> {
+  await fetch(depPath, { personalAccessToken });
+  await fetchTags(depPath, { personalAccessToken });
 
   const remoteBranchRef = `origin/${version}`;
   const hasRemoteBranch = (await execGitSafe(['rev-parse', '--verify', '--quiet', remoteBranchRef], depPath)) !== null;
@@ -326,7 +326,7 @@ export async function syncDependencies(pcdPath: string, personalAccessToken?: st
 
     if (hasGitFolder) {
       // Fetch tags and checkout new version
-      await updateDependency(depPath, requiredRef);
+      await updateDependency(depPath, requiredRef, personalAccessToken);
       await logger.info(`Updated dependency ${repoName}: ${installedVersion} -> ${requiredRef}`, {
         source: 'PCDDependencies',
         meta: { pcdPath, repoName, from: installedVersion, to: requiredRef, manifestRef },

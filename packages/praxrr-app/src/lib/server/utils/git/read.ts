@@ -2,7 +2,7 @@
  * Git status queries (read-only)
  */
 
-import { execGit, execGitSafe } from './exec.ts';
+import { execGit, execGitSafe, type GitExecOptions } from './exec.ts';
 import { fetch } from './write.ts';
 import type { GitStatus, UpdateInfo, Commit, IncomingChanges } from './types.ts';
 
@@ -26,6 +26,8 @@ export async function getBranch(repoPath: string): Promise<string> {
 export interface GetStatusOptions {
   /** Whether to fetch from remote first (slower but accurate ahead/behind) */
   fetch?: boolean;
+  /** Credential for the optional fetch (see GitExecOptions). */
+  personalAccessToken?: string | null;
 }
 
 /**
@@ -36,7 +38,7 @@ export async function getStatus(repoPath: string, options: GetStatusOptions = {}
 
   // Optionally fetch to get accurate ahead/behind
   if (options.fetch) {
-    await fetch(repoPath);
+    await fetch(repoPath, { personalAccessToken: options.personalAccessToken });
   }
 
   // Get ahead/behind
@@ -91,8 +93,8 @@ export async function getStatus(repoPath: string, options: GetStatusOptions = {}
 /**
  * Check for updates from remote
  */
-export async function checkForUpdates(repoPath: string): Promise<UpdateInfo> {
-  await fetch(repoPath);
+export async function checkForUpdates(repoPath: string, options: GitExecOptions = {}): Promise<UpdateInfo> {
+  await fetch(repoPath, options);
 
   const branch = await getBranch(repoPath);
   const remoteBranch = `origin/${branch}`;
@@ -235,8 +237,8 @@ export async function getCommits(repoPath: string, limit: number = 50, ref?: str
 /**
  * Get incoming changes (commits available to pull from remote)
  */
-export async function getIncomingChanges(repoPath: string): Promise<IncomingChanges> {
-  await fetch(repoPath);
+export async function getIncomingChanges(repoPath: string, options: GitExecOptions = {}): Promise<IncomingChanges> {
+  await fetch(repoPath, options);
   return await readIncomingChanges(repoPath);
 }
 

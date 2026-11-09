@@ -19,6 +19,7 @@ import { isValidScheduleIntervalMinutes, SYNC_STRATEGY_RANGE_ERROR } from '$jobs
 import { loadManifest, type Manifest } from '../manifest/manifest.ts';
 import { getPCDPath } from '../utils/operations.ts';
 import { processDependencies, syncDependencies, validateDependencies } from '../git/dependencies.ts';
+import { scrubStoredGitCredentials } from '../git/credentialScrub.ts';
 import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { logger } from '$logger/logger.ts';
@@ -228,8 +229,10 @@ class PCDManager {
         };
       }
 
+      const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+
       // Check for updates first
-      const updateInfo = await checkForUpdates(instance.local_path);
+      const updateInfo = await checkForUpdates(instance.local_path, { personalAccessToken });
 
       if (!updateInfo.hasUpdates) {
         // Already up to date
@@ -248,10 +251,9 @@ class PCDManager {
       });
 
       // Pull updates
-      await pull(instance.local_path);
+      await pull(instance.local_path, { personalAccessToken });
 
       // Sync dependencies (schema, etc.) if versions changed
-      const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
       await syncDependencies(instance.local_path, personalAccessToken);
 
       let importedBaseOps = true;
@@ -318,7 +320,8 @@ class PCDManager {
       };
     }
 
-    return await checkForUpdates(instance.local_path);
+    const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+    return await checkForUpdates(instance.local_path, { personalAccessToken });
   }
 
   /**
@@ -343,7 +346,8 @@ class PCDManager {
     }
 
     await checkout(instance.local_path, branch);
-    await pull(instance.local_path);
+    const personalAccessToken = await getDecryptedDatabasePersonalAccessToken(instance.id);
+    await pull(instance.local_path, { personalAccessToken });
     try {
       await importBaseOps(id, instance.local_path);
     } catch (error) {
@@ -402,6 +406,9 @@ class PCDManager {
     const startTime = performance.now();
 
     await logger.debug('Initialize caches', { source: 'PCDManager' });
+
+    // Older versions embedded the PAT in clone remote URLs; remove it before any git command runs.
+    await scrubStoredGitCredentials();
 
     const instances = databaseInstancesQueries.getAll();
     const enabledInstances = instances.filter((instance) => instance.enabled);
