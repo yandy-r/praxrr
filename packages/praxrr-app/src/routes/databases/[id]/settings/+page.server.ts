@@ -305,6 +305,10 @@ export const actions: Actions = {
     }
   },
 
+  /**
+   * Re-enable an auto-disabled database (recompiles first; stays disabled on failure). Returns
+   * `{ enableSuccess, enableStatus }`, or `fail(400|404|422|500, { error })` with a generic message.
+   */
   enable: async ({ params }) => {
     const id = /^\d+$/.test(params.id || '') ? Number.parseInt(params.id as string, 10) : NaN;
 

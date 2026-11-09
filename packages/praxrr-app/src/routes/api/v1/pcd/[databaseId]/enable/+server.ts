@@ -6,11 +6,12 @@ import { schedulePcdSyncForDatabase } from '$jobs/schedule.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;
 
+/** Parse a strictly positive safe-integer path segment, or describe why it is invalid. */
 function parsePositiveInteger(rawId: string | undefined, fieldName: string): { value: number } | { error: string } {
   if (!rawId) return { error: `Missing ${fieldName}` };
   if (!POSITIVE_INTEGER_ID.test(rawId)) return { error: `Invalid ${fieldName}` };
   const id = Number.parseInt(rawId, 10);
-  if (!Number.isInteger(id) || id <= 0) return { error: `Invalid ${fieldName}` };
+  if (!Number.isSafeInteger(id) || id <= 0) return { error: `Invalid ${fieldName}` };
   return { value: id };
 }
 

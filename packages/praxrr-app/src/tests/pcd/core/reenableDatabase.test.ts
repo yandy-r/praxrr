@@ -4,6 +4,7 @@ import { POST as enablePost } from '../../../routes/api/v1/pcd/[databaseId]/enab
 import { actions as settingsActions } from '../../../routes/databases/[id]/settings/+page.server.ts';
 import { db } from '$db/db.ts';
 import { pcdOpHistoryQueries } from '$db/queries/pcdOpHistory.ts';
+import { pcdOpsQueries } from '$db/queries/pcdOps.ts';
 import { jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { getPcdSyncDedupeKey } from '$jobs/helpers/pcdSyncDedupeKey.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
@@ -39,10 +40,12 @@ async function breakSchema(databaseId: number): Promise<void> {
   await Deno.writeTextFile(`${instance.local_path}/deps/schema/ops/9999.broken.sql`, 'THIS IS NOT VALID SQL;');
 }
 
+/** Whether the instance row currently has `enabled = 1`. */
 function isEnabled(databaseId: number): boolean {
   return databaseInstancesQueries.getById(databaseId)?.enabled === 1;
 }
 
+/** Invoke the enable route handler directly with the given `databaseId` path param. */
 async function postEnable(databaseId: string): Promise<Response> {
   return await enablePost({
     params: { databaseId },
@@ -340,5 +343,101 @@ bundleTest('reenable: a failure after the enable flip (override resolution) is r
     assertEquals(getCache(databaseId), undefined);
   } finally {
     pcdOpHistoryQueries.listLatestConflictsByDatabase = original;
+  }
+});
+
+bundleTest('reenable: override auto-resolution re-enters the held lock without deadlocking', async () => {
+  const databaseId = await createPcd();
+  const instance = databaseInstancesQueries.getById(databaseId)!;
+  assertEquals(instance.conflict_strategy, 'override');
+
+  // Published base regex plus a published user update whose value guard never matches: replaying
+  // it conflicts, and re-enable's auto-resolution must override it while holding the re-enable lock.
+  pcdOpsQueries.create({
+    databaseId,
+    origin: 'base',
+    state: 'published',
+    source: 'local',
+    sql: "INSERT INTO regular_expressions (name, pattern) VALUES ('Rx Conflict', 'x264')",
+  });
+  const conflictedOpId = pcdOpsQueries.create({
+    databaseId,
+    origin: 'user',
+    state: 'published',
+    source: 'local',
+    sql: "UPDATE regular_expressions SET pattern = 'new' WHERE name = 'Rx Conflict' AND pattern = 'never'",
+    metadata: JSON.stringify({ operation: 'update', entity: 'regular_expression', name: 'Rx Conflict' }),
+    desiredState: JSON.stringify({ pattern: { from: 'x264', to: 'new' } }),
+  });
+  // Compile while disabled: compile() skips auto-resolution then, so the conflict stays pending
+  // until re-enable resolves it (an enabled compile would have overridden it already).
+  assert(databaseInstancesQueries.disable(databaseId));
+  await compile(instance.local_path, databaseId);
+  assertEquals(
+    pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseId).map((c) => c.op.id),
+    [conflictedOpId]
+  );
+  invalidate(databaseId);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('re-enable deadlocked on the override lock')), 15_000);
+  });
+  try {
+    assertEquals(await Promise.race([pcdManager.reenable(databaseId), timeout]), { status: 'enabled' });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  assert(isEnabled(databaseId));
+  assert(getCache(databaseId) !== undefined);
+  // The conflicting op was overridden (superseded by its replacement), so no published user conflict remains.
+  assertEquals(pcdOpHistoryQueries.listLatestConflictsByDatabase(databaseId), []);
+  assertEquals(pcdOpsQueries.getById(conflictedOpId)?.state, 'superseded');
+  assertEquals(
+    liveCache(databaseId).query<{ pattern: string }>(
+      "SELECT pattern FROM regular_expressions WHERE name = 'Rx Conflict'"
+    ),
+    [{ pattern: 'new' }]
+  );
+});
+
+/** Make `schedulePcdSyncForDatabase` throw (it unschedules via this query when sync is off). */
+function breakScheduling(): () => void {
+  const original = jobQueueQueries.unscheduleByDedupeKey;
+  jobQueueQueries.unscheduleByDedupeKey = () => {
+    throw new Error('queue exploded');
+  };
+  return () => {
+    jobQueueQueries.unscheduleByDedupeKey = original;
+  };
+}
+
+bundleTest('enable route: a scheduling failure after a successful re-enable still returns 200', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+  const restore = breakScheduling();
+  try {
+    const response = await postEnable(String(databaseId));
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { status: 'enabled' });
+    assert(isEnabled(databaseId));
+  } finally {
+    restore();
+  }
+});
+
+bundleTest('settings enable action: a scheduling failure after a successful re-enable still succeeds', async () => {
+  const databaseId = await createPcd();
+  simulateAutoDisable(databaseId);
+  const restore = breakScheduling();
+  try {
+    const result = await (settingsActions.enable as (event: unknown) => Promise<Record<string, unknown>>)({
+      params: { id: String(databaseId) },
+    });
+    assertEquals(result, { enableSuccess: true, enableStatus: 'enabled' });
+    assert(isEnabled(databaseId));
+  } finally {
+    restore();
   }
 });

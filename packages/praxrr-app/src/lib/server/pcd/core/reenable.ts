@@ -19,7 +19,6 @@
 
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { logger } from '$logger/logger.ts';
-import { withDatabaseOverrideLock } from '../conflicts/override.ts';
 import { autoResolveOverrideConflicts, compile, invalidate } from '../database/compiler.ts';
 import { getRegisteredCache } from '../database/registry.ts';
 import { importBaseOps } from '../ops/importBaseOps.ts';
@@ -57,6 +56,10 @@ export const REENABLE_RECOMPILE_FAILED_MESSAGE =
 /** Collapses concurrent re-enables of the same database into one run. */
 const inFlight = new Map<number, Promise<ReenableResult>>();
 
+/**
+ * Leave the database disabled with nothing served: drop any registered cache, force `enabled = 0`,
+ * log the real cause server-side, and throw the generic `recompile_failed` error.
+ */
 async function failClosed(databaseId: number, name: string, error: unknown): Promise<never> {
   invalidate(databaseId);
   try {
@@ -74,6 +77,10 @@ async function failClosed(databaseId: number, name: string, error: unknown): Pro
   throw new ReenableError('recompile_failed', REENABLE_RECOMPILE_FAILED_MESSAGE, { cause: error });
 }
 
+/**
+ * Lock-held re-enable body: re-read the instance, import base ops and compile while disabled, flip
+ * `enabled = 1` only on success, then run override resolution. Any failure fails closed.
+ */
 async function runReenable(databaseId: number): Promise<ReenableResult> {
   // Re-read inside the lock: another writer may have changed the instance while this call queued.
   const instance = databaseInstancesQueries.getById(databaseId);
@@ -119,11 +126,25 @@ async function runReenable(databaseId: number): Promise<ReenableResult> {
   return { status: 'enabled' };
 }
 
+/**
+ * Dynamic import is required: `conflicts/override.ts` imports `$pcd/index.ts`, which re-exports the
+ * manager and therefore this module, so a static import would create a load-order cycle (same
+ * pattern as `overrides/revert.ts`).
+ */
+async function withLock<T>(databaseId: number, fn: () => Promise<T>): Promise<T> {
+  const { withDatabaseOverrideLock } = await import('../conflicts/override.ts');
+  return withDatabaseOverrideLock(databaseId, fn);
+}
+
+/**
+ * Re-enable an auto-disabled database. Concurrent calls for the same id share one run, and the run
+ * holds the per-database override lock. Resolves `{ status }` or throws `ReenableError`.
+ */
 export function reenableDatabase(databaseId: number): Promise<ReenableResult> {
   const existing = inFlight.get(databaseId);
   if (existing) return existing;
 
-  const run = withDatabaseOverrideLock(databaseId, () => runReenable(databaseId)).finally(() => {
+  const run = withLock(databaseId, () => runReenable(databaseId)).finally(() => {
     inFlight.delete(databaseId);
   });
   inFlight.set(databaseId, run);

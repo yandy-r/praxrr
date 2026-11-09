@@ -30,9 +30,9 @@
       <div class="space-y-1">
         <p class="font-semibold">This database is disabled</p>
         <p class="text-amber-800 dark:text-amber-300">
-          It was disabled automatically, usually after a failed cache build or a rolled-back import. While disabled, it
-          isn't being served and its configuration isn't synced to your Arr instances. Re-enable it to rebuild the cache
-          and resume normal operation.
+          It was disabled automatically, usually after a failed cache build or a rolled-back import. While disabled, its
+          cache may be out of date and its configuration isn't synced to your Arr instances. Re-enable it to rebuild the
+          cache and resume normal operation.
         </p>
       </div>
     </div>
