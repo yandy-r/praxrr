@@ -30,19 +30,19 @@ parity:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to compute compatibility parity map
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 versions:
   get:
@@ -67,10 +67,10 @@ versions:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to build version compatibility matrix
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

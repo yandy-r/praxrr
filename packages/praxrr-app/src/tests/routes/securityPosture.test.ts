@@ -10,6 +10,7 @@ import { buildPostureInputs } from '$lib/server/security/gather.ts';
 import { clearDiscoveryCache, getDiscoveryDocument } from '$auth/oidc.ts';
 import { createDnsTransportResolver, overrideDnsTransportResolverForTest } from '$lib/server/security/dnsTransport.ts';
 import type { DnsRecordType, DnsTransportResolver, ResolveDns } from '$lib/server/security/dnsTransport.ts';
+import type { OidcEndpointKind } from '$shared/security/types.ts';
 import type { SecurityPostureSummaryResponse } from '$lib/server/security/responses.ts';
 import { GET as GET_SUMMARY } from '../../routes/api/v1/security-posture/summary/+server.ts';
 
@@ -479,7 +480,7 @@ migratedTest('buildPostureInputs accepts https and loopback http OIDC endpoints'
 
 migratedTest('buildPostureInputs discovers insecure endpoints without a prior sign-in', async () => {
   const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
-  const cases: Array<[string, Record<string, unknown>, string[]]> = [
+  const cases: Array<[string, Record<string, unknown>, OidcEndpointKind[]]> = [
     ['token', { token_endpoint: 'http://idp.example.com/token' }, ['token']],
     ['jwks', { jwks_uri: 'http://idp.example.com/jwks' }, ['jwks']],
     ['authorization', { authorization_endpoint: 'http://idp.example.com/authorize' }, ['authorization']],

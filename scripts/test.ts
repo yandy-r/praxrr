@@ -75,6 +75,10 @@ const testPaths = testPath
   .filter((path) => path.length > 0);
 const repoRoot = Deno.cwd();
 
+// Arr credential encryption requires a master key; default to a fixed test key so the suite
+// is hermetic locally and in CI. An explicitly exported key still wins.
+const TEST_ARR_MASTER_KEY = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=';
+
 // Check if it's a valid path
 if (target && !aliases[target]) {
   // Check if it's a direct path
@@ -104,6 +108,8 @@ const cmd = new Deno.Command('deno', {
     '--allow-run',
   ],
   env: {
+    ARR_CREDENTIAL_MASTER_KEY: TEST_ARR_MASTER_KEY,
+    ARR_CREDENTIAL_MASTER_KEY_VERSION: 'v1',
     ...Deno.env.toObject(),
     APP_BASE_PATH: `${repoRoot}/dist/test`,
   },

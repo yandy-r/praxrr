@@ -57,10 +57,12 @@ Test aliases defined in `scripts/test.ts`: `filters`, `normalize`, `selectors`, 
 ### Docker
 
 ```bash
-deno task docker:build     # Build dev image
-deno task docker:up        # Build + run dev containers
-deno task docker:down      # Stop dev containers
-deno task arr              # Run local Radarr/Sonarr for testing
+deno task docker:dev:build     # Build dev images (no cache)
+deno task docker:dev:up        # Start parser (no watch) + build and run app with watch (watches app only)
+deno task docker:dev:down      # Stop dev containers
+deno task docker:arr:up        # Start local Radarr/Sonarr/Lidarr for testing
+deno task docker:arr:down      # Stop local Arr containers
+deno task docker:dev:up:with-arr   # Dev stack plus Arr profile
 ```
 
 ### Code Generation

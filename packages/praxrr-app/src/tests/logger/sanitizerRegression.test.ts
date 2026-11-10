@@ -10,6 +10,10 @@ import { assert, assertEquals } from '@std/assert';
 import { sanitizeLogMeta } from '$logger/sanitizer.ts';
 import { HttpError } from '$http/types.ts';
 
+// Loaded at module scope: logger.ts transitively loads a native SQLite library, which Deno's leak
+// sanitizer reports as a leak when first imported inside a test body.
+const { Logger } = await import('$logger/logger.ts');
+
 Deno.test('sanitizeLogMeta strips a 32-hex Arr-key-shaped value anywhere it appears', () => {
   const key = 'deadbeefdeadbeefdeadbeefdeadbeef';
   const sanitized = sanitizeLogMeta({ note: key, nested: { alsoKey: key } });
@@ -397,7 +401,6 @@ Deno.test('sanitizeLogMeta stays fast on adversarial large strings', () => {
 });
 
 Deno.test('Logger writes sanitized HttpError meta to the log file', async () => {
-  const { Logger } = await import('$logger/logger.ts');
   const dir = await Deno.makeTempDir({ prefix: 'praxrr-logger-' });
   const originalLog = console.log;
   console.log = () => {};

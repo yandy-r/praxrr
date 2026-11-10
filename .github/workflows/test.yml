@@ -1,0 +1,46 @@
+name: Test
+
+on:
+  pull_request:
+    paths:
+      - 'packages/praxrr-app/**'
+      - 'packages/praxrr-schema/**'
+      - 'packages/praxrr-db/**'
+      - 'packages/praxrr-api/**'
+      - 'docs/api/**'
+      - 'scripts/test.ts'
+      - 'deno.json'
+      - 'deno.lock'
+      - '.github/workflows/test.yml'
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DENO_VERSION: '2.5.6'
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: Install dependencies
+        run: |
+          if ! deno install --node-modules-dir --allow-scripts=npm:better-sqlite3; then
+            echo "::warning::Scripted install for better-sqlite3 failed; retrying without scripts."
+            deno install --node-modules-dir
+          fi
+      - name: Sync SvelteKit types
+        run: cd packages/praxrr-app && npx svelte-kit sync
+      - name: Run unit tests
+        run: deno task test

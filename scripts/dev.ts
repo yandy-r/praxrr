@@ -1,6 +1,5 @@
 /**
  * Dev script that runs parser and server concurrently with labeled output.
- * Set WITH_ARR=1 to also start Radarr/Sonarr/Lidarr (docker compose -f compose.arr.yml up -d).
  */
 
 // Auto-detect platform from Deno.build
@@ -11,7 +10,6 @@ function getPlatform(): string {
 }
 
 const colors = {
-  arr: '\x1b[32m', // green
   parser: '\x1b[33m', // yellow
   server: '\x1b[34m', // blue
   reset: '\x1b[0m',
@@ -44,30 +42,6 @@ async function isGoAvailable(): Promise<boolean> {
     return success;
   } catch {
     return false;
-  }
-}
-
-async function startArr(): Promise<void> {
-  console.log(`${colors.arr}[arr]${colors.reset} Starting Radarr/Sonarr/Lidarr...`);
-  try {
-    const cmd = new Deno.Command('docker', {
-      args: ['compose', '-f', 'compose.arr.yml', 'up', '-d'],
-      stdout: 'piped',
-      stderr: 'piped',
-    });
-    const process = cmd.spawn();
-    await Promise.all([
-      streamOutput(process.stdout.getReader(), 'arr', colors.arr),
-      streamOutput(process.stderr.getReader(), 'arr', colors.arr),
-    ]);
-    const status = await process.status;
-    if (status.success) {
-      console.log(`${colors.arr}[arr]${colors.reset} Containers started. Stop with: deno task arr:down`);
-    } else {
-      console.log(`${colors.arr}[arr]${colors.reset} docker compose exited with code ${status.code}`);
-    }
-  } catch (err) {
-    console.log(`${colors.arr}[arr]${colors.reset} Skipped (docker not available or failed). ${err}`);
   }
 }
 
@@ -161,11 +135,6 @@ async function runUntilExit(processes: Deno.ChildProcess[]): Promise<void> {
   } finally {
     removeSignalListeners();
   }
-}
-
-if (Deno.env.get('WITH_ARR') === '1') {
-  await startArr();
-  console.log('');
 }
 
 const usesExternalParser = Boolean(Deno.env.get('PARSER_HOST'));

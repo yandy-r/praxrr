@@ -1892,6 +1892,79 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/trash-guide/sources': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List TRaSH sources
+     * @description Returns every configured TRaSH source with entity counts.
+     */
+    get: operations['listTrashGuideSources'];
+    put?: never;
+    /**
+     * Create a TRaSH source
+     * @description Clones and parses the repository for the given `arrType` (`radarr` or `sonarr` only), persists the
+     *     source and its entity cache, and triggers an initial sync. Unknown request fields are rejected.
+     */
+    post: operations['createTrashGuideSource'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/trash-guide/sources/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID (positive integer) */
+        id: number;
+      };
+      cookie?: never;
+    };
+    /** Get a TRaSH source */
+    get: operations['getTrashGuideSource'];
+    /**
+     * Update a TRaSH source
+     * @description Partial update. `arrType` is immutable: supplying a different value is rejected with 422.
+     *     Changing `repositoryUrl` re-clones the repository.
+     */
+    put: operations['updateTrashGuideSource'];
+    post?: never;
+    /** Delete a TRaSH source */
+    delete: operations['deleteTrashGuideSource'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/trash-guide/sources/{id}/entities': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List cached TRaSH entities for a source
+     * @description Lists cached entities with optional type/name filtering and offset paging. Provide either `cursor`
+     *     or `offset`, not both (`cursor` is the `nextCursor` value from a previous page). The `arrType`
+     *     filter is validated but must equal the source's own arrType (sources are Radarr- or Sonarr-specific).
+     */
+    get: operations['listTrashGuideSourceEntities'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/trash-guide/sources/{id}/sync': {
     parameters: {
       query?: never;
@@ -4635,6 +4708,111 @@ export interface components {
         [key: string]: number;
       };
       group?: number | null;
+    };
+    /**
+     * @description Arr app a TRaSH source targets. Only radarr and sonarr are supported (lidarr is rejected). Immutable after creation.
+     * @enum {string}
+     */
+    TrashGuideSourceArrType: 'radarr' | 'sonarr';
+    TrashGuideSourceEntityCounts: {
+      customFormats: number;
+      customFormatGroups: number;
+      qualityProfiles: number;
+      qualitySizes: number;
+      naming: number;
+    };
+    TrashGuideSource: {
+      id: number;
+      name: string;
+      repositoryUrl: string;
+      branch: string;
+      arrType: components['schemas']['TrashGuideSourceArrType'];
+      scoreProfile: string;
+      autoPull: boolean;
+      enabled: boolean;
+      /** @description Sync interval in minutes (0 disables scheduled sync) */
+      syncStrategy: number;
+      /** Format: date-time */
+      lastSyncedAt: string | null;
+      lastCommitHash: string | null;
+      entityCounts: components['schemas']['TrashGuideSourceEntityCounts'];
+    };
+    TrashGuideSourceListResponse: {
+      sources: components['schemas']['TrashGuideSource'][];
+    };
+    TrashGuideSourceResponse: {
+      source: components['schemas']['TrashGuideSource'];
+    };
+    /** @description Unknown fields are rejected with 400. name, repositoryUrl and arrType are required. */
+    TrashGuideSourceCreateRequest: {
+      /** @description Source name (trimmed; case-insensitively unique) */
+      name: string;
+      /**
+       * Format: uri
+       * @description Git repository URL; must use http or https
+       */
+      repositoryUrl: string;
+      /** @description Branch to track (default `master`) */
+      branch?: string;
+      arrType: components['schemas']['TrashGuideSourceArrType'];
+      /** @description TRaSH score profile key (default `default`) */
+      scoreProfile?: string;
+      /** @description Default false */
+      autoPull?: boolean;
+      /** @description Default true */
+      enabled?: boolean;
+      /** @description Sync interval in minutes (default 0) */
+      syncStrategy?: number;
+    };
+    /** @description Partial update; at least one field is required and unknown fields are rejected with 400. arrType may only be supplied with its current value (changing it yields 422). */
+    TrashGuideSourceUpdateRequest: {
+      name?: string;
+      /**
+       * Format: uri
+       * @description Must use http or https. Changing it re-clones the repository.
+       */
+      repositoryUrl?: string;
+      branch?: string;
+      arrType?: components['schemas']['TrashGuideSourceArrType'];
+      scoreProfile?: string;
+      autoPull?: boolean;
+      enabled?: boolean;
+      syncStrategy?: number;
+    };
+    TrashGuideEntityListItem: {
+      source: {
+        /** @enum {string} */
+        type: 'trash';
+        id: number;
+        name: string;
+        arrType: components['schemas']['TrashGuideSourceArrType'];
+      };
+      trashId: string;
+      type: components['schemas']['TrashGuideEntityType'];
+      name: string;
+      filePath: string;
+      /** Format: date-time */
+      fetchedAt: string;
+      entity: {
+        [key: string]: unknown;
+      };
+      /** @description Present only for custom_format entities whose cached scores are all numeric */
+      scores?: {
+        [key: string]: number;
+      };
+      /** @description Present only for quality_profile entities */
+      group?: number | null;
+    };
+    TrashGuideEntityListResponse: {
+      entities: components['schemas']['TrashGuideEntityListItem'][];
+      pagination: {
+        limit: number;
+        offset: number;
+        /** @description Offset of the next page as a string, or null when there are no more results */
+        nextCursor: string | null;
+        total: number;
+        hasMore: boolean;
+      };
     };
     /**
      * @description Portable PCD entity identifiers used by import/export endpoints.
@@ -11689,6 +11867,344 @@ export interface operations {
       };
       /** @description Invalid query parameters */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listTrashGuideSources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description TRaSH sources */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSourceListResponse'];
+        };
+      };
+    };
+  };
+  createTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TrashGuideSourceCreateRequest'];
+      };
+    };
+    responses: {
+      /** @description Source created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSourceResponse'];
+        };
+      };
+      /** @description Invalid JSON, unsupported or missing fields, or invalid field values */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source name or repository already exists */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unsupported arrType, invalid syncStrategy, repository could not be parsed, or non-retryable fetch failure */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to create source */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Retryable repository fetch failure */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  getTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID (positive integer) */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description TRaSH source */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSourceResponse'];
+        };
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to fetch source */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  updateTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID (positive integer) */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TrashGuideSourceUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Source updated */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideSourceResponse'];
+        };
+      };
+      /** @description Invalid source ID, invalid JSON, unsupported fields, no updatable field, or invalid field values */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source name or repository already exists */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description arrType change, unsupported arrType, invalid syncStrategy, unparseable repository, or non-retryable fetch failure */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to update source */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Retryable repository fetch failure */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  deleteTrashGuideSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description TRaSH source ID (positive integer) */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Source deleted */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Invalid source ID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to delete source */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  listTrashGuideSourceEntities: {
+    parameters: {
+      query?: {
+        type?: components['schemas']['TrashGuideEntityType'];
+        /** @description Case-insensitive substring match on entity name */
+        search?: string;
+        /** @description Must match the source's arrType (radarr or sonarr) */
+        arrType?: components['schemas']['TrashGuideSourceArrType'];
+        limit?: number;
+        /** @description Offset cursor from a previous page's `nextCursor`; mutually exclusive with `offset` */
+        cursor?: string;
+        /** @description Zero-based offset; mutually exclusive with `cursor` */
+        offset?: number;
+      };
+      header?: never;
+      path: {
+        /** @description TRaSH source ID (positive integer) */
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Page of cached entities */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrashGuideEntityListResponse'];
+        };
+      };
+      /** @description Invalid source ID, empty or malformed filter/paging parameter, or both cursor and offset supplied */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Source not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Invalid type or arrType filter, or arrType differs from the source's arrType */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Failed to list entities */
+      500: {
         headers: {
           [name: string]: unknown;
         };

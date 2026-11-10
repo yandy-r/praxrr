@@ -72,25 +72,25 @@ list:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Database not found
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to read resolved config state
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 named:
   get:
@@ -180,25 +180,25 @@ named:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Database not found, or entity not found in the resolved layer
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to read resolved config state
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 compare:
   get:
@@ -269,31 +269,31 @@ compare:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Database not found, or entity not found
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '429':
         description: Comparison requests are being rate-limited
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to compute cross-instance comparison
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 diff:
   get:
@@ -352,28 +352,28 @@ diff:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: Database not found, Arr instance not found, or entity not found
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '429':
         description: Live diff requests are being rate-limited
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to compute live diff
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

@@ -8,7 +8,7 @@
 /// <reference path="../../../../app.d.ts" />
 import { assert, assertEquals, assertThrows } from '@std/assert';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
-import type { ActionFailure, RequestEvent } from '@sveltejs/kit';
+import type { ActionFailure, Cookies, RequestEvent } from '@sveltejs/kit';
 import { config, type AuthMode } from '$config';
 import { db } from '$db/db.ts';
 import { runMigrations } from '$db/migrations.ts';
@@ -297,21 +297,21 @@ migratedTest('setup action rejects oidc: prefixed usernames, then creates a vali
       assertEquals(userCount(), 0, username);
     }
 
-    const created = await setupActions
-      .default(
+    const created = await Promise.resolve(
+      setupActions.default(
         eventStub({
           path: '/auth/setup',
           form: { username: 'admin', password: 'long-enough-pass', confirmPassword: 'long-enough-pass' },
         }) as unknown as Parameters<typeof setupActions.default>[0]
       )
-      .then(
-        (value) => value,
-        (err: unknown) => {
-          assert(isRedirect(err), 'success path must redirect');
-          assertEquals(err.location, '/');
-          return undefined;
-        }
-      );
+    ).then(
+      (value) => value,
+      (err: unknown) => {
+        assert(isRedirect(err), 'success path must redirect');
+        assertEquals(err.location, '/');
+        return undefined;
+      }
+    );
     assertEquals(created, undefined);
     assertEquals(usersQueries.existsLocal(), true);
     assertEquals(userCount(), 1);
@@ -421,7 +421,7 @@ migratedTest('shouldClearSessionCookie: only unauthenticated non-bypass requests
   };
   const cases: Array<[AuthState, boolean, boolean]> = [
     [{ ...base, skipAuth: true }, true, false], // bypass: cookie left alone
-    [{ ...base, principal: { kind: 'token', tokenId: 1, scopes: [] } }, true, false], // API token: cookie left alone
+    [{ ...base, principal: { kind: 'token', tokenId: 1, tokenName: 't', isLegacy: false, scopes: [] } }, true, false], // API token: cookie left alone
     [
       {
         ...base,
@@ -442,7 +442,9 @@ migratedTest('shouldClearSessionCookie: only unauthenticated non-bypass requests
 
 migratedTest('clearSessionCookie: secure follows transport (plain http vs https)', () => {
   const jar: Record<string, unknown> = {};
-  const cookies = { delete: (name: string, opts: Record<string, unknown>) => void (jar[name] = opts) };
+  const cookies = {
+    delete: (name: string, opts: Record<string, unknown>) => void (jar[name] = opts),
+  } as unknown as Cookies;
 
   clearSessionCookie({ url: new URL('http://praxrr.test/'), request: new Request('http://praxrr.test/') }, cookies);
   const httpOpts = jar.session as { secure: boolean; httpOnly: boolean; sameSite: string; path: string };

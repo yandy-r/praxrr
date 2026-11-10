@@ -736,6 +736,12 @@ paths:
     $ref: './paths/goals.yaml#/reconcile'
   /goals/binding:
     $ref: './paths/goals.yaml#/binding'
+  /trash-guide/sources:
+    $ref: './paths/trash-guide.yaml#/sources'
+  /trash-guide/sources/{id}:
+    $ref: './paths/trash-guide.yaml#/sourceById'
+  /trash-guide/sources/{id}/entities:
+    $ref: './paths/trash-guide.yaml#/entities'
   /trash-guide/sources/{id}/sync:
     $ref: './paths/trash-guide.yaml#/sync'
   /canary/rollouts:
@@ -1251,66 +1257,27 @@ components:
     TrashGuideSyncDedupeResponse:
       $ref: './schemas/trash-guide.yaml#/TrashGuideSyncDedupeResponse'
     TrashGuideEntityType:
-      type: string
-      enum:
-        - custom_format
-        - custom_format_group
-        - quality_profile
-        - quality_size
-        - naming
+      $ref: './schemas/trash-guide.yaml#/TrashGuideEntityType'
     TrashGuideEntityDetailResponse:
-      type: object
-      required:
-        - source
-        - trashId
-        - type
-        - name
-        - filePath
-        - fetchedAt
-        - entity
-      properties:
-        source:
-          type: object
-          required:
-            - type
-            - id
-            - name
-            - arrType
-          properties:
-            type:
-              type: string
-              enum:
-                - trash
-            id:
-              type: integer
-            name:
-              type: string
-            arrType:
-              type: string
-              enum:
-                - radarr
-                - sonarr
-        trashId:
-          type: string
-        type:
-          $ref: '#/components/schemas/TrashGuideEntityType'
-        name:
-          type: string
-        filePath:
-          type: string
-        fetchedAt:
-          type: string
-          format: date-time
-        entity:
-          type: object
-          additionalProperties: true
-        scores:
-          type: object
-          additionalProperties:
-            type: number
-        group:
-          type: integer
-          nullable: true
+      $ref: './schemas/trash-guide.yaml#/TrashGuideEntityDetailResponse'
+    TrashGuideSourceArrType:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceArrType'
+    TrashGuideSourceEntityCounts:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceEntityCounts'
+    TrashGuideSource:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSource'
+    TrashGuideSourceListResponse:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceListResponse'
+    TrashGuideSourceResponse:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceResponse'
+    TrashGuideSourceCreateRequest:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceCreateRequest'
+    TrashGuideSourceUpdateRequest:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideSourceUpdateRequest'
+    TrashGuideEntityListItem:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideEntityListItem'
+    TrashGuideEntityListResponse:
+      $ref: './schemas/trash-guide.yaml#/TrashGuideEntityListResponse'
     # PCD
     EntityType:
       $ref: './schemas/pcd.yaml#/EntityType'
@@ -1321,121 +1288,19 @@ components:
     PcdEnableResponse:
       $ref: './schemas/pcd.yaml#/PcdEnableResponse'
     UiSectionKey:
-      type: string
-      pattern: '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$'
-      maxLength: 96
-      description: Canonical progressive disclosure section key
+      $ref: './schemas/ui-preferences.yaml#/UiSectionKey'
     UiPreferenceMode:
-      type: string
-      enum:
-        - basic
-        - advanced
-      description: Disclosure visibility mode for the section
+      $ref: './schemas/ui-preferences.yaml#/UiPreferenceMode'
     UiPreferenceRecord:
-      type: object
-      required:
-        - section_key
-        - mode
-        - updated_at
-        - persisted
-      properties:
-        section_key:
-          $ref: '#/components/schemas/UiSectionKey'
-        mode:
-          $ref: '#/components/schemas/UiPreferenceMode'
-        updated_at:
-          type: string
-          format: date-time
-          nullable: true
-        persisted:
-          type: boolean
+      $ref: './schemas/ui-preferences.yaml#/UiPreferenceRecord'
     UiPreferenceUpsertRequest:
-      type: object
-      required:
-        - section_key
-        - mode
-      properties:
-        section_key:
-          $ref: '#/components/schemas/UiSectionKey'
-        mode:
-          $ref: '#/components/schemas/UiPreferenceMode'
-        expected_updated_at:
-          type: string
-          nullable: true
-          format: date-time
-          description: Optional optimistic concurrency token
+      $ref: './schemas/ui-preferences.yaml#/UiPreferenceUpsertRequest'
     ComplexityTier:
-      type: string
-      enum:
-        - beginner
-        - intermediate
-        - advanced
-      description: Progressive complexity tier for the section
+      $ref: './schemas/ui-preferences.yaml#/ComplexityTier'
     ComplexityTierRecord:
-      type: object
-      required:
-        - section_key
-        - tier
-        - interaction_count
-        - advanced_toggle_count
-        - last_suggested_tier
-        - suggestion_dismissed_at
-        - updated_at
-        - persisted
-      properties:
-        section_key:
-          $ref: '#/components/schemas/UiSectionKey'
-        tier:
-          $ref: '#/components/schemas/ComplexityTier'
-        interaction_count:
-          type: integer
-          minimum: 0
-        advanced_toggle_count:
-          type: integer
-          minimum: 0
-        last_suggested_tier:
-          nullable: true
-          anyOf:
-            - $ref: '#/components/schemas/ComplexityTier'
-        suggestion_dismissed_at:
-          type: string
-          format: date-time
-          nullable: true
-        updated_at:
-          type: string
-          format: date-time
-          nullable: true
-        persisted:
-          type: boolean
+      $ref: './schemas/ui-preferences.yaml#/ComplexityTierRecord'
     ComplexityTierUpsertRequest:
-      type: object
-      required:
-        - section_key
-        - tier
-      properties:
-        section_key:
-          $ref: '#/components/schemas/UiSectionKey'
-        tier:
-          $ref: '#/components/schemas/ComplexityTier'
-        expected_updated_at:
-          type: string
-          nullable: true
-          format: date-time
-          description: Optional optimistic concurrency token
-        interaction_delta:
-          type: integer
-          description: Optional bounded interaction counter increment
-        advanced_toggle_delta:
-          type: integer
-          description: Optional bounded advanced-toggle counter increment
-        last_suggested_tier:
-          nullable: true
-          anyOf:
-            - $ref: '#/components/schemas/ComplexityTier'
-        suggestion_dismissed_at:
-          type: string
-          nullable: true
-          format: date-time
+      $ref: './schemas/ui-preferences.yaml#/ComplexityTierUpsertRequest'
     ImportRequest:
       $ref: './schemas/pcd.yaml#/ImportRequest'
     ImportResponse:
@@ -1464,379 +1329,34 @@ components:
     RollbackResult:
       $ref: './schemas/pcd-snapshots.yaml#/RollbackResult'
     LidarrMetadataProfileTypeToggle:
-      type: object
-      required:
-        - id
-        - name
-        - allowed
-      properties:
-        id:
-          type: integer
-          description: |
-            Lidarr identifier for an album or release-status entry used by write
-            operations.
-        name:
-          type: string
-          description: Lidarr album type name
-        allowed:
-          type: boolean
-          description: Whether the type is selected
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileTypeToggle'
     LidarrMetadataProfileAlbumType:
-      type: object
-      required:
-        - type_id
-        - name
-        - allowed
-      properties:
-        type_id:
-          type: integer
-          description: Lidarr primary/secondary album type id in read models
-        name:
-          type: string
-          description: Lidarr album type name
-        allowed:
-          type: boolean
-          description: Whether the type is selected
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileAlbumType'
     LidarrMetadataProfileReleaseStatusToggle:
-      type: object
-      required:
-        - id
-        - name
-        - allowed
-      properties:
-        id:
-          type: integer
-          description: Lidarr release status id
-        name:
-          type: string
-          description: Lidarr release status name
-        allowed:
-          type: boolean
-          description: Whether the status is selected
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileReleaseStatusToggle'
     LidarrMetadataProfileReleaseStatus:
-      type: object
-      required:
-        - status_id
-        - name
-        - allowed
-      properties:
-        status_id:
-          type: integer
-          description: Lidarr release status id in read models
-        name:
-          type: string
-          description: Lidarr release status name
-        allowed:
-          type: boolean
-          description: Whether the status is selected
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileReleaseStatus'
     LidarrMetadataProfile:
-      type: object
-      required:
-        - id
-        - name
-        - description
-        - updated_at
-        - primaryTypes
-        - secondaryTypes
-        - releaseStatuses
-      properties:
-        id:
-          type: integer
-          description: Local profile id in PCD cache
-        name:
-          type: string
-        description:
-          type: string
-          nullable: true
-          description: Optional Praxrr-only description for local documentation.
-        updated_at:
-          type: string
-          description: Last profile update timestamp in the PCD cache
-        primaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumType'
-        secondaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileAlbumType'
-        releaseStatuses:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatus'
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfile'
     LidarrMetadataProfileListItem:
-      type: object
-      required:
-        - id
-        - name
-        - description
-        - updated_at
-        - primaryTypeCount
-        - secondaryTypeCount
-        - releaseStatusCount
-        - primaryAllowedCount
-        - secondaryAllowedCount
-        - releaseStatusAllowedCount
-      properties:
-        id:
-          type: integer
-          description: Local profile id in PCD cache
-        name:
-          type: string
-        description:
-          type: string
-          nullable: true
-          description: Optional Praxrr-only description for local documentation.
-        updated_at:
-          type: string
-          description: Last profile update timestamp in the PCD cache
-        primaryTypeCount:
-          type: integer
-          description: Total number of primary types represented in the profile
-        secondaryTypeCount:
-          type: integer
-          description: Total number of secondary types represented in the profile
-        releaseStatusCount:
-          type: integer
-          description: Total number of release statuses represented in the profile
-        primaryAllowedCount:
-          type: integer
-          description: Number of allowed primary types
-        secondaryAllowedCount:
-          type: integer
-          description: Number of allowed secondary types
-        releaseStatusAllowedCount:
-          type: integer
-          description: Number of allowed release statuses
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileListItem'
     LidarrMetadataProfileCreateRequest:
-      type: object
-      required:
-        - name
-        - primaryTypes
-        - secondaryTypes
-        - releaseStatuses
-      properties:
-        name:
-          type: string
-          minLength: 1
-        description:
-          type: string
-          nullable: true
-        layer:
-          type: string
-          enum:
-            - user
-            - base
-          default: user
-          description: Write target for the operation. Defaults to user.
-        primaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
-        secondaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
-        releaseStatuses:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusToggle'
-      description: |
-        Create payload for Lidarr metadata profile entities.
-
-        Full arrays are expected for each section group; runtime validation enforces:
-        - all known types/statuses are represented with explicit `allowed` flags
-        - at least one enabled primary, one enabled secondary, one enabled status
-        - reserved profile name `None` is rejected
-        - case-insensitive name uniqueness in the target PCD database
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileCreateRequest'
     LidarrMetadataProfileUpdateRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 1
-        description:
-          type: string
-          nullable: true
-        layer:
-          type: string
-          enum:
-            - user
-            - base
-          default: user
-          description: Write target for the operation. Defaults to user.
-        primaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
-        secondaryTypes:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileTypeToggle'
-        releaseStatuses:
-          type: array
-          items:
-            $ref: '#/components/schemas/LidarrMetadataProfileReleaseStatusToggle'
-      description: |
-        Partial update payload for Lidarr metadata profile entities.
-
-        Omitted fields are preserved by the write layer.
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileUpdateRequest'
     LidarrMetadataProfileDeleteRequest:
-      type: object
-      required:
-        - name
-      properties:
-        layer:
-          type: string
-          enum:
-            - user
-            - base
-          default: user
-          description: Write target for the operation. Defaults to user.
-        name:
-          type: string
-          minLength: 1
-          description: |
-            Current row name used by value guards for concurrency detection.
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileDeleteRequest'
     LidarrMetadataProfileMutationResponse:
-      type: object
-      required:
-        - success
-      properties:
-        success:
-          type: boolean
-        error:
-          type: string
-          nullable: true
+      $ref: './schemas/lidarr-metadata-profiles.yaml#/LidarrMetadataProfileMutationResponse'
     # Startup Pull
     StartupPullRunStatus:
-      type: string
-      enum:
-        - success
-        - partial
-        - failed
-        - skipped
-        - disabled
-      description: |
-        Run-level status for a startup pull execution.
-        - `success`: All instances completed without failures
-        - `partial`: Some instances succeeded and some failed
-        - `failed`: All instances failed
-        - `skipped`: No instances were processed
-        - `disabled`: Feature was disabled at run time
+      $ref: './schemas/startup-pull.yaml#/StartupPullRunStatus'
     StartupPullInstanceStatus:
-      type: string
-      enum:
-        - success
-        - failure
-        - skipped
-        - cancelled
-      description: Per-instance outcome status following JobRunStatus semantics
+      $ref: './schemas/startup-pull.yaml#/StartupPullInstanceStatus'
     StartupPullInstanceOutcome:
-      type: object
-      required:
-        - id
-        - instanceId
-        - instanceName
-        - arrType
-        - status
-        - imported
-        - skippedDefault
-        - skippedNoMatch
-        - conflicted
-        - failed
-        - createdAt
-      properties:
-        id:
-          type: integer
-          description: Outcome row id
-        instanceId:
-          type: integer
-          description: Arr instance id
-        instanceName:
-          type: string
-          description: Arr instance name at time of run
-        arrType:
-          type: string
-          description: Arr application type (radarr, sonarr, lidarr)
-        status:
-          $ref: '#/components/schemas/StartupPullInstanceStatus'
-        imported:
-          type: integer
-          description: Number of entities imported for this instance
-        skippedDefault:
-          type: integer
-          description: Number of entities skipped as defaults
-        skippedNoMatch:
-          type: integer
-          description: Number of entities with no local match
-        conflicted:
-          type: integer
-          description: Number of entities with ambiguous matches
-        failed:
-          type: integer
-          description: Number of entities that failed processing
-        createdAt:
-          type: string
-          description: Outcome creation timestamp
+      $ref: './schemas/startup-pull.yaml#/StartupPullInstanceOutcome'
     StartupPullRunResponse:
-      type: object
-      required:
-        - id
-        - status
-        - startedAt
-        - finishedAt
-        - imported
-        - skippedDefault
-        - skippedNoMatch
-        - conflicted
-        - failed
-        - instancesTotal
-        - instancesFailed
-        - createdAt
-        - instances
-      properties:
-        id:
-          type: string
-          description: Unique run identifier
-        status:
-          $ref: '#/components/schemas/StartupPullRunStatus'
-        startedAt:
-          type: string
-          description: Run start timestamp
-        finishedAt:
-          type: string
-          nullable: true
-          description: Run completion timestamp, null if still running
-        imported:
-          type: integer
-          description: Total entities imported across all instances
-        skippedDefault:
-          type: integer
-          description: Total entities skipped as defaults across all instances
-        skippedNoMatch:
-          type: integer
-          description: Total entities with no local match across all instances
-        conflicted:
-          type: integer
-          description: Total entities with ambiguous matches across all instances
-        failed:
-          type: integer
-          description: Total entities that failed processing across all instances
-        instancesTotal:
-          type: integer
-          description: Total number of instances processed
-        instancesFailed:
-          type: integer
-          description: Number of instances that failed
-        createdAt:
-          type: string
-          description: Run record creation timestamp
-        instances:
-          type: array
-          description: Per-instance outcomes for this run
-          items:
-            $ref: '#/components/schemas/StartupPullInstanceOutcome'
+      $ref: './schemas/startup-pull.yaml#/StartupPullRunResponse'
     # Setup
     WizardStep:
       $ref: './schemas/setup.yaml#/WizardStep'

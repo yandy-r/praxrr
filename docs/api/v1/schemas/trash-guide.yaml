@@ -264,3 +264,310 @@ TrashGuideSyncDedupeResponse:
       type: string
     view:
       $ref: '#/TrashGuideSyncStatusView'
+
+TrashGuideEntityType:
+  type: string
+  enum:
+    - custom_format
+    - custom_format_group
+    - quality_profile
+    - quality_size
+    - naming
+
+TrashGuideEntityDetailResponse:
+  type: object
+  required:
+    - source
+    - trashId
+    - type
+    - name
+    - filePath
+    - fetchedAt
+    - entity
+  properties:
+    source:
+      type: object
+      required:
+        - type
+        - id
+        - name
+        - arrType
+      properties:
+        type:
+          type: string
+          enum:
+            - trash
+        id:
+          type: integer
+        name:
+          type: string
+        arrType:
+          type: string
+          enum:
+            - radarr
+            - sonarr
+    trashId:
+      type: string
+    type:
+      $ref: '#/TrashGuideEntityType'
+    name:
+      type: string
+    filePath:
+      type: string
+    fetchedAt:
+      type: string
+      format: date-time
+    entity:
+      type: object
+      additionalProperties: true
+    scores:
+      type: object
+      additionalProperties:
+        type: number
+    group:
+      type: integer
+      nullable: true
+
+TrashGuideSourceArrType:
+  type: string
+  description: 'Arr app a TRaSH source targets. Only radarr and sonarr are supported (lidarr is rejected). Immutable after creation.'
+  enum:
+    - radarr
+    - sonarr
+
+TrashGuideSourceEntityCounts:
+  type: object
+  required:
+    - customFormats
+    - customFormatGroups
+    - qualityProfiles
+    - qualitySizes
+    - naming
+  properties:
+    customFormats:
+      type: integer
+    customFormatGroups:
+      type: integer
+    qualityProfiles:
+      type: integer
+    qualitySizes:
+      type: integer
+    naming:
+      type: integer
+
+TrashGuideSource:
+  type: object
+  required:
+    - id
+    - name
+    - repositoryUrl
+    - branch
+    - arrType
+    - scoreProfile
+    - autoPull
+    - enabled
+    - syncStrategy
+    - lastSyncedAt
+    - lastCommitHash
+    - entityCounts
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    repositoryUrl:
+      type: string
+    branch:
+      type: string
+    arrType:
+      $ref: '#/TrashGuideSourceArrType'
+    scoreProfile:
+      type: string
+    autoPull:
+      type: boolean
+    enabled:
+      type: boolean
+    syncStrategy:
+      type: integer
+      description: Sync interval in minutes (0 disables scheduled sync)
+    lastSyncedAt:
+      type: string
+      format: date-time
+      nullable: true
+    lastCommitHash:
+      type: string
+      nullable: true
+    entityCounts:
+      $ref: '#/TrashGuideSourceEntityCounts'
+
+TrashGuideSourceListResponse:
+  type: object
+  required:
+    - sources
+  properties:
+    sources:
+      type: array
+      items:
+        $ref: '#/TrashGuideSource'
+
+TrashGuideSourceResponse:
+  type: object
+  required:
+    - source
+  properties:
+    source:
+      $ref: '#/TrashGuideSource'
+
+TrashGuideSourceCreateRequest:
+  type: object
+  description: 'Unknown fields are rejected with 400. name, repositoryUrl and arrType are required.'
+  additionalProperties: false
+  required:
+    - name
+    - repositoryUrl
+    - arrType
+  properties:
+    name:
+      type: string
+      minLength: 1
+      description: Source name (trimmed; case-insensitively unique)
+    repositoryUrl:
+      type: string
+      format: uri
+      description: Git repository URL; must use http or https
+    branch:
+      type: string
+      minLength: 1
+      description: Branch to track (default `master`)
+    arrType:
+      $ref: '#/TrashGuideSourceArrType'
+    scoreProfile:
+      type: string
+      minLength: 1
+      description: TRaSH score profile key (default `default`)
+    autoPull:
+      type: boolean
+      description: Default false
+    enabled:
+      type: boolean
+      description: Default true
+    syncStrategy:
+      type: integer
+      minimum: 0
+      maximum: 525600
+      description: Sync interval in minutes (default 0)
+
+TrashGuideSourceUpdateRequest:
+  type: object
+  description: 'Partial update; at least one field is required and unknown fields are rejected with 400. arrType may only be supplied with its current value (changing it yields 422).'
+  additionalProperties: false
+  minProperties: 1
+  properties:
+    name:
+      type: string
+      minLength: 1
+    repositoryUrl:
+      type: string
+      format: uri
+      description: Must use http or https. Changing it re-clones the repository.
+    branch:
+      type: string
+      minLength: 1
+    arrType:
+      $ref: '#/TrashGuideSourceArrType'
+    scoreProfile:
+      type: string
+      minLength: 1
+    autoPull:
+      type: boolean
+    enabled:
+      type: boolean
+    syncStrategy:
+      type: integer
+      minimum: 0
+      maximum: 525600
+
+TrashGuideEntityListItem:
+  type: object
+  required:
+    - source
+    - trashId
+    - type
+    - name
+    - filePath
+    - fetchedAt
+    - entity
+  properties:
+    source:
+      type: object
+      required:
+        - type
+        - id
+        - name
+        - arrType
+      properties:
+        type:
+          type: string
+          enum:
+            - trash
+        id:
+          type: integer
+        name:
+          type: string
+        arrType:
+          $ref: '#/TrashGuideSourceArrType'
+    trashId:
+      type: string
+    type:
+      $ref: '#/TrashGuideEntityType'
+    name:
+      type: string
+    filePath:
+      type: string
+    fetchedAt:
+      type: string
+      format: date-time
+    entity:
+      type: object
+      additionalProperties: true
+    scores:
+      type: object
+      description: Present only for custom_format entities whose cached scores are all numeric
+      additionalProperties:
+        type: number
+    group:
+      type: integer
+      nullable: true
+      description: Present only for quality_profile entities
+
+TrashGuideEntityListResponse:
+  type: object
+  required:
+    - entities
+    - pagination
+  properties:
+    entities:
+      type: array
+      items:
+        $ref: '#/TrashGuideEntityListItem'
+    pagination:
+      type: object
+      required:
+        - limit
+        - offset
+        - nextCursor
+        - total
+        - hasMore
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        nextCursor:
+          type: string
+          nullable: true
+          description: Offset of the next page as a string, or null when there are no more results
+        total:
+          type: integer
+        hasMore:
+          type: boolean
