@@ -83,3 +83,279 @@ sync:
           application/json:
             schema:
               $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+sources:
+  get:
+    operationId: listTrashGuideSources
+    summary: List TRaSH sources
+    description: Returns every configured TRaSH source with entity counts.
+    tags:
+      - Trash Guide
+    responses:
+      '200':
+        description: TRaSH sources
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceListResponse'
+  post:
+    operationId: createTrashGuideSource
+    summary: Create a TRaSH source
+    description: |
+      Clones and parses the repository for the given `arrType` (`radarr` or `sonarr` only), persists the
+      source and its entity cache, and triggers an initial sync. Unknown request fields are rejected.
+    tags:
+      - Trash Guide
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceCreateRequest'
+    responses:
+      '201':
+        description: Source created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceResponse'
+      '400':
+        description: Invalid JSON, unsupported or missing fields, or invalid field values
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Source name or repository already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Unsupported arrType, invalid syncStrategy, repository could not be parsed, or non-retryable fetch failure
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to create source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '502':
+        description: Retryable repository fetch failure
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+sourceById:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: TRaSH source ID (positive integer)
+      schema:
+        type: integer
+  get:
+    operationId: getTrashGuideSource
+    summary: Get a TRaSH source
+    tags:
+      - Trash Guide
+    responses:
+      '200':
+        description: TRaSH source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceResponse'
+      '400':
+        description: Invalid source ID
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Source not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to fetch source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  put:
+    operationId: updateTrashGuideSource
+    summary: Update a TRaSH source
+    description: |
+      Partial update. `arrType` is immutable: supplying a different value is rejected with 422.
+      Changing `repositoryUrl` re-clones the repository.
+    tags:
+      - Trash Guide
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceUpdateRequest'
+    responses:
+      '200':
+        description: Source updated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceResponse'
+      '400':
+        description: Invalid source ID, invalid JSON, unsupported fields, no updatable field, or invalid field values
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Source not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '409':
+        description: Source name or repository already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: arrType change, unsupported arrType, invalid syncStrategy, unparseable repository, or non-retryable fetch failure
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to update source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '502':
+        description: Retryable repository fetch failure
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+  delete:
+    operationId: deleteTrashGuideSource
+    summary: Delete a TRaSH source
+    tags:
+      - Trash Guide
+    responses:
+      '204':
+        description: Source deleted
+      '400':
+        description: Invalid source ID
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Source not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to delete source
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+
+entities:
+  get:
+    operationId: listTrashGuideSourceEntities
+    summary: List cached TRaSH entities for a source
+    description: |
+      Lists cached entities with optional type/name filtering and offset paging. Provide either `cursor`
+      or `offset`, not both (`cursor` is the `nextCursor` value from a previous page). The `arrType`
+      filter is validated but must equal the source's own arrType (sources are Radarr- or Sonarr-specific).
+    tags:
+      - Trash Guide
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: TRaSH source ID (positive integer)
+        schema:
+          type: integer
+      - name: type
+        in: query
+        required: false
+        schema:
+          $ref: '../schemas/trash-guide.yaml#/TrashGuideEntityType'
+      - name: search
+        in: query
+        required: false
+        description: Case-insensitive substring match on entity name
+        schema:
+          type: string
+      - name: arrType
+        in: query
+        required: false
+        description: Must match the source's arrType (radarr or sonarr)
+        schema:
+          $ref: '../schemas/trash-guide.yaml#/TrashGuideSourceArrType'
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: cursor
+        in: query
+        required: false
+        description: Offset cursor from a previous page's `nextCursor`; mutually exclusive with `offset`
+        schema:
+          type: string
+      - name: offset
+        in: query
+        required: false
+        description: Zero-based offset; mutually exclusive with `cursor`
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+    responses:
+      '200':
+        description: Page of cached entities
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/trash-guide.yaml#/TrashGuideEntityListResponse'
+      '400':
+        description: Invalid source ID, empty or malformed filter/paging parameter, or both cursor and offset supplied
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '404':
+        description: Source not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '422':
+        description: Invalid type or arrType filter, or arrType differs from the source's arrType
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
+      '500':
+        description: Failed to list entities
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

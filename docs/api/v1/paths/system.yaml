@@ -140,16 +140,16 @@ startup-pull-latest:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/StartupPullRunResponse'
+              $ref: '../schemas/startup-pull.yaml#/StartupPullRunResponse'
       '404':
         description: No startup pull runs exist
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to fetch latest startup pull run
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

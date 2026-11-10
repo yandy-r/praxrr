@@ -449,7 +449,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/StartupPullRunResponse"
+                  "$ref": "#/components/schemas/StartupPullRunResponse"
                 }
               }
             }
@@ -459,7 +459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -469,7 +469,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4035,7 +4035,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4045,7 +4045,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4055,7 +4055,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4065,7 +4065,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4165,7 +4165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4175,7 +4175,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4185,7 +4185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4195,7 +4195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4283,7 +4283,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4293,7 +4293,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4303,7 +4303,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4313,7 +4313,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4323,7 +4323,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4401,7 +4401,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4411,7 +4411,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4421,7 +4421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4431,7 +4431,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4441,7 +4441,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4502,7 +4502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4512,7 +4512,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4522,7 +4522,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4615,7 +4615,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4625,7 +4625,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4635,7 +4635,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4645,7 +4645,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5841,7 +5841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5851,7 +5851,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5861,7 +5861,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5891,7 +5891,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5901,7 +5901,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6260,6 +6260,420 @@
           },
           "400": {
             "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trash-guide/sources": {
+      "get": {
+        "operationId": "listTrashGuideSources",
+        "summary": "List TRaSH sources",
+        "description": "Returns every configured TRaSH source with entity counts.",
+        "tags": ["Trash Guide"],
+        "responses": {
+          "200": {
+            "description": "TRaSH sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideSourceListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTrashGuideSource",
+        "summary": "Create a TRaSH source",
+        "description": "Clones and parses the repository for the given `arrType` (`radarr` or `sonarr` only), persists the\nsource and its entity cache, and triggers an initial sync. Unknown request fields are rejected.\n",
+        "tags": ["Trash Guide"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrashGuideSourceCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Source created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideSourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unsupported or missing fields, or invalid field values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source name or repository already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unsupported arrType, invalid syncStrategy, repository could not be parsed, or non-retryable fetch failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to create source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Retryable repository fetch failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trash-guide/sources/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "TRaSH source ID (positive integer)",
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getTrashGuideSource",
+        "summary": "Get a TRaSH source",
+        "tags": ["Trash Guide"],
+        "responses": {
+          "200": {
+            "description": "TRaSH source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideSourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid source ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateTrashGuideSource",
+        "summary": "Update a TRaSH source",
+        "description": "Partial update. `arrType` is immutable: supplying a different value is rejected with 422.\nChanging `repositoryUrl` re-clones the repository.\n",
+        "tags": ["Trash Guide"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrashGuideSourceUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Source updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideSourceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid source ID, invalid JSON, unsupported fields, no updatable field, or invalid field values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source name or repository already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "arrType change, unsupported arrType, invalid syncStrategy, unparseable repository, or non-retryable fetch failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to update source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Retryable repository fetch failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTrashGuideSource",
+        "summary": "Delete a TRaSH source",
+        "tags": ["Trash Guide"],
+        "responses": {
+          "204": {
+            "description": "Source deleted"
+          },
+          "400": {
+            "description": "Invalid source ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to delete source",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trash-guide/sources/{id}/entities": {
+      "get": {
+        "operationId": "listTrashGuideSourceEntities",
+        "summary": "List cached TRaSH entities for a source",
+        "description": "Lists cached entities with optional type/name filtering and offset paging. Provide either `cursor`\nor `offset`, not both (`cursor` is the `nextCursor` value from a previous page). The `arrType`\nfilter is validated but must equal the source's own arrType (sources are Radarr- or Sonarr-specific).\n",
+        "tags": ["Trash Guide"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "TRaSH source ID (positive integer)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TrashGuideEntityType"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring match on entity name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "arrType",
+            "in": "query",
+            "required": false,
+            "description": "Must match the source's arrType (radarr or sonarr)",
+            "schema": {
+              "$ref": "#/components/schemas/TrashGuideSourceArrType"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Offset cursor from a previous page's `nextCursor`; mutually exclusive with `offset`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Zero-based offset; mutually exclusive with `cursor`",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of cached entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashGuideEntityListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid source ID, empty or malformed filter/paging parameter, or both cursor and offset supplied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid type or arrType filter, or arrType differs from the source's arrType",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to list entities",
             "content": {
               "application/json": {
                 "schema": {
@@ -14536,6 +14950,348 @@
           }
         }
       },
+      "TrashGuideEntityType": {
+        "type": "string",
+        "enum": ["custom_format", "custom_format_group", "quality_profile", "quality_size", "naming"]
+      },
+      "TrashGuideEntityDetailResponse": {
+        "type": "object",
+        "required": ["source", "trashId", "type", "name", "filePath", "fetchedAt", "entity"],
+        "properties": {
+          "source": {
+            "type": "object",
+            "required": ["type", "id", "name", "arrType"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["trash"]
+              },
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "arrType": {
+                "type": "string",
+                "enum": ["radarr", "sonarr"]
+              }
+            }
+          },
+          "trashId": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TrashGuideEntityType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filePath": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "group": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "TrashGuideSourceArrType": {
+        "type": "string",
+        "description": "Arr app a TRaSH source targets. Only radarr and sonarr are supported (lidarr is rejected). Immutable after creation.",
+        "enum": ["radarr", "sonarr"]
+      },
+      "TrashGuideSourceEntityCounts": {
+        "type": "object",
+        "required": ["customFormats", "customFormatGroups", "qualityProfiles", "qualitySizes", "naming"],
+        "properties": {
+          "customFormats": {
+            "type": "integer"
+          },
+          "customFormatGroups": {
+            "type": "integer"
+          },
+          "qualityProfiles": {
+            "type": "integer"
+          },
+          "qualitySizes": {
+            "type": "integer"
+          },
+          "naming": {
+            "type": "integer"
+          }
+        }
+      },
+      "TrashGuideSource": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "repositoryUrl",
+          "branch",
+          "arrType",
+          "scoreProfile",
+          "autoPull",
+          "enabled",
+          "syncStrategy",
+          "lastSyncedAt",
+          "lastCommitHash",
+          "entityCounts"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "repositoryUrl": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/TrashGuideSourceArrType"
+          },
+          "scoreProfile": {
+            "type": "string"
+          },
+          "autoPull": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "syncStrategy": {
+            "type": "integer",
+            "description": "Sync interval in minutes (0 disables scheduled sync)"
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCommitHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityCounts": {
+            "$ref": "#/components/schemas/TrashGuideSourceEntityCounts"
+          }
+        }
+      },
+      "TrashGuideSourceListResponse": {
+        "type": "object",
+        "required": ["sources"],
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrashGuideSource"
+            }
+          }
+        }
+      },
+      "TrashGuideSourceResponse": {
+        "type": "object",
+        "required": ["source"],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/TrashGuideSource"
+          }
+        }
+      },
+      "TrashGuideSourceCreateRequest": {
+        "type": "object",
+        "description": "Unknown fields are rejected with 400. name, repositoryUrl and arrType are required.",
+        "additionalProperties": false,
+        "required": ["name", "repositoryUrl", "arrType"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source name (trimmed; case-insensitively unique)"
+          },
+          "repositoryUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Git repository URL; must use http or https"
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Branch to track (default `master`)"
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/TrashGuideSourceArrType"
+          },
+          "scoreProfile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TRaSH score profile key (default `default`)"
+          },
+          "autoPull": {
+            "type": "boolean",
+            "description": "Default false"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Default true"
+          },
+          "syncStrategy": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 525600,
+            "description": "Sync interval in minutes (default 0)"
+          }
+        }
+      },
+      "TrashGuideSourceUpdateRequest": {
+        "type": "object",
+        "description": "Partial update; at least one field is required and unknown fields are rejected with 400. arrType may only be supplied with its current value (changing it yields 422).",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repositoryUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Must use http or https. Changing it re-clones the repository."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "arrType": {
+            "$ref": "#/components/schemas/TrashGuideSourceArrType"
+          },
+          "scoreProfile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "autoPull": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "syncStrategy": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 525600
+          }
+        }
+      },
+      "TrashGuideEntityListItem": {
+        "type": "object",
+        "required": ["source", "trashId", "type", "name", "filePath", "fetchedAt", "entity"],
+        "properties": {
+          "source": {
+            "type": "object",
+            "required": ["type", "id", "name", "arrType"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["trash"]
+              },
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "arrType": {
+                "$ref": "#/components/schemas/TrashGuideSourceArrType"
+              }
+            }
+          },
+          "trashId": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TrashGuideEntityType"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filePath": {
+            "type": "string"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "scores": {
+            "type": "object",
+            "description": "Present only for custom_format entities whose cached scores are all numeric",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "group": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Present only for quality_profile entities"
+          }
+        }
+      },
+      "TrashGuideEntityListResponse": {
+        "type": "object",
+        "required": ["entities", "pagination"],
+        "properties": {
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrashGuideEntityListItem"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "required": ["limit", "offset", "nextCursor", "total", "hasMore"],
+            "properties": {
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "nextCursor": {
+                "type": "string",
+                "nullable": true,
+                "description": "Offset of the next page as a string, or null when there are no more results"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "hasMore": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
       "EntityType": {
         "type": "string",
         "description": "Portable PCD entity identifiers used by import/export endpoints.\n\nLidarr media-management entities are first-class portable contract members:\n- `lidarr_naming`\n- `lidarr_media_settings`\n- `lidarr_quality_definitions`\n\nRuntime validation is deterministic and fail-fast for Lidarr payloads:\npayloads are rejected when required fields are missing, when unsupported\nfields are present, or when cross-family fields are mixed into the payload\n(for example Radarr naming fields with `lidarr_naming`).\n\nClients must emit `lidarr_*` entity types for Lidarr entities.\n",
@@ -15356,6 +16112,149 @@
           }
         ]
       },
+      "UiSectionKey": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$",
+        "maxLength": 96,
+        "description": "Canonical progressive disclosure section key"
+      },
+      "UiPreferenceMode": {
+        "type": "string",
+        "enum": ["basic", "advanced"],
+        "description": "Disclosure visibility mode for the section"
+      },
+      "UiPreferenceRecord": {
+        "type": "object",
+        "required": ["section_key", "mode", "updated_at", "persisted"],
+        "properties": {
+          "section_key": {
+            "$ref": "#/components/schemas/UiSectionKey"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/UiPreferenceMode"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "persisted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UiPreferenceUpsertRequest": {
+        "type": "object",
+        "required": ["section_key", "mode"],
+        "properties": {
+          "section_key": {
+            "$ref": "#/components/schemas/UiSectionKey"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/UiPreferenceMode"
+          },
+          "expected_updated_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Optional optimistic concurrency token"
+          }
+        }
+      },
+      "ComplexityTier": {
+        "type": "string",
+        "enum": ["beginner", "intermediate", "advanced"],
+        "description": "Progressive complexity tier for the section"
+      },
+      "ComplexityTierRecord": {
+        "type": "object",
+        "required": [
+          "section_key",
+          "tier",
+          "interaction_count",
+          "advanced_toggle_count",
+          "last_suggested_tier",
+          "suggestion_dismissed_at",
+          "updated_at",
+          "persisted"
+        ],
+        "properties": {
+          "section_key": {
+            "$ref": "#/components/schemas/UiSectionKey"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/ComplexityTier"
+          },
+          "interaction_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "advanced_toggle_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_suggested_tier": {
+            "nullable": true,
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComplexityTier"
+              }
+            ]
+          },
+          "suggestion_dismissed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "persisted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ComplexityTierUpsertRequest": {
+        "type": "object",
+        "required": ["section_key", "tier"],
+        "properties": {
+          "section_key": {
+            "$ref": "#/components/schemas/UiSectionKey"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/ComplexityTier"
+          },
+          "expected_updated_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Optional optimistic concurrency token"
+          },
+          "interaction_delta": {
+            "type": "integer",
+            "description": "Optional bounded interaction counter increment"
+          },
+          "advanced_toggle_delta": {
+            "type": "integer",
+            "description": "Optional bounded advanced-toggle counter increment"
+          },
+          "last_suggested_tier": {
+            "nullable": true,
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComplexityTier"
+              }
+            ]
+          },
+          "suggestion_dismissed_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        }
+      },
       "SnapshotType": {
         "type": "string",
         "enum": ["auto", "manual"],
@@ -15641,6 +16540,428 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "LidarrMetadataProfileTypeToggle": {
+        "type": "object",
+        "required": ["id", "name", "allowed"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Lidarr identifier for an album or release-status entry used by write\noperations.\n"
+          },
+          "name": {
+            "type": "string",
+            "description": "Lidarr album type name"
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether the type is selected"
+          }
+        }
+      },
+      "LidarrMetadataProfileAlbumType": {
+        "type": "object",
+        "required": ["type_id", "name", "allowed"],
+        "properties": {
+          "type_id": {
+            "type": "integer",
+            "description": "Lidarr primary/secondary album type id in read models"
+          },
+          "name": {
+            "type": "string",
+            "description": "Lidarr album type name"
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether the type is selected"
+          }
+        }
+      },
+      "LidarrMetadataProfileReleaseStatusToggle": {
+        "type": "object",
+        "required": ["id", "name", "allowed"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Lidarr release status id"
+          },
+          "name": {
+            "type": "string",
+            "description": "Lidarr release status name"
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether the status is selected"
+          }
+        }
+      },
+      "LidarrMetadataProfileReleaseStatus": {
+        "type": "object",
+        "required": ["status_id", "name", "allowed"],
+        "properties": {
+          "status_id": {
+            "type": "integer",
+            "description": "Lidarr release status id in read models"
+          },
+          "name": {
+            "type": "string",
+            "description": "Lidarr release status name"
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether the status is selected"
+          }
+        }
+      },
+      "LidarrMetadataProfile": {
+        "type": "object",
+        "required": ["id", "name", "description", "updated_at", "primaryTypes", "secondaryTypes", "releaseStatuses"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Local profile id in PCD cache"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional Praxrr-only description for local documentation."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last profile update timestamp in the PCD cache"
+          },
+          "primaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileAlbumType"
+            }
+          },
+          "secondaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileAlbumType"
+            }
+          },
+          "releaseStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileReleaseStatus"
+            }
+          }
+        }
+      },
+      "LidarrMetadataProfileListItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "updated_at",
+          "primaryTypeCount",
+          "secondaryTypeCount",
+          "releaseStatusCount",
+          "primaryAllowedCount",
+          "secondaryAllowedCount",
+          "releaseStatusAllowedCount"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Local profile id in PCD cache"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional Praxrr-only description for local documentation."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last profile update timestamp in the PCD cache"
+          },
+          "primaryTypeCount": {
+            "type": "integer",
+            "description": "Total number of primary types represented in the profile"
+          },
+          "secondaryTypeCount": {
+            "type": "integer",
+            "description": "Total number of secondary types represented in the profile"
+          },
+          "releaseStatusCount": {
+            "type": "integer",
+            "description": "Total number of release statuses represented in the profile"
+          },
+          "primaryAllowedCount": {
+            "type": "integer",
+            "description": "Number of allowed primary types"
+          },
+          "secondaryAllowedCount": {
+            "type": "integer",
+            "description": "Number of allowed secondary types"
+          },
+          "releaseStatusAllowedCount": {
+            "type": "integer",
+            "description": "Number of allowed release statuses"
+          }
+        }
+      },
+      "LidarrMetadataProfileCreateRequest": {
+        "type": "object",
+        "required": ["name", "primaryTypes", "secondaryTypes", "releaseStatuses"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "layer": {
+            "type": "string",
+            "enum": ["user", "base"],
+            "default": "user",
+            "description": "Write target for the operation. Defaults to user."
+          },
+          "primaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileTypeToggle"
+            }
+          },
+          "secondaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileTypeToggle"
+            }
+          },
+          "releaseStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileReleaseStatusToggle"
+            }
+          }
+        },
+        "description": "Create payload for Lidarr metadata profile entities.\n\nFull arrays are expected for each section group; runtime validation enforces:\n- all known types/statuses are represented with explicit `allowed` flags\n- at least one enabled primary, one enabled secondary, one enabled status\n- reserved profile name `None` is rejected\n- case-insensitive name uniqueness in the target PCD database\n"
+      },
+      "LidarrMetadataProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "layer": {
+            "type": "string",
+            "enum": ["user", "base"],
+            "default": "user",
+            "description": "Write target for the operation. Defaults to user."
+          },
+          "primaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileTypeToggle"
+            }
+          },
+          "secondaryTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileTypeToggle"
+            }
+          },
+          "releaseStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LidarrMetadataProfileReleaseStatusToggle"
+            }
+          }
+        },
+        "description": "Partial update payload for Lidarr metadata profile entities.\n\nOmitted fields are preserved by the write layer.\n"
+      },
+      "LidarrMetadataProfileDeleteRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": ["user", "base"],
+            "default": "user",
+            "description": "Write target for the operation. Defaults to user."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Current row name used by value guards for concurrency detection.\n"
+          }
+        }
+      },
+      "LidarrMetadataProfileMutationResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "StartupPullRunStatus": {
+        "type": "string",
+        "enum": ["success", "partial", "failed", "skipped", "disabled"],
+        "description": "Run-level status for a startup pull execution.\n- `success`: All instances completed without failures\n- `partial`: Some instances succeeded and some failed\n- `failed`: All instances failed\n- `skipped`: No instances were processed\n- `disabled`: Feature was disabled at run time\n"
+      },
+      "StartupPullInstanceStatus": {
+        "type": "string",
+        "enum": ["success", "failure", "skipped", "cancelled"],
+        "description": "Per-instance outcome status following JobRunStatus semantics"
+      },
+      "StartupPullInstanceOutcome": {
+        "type": "object",
+        "required": [
+          "id",
+          "instanceId",
+          "instanceName",
+          "arrType",
+          "status",
+          "imported",
+          "skippedDefault",
+          "skippedNoMatch",
+          "conflicted",
+          "failed",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Outcome row id"
+          },
+          "instanceId": {
+            "type": "integer",
+            "description": "Arr instance id"
+          },
+          "instanceName": {
+            "type": "string",
+            "description": "Arr instance name at time of run"
+          },
+          "arrType": {
+            "type": "string",
+            "description": "Arr application type (radarr, sonarr, lidarr)"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StartupPullInstanceStatus"
+          },
+          "imported": {
+            "type": "integer",
+            "description": "Number of entities imported for this instance"
+          },
+          "skippedDefault": {
+            "type": "integer",
+            "description": "Number of entities skipped as defaults"
+          },
+          "skippedNoMatch": {
+            "type": "integer",
+            "description": "Number of entities with no local match"
+          },
+          "conflicted": {
+            "type": "integer",
+            "description": "Number of entities with ambiguous matches"
+          },
+          "failed": {
+            "type": "integer",
+            "description": "Number of entities that failed processing"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Outcome creation timestamp"
+          }
+        }
+      },
+      "StartupPullRunResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "imported",
+          "skippedDefault",
+          "skippedNoMatch",
+          "conflicted",
+          "failed",
+          "instancesTotal",
+          "instancesFailed",
+          "createdAt",
+          "instances"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique run identifier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StartupPullRunStatus"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "Run start timestamp"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Run completion timestamp, null if still running"
+          },
+          "imported": {
+            "type": "integer",
+            "description": "Total entities imported across all instances"
+          },
+          "skippedDefault": {
+            "type": "integer",
+            "description": "Total entities skipped as defaults across all instances"
+          },
+          "skippedNoMatch": {
+            "type": "integer",
+            "description": "Total entities with no local match across all instances"
+          },
+          "conflicted": {
+            "type": "integer",
+            "description": "Total entities with ambiguous matches across all instances"
+          },
+          "failed": {
+            "type": "integer",
+            "description": "Total entities that failed processing across all instances"
+          },
+          "instancesTotal": {
+            "type": "integer",
+            "description": "Total number of instances processed"
+          },
+          "instancesFailed": {
+            "type": "integer",
+            "description": "Number of instances that failed"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Run record creation timestamp"
+          },
+          "instances": {
+            "type": "array",
+            "description": "Per-instance outcomes for this run",
+            "items": {
+              "$ref": "#/components/schemas/StartupPullInstanceOutcome"
+            }
           }
         }
       },

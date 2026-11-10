@@ -59,19 +59,19 @@ graph:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to build the dependency graph
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
 
 impact:
   get:
@@ -156,22 +156,22 @@ impact:
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '401':
         description: Authentication required
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '404':
         description: No node with that kind and name (an unknown or not-yet-built databaseId is 400, not 404)
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'
       '500':
         description: Failed to compute dependency impact
         content:
           application/json:
             schema:
-              $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              $ref: '../schemas/arr.yaml#/ErrorResponse'

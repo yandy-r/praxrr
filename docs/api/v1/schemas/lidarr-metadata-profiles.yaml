@@ -1,0 +1,257 @@
+# Lidarr metadata profile (PCD) schemas.
+# Moved out of openapi.yaml so scripts/bundle-api.ts (which only imports schema files) includes them.
+
+LidarrMetadataProfileTypeToggle:
+  type: object
+  required:
+    - id
+    - name
+    - allowed
+  properties:
+    id:
+      type: integer
+      description: |
+        Lidarr identifier for an album or release-status entry used by write
+        operations.
+    name:
+      type: string
+      description: Lidarr album type name
+    allowed:
+      type: boolean
+      description: Whether the type is selected
+
+LidarrMetadataProfileAlbumType:
+  type: object
+  required:
+    - type_id
+    - name
+    - allowed
+  properties:
+    type_id:
+      type: integer
+      description: Lidarr primary/secondary album type id in read models
+    name:
+      type: string
+      description: Lidarr album type name
+    allowed:
+      type: boolean
+      description: Whether the type is selected
+
+LidarrMetadataProfileReleaseStatusToggle:
+  type: object
+  required:
+    - id
+    - name
+    - allowed
+  properties:
+    id:
+      type: integer
+      description: Lidarr release status id
+    name:
+      type: string
+      description: Lidarr release status name
+    allowed:
+      type: boolean
+      description: Whether the status is selected
+
+LidarrMetadataProfileReleaseStatus:
+  type: object
+  required:
+    - status_id
+    - name
+    - allowed
+  properties:
+    status_id:
+      type: integer
+      description: Lidarr release status id in read models
+    name:
+      type: string
+      description: Lidarr release status name
+    allowed:
+      type: boolean
+      description: Whether the status is selected
+
+LidarrMetadataProfile:
+  type: object
+  required:
+    - id
+    - name
+    - description
+    - updated_at
+    - primaryTypes
+    - secondaryTypes
+    - releaseStatuses
+  properties:
+    id:
+      type: integer
+      description: Local profile id in PCD cache
+    name:
+      type: string
+    description:
+      type: string
+      nullable: true
+      description: Optional Praxrr-only description for local documentation.
+    updated_at:
+      type: string
+      description: Last profile update timestamp in the PCD cache
+    primaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileAlbumType'
+    secondaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileAlbumType'
+    releaseStatuses:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileReleaseStatus'
+
+LidarrMetadataProfileListItem:
+  type: object
+  required:
+    - id
+    - name
+    - description
+    - updated_at
+    - primaryTypeCount
+    - secondaryTypeCount
+    - releaseStatusCount
+    - primaryAllowedCount
+    - secondaryAllowedCount
+    - releaseStatusAllowedCount
+  properties:
+    id:
+      type: integer
+      description: Local profile id in PCD cache
+    name:
+      type: string
+    description:
+      type: string
+      nullable: true
+      description: Optional Praxrr-only description for local documentation.
+    updated_at:
+      type: string
+      description: Last profile update timestamp in the PCD cache
+    primaryTypeCount:
+      type: integer
+      description: Total number of primary types represented in the profile
+    secondaryTypeCount:
+      type: integer
+      description: Total number of secondary types represented in the profile
+    releaseStatusCount:
+      type: integer
+      description: Total number of release statuses represented in the profile
+    primaryAllowedCount:
+      type: integer
+      description: Number of allowed primary types
+    secondaryAllowedCount:
+      type: integer
+      description: Number of allowed secondary types
+    releaseStatusAllowedCount:
+      type: integer
+      description: Number of allowed release statuses
+
+LidarrMetadataProfileCreateRequest:
+  type: object
+  required:
+    - name
+    - primaryTypes
+    - secondaryTypes
+    - releaseStatuses
+  properties:
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+      nullable: true
+    layer:
+      type: string
+      enum:
+        - user
+        - base
+      default: user
+      description: Write target for the operation. Defaults to user.
+    primaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileTypeToggle'
+    secondaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileTypeToggle'
+    releaseStatuses:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileReleaseStatusToggle'
+  description: |
+    Create payload for Lidarr metadata profile entities.
+
+    Full arrays are expected for each section group; runtime validation enforces:
+    - all known types/statuses are represented with explicit `allowed` flags
+    - at least one enabled primary, one enabled secondary, one enabled status
+    - reserved profile name `None` is rejected
+    - case-insensitive name uniqueness in the target PCD database
+
+LidarrMetadataProfileUpdateRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+    description:
+      type: string
+      nullable: true
+    layer:
+      type: string
+      enum:
+        - user
+        - base
+      default: user
+      description: Write target for the operation. Defaults to user.
+    primaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileTypeToggle'
+    secondaryTypes:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileTypeToggle'
+    releaseStatuses:
+      type: array
+      items:
+        $ref: '#/LidarrMetadataProfileReleaseStatusToggle'
+  description: |
+    Partial update payload for Lidarr metadata profile entities.
+
+    Omitted fields are preserved by the write layer.
+
+LidarrMetadataProfileDeleteRequest:
+  type: object
+  required:
+    - name
+  properties:
+    layer:
+      type: string
+      enum:
+        - user
+        - base
+      default: user
+      description: Write target for the operation. Defaults to user.
+    name:
+      type: string
+      minLength: 1
+      description: |
+        Current row name used by value guards for concurrency detection.
+
+LidarrMetadataProfileMutationResponse:
+  type: object
+  required:
+    - success
+  properties:
+    success:
+      type: boolean
+    error:
+      type: string
+      nullable: true

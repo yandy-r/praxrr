@@ -1,0 +1,125 @@
+# Progressive disclosure UI preferences and per-section complexity tiers.
+# Moved out of openapi.yaml so scripts/bundle-api.ts (which only imports schema files) includes them.
+
+UiSectionKey:
+  type: string
+  pattern: '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$'
+  maxLength: 96
+  description: Canonical progressive disclosure section key
+
+UiPreferenceMode:
+  type: string
+  enum:
+    - basic
+    - advanced
+  description: Disclosure visibility mode for the section
+
+UiPreferenceRecord:
+  type: object
+  required:
+    - section_key
+    - mode
+    - updated_at
+    - persisted
+  properties:
+    section_key:
+      $ref: '#/UiSectionKey'
+    mode:
+      $ref: '#/UiPreferenceMode'
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+    persisted:
+      type: boolean
+
+UiPreferenceUpsertRequest:
+  type: object
+  required:
+    - section_key
+    - mode
+  properties:
+    section_key:
+      $ref: '#/UiSectionKey'
+    mode:
+      $ref: '#/UiPreferenceMode'
+    expected_updated_at:
+      type: string
+      nullable: true
+      format: date-time
+      description: Optional optimistic concurrency token
+
+ComplexityTier:
+  type: string
+  enum:
+    - beginner
+    - intermediate
+    - advanced
+  description: Progressive complexity tier for the section
+
+ComplexityTierRecord:
+  type: object
+  required:
+    - section_key
+    - tier
+    - interaction_count
+    - advanced_toggle_count
+    - last_suggested_tier
+    - suggestion_dismissed_at
+    - updated_at
+    - persisted
+  properties:
+    section_key:
+      $ref: '#/UiSectionKey'
+    tier:
+      $ref: '#/ComplexityTier'
+    interaction_count:
+      type: integer
+      minimum: 0
+    advanced_toggle_count:
+      type: integer
+      minimum: 0
+    last_suggested_tier:
+      nullable: true
+      anyOf:
+        - $ref: '#/ComplexityTier'
+    suggestion_dismissed_at:
+      type: string
+      format: date-time
+      nullable: true
+    updated_at:
+      type: string
+      format: date-time
+      nullable: true
+    persisted:
+      type: boolean
+
+ComplexityTierUpsertRequest:
+  type: object
+  required:
+    - section_key
+    - tier
+  properties:
+    section_key:
+      $ref: '#/UiSectionKey'
+    tier:
+      $ref: '#/ComplexityTier'
+    expected_updated_at:
+      type: string
+      nullable: true
+      format: date-time
+      description: Optional optimistic concurrency token
+    interaction_delta:
+      type: integer
+      description: Optional bounded interaction counter increment
+    advanced_toggle_delta:
+      type: integer
+      description: Optional bounded advanced-toggle counter increment
+    last_suggested_tier:
+      nullable: true
+      anyOf:
+        - $ref: '#/ComplexityTier'
+    suggestion_dismissed_at:
+      type: string
+      nullable: true
+      format: date-time
