@@ -9,7 +9,21 @@ concurrency:
   group: lint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DENO_VERSION: '2.5.6'
+
 jobs:
+  lint-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - run: deno install --node-modules-dir
+      - run: deno task lint
+
   lint-shell:
     runs-on: ubuntu-latest
     steps:
