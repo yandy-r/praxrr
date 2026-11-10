@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Project Overview
 
@@ -12,7 +12,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 - **Web framework:** SvelteKit (Vite + sveltekit-adapter-deno), Svelte 5
 - **Database:** SQLite (app DB via Kysely) + in-memory SQLite (PCD cache)
 - **UI:** Tailwind CSS v4
-- **Parser:** C# microservice (.NET 8+, optional for CF/profile testing)
+- **Parser:** Go microservice (Go 1.26.10 toolchain, optional for CF/profile testing)
 - **SCM:** Git (PCD repos + export flow)
 
 ## Commands
@@ -23,7 +23,7 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 deno task dev              # Run parser + Vite dev server (port 6969)
 deno task dev:noauth       # Dev server with AUTH=off
 deno task dev:server       # Vite dev server only (no parser)
-deno task dev:parser       # Parser service only (dotnet watch, port 5000)
+deno task dev:parser       # Parser service only (Go, port 5000)
 ```
 
 ### Build
@@ -61,10 +61,12 @@ Test aliases defined in `scripts/test.ts`: `filters`, `normalize`, `selectors`, 
 ### Docker
 
 ```bash
-deno task docker:build     # Build dev image
-deno task docker:up        # Build + run dev containers
-deno task docker:down      # Stop dev containers
-deno task arr              # Run local Radarr/Sonarr for testing
+deno task docker:dev:build     # Build dev images (no cache)
+deno task docker:dev:up        # Build + run dev containers (parser + app, watch mode)
+deno task docker:dev:down      # Stop dev containers
+deno task docker:arr:up        # Start local Radarr/Sonarr/Lidarr for testing
+deno task docker:arr:down      # Stop local Arr containers
+deno task docker:dev:up:with-arr   # Dev stack plus Arr profile
 ```
 
 ### Code Generation
@@ -131,16 +133,23 @@ Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
 
 ### Services
 
-- `packages/praxrr-parser/` - C# parser microservice (release title parsing)
+- `packages/praxrr-parser/cmd/praxrr-parser/` - Go parser process entry point and lifecycle
+- `packages/praxrr-parser/internal/httpserver/` - four-route HTTP adapter (`/health`, `/parse`, `/match`, `/match/batch`)
+- `packages/praxrr-parser/internal/contract/` - JSON request/response wire contract
+- `packages/praxrr-parser/internal/parser/` - release parsing, .NET-compatible regex matching, limits, and bounded workers
+- `packages/praxrr-parser/testdata/golden/` - captured legacy-oracle parity corpus and measured limits
 
 ## Key Concepts
 
 ### PCD (Praxrr Config Database)
 
-Configuration is stored as append-only **ops** (SQL operations) in `pcd_ops`. Ops are replayed into an in-memory SQLite cache on each compile. Two layers exist:
+Configuration is stored as append-only **ops** in `pcd_ops`. Base ops are derived from YAML entity
+imports during runtime ingestion and compiled to SQL before persistence. Two layers exist:
 
 - **Base ops**: published canonical state (from repo)
 - **User ops**: local overrides that persist across syncs
+- SQL schema and tweak inputs remain file-based in `deps/schema/ops` and repo `tweaks/`; they are not the
+  YAML base-data ingestion path.
 
 Writer pipeline: Kysely query -> SQL compile -> validate against cache -> write to `pcd_ops` -> recompile cache.
 
@@ -165,6 +174,10 @@ SQLite file (`praxrr.db`) managed by `DatabaseManager` in `$db/db.ts`. Schema ch
 - **Conventional commits.** `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`.
 - **Formatting.** Tabs, single quotes, no trailing commas, 100 char print width (Prettier + prettier-plugin-svelte + prettier-plugin-tailwindcss).
 - **Entity names.** Case-insensitive uniqueness enforced on create/rename for all PCD entities.
+- **Parser contract fidelity.** Preserve the four parser routes and their exact JSON/status behavior. User-supplied patterns continue to use .NET-compatible regex syntax through `regexp2`; do not replace them with Go `regexp` or silently narrow accepted syntax.
+- **Parser cache safety.** Treat the `/health` version as a behavior version. Parsed-release and pattern-match caches must stay namespaced by it so upgrades and rollbacks cannot reuse incompatible results.
+- **Parser parity evidence.** Parser behavior changes require the golden corpus and differential/parity tests under `packages/praxrr-parser/internal/parity/`; keep request, regex, worker, and timeout limits finite.
+- **Optional parser degradation.** The main app must remain available when the parser is absent or unhealthy. Parser-dependent entity testing reports `parserAvailable: false` and skips matching rather than failing app startup.
 - **Template-required issue/PR creation.** Every `gh issue create` must use a template from `.github/ISSUE_TEMPLATE/`, and every `gh pr create` must use the repository PR template once it exists (or a `--body-file` derived from it). Do not create freeform issues or PR bodies.
 - **Missing template handling.** If a matching issue or PR template is missing or unclear, stop and ask for direction before creating it.
 - **PR body updates.** Use `gh pr create/edit --body-file <file>` rather than inline `--body`; if `gh pr edit` fails with GraphQL `projectCards` deprecation errors, patch the PR via `gh api -X PATCH repos/<owner>/<repo>/pulls/<number> -f body=...`.
@@ -201,9 +214,19 @@ Checklist (required for Arr-touching changes):
 - For Arr-scoped quality profile UI filtering, do not rely on `quality_profile_custom_formats.arr_type` alone because legacy or shared `arr_type='all'` scores can make incompatible profiles appear valid; enforce app compatibility from enabled quality names mapped via `quality_api_mappings` for the target `arr_type`.
 - For Arr-scoped quality profile compatibility, do not require `enabled=1` quality rows; profiles with all qualities disabled (or transitional defaults) must still be considered against app-compatible quality names, otherwise valid profiles can disappear from sync selection UI.
 
+### Local-Path Source Guardrails (Required)
+
+- Do not assume a local-path PCD source clone is a Git repository; local-path sources may intentionally contain entities/ops without `.git`.
+- Any Git-dependent API surface (for example `/api/databases/{id}/changes` and `/api/databases/{id}/commits`) must degrade gracefully for non-Git local-path sources and must not return 500 for this case.
+- In `importBaseOps`, refresh `last_seen_in_repo_at` on matching published repo base ops before cache/entity-existence short-circuits; never allow ordering that can orphan all repo base ops on a no-op import pass.
+
 ## Environment Variables
 
-Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location).
+Key variables for development: `APP_BASE_PATH` (default `./dist/dev` in dev), `PORT` (default 6969 in dev, 6868 in prod), `AUTH` (`on`|`local`|`off`|`oidc`), `PARSER_HOST`/`PARSER_PORT` (parser service location), `PRAXRR_COOKIE_SECURE` (`auto`|`on`|`off`, default `auto`).
+
+`PRAXRR_COOKIE_SECURE` controls the session cookie `Secure` flag: `auto` (default) marks it `Secure` only when the observed request transport is direct HTTPS or a proxy reporting `X-Forwarded-Proto: https`; `on` always marks it `Secure` (HTTPS-only deployments, including a TLS-terminating proxy that omits `X-Forwarded-Proto`); `off` never marks it `Secure` (plain-http LAN / dev escape hatch). Invalid or empty values fall back to `auto`.
+
+The Phase-1 WASM plugin-system foundation (issue #35) is gated by a DB-backed UI **Enable plugins** control (default **off**, under Apps → Plugins / Settings → Plugins). When off, the plugin host is a hard no-op. Legacy `PLUGINS_ENABLED` is seed-only on upgrade (non-throwing) and is no longer the operator master switch. `PLUGINS_DIR` (default `<APP_BASE_PATH>/plugins`) is the directory scanned for `praxrr.plugin.json` manifests when plugins are enabled; it is never auto-created. The foundation ships the stable plugin contract, capability model, and registry only — no WASM runtime executes yet (the executor seam throws `wasm runtime not yet available`).
 
 ### Build artifact location policy
 
@@ -229,11 +252,13 @@ and mirrored external distribution.
 ### Environment Variables
 
 - [ ] `PRAXRR_DEFAULT_DB_URL` configures the default PCD repository used for first-run auto-link.
+- [ ] `PRAXRR_DEFAULT_DB_URL` also accepts local filesystem paths (or `file://` paths) for development.
 - [ ] Unset default resolves to `https://github.com/yandy-r/praxrr-db`.
 - [ ] Explicitly set to empty string to disable default auto-linking.
 - [ ] `PRAXRR_DEFAULT_DB_BRANCH` defaults to `main`.
 - [ ] `PRAXRR_DEFAULT_DB_NAME` defaults to `Praxrr-DB`.
 - [ ] `PRAXRR_SCHEMA_REF` optionally overrides schema dependency ref resolution using either a tag or branch name.
+- [ ] `PRAXRR_SCHEMA_LOCAL_PATH` optionally overrides schema dependency resolution to use a local folder containing `ops/` + `pcd.json` for development.
 - [ ] `PRAXRR_DEFAULT_DB_TOKEN`, `PRAXRR_DEFAULT_DB_GIT_USERNAME`, and `PRAXRR_DEFAULT_DB_GIT_EMAIL` remain supported.
 
 ### Empty URL Behavior

@@ -17,7 +17,7 @@ flowchart LR
     PCD --> SQLite[(SQLite app DB)]
     Jobs --> SQLite
     Sync --> Arr[Arr media-management apps]
-    API --> Parser[C# Parser Service]
+    API --> Parser[Go Parser Service]
     API --> TRaSH[TRaSH Guide Manager]
     TRaSH --> Arr
     PCD --> DBPkg[praxrr-db ops repo]

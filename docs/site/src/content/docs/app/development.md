@@ -106,7 +106,7 @@ Use environment files excluded from Git and rotate any exposed credentials.
 | ---------------------------------- | --------------------------------------- |
 | `deno task docker:dev:up`          | Build and run dev containers with watch |
 | `deno task docker:dev:down`        | Stop dev containers                     |
-| `deno task docker:arr:up`          | Start local Radarr/Sonarr for testing   |
+| `deno task docker:arr:up`          | Start local Radarr/Sonarr/Lidarr        |
 | `deno task docker:dev:up:with-arr` | Dev stack plus Arr profile              |
 
 See [Docker getting started](/getting-started/docker/) for compose topology and volume
