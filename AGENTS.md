@@ -62,7 +62,7 @@ Test aliases defined in `scripts/test.ts`: `filters`, `normalize`, `selectors`, 
 
 ```bash
 deno task docker:dev:build     # Build dev images (no cache)
-deno task docker:dev:up        # Build + run dev containers (parser + app, watch mode)
+deno task docker:dev:up        # Start parser (no watch) + build and run app with watch (watches app only)
 deno task docker:dev:down      # Stop dev containers
 deno task docker:arr:up        # Start local Radarr/Sonarr/Lidarr for testing
 deno task docker:arr:down      # Stop local Arr containers
