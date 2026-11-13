@@ -7,7 +7,7 @@
 # commands into its `pre-commit` block instead of overwriting.
 
 pre-commit:
-  parallel: true
+  parallel: false
   commands:
     style-lint:
       run: ./scripts/style.sh lint --staged --fix --docs --shell
