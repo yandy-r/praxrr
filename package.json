@@ -60,7 +60,7 @@
     "lint:unstaged": "./scripts/style.sh lint --unstaged",
     "lint:fix": "./scripts/style.sh lint --fix --docs --shell",
     "lint:fix:modified": "./scripts/style.sh lint --fix --modified",
-    "format": "./scripts/style.sh format --docs --shell",
+    "format": "./scripts/style.sh format --docs",
     "format:modified": "./scripts/style.sh format --modified",
     "format:staged": "./scripts/style.sh format --staged",
     "format:unstaged": "./scripts/style.sh format --unstaged"
