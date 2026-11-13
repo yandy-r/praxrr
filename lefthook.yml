@@ -13,7 +13,7 @@ pre-commit:
       run: ./scripts/style.sh lint --staged --fix --docs --shell
       stage_fixed: true
     style-format:
-      run: ./scripts/style.sh format --staged --docs --shell
+      run: ./scripts/style.sh format --staged --docs
       stage_fixed: true
 
 pre-push:
