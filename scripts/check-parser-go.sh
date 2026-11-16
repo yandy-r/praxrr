@@ -7,7 +7,7 @@ readonly SCRIPT_DIR
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly REPO_ROOT
 readonly PARSER_DIR="${REPO_ROOT}/packages/praxrr-parser"
-readonly EXPECTED_GO_VERSION="go1.26.10"
+readonly EXPECTED_GO_VERSION="go1.26.11"
 
 section() {
 	printf '\n==> %s\n' "$1"

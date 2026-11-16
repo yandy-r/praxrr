@@ -110,7 +110,7 @@ after tightening deployment:
    Windows) is adjacent to the app binary and executable. Remove an accidental
    `PARSER_HOST` override to restore automatic child-process startup.
 5. For a source checkout, run `mise install` and `deno task dev:parser`; the
-   repository pins Go 1.26.10.
+   repository pins Go 1.26.11.
 
 Sync and editing still work without the parser.
 
