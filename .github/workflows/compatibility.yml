@@ -42,7 +42,7 @@ permissions:
   pull-requests: read
 
 env:
-  DENO_VERSION: '2.5.6'
+  DENO_VERSION: '2.9.8'
   GO_VERSION: '1.26.11'
 
 jobs:
