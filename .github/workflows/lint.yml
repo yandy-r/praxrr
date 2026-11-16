@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DENO_VERSION: '2.5.6'
+  DENO_VERSION: '2.9.8'
 
 jobs:
   lint-code:
