@@ -39,6 +39,7 @@ WHERE custom_format_name = '${esc(formatName)}'
   AND description ${currentDescription === null ? 'IS NULL' : `= '${esc(currentDescription)}'`}`,
     parameters: [],
     query: {} as never,
+    queryId: {} as never,
   };
 
   // Write the operation
