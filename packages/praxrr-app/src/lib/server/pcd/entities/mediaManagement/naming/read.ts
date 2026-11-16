@@ -116,17 +116,15 @@ async function getDefaultNamingRow<T extends NamingDefaultsTable>(
   table: T,
   arrType: NamingDefaultsArrType
 ): Promise<Selectable<PCDDatabase[T]> | null> {
-  // The three naming tables share the columns used here; typing the builder against one of them
-  // avoids a union of query builders, whose orderBy overloads TypeScript can't resolve.
   const row = await cache.kb
-    .selectFrom(table as typeof RADARR_NAMING_TABLE)
+    .selectFrom(table)
     .selectAll()
     .orderBy(sql<number>`CASE WHEN lower(name) = 'default' THEN 0 WHEN lower(name) = ${arrType} THEN 1 ELSE 2 END`)
     .orderBy('created_at', 'asc')
     .orderBy('name', 'asc')
     .executeTakeFirst();
 
-  return (row as unknown as Selectable<PCDDatabase[T]> | undefined) ?? null;
+  return (row as Selectable<PCDDatabase[T]> | undefined) ?? null;
 }
 
 export async function getRadarrByName(cache: PCDCache, name: string): Promise<RadarrNamingRow | null> {

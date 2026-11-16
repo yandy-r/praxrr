@@ -38,7 +38,7 @@
     "npm:globals@^17.14.0": "17.14.0",
     "npm:highlight.js@^11.11.1": "11.12.0",
     "npm:highlight.js@^11.12.0": "11.12.0",
-    "npm:kysely@0.29.9": "0.29.9",
+    "npm:kysely@0.27.6": "0.27.6",
     "npm:kysely@~0.27.2": "0.27.6",
     "npm:lucide-svelte@^1.0.1": "1.0.1_svelte@5.57.3",
     "npm:markdownlint-cli@0.50": "0.50.0",
@@ -1684,9 +1684,6 @@
     "kysely@0.27.6": {
       "integrity": "sha512-FIyV/64EkKhJmjgC0g2hygpBv5RNWVPyNCqSAD7eTCv6eFWNIi4PN1UvdSJGicN/o35bnevgis4Y0UDC0qi8jQ=="
     },
-    "kysely@0.29.9": {
-      "integrity": "sha512-K48ErswC3MlIcBqR0pYIIEl+n9rIgwxgzaM1FxKHMXn7egxr1NHj7bCeF98mXl9A3/QoL5I7mo5S/mLXgeDgGA=="
-    },
     "levn@0.4.1": {
       "integrity": "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==",
       "dependencies": [
@@ -2664,7 +2661,7 @@
         "npm:eslint@^9.36.0",
         "npm:globals@^17.14.0",
         "npm:highlight.js@^11.12.0",
-        "npm:kysely@0.29.9",
+        "npm:kysely@0.27.6",
         "npm:lucide-svelte@^1.0.1",
         "npm:markdownlint-cli@0.50",
         "npm:marked@^18.1.3",

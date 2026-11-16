@@ -25,6 +25,10 @@ updates:
       # openapi-typescript or @astrojs/svelte. Revisit once they support it.
       - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
+      # jsr:@soapbox/kysely-deno-sqlite (our SQLite dialect) still requires kysely ^0.27.
+      # Revisit when it supports kysely 0.28+.
+      - dependency-name: 'kysely'
+        versions: ['>=0.28.0']
 
   - package-ecosystem: 'npm'
     directory: '/docs/site'

@@ -82,7 +82,6 @@ export async function create(options: CreateRegularExpressionOptions) {
       sql: `INSERT INTO regular_expression_tags (regular_expression_name, tag_name) VALUES ('${esc(input.name)}', '${esc(tagName)}')`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
 
     queries.push(linkTag);
