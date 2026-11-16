@@ -116,6 +116,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND upgrade_until = ${item.upgradeUntil ? 1 : 0}`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     });
     return queries;
   }
@@ -130,6 +131,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND upgrade_until = ${item.upgradeUntil ? 1 : 0}`,
     parameters: [],
     query: {} as never,
+    queryId: {} as never,
   });
 
   for (const member of getMembers(item)) {
@@ -140,6 +142,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND quality_name = '${esc(member)}'`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     });
   }
 
@@ -149,6 +152,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND name = '${esc(item.name)}'`,
     parameters: [],
     query: {} as never,
+    queryId: {} as never,
   });
 
   return queries;
@@ -170,6 +174,7 @@ WHERE NOT EXISTS (
 )`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     });
 
     for (const member of getMembers(item)) {
@@ -184,6 +189,7 @@ WHERE NOT EXISTS (
 )`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     }
 
@@ -198,6 +204,7 @@ WHERE NOT EXISTS (
 )`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     });
 
     return queries;
@@ -214,6 +221,7 @@ WHERE NOT EXISTS (
 )`,
     parameters: [],
     query: {} as never,
+    queryId: {} as never,
   });
 
   return queries;
@@ -246,6 +254,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND upgrade_until = ${current.upgradeUntil ? 1 : 0}`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     } else {
       queries.push({
@@ -259,6 +268,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND upgrade_until = ${current.upgradeUntil ? 1 : 0}`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     }
   }
@@ -277,6 +287,7 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND quality_name = '${esc(member)}'`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     }
 
@@ -292,6 +303,7 @@ WHERE NOT EXISTS (
 )`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     }
   }

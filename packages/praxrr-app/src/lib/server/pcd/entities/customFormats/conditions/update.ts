@@ -182,7 +182,7 @@ export async function updateConditions(options: UpdateConditionsOptions) {
 
   const conditionOps: Array<{
     description: string;
-    queries: Array<{ sql: string; parameters: unknown[]; query: never }>;
+    queries: Array<{ sql: string; parameters: unknown[]; query: never; queryId: never }>;
     desiredState: Record<string, unknown>;
     summary: string;
     title: string;
@@ -232,6 +232,7 @@ export async function updateConditions(options: UpdateConditionsOptions) {
 	  AND required = ${condition.required ? 1 : 0}`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       },
     ];
 
@@ -258,7 +259,7 @@ export async function updateConditions(options: UpdateConditionsOptions) {
 
   // 2. Handle new conditions (names not in original)
   for (const condition of newConditions) {
-    const insertQueries: Array<{ sql: string; parameters: unknown[]; query: never }> = [];
+    const insertQueries: Array<{ sql: string; parameters: unknown[]; query: never; queryId: never }> = [];
 
     // Insert the base condition
     insertQueries.push({
@@ -266,6 +267,7 @@ export async function updateConditions(options: UpdateConditionsOptions) {
 VALUES ('${esc(formatName)}', '${esc(condition.name)}', '${esc(condition.type)}', '${esc(condition.arrType ?? 'all')}', ${condition.negate ? 1 : 0}, ${condition.required ? 1 : 0})`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     });
 
     // Insert type-specific data
@@ -275,6 +277,7 @@ VALUES ('${esc(formatName)}', '${esc(condition.name)}', '${esc(condition.type)}'
         sql,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       });
     }
 
@@ -334,7 +337,7 @@ VALUES ('${esc(formatName)}', '${esc(condition.name)}', '${esc(condition.type)}'
 
     updatedConditions.push(condition);
 
-    const updateQueries: Array<{ sql: string; parameters: unknown[]; query: never }> = [];
+    const updateQueries: Array<{ sql: string; parameters: unknown[]; query: never; queryId: never }> = [];
 
     if (baseChanged) {
       const setParts: string[] = [];
@@ -363,6 +366,7 @@ WHERE custom_format_name = '${esc(formatName)}'
   AND required = ${original.required ? 1 : 0}`,
           parameters: [],
           query: {} as never,
+          queryId: {} as never,
         });
       }
     }
@@ -375,6 +379,7 @@ WHERE custom_format_name = '${esc(formatName)}'
           sql,
           parameters: [],
           query: {} as never,
+          queryId: {} as never,
         });
       }
 
@@ -385,6 +390,7 @@ WHERE custom_format_name = '${esc(formatName)}'
           sql,
           parameters: [],
           query: {} as never,
+          queryId: {} as never,
         });
       }
     }
