@@ -23,7 +23,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@eslint/compat": "^1.4.0",
-    "@eslint/js": "^9.36.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.0",
     "@sveltejs/kit": "^2.43.2",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
