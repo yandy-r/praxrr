@@ -56,6 +56,7 @@ export async function createTest(options: CreateTestOptions) {
     sql: `INSERT INTO custom_format_tests (custom_format_name, title, type, should_match, description) VALUES ('${esc(formatName)}', '${esc(input.title)}', '${esc(input.type)}', ${input.should_match ? 1 : 0}, ${descriptionValue})`,
     parameters: [],
     query: {} as never,
+    queryId: {} as never,
   };
 
   // Write the operation

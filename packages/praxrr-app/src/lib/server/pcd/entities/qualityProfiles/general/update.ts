@@ -127,6 +127,7 @@ export async function updateGeneral(options: UpdateGeneralOptions) {
         sql: `DELETE FROM quality_profile_languages WHERE quality_profile_name = '${esc(current.name)}' AND language_name = '${esc(current.language)}'`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       };
       languageQueries.push(deleteLanguage);
     }
@@ -141,6 +142,7 @@ WHERE NOT EXISTS (
 )`,
         parameters: [],
         query: {} as never,
+        queryId: {} as never,
       };
       languageQueries.push(insertLanguage);
     }
@@ -154,6 +156,7 @@ WHERE NOT EXISTS (
       sql: `DELETE FROM quality_profile_tags WHERE quality_profile_name = '${esc(current.name)}' AND tag_name = '${esc(tagName)}'`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
     tagQueries.push(removeTag);
   }
@@ -170,6 +173,7 @@ WHERE NOT EXISTS (
       sql: `INSERT INTO quality_profile_tags (quality_profile_name, tag_name) VALUES ('${esc(current.name)}', '${esc(tagName)}')`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
     tagQueries.push(linkTag);
   }
@@ -334,6 +338,7 @@ export async function updateLanguages(options: UpdateLanguagesOptions) {
       sql: `INSERT INTO quality_profile_languages (quality_profile_name, language_name, type) VALUES ('${profileName.replace(/'/g, "''")}', '${input.languageName.replace(/'/g, "''")}', '${input.type}')`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
     queries.push(insertLanguage);
   }

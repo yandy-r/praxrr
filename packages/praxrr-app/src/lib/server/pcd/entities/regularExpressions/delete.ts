@@ -143,6 +143,7 @@ export async function remove(options: DeleteRegularExpressionOptions) {
       sql: `DELETE FROM regular_expression_tags WHERE regular_expression_name = '${esc(current.name)}' AND tag_name = '${esc(tag.name)}'`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
     queries.push(removeTagLink);
   }

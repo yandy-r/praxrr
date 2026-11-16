@@ -229,6 +229,7 @@ export async function update(options: UpdateRegularExpressionOptions) {
       sql: `DELETE FROM regular_expression_tags WHERE regular_expression_name IN (${tagParentInClause}) AND tag_name = '${esc(tagName)}'`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
     queries.push(removeTag);
   }
@@ -251,6 +252,7 @@ export async function update(options: UpdateRegularExpressionOptions) {
 SELECT name, '${esc(tagName)}' FROM regular_expressions WHERE name IN (${tagParentInClause}) LIMIT 1`,
       parameters: [],
       query: {} as never,
+      queryId: {} as never,
     };
 
     queries.push(linkTag);
