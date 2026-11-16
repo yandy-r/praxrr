@@ -15,7 +15,7 @@
     "jsr:@std/yaml@^1.0.10": "1.1.2",
     "npm:@axe-core/playwright@^4.14.0": "4.14.0_playwright-core@1.63.0",
     "npm:@deno/vite-plugin@^2.0.4": "2.0.4_vite@8.3.8_@types+node@26.6.6_yaml@2.9.1",
-    "npm:@eslint/compat@^1.4.0": "1.4.1_eslint@9.39.5",
+    "npm:@eslint/compat@^2.1.1": "2.1.1_eslint@9.39.5",
     "npm:@eslint/js@^9.36.0": "9.39.5",
     "npm:@jsr/db__sqlite@0.12": "0.12.0",
     "npm:@playwright/test@^1.65.0": "1.65.1",
@@ -295,10 +295,10 @@
     "@eslint-community/regexpp@4.12.2": {
       "integrity": "sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew=="
     },
-    "@eslint/compat@1.4.1_eslint@9.39.5": {
-      "integrity": "sha512-cfO82V9zxxGBxcQDr1lfaYB7wykTa0b00mGa36FrJl7iTFd0Z2cHfEYuxcBRP/iNijCsWsEkA+jzT8hGYmv33w==",
+    "@eslint/compat@2.1.1_eslint@9.39.5": {
+      "integrity": "sha512-rMcy8GSrwNzcISX/BlTDY/GLB4eCopEuy9woIls3To+15OLxykZrxxq+WUcylCPCQ6F4MujjBM1DX5V1aqI3Vw==",
       "dependencies": [
-        "@eslint/core",
+        "@eslint/core@1.2.1",
         "eslint"
       ],
       "optionalPeers": [
@@ -316,11 +316,17 @@
     "@eslint/config-helpers@0.4.2": {
       "integrity": "sha512-gBrxN88gOIf3R7ja5K9slwNayVcZgK6SOUORm2uBzTeIEfeVaIhOpCtTox3P6R7o2jLFwLFTLnC7kU/RGcYEgw==",
       "dependencies": [
-        "@eslint/core"
+        "@eslint/core@0.17.0"
       ]
     },
     "@eslint/core@0.17.0": {
       "integrity": "sha512-yL/sLrpmtDaFEiUj1osRP4TI2MDz1AddJL+jZ7KSqvBuliN4xqYY54IfdN8qD8Toa6g1iloph1fxQNkjOxrrpQ==",
+      "dependencies": [
+        "@types/json-schema"
+      ]
+    },
+    "@eslint/core@1.2.1": {
+      "integrity": "sha512-MwcE1P+AZ4C6DWlpin/OmOA54mmIZ/+xZuJiQd4SyB29oAJjN30UW9wkKNptW2ctp4cEsvhlLY/CsQ1uoHDloQ==",
       "dependencies": [
         "@types/json-schema"
       ]
@@ -348,7 +354,7 @@
     "@eslint/plugin-kit@0.4.1": {
       "integrity": "sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==",
       "dependencies": [
-        "@eslint/core",
+        "@eslint/core@0.17.0",
         "levn"
       ]
     },
@@ -1415,7 +1421,7 @@
         "@eslint-community/regexpp",
         "@eslint/config-array",
         "@eslint/config-helpers",
-        "@eslint/core",
+        "@eslint/core@0.17.0",
         "@eslint/eslintrc",
         "@eslint/js",
         "@eslint/plugin-kit",
@@ -2641,7 +2647,7 @@
       "dependencies": [
         "npm:@axe-core/playwright@^4.14.0",
         "npm:@deno/vite-plugin@^2.0.4",
-        "npm:@eslint/compat@^1.4.0",
+        "npm:@eslint/compat@^2.1.1",
         "npm:@eslint/js@^9.36.0",
         "npm:@jsr/db__sqlite@0.12",
         "npm:@playwright/test@^1.65.0",
