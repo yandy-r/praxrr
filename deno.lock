@@ -14,7 +14,7 @@
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/yaml@^1.0.10": "1.1.2",
     "npm:@axe-core/playwright@^4.14.0": "4.14.0_playwright-core@1.63.0",
-    "npm:@deno/vite-plugin@^1.0.5": "1.0.6_vite@7.3.7_@types+node@26.6.6",
+    "npm:@deno/vite-plugin@^2.0.4": "2.0.4_vite@7.3.7",
     "npm:@eslint/compat@^1.4.0": "1.4.1_eslint@9.39.5",
     "npm:@eslint/js@^9.36.0": "9.39.5",
     "npm:@jsr/db__sqlite@0.12": "0.12.0",
@@ -35,7 +35,7 @@
     "npm:eslint-config-prettier@^10.1.8": "10.1.8_eslint@9.39.5",
     "npm:eslint-plugin-svelte@^3.24.1": "3.24.1_eslint@9.39.5_svelte@5.57.3",
     "npm:eslint@^9.36.0": "9.39.5",
-    "npm:globals@^16.4.0": "16.5.0",
+    "npm:globals@^17.14.0": "17.14.0",
     "npm:highlight.js@^11.11.1": "11.12.0",
     "npm:highlight.js@^11.12.0": "11.12.0",
     "npm:kysely@0.29.9": "0.29.9",
@@ -133,9 +133,11 @@
     "@babel/helper-validator-identifier@7.29.7": {
       "integrity": "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
     },
-    "@deno/vite-plugin@1.0.6_vite@7.3.7_@types+node@26.6.6": {
-      "integrity": "sha512-Sh5XqvFuKAwjARTesi0n6xRpEXm1V0UeqKh+SxIrexCofxOaieNDMqXZD02RiZCg0mrJ43V8eCMuVrDfq6mLmg==",
+    "@deno/vite-plugin@2.0.4_vite@7.3.7": {
+      "integrity": "sha512-v9bm0NJx0SVPAyUeUi+iMXCByFIkaTtpWbGXwuNdDwfIdwHOVqe6sZz2wvWwulZqpA4QeGnxlJAkC4sZfoHCfQ==",
       "dependencies": [
+        "@deno/loader@npm:@jsr/deno__loader@0.5.0",
+        "@std/jsonc@npm:@jsr/std__jsonc@1.0.3",
         "vite"
       ]
     },
@@ -522,6 +524,10 @@
       ],
       "tarball": "https://npm.jsr.io/~/11/@jsr/db__sqlite/0.12.0.tgz"
     },
+    "@jsr/deno__loader@0.5.0": {
+      "integrity": "sha512-sf/YBwnyAsbyeYYB71Zdj2Ca2Q9tt25EZpAiZdDA9W7Mm3GcpjA2WMeqj19xPIurZK12G3OAsa5yrtPB7E+gvA==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/deno__loader/0.5.0.tgz"
+    },
     "@jsr/denosaurs__plug@1.1.0": {
       "integrity": "sha512-GNRMr8XcYWbv8C1B5OjDa5u8q3p2lz7YVWQLhH5HAy0pkpb0+Y3npSxzjM49v5ajTFIzUCwIKv1gQukPm9q7qw==",
       "dependencies": [
@@ -538,6 +544,10 @@
         "@jsr/std__fmt@0.217.0"
       ],
       "tarball": "https://npm.jsr.io/~/11/@jsr/std__assert/0.217.0.tgz"
+    },
+    "@jsr/std__bytes@1.0.6": {
+      "integrity": "sha512-St6yKggjFGhxS52IFLJWvkchRFbAKg2Xh8UxA4S1EGz7GJ2Ui+ssDDldj/w2c8vCxvl6qgR0HaYbKeFJNqujmA==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__bytes/1.0.6.tgz"
     },
     "@jsr/std__encoding@1.0.11": {
       "integrity": "sha512-4SmW8WXf4x4FjkxVpxbir06QYwxw/h/2+RU5A66iKXbJC9WAYCICZkH01mcOGj8FgSitF/lSTlT585RZfo8Ukg==",
@@ -563,6 +573,20 @@
       "integrity": "sha512-JT8b/t40WcR9q0GDwRZUooY7aXeXnFal8iidE/5TckdAFtvpVAsaJ71/Xgf1SfoChs41s6CZkuCYM8toaNgdvA==",
       "tarball": "https://npm.jsr.io/~/11/@jsr/std__internal/1.0.14.tgz"
     },
+    "@jsr/std__json@1.1.0": {
+      "integrity": "sha512-a9Eylh7ox33tFn5RxhESnvI4akpefQP5Qn+ePz3Ih4IJ/EPA8p0SKq0aztRfN1sGDhfyWMPWwlUcwNxONt+Ncg==",
+      "dependencies": [
+        "@jsr/std__streams"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__json/1.1.0.tgz"
+    },
+    "@jsr/std__jsonc@1.0.3": {
+      "integrity": "sha512-NALyuVr8/MJsdKnVFCXKNyWzCJTbLlXASTF/4YyfQN2evCRWaZoTeQ17estdejU5a/xhdPfJ4aDv6MP0b17UHQ==",
+      "dependencies": [
+        "@jsr/std__json"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__jsonc/1.0.3.tgz"
+    },
     "@jsr/std__path@0.217.0": {
       "integrity": "sha512-KoqEpZX9CE8zyyr4+X6AROOGYv95AysnJni2E5g9pqG+IGUUuNjOC3yRTvHnsB5tJ6uQs6DwET5chIdUPcylIQ==",
       "dependencies": [
@@ -576,6 +600,13 @@
         "@jsr/std__internal"
       ],
       "tarball": "https://npm.jsr.io/~/11/@jsr/std__path/1.1.6.tgz"
+    },
+    "@jsr/std__streams@1.2.0": {
+      "integrity": "sha512-cQnU2wdP12rYRy+gGAiFarEK9YmWjVwnFMiOGIe0wMKmRLY68INH9hB/mqjKdPX/ruUhNYB70x5YRPLzUYIrbg==",
+      "dependencies": [
+        "@jsr/std__bytes"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__streams/1.2.0.tgz"
     },
     "@levischuck/tiny-cbor@0.2.11": {
       "integrity": "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow=="
@@ -1694,6 +1725,9 @@
     "globals@16.5.0": {
       "integrity": "sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ=="
     },
+    "globals@17.14.0": {
+      "integrity": "sha512-UtdkTVyAJePQv0J2M9Xe4L0ruNSDV314XiIJsADI2Zf40bcdAonE/D/OhAU8AT99oij9mhLByb+NvA3QWZYgCg=="
+    },
     "graceful-fs@4.2.12": {
       "integrity": "sha512-iuyGF2E4oafQfPsRrG2wtY2ILupMhvtdrhzrxB+0VcjsPpSPttpfYdjnGFGsTi5MaJFjI1jOKHPQ6UTbTj9TAw=="
     },
@@ -2798,7 +2832,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@axe-core/playwright@^4.14.0",
-        "npm:@deno/vite-plugin@^1.0.5",
+        "npm:@deno/vite-plugin@^2.0.4",
         "npm:@eslint/compat@^1.4.0",
         "npm:@eslint/js@^9.36.0",
         "npm:@jsr/db__sqlite@0.12",
@@ -2817,7 +2851,7 @@
         "npm:eslint-config-prettier@^10.1.8",
         "npm:eslint-plugin-svelte@^3.24.1",
         "npm:eslint@^9.36.0",
-        "npm:globals@^16.4.0",
+        "npm:globals@^17.14.0",
         "npm:highlight.js@^11.12.0",
         "npm:kysely@0.29.9",
         "npm:lucide-svelte@^1.0.1",
