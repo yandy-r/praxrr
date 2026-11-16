@@ -92,7 +92,6 @@ export async function create(options: CreateQualityProfileOptions) {
       sql: `INSERT INTO quality_profile_tags (quality_profile_name, tag_name) VALUES ('${esc(input.name)}', '${esc(tagName)}')`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
 
     queries.push(linkTag);
@@ -236,7 +235,6 @@ export async function create(options: CreateQualityProfileOptions) {
       sql: `INSERT INTO quality_groups (quality_profile_name, name) VALUES ('${esc(input.name)}', '${esc(groupName)}')`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
     queries.push(insertGroup);
 
@@ -245,7 +243,6 @@ export async function create(options: CreateQualityProfileOptions) {
         sql: `INSERT INTO quality_group_members (quality_profile_name, quality_group_name, quality_name) VALUES ('${esc(input.name)}', '${esc(groupName)}', '${esc(memberName)}')`,
         parameters: [],
         query: {} as never,
-        queryId: {} as never,
       };
       queries.push(insertMember);
     }
@@ -261,7 +258,6 @@ export async function create(options: CreateQualityProfileOptions) {
       }, ${item.type === 'group' ? `'${esc(item.name)}'` : 'NULL'}, ${item.position}, ${enabled}, ${upgradeUntil})`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
     queries.push(insertQuality);
   }
@@ -272,7 +268,6 @@ export async function create(options: CreateQualityProfileOptions) {
       sql: `INSERT INTO quality_profile_languages (quality_profile_name, language_name, type) VALUES ('${esc(input.name)}', '${esc(input.language)}', 'simple')`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
     queries.push(insertLanguage);
   }

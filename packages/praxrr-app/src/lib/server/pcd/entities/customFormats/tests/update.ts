@@ -103,7 +103,6 @@ export async function updateTest(options: UpdateTestOptions) {
           sql: `UPDATE custom_format_tests SET ${setParts.join(', ')} WHERE ${guardParts.join(' AND ')}`,
           parameters: [],
           query: {} as never,
-          queryId: {} as never,
         }
       : null;
 
