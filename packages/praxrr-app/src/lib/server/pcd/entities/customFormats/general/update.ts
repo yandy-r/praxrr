@@ -119,7 +119,6 @@ export async function updateGeneral(options: UpdateGeneralOptions) {
       sql: `DELETE FROM custom_format_tags WHERE custom_format_name = '${esc(formatNameForTags)}' AND tag_name = '${esc(tagName)}'`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
     tagQueries.push(removeTag);
   }
@@ -141,7 +140,6 @@ export async function updateGeneral(options: UpdateGeneralOptions) {
       sql: `INSERT INTO custom_format_tags (custom_format_name, tag_name) VALUES ('${esc(formatNameForTags)}', '${esc(tagName)}')`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
 
     tagQueries.push(linkTag);

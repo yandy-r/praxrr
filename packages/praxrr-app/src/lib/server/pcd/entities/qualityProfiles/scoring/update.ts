@@ -135,7 +135,6 @@ WHERE NOT EXISTS (
 )`,
           parameters: [],
           query: {} as never,
-          queryId: {} as never,
         };
 
         ops.push({
@@ -169,7 +168,6 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND score = ${allScore}`,
       parameters: [],
       query: {} as never,
-      queryId: {} as never,
     };
 
     ops.push({
@@ -289,7 +287,6 @@ WHERE NOT EXISTS (
 )`,
         parameters: [],
         query: {} as never,
-        queryId: {} as never,
       };
 
       ops.push({
@@ -322,7 +319,6 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND score = ${currentScore}`,
         parameters: [],
         query: {} as never,
-        queryId: {} as never,
       };
 
       ops.push({
@@ -356,7 +352,6 @@ WHERE quality_profile_name = '${esc(profileName)}'
   AND score = ${currentScore}`,
         parameters: [],
         query: {} as never,
-        queryId: {} as never,
       };
 
       ops.push({
