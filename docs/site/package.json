@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "astro-mermaid": "^2.2.0",
-    "@astrojs/starlight": "^0.43.0",
+    "@astrojs/starlight": "^0.43.1",
     "@astrojs/svelte": "^9.1.6",
     "@tailwindcss/vite": "^4.3.5",
     "astro": "^7.4.12",
