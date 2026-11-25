@@ -29,6 +29,20 @@ export interface ArrClientOptions {
   retries?: number;
 }
 
+/** Interval between `GET /command/{id}` polls in {@link BaseArrClient.waitForCommand}. */
+export const ARR_COMMAND_POLL_INTERVAL_MS = 2_000;
+
+/**
+ * Terminal non-success statuses of the Arr CommandStatus enum
+ * (Radarr, Sonarr and Lidarr share it). Compared lowercase.
+ */
+export const ARR_COMMAND_FAILURE_STATUSES: ReadonlySet<string> = new Set([
+  'failed',
+  'aborted',
+  'cancelled',
+  'orphaned',
+]);
+
 export class BaseArrClient extends BaseHttpClient {
   private apiKey: string;
   protected apiVersion: string = 'v3'; // Default to v3, can be overridden by subclasses
@@ -307,35 +321,48 @@ export class BaseArrClient extends BaseHttpClient {
   }
 
   /**
-   * Wait for a command to complete
-   * Polls every 5 seconds until status is 'completed' or 'failed'
+   * Wait for a command to reach a terminal status.
+   * Polls every {@link ARR_COMMAND_POLL_INTERVAL_MS} until the status is 'completed'
+   * (resolves) or any terminal failure status (rejects immediately):
+   * 'failed', 'aborted', 'cancelled', or 'orphaned' — the terminal values of the
+   * Radarr/Sonarr/Lidarr CommandStatus enum.
    * @param commandId - The command ID to wait for
    * @param timeoutMs - Maximum wait time in milliseconds (default: 10 minutes)
+   * @param options.pollIntervalMs - Override the poll interval (tests only)
    * @returns The final command status
-   * @throws Error if command fails or times out
+   * @throws Error if the command ends in a failure status or times out
    */
-  async waitForCommand(commandId: number, timeoutMs: number = 600000): Promise<ArrCommand> {
-    const pollInterval = 100; // 100ms
+  async waitForCommand(
+    commandId: number,
+    timeoutMs: number = 600000,
+    options: { pollIntervalMs?: number } = {}
+  ): Promise<ArrCommand> {
+    const requested = options.pollIntervalMs ?? ARR_COMMAND_POLL_INTERVAL_MS;
+    // Guard against a non-positive/NaN override turning this into a tight request loop.
+    const pollInterval = Number.isFinite(requested) && requested > 0 ? requested : ARR_COMMAND_POLL_INTERVAL_MS;
     const startTime = Date.now();
 
     while (true) {
       const command = await this.getCommand(commandId);
+      // An empty 200 body yields null; treat a missing status as non-terminal.
+      const status = String(command?.status ?? '').toLowerCase();
 
-      if (command.status === 'completed') {
+      if (status === 'completed') {
         return command;
       }
 
-      if (command.status === 'failed') {
-        throw new Error(`Command ${commandId} failed: ${command.message || 'Unknown error'}`);
+      if (ARR_COMMAND_FAILURE_STATUSES.has(status)) {
+        throw new Error(`Command ${commandId} ${status}: ${command.message || 'Unknown error'}`);
       }
 
-      // Check timeout
-      if (Date.now() - startTime >= timeoutMs) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= timeoutMs) {
         throw new Error(`Command ${commandId} timed out after ${timeoutMs / 1000} seconds`);
       }
 
-      // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      // Never sleep past the deadline.
+      const delay = Math.min(pollInterval, timeoutMs - elapsed);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 

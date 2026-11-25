@@ -150,7 +150,7 @@ export interface ArrCommand {
   id: number;
   name: string;
   commandName: string;
-  status: 'queued' | 'started' | 'completed' | 'failed' | string;
+  status: 'queued' | 'started' | 'completed' | 'failed' | 'aborted' | 'cancelled' | 'orphaned' | string;
   queued?: string;
   started?: string;
   ended?: string;
