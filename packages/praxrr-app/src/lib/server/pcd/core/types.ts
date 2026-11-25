@@ -4,6 +4,7 @@
  */
 
 import type { CompiledQuery } from 'kysely';
+import type { GitFetchFailureKind } from '$utils/git/errors.ts';
 
 // ============================================================================
 // OPERATION TYPES
@@ -147,4 +148,6 @@ export interface SyncResult {
   success: boolean;
   commitsBehind: number;
   error?: string;
+  /** Set when the sync failed because the remote fetch failed (see GitFetchError). */
+  fetchFailureKind?: GitFetchFailureKind;
 }

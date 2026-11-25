@@ -8,6 +8,7 @@ import {
   clone,
   refreshLocalRepositoryClone,
   getStatus,
+  isGitFetchError,
   isLocalRepositorySource,
   type GitStatus,
   pull,
@@ -298,12 +299,13 @@ class PCDManager {
         success: false,
         commitsBehind: 0,
         error: error instanceof Error ? error.message : 'Unknown error',
+        ...(isGitFetchError(error) ? { fetchFailureKind: error.kind } : {}),
       };
     }
   }
 
   /**
-   * Check for available updates without pulling
+   * Check for available updates without pulling. Throws GitFetchError when the remote fetch fails.
    */
   async checkForUpdates(id: number): Promise<UpdateInfo> {
     const instance = databaseInstancesQueries.getById(id);

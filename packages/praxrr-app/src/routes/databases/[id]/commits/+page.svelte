@@ -6,6 +6,8 @@
   import type { PageData } from './$types';
   import type { Commit } from '$utils/git/types';
   import { parseUTC } from '$shared/utils/dates';
+  import FetchErrorNotice from '../FetchErrorNotice.svelte';
+  import type { GitFetchFailure } from '$utils/git/errors';
 
   export let data: PageData;
 
@@ -13,6 +15,7 @@
   let commits: Commit[] = [];
   let branch = '';
   let repositoryUrl = '';
+  let fetchError: GitFetchFailure | null = null;
 
   async function fetchCommits() {
     loading = true;
@@ -23,6 +26,7 @@
         commits = result.commits;
         branch = result.branch;
         repositoryUrl = result.repositoryUrl;
+        fetchError = result.fetchError ?? null;
       }
     } finally {
       loading = false;
@@ -103,6 +107,10 @@
 </svelte:head>
 
 <div class="mt-6 space-y-6">
+  {#if !loading && fetchError}
+    <FetchErrorNotice {fetchError} databaseId={data.database.id} />
+  {/if}
+
   {#if loading}
     <!-- Skeleton Table -->
     <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
