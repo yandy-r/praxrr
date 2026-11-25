@@ -231,14 +231,17 @@ function sanitizeMap(
   let truncated = false;
   try {
     for (const entry of iterator) {
-      if (entries.length >= MAX_COLLECTION_ENTRIES) {
-        truncated = true;
-        break;
-      }
       if (typeof entry[0] !== 'string') {
         allStringKeys = false;
       }
-      entries.push(entry);
+      if (entries.length < MAX_COLLECTION_ENTRIES) {
+        entries.push(entry);
+      } else {
+        truncated = true;
+        if (!allStringKeys) {
+          break;
+        }
+      }
     }
   } catch {
     return UNSERIALIZABLE_VALUE;
@@ -264,7 +267,12 @@ function sanitizeMap(
 
   const out: unknown[] = [];
   for (const [rawKey, rawValue] of entries) {
-    const sanitizedKey = sanitizeNested(rawKey, ancestors, depth + 1);
+    const sanitizedKey =
+      typeof rawKey === 'string'
+        ? depth + 1 > MAX_DEPTH
+          ? TRUNCATED_VALUE
+          : sanitizeKeyString(rawKey)
+        : sanitizeNested(rawKey, ancestors, depth + 1);
     const sanitizedValue =
       typeof rawKey === 'string' && isSensitiveKey(rawKey)
         ? rawValue === ''

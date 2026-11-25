@@ -486,6 +486,8 @@ Deno.test('sanitizeLogMeta serializes non-string-keyed Map as a sanitized entry 
   const hexKey = 'deadbeefdeadbeefdeadbeefdeadbeef';
   const map = new Map<unknown, unknown>([
     [1, 'one'],
+    ['v0.8.0', 200],
+    ['https://user:hunter2@arr.example/api', 'ok'],
     [
       { apiKey: 'key-in-obj', id: 7 },
       { password: 'pw-in-val', ok: true },
@@ -502,17 +504,27 @@ Deno.test('sanitizeLogMeta serializes non-string-keyed Map as a sanitized entry 
   const serialized = JSON.stringify(sanitized);
 
   assertEquals(sanitized.map[0], [1, 'one']);
-  assertEquals(sanitized.map[1], [
+  assertEquals(sanitized.map[1], ['v0.8.0', 200]);
+  assertEquals(sanitized.map[2], ['https://[REDACTED]@arr.example/api', 'ok']);
+  assertEquals(sanitized.map[3], [
     { apiKey: '[REDACTED]', id: 7 },
     { password: '[REDACTED]', ok: true },
   ]);
-  assertEquals(sanitized.map[2], ['authorization', '[REDACTED]']);
-  assertEquals(sanitized.map[3], ['cookie', '[REDACTED]']);
-  assertEquals(sanitized.map[4], ['x-api-key', '[REDACTED]']);
-  assertEquals(sanitized.map[5], ['empty_secret', '']);
-  assertEquals(sanitized.map[6], ['42', 'note [REDACTED]']);
-  assertEquals(sanitized.map[7], [undefined, 'sym-val']);
-  for (const leaked of [hexKey, 'key-in-obj', 'pw-in-val', 'mixed-secret', 'mixed-cookie', 'mixed-api-key']) {
+  assertEquals(sanitized.map[4], ['authorization', '[REDACTED]']);
+  assertEquals(sanitized.map[5], ['cookie', '[REDACTED]']);
+  assertEquals(sanitized.map[6], ['x-api-key', '[REDACTED]']);
+  assertEquals(sanitized.map[7], ['empty_secret', '']);
+  assertEquals(sanitized.map[8], ['42', 'note [REDACTED]']);
+  assertEquals(sanitized.map[9], [undefined, 'sym-val']);
+  for (const leaked of [
+    hexKey,
+    'key-in-obj',
+    'pw-in-val',
+    'mixed-secret',
+    'mixed-cookie',
+    'mixed-api-key',
+    'hunter2',
+  ]) {
     assert(!serialized.includes(leaked), `${leaked} must not survive`);
   }
 });
@@ -665,24 +677,34 @@ Deno.test(
     assert(longSanitized.set[0].length < 9_000 && longSanitized.set[0].endsWith('…[Truncated]'));
     assert(longSanitized.headers['x-long'].length < 9_000 && longSanitized.headers['x-long'].endsWith('…[Truncated]'));
 
-    // Collection entry cap for oversized Map and Set
+    // Collection entry cap for oversized Map and Set (including non-string key past the cap)
     const bigMap = new Map<string, number>();
     const bigMixedMap = new Map<unknown, number>();
+    const lateMixedMap = new Map<unknown, number>();
     const bigSet = new Set<number>();
     for (let i = 0; i < 1_200; i++) {
       bigMap.set(`k${i}`, i);
       bigMixedMap.set(i, i);
       bigSet.add(i);
     }
-    const cappedCollections = sanitizeLogMeta({ bigMap, bigMixedMap, bigSet }) as {
+    for (let i = 0; i < 1_000; i++) {
+      lateMixedMap.set(`k${i}`, i);
+    }
+    lateMixedMap.set(1_001, 1_001);
+    const cappedCollections = sanitizeLogMeta({ bigMap, bigMixedMap, lateMixedMap, bigSet }) as {
       bigMap: Record<string, unknown>;
       bigMixedMap: unknown[];
+      lateMixedMap: unknown[];
       bigSet: unknown[];
     };
     assertEquals(cappedCollections.bigMap['[Truncated]'], true);
     assertEquals(Object.keys(cappedCollections.bigMap).length, 1_001);
     assertEquals(cappedCollections.bigMixedMap.length, 1_001);
     assertEquals(cappedCollections.bigMixedMap[1_000], '[Truncated]');
+    assert(Array.isArray(cappedCollections.lateMixedMap));
+    assertEquals(cappedCollections.lateMixedMap.length, 1_001);
+    assertEquals(cappedCollections.lateMixedMap[0], ['k0', 0]);
+    assertEquals(cappedCollections.lateMixedMap[1_000], '[Truncated]');
     assertEquals(cappedCollections.bigSet.length, 1_001);
     assertEquals(cappedCollections.bigSet[1_000], '[Truncated]');
 
