@@ -205,7 +205,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   if (!pcdManager.getCache(databaseId as number)) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
+    return json({ error: 'Database cache not available', code: 'import_failed' }, { status: 500 });
   }
 
   try {
@@ -304,7 +304,7 @@ async function handleBundleImport(body: Record<string, unknown>): Promise<Respon
   }
 
   if (!pcdManager.getCache(databaseId)) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
+    return json({ error: 'Database cache not available', code: 'import_failed' }, { status: 500 });
   }
 
   const isDryRun = dryRun === true;

@@ -301,7 +301,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
   const database = getDatabase(databaseIdResult.value);
   if ('error' in database) {
-    return json({ error: database.error }, { status: database.status });
+    return await metadataProfileErrorResponse(database.error, database.error, database.status, 'cache lookup');
   }
 
   try {
@@ -356,7 +356,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
   const database = getDatabase(databaseIdResult.value);
   if ('error' in database) {
-    return json({ error: database.error }, { status: database.status });
+    return await metadataProfileErrorResponse(database.error, database.error, database.status, 'cache lookup');
   }
 
   const isSupported = await validateLidarrMetadataProfileSupport(database.value);
