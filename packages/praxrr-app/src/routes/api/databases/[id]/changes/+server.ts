@@ -1,8 +1,19 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
-import { getBranches, getIncomingChanges, getRepoInfo, getStatus, isNotGitRepositoryError } from '$utils/git/index.ts';
+import {
+  getBranches,
+  getIncomingChanges,
+  getRepoInfo,
+  getStatus,
+  isGitFetchError,
+  isNotGitRepositoryError,
+  readIncomingChanges,
+  toGitFetchFailure,
+  type GitFetchFailure,
+} from '$utils/git/index.ts';
 import type { GitStatus, IncomingChanges } from '$utils/git/types.ts';
+import { logger } from '$logger/logger.ts';
 import { listDraftEntityChanges } from '$pcd/ops/draftChanges.ts';
 import { getDecryptedDatabasePersonalAccessToken } from '$server/utils/encryption/database-credentials.ts';
 
@@ -51,11 +62,30 @@ export const GET: RequestHandler = async ({ params }) => {
   let incomingChanges: IncomingChanges;
   let branches: string[];
   let gitUnavailable = false;
+  let fetchError: GitFetchFailure | null = null;
+
+  // A failed remote fetch (e.g. revoked token) is reported to the page instead of being shown as
+  // "up to date"; incoming changes then fall back to the last fetched remote-tracking ref.
+  const loadIncomingChanges = async (): Promise<IncomingChanges> => {
+    try {
+      return await getIncomingChanges(database.local_path, { personalAccessToken });
+    } catch (fetchFailure) {
+      if (!isGitFetchError(fetchFailure)) {
+        throw fetchFailure;
+      }
+      fetchError = toGitFetchFailure(fetchFailure);
+      await logger.warn('Database remote fetch failed while loading changes', {
+        source: 'DatabaseChanges',
+        meta: { databaseId: id, kind: fetchFailure.kind, detail: fetchFailure.detail },
+      });
+      return await readIncomingChanges(database.local_path);
+    }
+  };
 
   try {
     [status, incomingChanges, branches] = await Promise.all([
       getStatus(database.local_path),
-      getIncomingChanges(database.local_path, { personalAccessToken }),
+      loadIncomingChanges(),
       getBranches(database.local_path),
     ]);
   } catch (gitError) {
@@ -66,6 +96,7 @@ export const GET: RequestHandler = async ({ params }) => {
     incomingChanges = emptyIncomingChanges();
     branches = [];
     gitUnavailable = true;
+    fetchError = null;
   }
 
   const repoInfo = await getRepoInfo(database.repository_url, personalAccessToken);
@@ -114,5 +145,6 @@ export const GET: RequestHandler = async ({ params }) => {
     repoInfo,
     draftChanges,
     gitUnavailable,
+    fetchError,
   });
 };

@@ -20,6 +20,8 @@
   import { parseUTC } from '$shared/utils/dates';
   import type { components } from '$api/v1.d.ts';
   import SnapshotDiff from '$ui/snapshots/SnapshotDiff.svelte';
+  import FetchErrorNotice from '../FetchErrorNotice.svelte';
+  import type { GitFetchFailure } from '$utils/git/errors';
 
   type IncomingPreview = components['schemas']['IncomingPreview'];
 
@@ -83,6 +85,7 @@
   let pulling = false;
   let status: GitStatus | null = null;
   let incomingChanges: IncomingChanges | null = null;
+  let fetchError: GitFetchFailure | null = null;
   let draftChanges: DraftEntityChange[] = [];
   let branches: string[] = [];
   let repoInfo: RepoInfo | null = null;
@@ -146,6 +149,7 @@
         const result = await response.json();
         status = result.status;
         incomingChanges = result.incomingChanges;
+        fetchError = result.fetchError ?? null;
         draftChanges = result.draftChanges || [];
         branches = result.branches;
         repoInfo = result.repoInfo;
@@ -837,6 +841,12 @@
       {/if}
     </div>
 
+    {#if !loading && fetchError}
+      <div class="mb-3">
+        <FetchErrorNotice {fetchError} databaseId={data.database.id} />
+      </div>
+    {/if}
+
     {#if loading}
       <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
         <div class="animate-pulse p-8">
@@ -848,7 +858,9 @@
         class="rounded-lg border border-neutral-200 bg-white p-8 text-center dark:border-neutral-800 dark:bg-neutral-900"
       >
         <p class="text-neutral-600 dark:text-neutral-400">
-          {#if data.database.auto_pull}
+          {#if fetchError}
+            No incoming changes found locally (the remote could not be checked)
+          {:else if data.database.auto_pull}
             Up to date — updates are pulled automatically
           {:else}
             Up to date

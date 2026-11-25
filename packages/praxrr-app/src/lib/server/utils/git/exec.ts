@@ -58,6 +58,35 @@ export function buildGitEnv(options: GitExecOptions = {}): Record<string, string
   return env;
 }
 
+const REDACTED = '[REDACTED]';
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Remove credentials from git output before it leaves this module: the supplied token (raw and
+ * as the encoded header value), any `Authorization:` / `extraHeader` value, and URL userinfo.
+ * Git does not normally echo these, but tracing env vars or remote messages could.
+ */
+export function redactGitOutput(text: string, options: GitExecOptions = {}): string {
+  let result = text;
+
+  const token = options.personalAccessToken?.trim();
+  if (token) {
+    const secrets = [token, encodeBase64Utf8(`x-access-token:${token}`)];
+    for (const secret of secrets) {
+      result = result.replace(new RegExp(escapeRegExp(secret), 'g'), REDACTED);
+    }
+  }
+
+  return result
+    .replace(/(authorization\s*:\s*)[^\r\n]*/gi, `$1${REDACTED}`)
+    .replace(/(extraheader\s*[=:]?\s*)[^\r\n]*/gi, `$1${REDACTED}`)
+    .replace(/x-access-token:[^\s@'"]+/gi, `x-access-token:${REDACTED}`)
+    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@'"]+@/gi, `$1${REDACTED}@`);
+}
+
 /**
  * Execute a git command with sandboxed environment
  */
@@ -73,7 +102,7 @@ export async function execGit(args: string[], cwd: string, options: GitExecOptio
   const { code, stdout, stderr } = await command.output();
 
   if (code !== 0) {
-    const errorMessage = new TextDecoder().decode(stderr);
+    const errorMessage = redactGitOutput(new TextDecoder().decode(stderr), options);
     if (isNotGitRepositoryMessage(errorMessage)) {
       throw new NotGitRepositoryError(`Git command failed: ${errorMessage}`);
     }
