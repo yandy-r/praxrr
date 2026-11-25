@@ -4,7 +4,12 @@ import { buildGoalPlan, type GoalRequest } from '$lib/server/goals/planRequest.t
 import { persistGoalApply } from '$lib/server/goals/persistGoalApply.ts';
 import { computeGoalConfigDiff } from '$lib/server/goals/computeConfigDiff.ts';
 import { computeIntentFingerprint } from '$lib/server/goals/fingerprint.ts';
-import { buildApplyStatus, buildApplyFailure } from '$lib/server/goals/applyStatus.ts';
+import {
+  buildApplyStatus,
+  buildApplyFailure,
+  GOAL_APPLY_FAILED_CODE,
+  logGoalApplyInternalFailure,
+} from '$lib/server/goals/applyStatus.ts';
 import { toWirePlan, toWireBinding } from '$lib/server/goals/responses.ts';
 import { buildGoalDecisionLogMetadata } from '$lib/server/goals/decisionLog.ts';
 import { qualityGoalBindingQueries } from '$db/queries/qualityGoalBindings.ts';
@@ -156,12 +161,17 @@ export async function reconcileGoalApply(
       plan,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = await logGoalApplyInternalFailure(err, {
+      origin: 'reconcile',
+      applyId: reconcileId,
+      failureStage: 'scoring',
+    });
     deps.markJournalFailed(reconcileId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 1 });
     return json(
       buildApplyFailure({
         applyId: reconcileId,
         message,
+        code: GOAL_APPLY_FAILED_CODE,
         scoringChanged: true,
         failureStage: 'scoring',
         intentFingerprint,
@@ -172,13 +182,22 @@ export async function reconcileGoalApply(
   }
 
   if (!scoringResult.success) {
-    const message = scoringResult.error ?? 'Failed to reconcile goal';
-    const isGuardConflict = /value-guard gate/i.test(message);
+    const rawMessage = scoringResult.error ?? 'Failed to reconcile goal';
+    // A value-guard reject is a 409 conflict whose text the UI shows as-is; anything else is a 5xx.
+    const isGuardConflict = /value-guard gate/i.test(rawMessage);
+    const message = isGuardConflict
+      ? rawMessage
+      : await logGoalApplyInternalFailure(rawMessage, {
+          origin: 'reconcile',
+          applyId: reconcileId,
+          failureStage: 'scoring',
+        });
     deps.markJournalFailed(reconcileId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 0 });
     return json(
       buildApplyFailure({
         applyId: reconcileId,
         message,
+        ...(isGuardConflict ? {} : { code: GOAL_APPLY_FAILED_CODE }),
         scoringChanged: false,
         failureStage: 'scoring',
         intentFingerprint,
@@ -203,7 +222,11 @@ export async function reconcileGoalApply(
       appliedAt: new Date().toISOString(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = await logGoalApplyInternalFailure(err, {
+      origin: 'reconcile',
+      applyId: reconcileId,
+      failureStage: 'binding',
+    });
     deps.markJournalFailed(reconcileId, {
       failureStage: 'binding',
       failureReason: message,
@@ -214,6 +237,7 @@ export async function reconcileGoalApply(
       buildApplyFailure({
         applyId: reconcileId,
         message,
+        code: GOAL_APPLY_FAILED_CODE,
         scoringChanged: opsPersisted,
         failureStage: 'binding',
         intentFingerprint,

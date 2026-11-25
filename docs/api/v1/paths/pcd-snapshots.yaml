@@ -320,4 +320,4 @@ snapshotRollback:
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'

@@ -153,7 +153,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
     patch:
       operationId: upsertUiPreference
       summary: Upsert one UI preference
@@ -205,7 +205,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
   /ui-preferences/command-palette-recents:
     $ref: './paths/search.yaml#/commandPaletteRecents'
   /complexity-tiers:
@@ -390,7 +390,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
   /sync/preview:
     $ref: './paths/sync.yaml#/preview'
   /sync/preview/{previewId}:
@@ -465,7 +465,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
     post:
       operationId: createLidarrMetadataProfile
       summary: Create a Lidarr metadata profile
@@ -516,7 +516,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
   /pcd/{databaseId}/lidarr-metadata-profiles/{id}:
     get:
       operationId: getLidarrMetadataProfile
@@ -564,7 +564,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
     put:
       operationId: updateLidarrMetadataProfile
       summary: Update a Lidarr metadata profile
@@ -620,7 +620,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
     delete:
       operationId: deleteLidarrMetadataProfile
       summary: Delete a Lidarr metadata profile
@@ -675,7 +675,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PcdErrorResponse'
+                $ref: '#/components/schemas/InternalErrorResponse'
   /pcd/{databaseId}/resolved/{entityType}:
     $ref: './paths/resolved-config.yaml#/list'
   /pcd/{databaseId}/resolved/{entityType}/{name}:
@@ -844,6 +844,8 @@ components:
       $ref: './schemas/common.yaml#/HealthStatus'
     ScopeForbiddenResponse:
       $ref: './schemas/common.yaml#/ScopeForbiddenResponse'
+    InternalErrorResponse:
+      $ref: './schemas/common.yaml#/InternalErrorResponse'
     # Health
     HealthResponse:
       $ref: './schemas/health.yaml#/HealthResponse'

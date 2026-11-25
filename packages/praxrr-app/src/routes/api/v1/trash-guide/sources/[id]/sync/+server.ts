@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
-import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorBody } from '../../_helpers.ts';
 import { enqueueManualTrashGuideSourceSync, getTrashGuideSyncStatus } from '$jobs/helpers/trashGuideSyncQueue.ts';
 
 function statusUrlFor(sourceId: number): string {
@@ -35,7 +35,7 @@ export const POST: RequestHandler = async ({ params }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, `Failed to validate TRaSH source id=${sourceId} before sync`);
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 
   try {
@@ -64,7 +64,7 @@ export const POST: RequestHandler = async ({ params }) => {
     });
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to enqueue TRaSH source sync id=${sourceId}`);
-    return json({ error: toErrorMessage(error) }, { status: 500 });
+    return json(toErrorBody(error, 500), { status: 500 });
   }
 };
 
@@ -89,6 +89,6 @@ export const GET: RequestHandler = async ({ params }) => {
     return json(getTrashGuideSyncStatus(sourceIdResult.value));
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to resolve TRaSH sync status id=${sourceIdResult.value}`);
-    return json({ error: toErrorMessage(error) }, { status: 500 });
+    return json(toErrorBody(error, 500), { status: 500 });
   }
 };

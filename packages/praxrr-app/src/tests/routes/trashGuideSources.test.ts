@@ -1,4 +1,4 @@
-import { assertEquals, assertMatch, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertMatch, assertStringIncludes } from '@std/assert';
 import { type CreateJobQueueInput, jobQueueQueries } from '$db/queries/jobQueue.ts';
 import { jobRunHistoryQueries } from '$db/queries/jobRunHistory.ts';
 import {
@@ -812,8 +812,10 @@ Deno.test({
       } as unknown as Parameters<typeof sourceSyncPost>[0]);
 
       assertEquals(response.status, 500);
-      const payload = (await response.json()) as { error: string };
-      assertEquals(payload.error, 'unexpected lookup failure');
+      const payload = (await response.json()) as { error: string; code?: string };
+      // 5xx never echoes the raw exception text; the detail stays in the server log.
+      assertEquals(payload.code, 'trash_guide_request_failed');
+      assert(!payload.error.includes('unexpected lookup failure'));
       assertEquals(logged, true);
     } finally {
       for (const restore of restores.reverse()) {

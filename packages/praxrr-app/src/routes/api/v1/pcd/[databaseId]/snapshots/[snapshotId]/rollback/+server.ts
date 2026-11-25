@@ -6,10 +6,14 @@ import {
   isRollbackStaleError,
   isRollbackUnverifiableError,
 } from '$pcd/snapshots/rollback/types.ts';
-import { logger } from '$logger/logger.ts';
+import { internalErrorResponse } from '$http/internalError.ts';
 
 const POSITIVE_INTEGER_ID = /^\d+$/;
 const MAX_BODY_BYTES = 8 * 1024;
+const LOG_SOURCE = 'SnapshotRollbackApi';
+const ROLLBACK_POST_VERIFY_FAILED_MESSAGE =
+  'Rollback could not be verified after it was applied. Check the server logs for details.';
+const ROLLBACK_FAILED_MESSAGE = 'Failed to execute rollback. Check the server logs for details.';
 
 function parsePositiveInteger(rawId: string | undefined, fieldName: string): { value: number } | { error: string } {
   if (!rawId) {
@@ -100,27 +104,23 @@ export const POST: RequestHandler = async ({ params, request }) => {
     if (isRollbackUnverifiableError(error)) {
       return json({ error: error.message }, { status: 409 });
     }
+    const meta = { databaseId: databaseIdResult.value, snapshotId: snapshotIdResult.value };
     if (isRollbackPostVerifyError(error)) {
-      await logger.error('Rollback failed post-verify', {
-        source: 'SnapshotRollbackApi',
-        meta: {
-          databaseId: databaseIdResult.value,
-          snapshotId: snapshotIdResult.value,
-          error: error.message,
-        },
+      return await internalErrorResponse(error, {
+        message: ROLLBACK_POST_VERIFY_FAILED_MESSAGE,
+        code: 'rollback_post_verify_failed',
+        source: LOG_SOURCE,
+        logMessage: 'Rollback failed post-verify',
+        meta,
       });
-      return json({ error: error.message }, { status: 500 });
     }
 
-    await logger.error('Failed to execute rollback', {
-      source: 'SnapshotRollbackApi',
-      meta: {
-        databaseId: databaseIdResult.value,
-        snapshotId: snapshotIdResult.value,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      },
+    return await internalErrorResponse(error, {
+      message: ROLLBACK_FAILED_MESSAGE,
+      code: 'rollback_failed',
+      source: LOG_SOURCE,
+      logMessage: 'Failed to execute rollback',
+      meta,
     });
-    return json({ error: 'Failed to execute rollback' }, { status: 500 });
   }
 };

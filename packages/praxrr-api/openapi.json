@@ -1097,7 +1097,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -1175,7 +1175,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -2117,7 +2117,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -2248,7 +2248,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -2290,7 +2290,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3172,7 +3172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3662,7 +3662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3731,7 +3731,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3800,7 +3800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3877,7 +3877,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -3954,7 +3954,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PcdErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6351,7 +6351,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6361,7 +6361,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6421,7 +6421,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6499,7 +6499,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6509,7 +6509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6549,7 +6549,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6677,7 +6677,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6748,7 +6748,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -6797,7 +6797,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/InternalErrorResponse"
                 }
               }
             }
@@ -8794,6 +8794,34 @@
           }
         },
         "description": "An authenticated API token lacks the scope the requested route requires."
+      },
+      "InternalErrorResponse": {
+        "type": "object",
+        "required": ["error", "code"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Fixed, user-safe message. Never contains raw exception text; detail is logged server-side only."
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "preference_read_failed",
+              "preference_save_failed",
+              "rollback_failed",
+              "rollback_post_verify_failed",
+              "preview_read_failed",
+              "preview_delete_failed",
+              "metadata_profile_request_failed",
+              "import_failed",
+              "bundle_import_failed",
+              "trash_guide_request_failed",
+              "trash_guide_upstream_failed"
+            ],
+            "description": "Stable machine-readable code for the server-side failure."
+          }
+        },
+        "description": "A 5xx failure body with a fixed message and a stable code."
       },
       "SqliteHealth": {
         "type": "object",
@@ -14559,7 +14587,13 @@
         "required": ["message", "applyStatus"],
         "properties": {
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable failure text. For internal (5xx) failures this is a fixed, user-safe message and `code` is set; raw detail is logged server-side only."
+          },
+          "code": {
+            "type": "string",
+            "enum": ["goal_apply_failed"],
+            "description": "Stable machine-readable code present on internal (5xx) failures."
           },
           "applyStatus": {
             "$ref": "#/components/schemas/GoalApplyStatus"
@@ -15697,6 +15731,11 @@
           },
           "report": {
             "$ref": "#/components/schemas/PcdBundleImportReport"
+          },
+          "code": {
+            "type": "string",
+            "enum": ["bundle_import_failed"],
+            "description": "Stable machine-readable code present on HTTP 500; `error` and per-entity reasons are then fixed, user-safe text and raw detail is logged server-side only."
           },
           "rolledBack": {
             "type": "boolean",

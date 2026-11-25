@@ -40,19 +40,35 @@ export function mapReadErrorStatus(error: unknown): number {
   return 500;
 }
 
+const TRASH_REQUEST_FAILED_MESSAGE = 'TRaSH source request failed. Check the server logs for details.';
+const TRASH_UPSTREAM_FAILED_MESSAGE =
+  'TRaSH source repository could not be reached. Check the server logs for details.';
+
 /**
- * Convert any TRaSH route error into a user-facing message.
+ * Convert any TRaSH route error into a user-facing response body.
+ *
+ * 4xx errors keep their specific (validation/not-found/conflict) message. 5xx errors return a
+ * fixed message plus a stable code: raw exception text can embed repository URLs, file paths or
+ * upstream response detail, so it stays in the server log (callers log it via
+ * {@link logTrashGuideRouteError}).
  *
  * @param {unknown} error - Unknown thrown value.
- * @returns {string} Error message for API responses.
+ * @param {number} status - HTTP status the route will respond with.
+ * @returns {{ error: string; code?: string }} Error body for API responses.
  * @throws {never} This helper does not throw.
  */
-export function toErrorMessage(error: unknown): string {
+export function toErrorBody(error: unknown, status: number): { error: string; code?: string } {
+  if (status === 502) {
+    return { error: TRASH_UPSTREAM_FAILED_MESSAGE, code: 'trash_guide_upstream_failed' };
+  }
+  if (status >= 500) {
+    return { error: TRASH_REQUEST_FAILED_MESSAGE, code: 'trash_guide_request_failed' };
+  }
   if (error instanceof Error) {
-    return error.message;
+    return { error: error.message };
   }
 
-  return 'TRaSH source request failed';
+  return { error: 'TRaSH source request failed' };
 }
 
 /**

@@ -379,6 +379,13 @@ PcdBundleImportErrorResponse:
       type: string
     report:
       $ref: '#/PcdBundleImportReport'
+    code:
+      type: string
+      enum:
+        - bundle_import_failed
+      description: >-
+        Stable machine-readable code present on HTTP 500; `error` and per-entity reasons are then fixed,
+        user-safe text and raw detail is logged server-side only.
     rolledBack:
       type: boolean
       description: True when a mid-apply failure was fully rolled back (HTTP 500).

@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { internalErrorResponse } from '$http/internalError.ts';
 import type { RequestHandler } from '@sveltejs/kit';
 import { logger } from '$logger/logger.ts';
 import { previewStore } from '$sync/preview/store.ts';
@@ -37,12 +38,13 @@ export const GET: RequestHandler = async ({ params }) => {
 
     return json(snapshot);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch preview';
-    await logger.error('Failed to get sync preview', {
+    return await internalErrorResponse(error, {
+      message: 'Failed to fetch preview. Check the server logs for details.',
+      code: 'preview_read_failed',
       source: 'SyncPreview',
-      meta: { previewId, error: message },
+      logMessage: 'Failed to get sync preview',
+      meta: { previewId },
     });
-    return json({ error: message } satisfies ErrorResponse, { status: 500 });
   }
 };
 
@@ -72,11 +74,12 @@ export const DELETE: RequestHandler = async ({ params }) => {
 
     return new Response(null, { status: 204 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to delete preview';
-    await logger.error('Failed to delete sync preview', {
+    return await internalErrorResponse(error, {
+      message: 'Failed to delete preview. Check the server logs for details.',
+      code: 'preview_delete_failed',
       source: 'SyncPreview',
-      meta: { previewId, error: message },
+      logMessage: 'Failed to delete sync preview',
+      meta: { previewId },
     });
-    return json({ error: message } satisfies ErrorResponse, { status: 500 });
   }
 };
