@@ -2560,6 +2560,27 @@ export interface components {
        */
       requiredScope: 'read' | 'mcp' | 'sync:apply' | 'admin';
     };
+    /** @description A 5xx failure body with a fixed message and a stable code. */
+    InternalErrorResponse: {
+      /** @description Fixed, user-safe message. Never contains raw exception text; detail is logged server-side only. */
+      error: string;
+      /**
+       * @description Stable machine-readable code for the server-side failure.
+       * @enum {string}
+       */
+      code:
+        | 'preference_read_failed'
+        | 'preference_save_failed'
+        | 'rollback_failed'
+        | 'rollback_post_verify_failed'
+        | 'preview_read_failed'
+        | 'preview_delete_failed'
+        | 'metadata_profile_request_failed'
+        | 'import_failed'
+        | 'bundle_import_failed'
+        | 'trash_guide_request_failed'
+        | 'trash_guide_upstream_failed';
+    };
     HealthResponse: {
       status: components['schemas']['HealthStatus'];
       /**
@@ -4581,7 +4602,13 @@ export interface components {
     };
     /** @description Structured failure body for a Quality Goals apply/reconcile (issue #236). `message` mirrors ErrorResponse's human text (the UI failure reader falls back to `error`), and `applyStatus` carries the reported outcome + recovery action. */
     GoalApplyFailure: {
+      /** @description Human-readable failure text. For internal (5xx) failures this is a fixed, user-safe message and `code` is set; raw detail is logged server-side only. */
       message: string;
+      /**
+       * @description Stable machine-readable code present on internal (5xx) failures.
+       * @enum {string}
+       */
+      code?: 'goal_apply_failed';
       applyStatus: components['schemas']['GoalApplyStatus'];
     };
     /** @description Recover a partial or pending Quality Goals apply by re-driving the recorded intent (#236). */
@@ -7105,6 +7132,11 @@ export interface components {
     PcdBundleImportErrorResponse: {
       error: string;
       report?: components['schemas']['PcdBundleImportReport'];
+      /**
+       * @description Stable machine-readable code present on HTTP 500; `error` and per-entity reasons are then fixed, user-safe text and raw detail is logged server-side only.
+       * @enum {string}
+       */
+      code?: 'bundle_import_failed';
       /** @description True when a mid-apply failure was fully rolled back (HTTP 500). */
       rolledBack?: boolean;
       /** @description Present on HTTP 400 when references resolve neither in the bundle nor the target database. */
@@ -7976,7 +8008,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -8045,7 +8077,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -8773,7 +8805,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -8886,7 +8918,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -8925,7 +8957,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -9555,7 +9587,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -9951,7 +9983,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -10005,7 +10037,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -10056,7 +10088,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -10111,7 +10143,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -10166,7 +10198,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -11951,7 +11983,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
       /** @description Retryable repository fetch failure */
@@ -11960,7 +11992,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12010,7 +12042,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12082,7 +12114,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
       /** @description Retryable repository fetch failure */
@@ -12091,7 +12123,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12139,7 +12171,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12209,7 +12241,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12250,7 +12282,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };
@@ -12309,7 +12341,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ErrorResponse'];
+          'application/json': components['schemas']['InternalErrorResponse'];
         };
       };
     };

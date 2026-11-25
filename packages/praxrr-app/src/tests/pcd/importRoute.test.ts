@@ -158,7 +158,9 @@ bundleTest('pcd import: a QP qualities write failing after create is reported an
   const body = await response.json();
 
   assertEquals(response.status, 500);
-  assertEquals(body.error, 'injected');
+  // 5xx never echoes the raw exception text; it stays in the server log.
+  assertEquals(body.code, 'import_failed');
+  assert(!String(body.error).includes('injected'));
   assertEquals(snapshotOps(databaseId), before);
   assertEquals(namesIn(liveCache(databaseId), 'quality_profiles'), []);
 });
@@ -174,7 +176,9 @@ bundleTest('pcd import: a CF conditions write failing after create is reported a
   const body = await response.json();
 
   assertEquals(response.status, 500);
-  assertEquals(body.error, 'injected');
+  // 5xx never echoes the raw exception text; it stays in the server log.
+  assertEquals(body.code, 'import_failed');
+  assert(!String(body.error).includes('injected'));
   assertEquals(snapshotOps(databaseId), before);
   assertEquals(namesIn(liveCache(databaseId), 'custom_formats'), []);
 });

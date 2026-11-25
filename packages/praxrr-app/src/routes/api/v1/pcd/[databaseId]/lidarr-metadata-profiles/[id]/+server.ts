@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { internalErrorResponse } from '$http/internalError.ts';
 import { canWriteToBase, parseOperationLayer, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileDetail } from '$shared/pcd/display.ts';
 import * as metadataProfiles from '$pcd/entities/metadataProfiles/index.ts';
@@ -295,6 +296,29 @@ function toDetail(current: CurrentMetadataProfile, updatedAt: string): LidarrMet
   };
 }
 
+const METADATA_PROFILE_FAILED_MESSAGE = 'Metadata profile request failed. Check the server logs for details.';
+
+/**
+ * Build an error response: 4xx keeps its specific (validation/not-found/permission) message;
+ * 5xx returns a fixed message plus a stable code and logs the raw detail server-side.
+ */
+async function metadataProfileErrorResponse(
+  rawError: unknown,
+  message: string,
+  status: number,
+  operation: string
+): Promise<Response> {
+  if (status < 500) {
+    return json({ error: message }, { status });
+  }
+  return await internalErrorResponse(rawError, {
+    message: METADATA_PROFILE_FAILED_MESSAGE,
+    code: 'metadata_profile_request_failed',
+    source: 'LidarrMetadataProfilesApi',
+    logMessage: `Lidarr metadata profile ${operation} failed`,
+  });
+}
+
 function getWriteErrorStatus(message: string): number {
   if (isLidarrMetadataProfileSchemaError(message)) {
     return 400;
@@ -382,7 +406,7 @@ export const GET: RequestHandler = async ({ params }) => {
     return json(toDetail(current, profileRow.updated_at));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch metadata profile';
-    return json({ error: message }, { status: getReadErrorStatus(message) });
+    return await metadataProfileErrorResponse(error, message, getReadErrorStatus(message), 'read');
   }
 };
 
@@ -486,13 +510,13 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
     if (!result.success) {
       const message = result.error ?? 'Failed to update metadata profile';
-      return json({ error: message }, { status: getWriteErrorStatus(message) });
+      return await metadataProfileErrorResponse(message, message, getWriteErrorStatus(message), 'update');
     }
 
     return json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update metadata profile';
-    return json({ error: message }, { status: getWriteErrorStatus(message) });
+    return await metadataProfileErrorResponse(error, message, getWriteErrorStatus(message), 'update');
   }
 };
 
@@ -565,12 +589,12 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
 
     if (!result.success) {
       const message = result.error ?? 'Failed to delete metadata profile';
-      return json({ error: message }, { status: getWriteErrorStatus(message) });
+      return await metadataProfileErrorResponse(message, message, getWriteErrorStatus(message), 'delete');
     }
 
     return json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete metadata profile';
-    return json({ error: message }, { status: getWriteErrorStatus(message) });
+    return await metadataProfileErrorResponse(error, message, getWriteErrorStatus(message), 'delete');
   }
 };

@@ -8,8 +8,18 @@ import { backupSettingsQueries } from '$db/queries/backupSettings.ts';
 import { appInfoQueries } from '$db/queries/appInfo.ts';
 import { getCache } from '$pcd/index.ts';
 import { config } from '$config';
+import { logger } from '$logger/logger.ts';
 
 type ComponentStatus = 'healthy' | 'degraded' | 'unhealthy';
+
+/**
+ * `/api/v1/health` is unauthenticated, so a failed check reports only a fixed message; the raw
+ * error (which can embed file paths or SQL) goes to the sanitizing logger. Fire-and-forget so a
+ * logging failure never breaks the health response.
+ */
+function logHealthCheckFailure(component: string, error: unknown): void {
+  logger.error('Health check failed', { source: 'Health', meta: { component, error } }).catch(() => {});
+}
 
 // Track startup time for uptime calculation
 const startupTime = Date.now();
@@ -110,11 +120,12 @@ function checkSqlite() {
       migration,
     };
   } catch (error) {
+    logHealthCheckFailure('sqlite', error);
     return {
       status: 'unhealthy' as ComponentStatus,
       responseTimeMs: -1,
       migration: 0,
-      message: error instanceof Error ? error.message : 'Database query failed',
+      message: 'Database query failed',
     };
   }
 }
@@ -169,9 +180,10 @@ function checkRepos(verbose: boolean) {
 
     return result as { status: ComponentStatus; message?: string };
   } catch (error) {
+    logHealthCheckFailure('repos', error);
     return {
       status: 'unhealthy' as ComponentStatus,
-      message: error instanceof Error ? error.message : 'Failed to check repos',
+      message: 'Failed to check repos',
     };
   }
 }
@@ -203,9 +215,10 @@ function checkJobs(verbose: boolean) {
 
     return result as { status: ComponentStatus; message?: string };
   } catch (error) {
+    logHealthCheckFailure('jobs', error);
     return {
       status: 'unhealthy' as ComponentStatus,
-      message: error instanceof Error ? error.message : 'Failed to check jobs',
+      message: 'Failed to check jobs',
     };
   }
 }
@@ -277,10 +290,11 @@ async function checkBackups(verbose: boolean) {
 
     return result as { status: ComponentStatus; enabled: boolean; message?: string };
   } catch (error) {
+    logHealthCheckFailure('backups', error);
     return {
       status: 'unhealthy' as ComponentStatus,
       enabled: false,
-      message: error instanceof Error ? error.message : 'Failed to check backups',
+      message: 'Failed to check backups',
     };
   }
 }
@@ -343,9 +357,10 @@ async function checkLogs(verbose: boolean) {
 
     return result as { status: ComponentStatus; message?: string };
   } catch (error) {
+    logHealthCheckFailure('logs', error);
     return {
       status: 'unhealthy' as ComponentStatus,
-      message: error instanceof Error ? error.message : 'Failed to check logs',
+      message: 'Failed to check logs',
     };
   }
 }

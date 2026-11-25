@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { internalErrorResponse } from '$http/internalError.ts';
 import { canWriteToBase, parseOperationLayer, pcdManager, type OperationLayer, type PCDCache } from '$pcd/index.ts';
 import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';
 import type { PortableMetadataProfileType } from '$shared/pcd/portable.ts';
@@ -233,6 +234,29 @@ function toMetadataProfileListItemRows(
   }));
 }
 
+const METADATA_PROFILE_FAILED_MESSAGE = 'Metadata profile request failed. Check the server logs for details.';
+
+/**
+ * Build an error response: 4xx keeps its specific (validation/not-found/permission) message;
+ * 5xx returns a fixed message plus a stable code and logs the raw detail server-side.
+ */
+async function metadataProfileErrorResponse(
+  rawError: unknown,
+  message: string,
+  status: number,
+  operation: string
+): Promise<Response> {
+  if (status < 500) {
+    return json({ error: message }, { status });
+  }
+  return await internalErrorResponse(rawError, {
+    message: METADATA_PROFILE_FAILED_MESSAGE,
+    code: 'metadata_profile_request_failed',
+    source: 'LidarrMetadataProfilesApi',
+    logMessage: `Lidarr metadata profile ${operation} failed`,
+  });
+}
+
 function getWriteErrorStatus(message: string): number {
   if (isLidarrMetadataProfileSchemaError(message)) {
     return 400;
@@ -307,7 +331,7 @@ export const GET: RequestHandler = async ({ params }) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to list metadata profiles';
     const status = isLidarrMetadataProfileSchemaError(message) ? 400 : 500;
-    return json({ error: message }, { status });
+    return await metadataProfileErrorResponse(err, message, status, 'list');
   }
 };
 
@@ -386,7 +410,6 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Create failed';
-    const status = getWriteErrorStatus(message);
-    return json({ error: message }, { status });
+    return await metadataProfileErrorResponse(err, message, getWriteErrorStatus(message), 'create');
   }
 };

@@ -4,7 +4,12 @@ import { readJsonObjectBody, parseGoalRequest, buildGoalPlan } from '$lib/server
 import { persistGoalApply } from '$lib/server/goals/persistGoalApply.ts';
 import { computeGoalConfigDiff } from '$lib/server/goals/computeConfigDiff.ts';
 import { computeIntentFingerprint } from '$lib/server/goals/fingerprint.ts';
-import { buildApplyStatus, buildApplyFailure } from '$lib/server/goals/applyStatus.ts';
+import {
+  buildApplyStatus,
+  buildApplyFailure,
+  GOAL_APPLY_FAILED_CODE,
+  logGoalApplyInternalFailure,
+} from '$lib/server/goals/applyStatus.ts';
 import { toWirePlan, toWireBinding } from '$lib/server/goals/responses.ts';
 import { buildGoalDecisionLogMetadata } from '$lib/server/goals/decisionLog.ts';
 import { qualityGoalBindingQueries } from '$db/queries/qualityGoalBindings.ts';
@@ -106,12 +111,17 @@ export async function _handleGoalApplyRequest(
   } catch (err) {
     // Rare mid-persist infra throw (op k of N): a partial pcd_ops write is possible and the success-path
     // recompile did not run. Report conservatively (scoring may have changed); reconcile heals it.
-    const message = err instanceof Error ? err.message : String(err);
+    const message = await logGoalApplyInternalFailure(err, {
+      origin: 'apply',
+      applyId,
+      failureStage: 'scoring',
+    });
     dependencies.markJournalFailed(applyId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 1 });
     return json(
       buildApplyFailure({
         applyId,
         message,
+        code: GOAL_APPLY_FAILED_CODE,
         scoringChanged: true,
         failureStage: 'scoring',
         intentFingerprint,
@@ -123,13 +133,18 @@ export async function _handleGoalApplyRequest(
 
   if (!scoringResult.success) {
     // Value-guard reject or build error: the gate is a pre-persist dry-run, so nothing landed.
-    const message = scoringResult.error ?? 'Failed to apply goal';
-    const isGuardConflict = /value-guard gate/i.test(message);
+    const rawMessage = scoringResult.error ?? 'Failed to apply goal';
+    // A value-guard reject is a 409 conflict whose text the UI shows as-is; anything else is a 5xx.
+    const isGuardConflict = /value-guard gate/i.test(rawMessage);
+    const message = isGuardConflict
+      ? rawMessage
+      : await logGoalApplyInternalFailure(rawMessage, { origin: 'apply', applyId, failureStage: 'scoring' });
     dependencies.markJournalFailed(applyId, { failureStage: 'scoring', failureReason: message, scoringPersisted: 0 });
     return json(
       buildApplyFailure({
         applyId,
         message,
+        ...(isGuardConflict ? {} : { code: GOAL_APPLY_FAILED_CODE }),
         scoringChanged: false,
         failureStage: 'scoring',
         intentFingerprint,
@@ -155,7 +170,11 @@ export async function _handleGoalApplyRequest(
       appliedAt: new Date().toISOString(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = await logGoalApplyInternalFailure(err, {
+      origin: 'apply',
+      applyId,
+      failureStage: 'binding',
+    });
     // Scoring is durable but the binding is not — a REAL, reported partial write. `scoringChanged`
     // mirrors whether scoring actually wrote this attempt (consistent with the status GET).
     dependencies.markJournalFailed(applyId, {
@@ -165,7 +184,15 @@ export async function _handleGoalApplyRequest(
       bindingPersisted: 0,
     });
     return json(
-      buildApplyFailure({ applyId, message, scoringChanged, failureStage: 'binding', intentFingerprint, startedAt }),
+      buildApplyFailure({
+        applyId,
+        message,
+        code: GOAL_APPLY_FAILED_CODE,
+        scoringChanged,
+        failureStage: 'binding',
+        intentFingerprint,
+        startedAt,
+      }),
       { status: 500 }
     );
   }

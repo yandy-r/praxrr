@@ -4,7 +4,7 @@ import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.
 import { parseCachedEntity } from '$lib/server/trashguide/displayTransform.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { isTrashGuideEntityType, type TrashGuideEntityType } from '$shared/trashguide/types.ts';
-import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorMessage } from '../../../_helpers.ts';
+import { logTrashGuideRouteError, mapReadErrorStatus, parseSourceId, toErrorBody } from '../../../_helpers.ts';
 
 interface TrashGuideSourceRef {
   type: 'trash';
@@ -74,7 +74,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, `Failed to fetch TRaSH source id=${sourceId} before entity lookup`);
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 
   try {
@@ -110,7 +110,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
     return json(response satisfies TrashGuideEntityDetailResponse);
   } catch (error) {
     await logTrashGuideRouteError(error, `Failed to fetch TRaSH entity trashId=${trashId} source=${sourceId}`);
-    return json({ error: toErrorMessage(error) }, { status: 500 });
+    return json(toErrorBody(error, 500), { status: 500 });
   }
 };
 

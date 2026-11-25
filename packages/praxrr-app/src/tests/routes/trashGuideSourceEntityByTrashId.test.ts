@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import { trashGuideEntityCacheQueries } from '$db/queries/trashGuideEntityCache.ts';
 import { trashGuideManager } from '$lib/server/trashguide/manager.ts';
 import { GET as sourceEntityByTrashIdGet } from '../../routes/api/v1/trash-guide/sources/[id]/entities/[trashId]/+server.ts';
@@ -83,8 +83,10 @@ Deno.test('trash guide entity-by-trashId GET returns 500 for malformed typed pay
     } as unknown as Parameters<typeof sourceEntityByTrashIdGet>[0]);
 
     assertEquals(response.status, 500);
-    const payload = (await response.json()) as { error: string };
-    assertStringIncludes(payload.error, 'Invalid TRaSH cached payload');
+    const payload = (await response.json()) as { error: string; code?: string };
+    // 5xx never echoes the raw exception text; the detail stays in the server log.
+    assertEquals(payload.code, 'trash_guide_request_failed');
+    assert(!payload.error.includes('Invalid TRaSH cached payload'));
   } finally {
     for (const restore of restores.reverse()) {
       restore();
