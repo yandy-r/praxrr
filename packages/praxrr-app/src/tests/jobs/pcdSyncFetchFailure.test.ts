@@ -193,3 +193,53 @@ Deno.test('GitFetchError message is pre-authored and never echoes git output', (
   assertFalse(error.message.includes(TOKEN));
   assertFalse(error.message.includes('Authentication failed for'));
 });
+
+Deno.test('scheduled pcd.sync finishes interrupted post-pull work even with no new commits', async () => {
+  const restores: Restore[] = [];
+  const { syncedAtUpdates } = stubCollaborators(restores);
+  // auto_pull off: the pending work belongs to a pull that already happened, so it still runs.
+  patchTarget(
+    databaseInstancesQueries,
+    'getById',
+    ((_id: number) => ({ ...createInstance(), auto_pull: 0 })) as typeof databaseInstancesQueries.getById,
+    restores
+  );
+  patchTarget(
+    pcdManager,
+    'checkForUpdates',
+    (() =>
+      Promise.resolve({
+        hasUpdates: false,
+        commitsBehind: 0,
+        commitsAhead: 0,
+        latestRemoteCommit: 'c',
+        currentLocalCommit: 'c',
+      })) as typeof pcdManager.checkForUpdates,
+    restores
+  );
+  patchTarget(
+    pcdManager,
+    'hasPendingPostPullWork',
+    (() => Promise.resolve(true)) as typeof pcdManager.hasPendingPostPullWork,
+    restores
+  );
+  let syncCalls = 0;
+  patchTarget(
+    pcdManager,
+    'sync',
+    (() => {
+      syncCalls++;
+      return Promise.resolve({ success: true, commitsBehind: 0 });
+    }) as typeof pcdManager.sync,
+    restores
+  );
+  try {
+    const result = await getHandler()(createSyncJob('schedule'));
+
+    assertEquals(result.status, 'success');
+    assertEquals(syncCalls, 1);
+    assertEquals(syncedAtUpdates, []);
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
+});

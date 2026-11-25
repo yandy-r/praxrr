@@ -110,8 +110,10 @@ const dbSyncHandler: JobHandler = async (job) => {
 
   try {
     const updateInfo = await pcdManager.checkForUpdates(databaseId);
+    // A previous pull whose post-pull work failed must be finished even without new commits.
+    const postPullPending = !updateInfo.hasUpdates && (await pcdManager.hasPendingPostPullWork(databaseId));
 
-    if (!updateInfo.hasUpdates) {
+    if (!updateInfo.hasUpdates && !postPullPending) {
       databaseInstancesQueries.updateSyncedAt(databaseId);
       return {
         status: 'skipped',
@@ -120,7 +122,7 @@ const dbSyncHandler: JobHandler = async (job) => {
       };
     }
 
-    if (instance.auto_pull === 1) {
+    if (instance.auto_pull === 1 || postPullPending) {
       const syncResult = await pcdManager.sync(databaseId);
       if (!syncResult.success) {
         await logger.error('Database sync job failed', {
@@ -132,7 +134,7 @@ const dbSyncHandler: JobHandler = async (job) => {
 
       return {
         status: 'success',
-        output: `Pulled ${syncResult.commitsBehind} update(s)`,
+        output: postPullPending ? 'Completed an interrupted sync' : `Pulled ${syncResult.commitsBehind} update(s)`,
         rescheduleAt,
       };
     }
