@@ -426,3 +426,348 @@ Deno.test('Logger writes sanitized HttpError meta to the log file', async () => 
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test('sanitizeLogMeta serializes string-keyed Map as a sanitized record', () => {
+  const hexKey = 'deadbeefdeadbeefdeadbeefdeadbeef';
+  const sk = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';
+  const map = new Map<string, unknown>([
+    ['host', '10.0.0.5'],
+    ['radarr.local.lan', 'reachable'],
+    ['v0.8.0', 200],
+    ['apiKey', 'short-key'],
+    ['authorization', 'Bearer custom-token'],
+    ['x-api-key', 'arr-secret'],
+    ['cookie', 'session=secret-cookie'],
+    ['empty_token', ''],
+    ['note', `leak ${hexKey}`],
+    ['https://user:hunter2@arr.example/api', 'ok'],
+    [`key-${sk}`, 'value'],
+  ]);
+
+  const sanitized = sanitizeLogMeta({ map, empty: new Map() }) as {
+    map: Record<string, unknown>;
+    empty: Record<string, unknown>;
+  };
+  const serialized = JSON.stringify(sanitized);
+
+  assertEquals(sanitized.empty, {});
+  assertEquals(sanitized.map.host, '10.0.0.5');
+  assertEquals(sanitized.map['radarr.local.lan'], 'reachable');
+  assertEquals(sanitized.map['v0.8.0'], 200);
+  assertEquals(sanitized.map.apiKey, '[REDACTED]');
+  assertEquals(sanitized.map.authorization, '[REDACTED]');
+  assertEquals(sanitized.map['x-api-key'], '[REDACTED]');
+  assertEquals(sanitized.map.cookie, '[REDACTED]');
+  assertEquals(sanitized.map.empty_token, '');
+  assertEquals(sanitized.map.note, 'leak [REDACTED]');
+  assertEquals(sanitized.map['https://[REDACTED]@arr.example/api'], 'ok');
+  assertEquals(sanitized.map['key-[REDACTED]'], 'value');
+  for (const leaked of [hexKey, sk, 'short-key', 'custom-token', 'arr-secret', 'secret-cookie', 'hunter2']) {
+    assert(!serialized.includes(leaked), `${leaked} must not survive`);
+  }
+});
+
+Deno.test('sanitizeLogMeta handles __proto__ keys in Map without prototype pollution', () => {
+  const map = new Map<string, unknown>([
+    ['__proto__', { polluted: true }],
+    ['safe', 'kept'],
+  ]);
+  const sanitized = sanitizeLogMeta(map) as Record<string, unknown>;
+
+  assertEquals(Object.getPrototypeOf(sanitized), Object.prototype);
+  assertEquals(Object.prototype.hasOwnProperty.call(sanitized, '__proto__'), true);
+  assertEquals(({} as { polluted?: unknown }).polluted, undefined);
+  assertEquals((sanitized as { polluted?: unknown }).polluted, undefined);
+  assertEquals(sanitized.safe, 'kept');
+  assert(JSON.stringify(sanitized).includes('"__proto__":{"polluted":true}'));
+});
+
+Deno.test('sanitizeLogMeta serializes non-string-keyed Map as a sanitized entry array', () => {
+  const hexKey = 'deadbeefdeadbeefdeadbeefdeadbeef';
+  const map = new Map<unknown, unknown>([
+    [1, 'one'],
+    [
+      { apiKey: 'key-in-obj', id: 7 },
+      { password: 'pw-in-val', ok: true },
+    ],
+    ['authorization', 'Bearer mixed-secret'],
+    ['cookie', 'sid=mixed-cookie'],
+    ['x-api-key', 'mixed-api-key'],
+    ['empty_secret', ''],
+    [42n, `note ${hexKey}`],
+    [Symbol('s'), 'sym-val'],
+  ]);
+
+  const sanitized = sanitizeLogMeta({ map }) as { map: Array<[unknown, unknown]> };
+  const serialized = JSON.stringify(sanitized);
+
+  assertEquals(sanitized.map[0], [1, 'one']);
+  assertEquals(sanitized.map[1], [
+    { apiKey: '[REDACTED]', id: 7 },
+    { password: '[REDACTED]', ok: true },
+  ]);
+  assertEquals(sanitized.map[2], ['authorization', '[REDACTED]']);
+  assertEquals(sanitized.map[3], ['cookie', '[REDACTED]']);
+  assertEquals(sanitized.map[4], ['x-api-key', '[REDACTED]']);
+  assertEquals(sanitized.map[5], ['empty_secret', '']);
+  assertEquals(sanitized.map[6], ['42', 'note [REDACTED]']);
+  assertEquals(sanitized.map[7], [undefined, 'sym-val']);
+  for (const leaked of [hexKey, 'key-in-obj', 'pw-in-val', 'mixed-secret', 'mixed-cookie', 'mixed-api-key']) {
+    assert(!serialized.includes(leaked), `${leaked} must not survive`);
+  }
+});
+
+Deno.test('sanitizeLogMeta serializes Set as a sanitized array', () => {
+  const sk = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';
+  const set = new Set<unknown>(['alpha', 42, sk, { token: 'secret-token', label: 'keep' }, new Set(['nested', 9n])]);
+
+  const sanitized = sanitizeLogMeta({ set, empty: new Set() }) as {
+    set: unknown[];
+    empty: unknown[];
+  };
+  const serialized = JSON.stringify(sanitized);
+
+  assertEquals(sanitized.empty, []);
+  assertEquals(sanitized.set, ['alpha', 42, '[REDACTED]', { token: '[REDACTED]', label: 'keep' }, ['nested', '9']]);
+  assert(!serialized.includes(sk), 'sk token inside Set must not survive');
+  assert(!serialized.includes('secret-token'), 'nested secret inside Set must not survive');
+});
+
+Deno.test('sanitizeLogMeta serializes Headers as a sanitized record with sensitive headers redacted', () => {
+  const hexKey = 'deadbeefdeadbeefdeadbeefdeadbeef';
+  const sk = 'sk-ABCDEFGHIJKLMNOPQRSTUVWX';
+  const headers = new Headers([
+    ['Content-Type', 'application/json'],
+    ['X-Request-Id', 'req-123'],
+    ['Authorization', `Bearer ${sk}`],
+    ['Proxy-Authorization', 'Basic dXNlcjpwYXNz'],
+    ['X-Api-Key', 'plain-arr-key'],
+    ['Cookie', 'session=abc123; theme=dark'],
+    ['Set-Cookie', 'session=new-session-secret; HttpOnly; Secure'],
+    ['Set-Cookie', ''],
+    ['X-Csrf-Token', 'csrf-secret'],
+    ['Referer', `https://user:hunter2@arr.example/api?apikey=${hexKey}&page=1`],
+    ['X-Custom', `token ${sk}`],
+  ]);
+
+  const error = new Error('upstream failed') as Error & { headers?: Headers };
+  error.headers = headers;
+
+  const sanitized = sanitizeLogMeta({
+    headers,
+    empty: new Headers(),
+    error,
+  }) as {
+    headers: Record<string, unknown>;
+    empty: Record<string, unknown>;
+    error: { headers: Record<string, unknown> };
+  };
+  const serialized = JSON.stringify(sanitized);
+
+  assertEquals(sanitized.empty, {});
+  assertEquals(sanitized.headers['content-type'], 'application/json');
+  assertEquals(sanitized.headers['x-request-id'], 'req-123');
+  assertEquals(sanitized.headers.authorization, '[REDACTED]');
+  assertEquals(sanitized.headers['proxy-authorization'], '[REDACTED]');
+  assertEquals(sanitized.headers['x-api-key'], '[REDACTED]');
+  assertEquals(sanitized.headers.cookie, '[REDACTED]');
+  assertEquals(sanitized.headers['set-cookie'], '[REDACTED]');
+  assertEquals(sanitized.headers['x-csrf-token'], '[REDACTED]');
+  assertEquals(sanitized.headers.referer, 'https://[REDACTED]@arr.example/api?apikey=[REDACTED]&page=1');
+  assertEquals(sanitized.headers['x-custom'], 'token [REDACTED]');
+  assertEquals(sanitized.error.headers, sanitized.headers);
+
+  for (const leaked of [
+    hexKey,
+    sk,
+    'dXNlcjpwYXNz',
+    'plain-arr-key',
+    'abc123',
+    'new-session-secret',
+    'csrf-secret',
+    'hunter2',
+  ]) {
+    assert(!serialized.includes(leaked), `${leaked} must not survive`);
+  }
+});
+
+Deno.test(
+  'sanitizeLogMeta preserves cycle, shared-ref, depth, size, and non-throwing guarantees for Map, Set, and Headers',
+  () => {
+    // Cycles in Set and Map (both value and key positions)
+    const cyclicSet = new Set<unknown>(['kept']);
+    cyclicSet.add(cyclicSet);
+    const cyclicValueMap = new Map<string, unknown>([['ok', 1]]);
+    cyclicValueMap.set('self', cyclicValueMap);
+    const cyclicKeyMap = new Map<unknown, unknown>();
+    cyclicKeyMap.set(cyclicKeyMap, 'self-key');
+
+    const cyclic = sanitizeLogMeta({ cyclicSet, cyclicValueMap, cyclicKeyMap }) as {
+      cyclicSet: unknown[];
+      cyclicValueMap: Record<string, unknown>;
+      cyclicKeyMap: Array<[unknown, unknown]>;
+    };
+    assertEquals(cyclic.cyclicSet, ['kept', '[Circular]']);
+    assertEquals(cyclic.cyclicValueMap, { ok: 1, self: '[Circular]' });
+    assertEquals(cyclic.cyclicKeyMap, [['[Circular]', 'self-key']]);
+
+    // Shared non-cyclic references must not be marked circular
+    const sharedMap = new Map([['k', 'v']]);
+    const sharedSet = new Set(['x']);
+    const sharedHeaders = new Headers({ 'content-type': 'text/plain', cookie: 'sid=1' });
+    const shared = sanitizeLogMeta({
+      first: { sharedMap, sharedSet, sharedHeaders },
+      second: { sharedMap, sharedSet, sharedHeaders },
+    }) as {
+      first: Record<string, unknown>;
+      second: Record<string, unknown>;
+    };
+    assertEquals(shared.first, shared.second);
+    assertEquals(shared.first.sharedMap, { k: 'v' });
+    assertEquals(shared.first.sharedSet, ['x']);
+    assertEquals(shared.first.sharedHeaders, { 'content-type': 'text/plain', cookie: '[REDACTED]' });
+
+    // Depth caps for Map, Set, and Headers (including sensitive header at MAX_DEPTH boundary)
+    let deepMap: Map<string, unknown> = new Map([['leaf', 'deep-value']]);
+    let deepSet: Set<unknown> = new Set(['deep-value']);
+    for (let i = 0; i < 40; i++) {
+      deepMap = new Map([['next', deepMap]]);
+      deepSet = new Set([deepSet]);
+    }
+    assert(JSON.stringify(sanitizeLogMeta(deepMap)).includes('[Truncated]'));
+    assert(JSON.stringify(sanitizeLogMeta(deepSet)).includes('[Truncated]'));
+
+    let atDepthLimit: Record<string, unknown> = {
+      headers: new Headers({ authorization: 'Bearer boundary-secret', 'content-type': 'text/plain' }),
+    };
+    for (let i = 0; i < 31; i++) {
+      atDepthLimit = { next: atDepthLimit };
+    }
+    const boundarySerialized = JSON.stringify(sanitizeLogMeta(atDepthLimit));
+    assert(!boundarySerialized.includes('boundary-secret'), 'sensitive header at depth limit must not leak');
+    assert(boundarySerialized.includes('[REDACTED]'));
+    assert(boundarySerialized.includes('[Truncated]'));
+
+    // String length cap inside Map keys/values, Set items, and Headers values
+    const longText = 'x '.repeat(20_000);
+    const longSanitized = sanitizeLogMeta({
+      map: new Map([[longText, longText]]),
+      set: new Set([longText]),
+      headers: new Headers({ 'x-long': longText }),
+    }) as {
+      map: Record<string, string>;
+      set: string[];
+      headers: Record<string, string>;
+    };
+    const [longMapKey] = Object.keys(longSanitized.map);
+    assert(longMapKey.length < 9_000 && longMapKey.endsWith('…[Truncated]'));
+    assert(longSanitized.map[longMapKey].length < 9_000 && longSanitized.map[longMapKey].endsWith('…[Truncated]'));
+    assert(longSanitized.set[0].length < 9_000 && longSanitized.set[0].endsWith('…[Truncated]'));
+    assert(longSanitized.headers['x-long'].length < 9_000 && longSanitized.headers['x-long'].endsWith('…[Truncated]'));
+
+    // Collection entry cap for oversized Map and Set
+    const bigMap = new Map<string, number>();
+    const bigMixedMap = new Map<unknown, number>();
+    const bigSet = new Set<number>();
+    for (let i = 0; i < 1_200; i++) {
+      bigMap.set(`k${i}`, i);
+      bigMixedMap.set(i, i);
+      bigSet.add(i);
+    }
+    const cappedCollections = sanitizeLogMeta({ bigMap, bigMixedMap, bigSet }) as {
+      bigMap: Record<string, unknown>;
+      bigMixedMap: unknown[];
+      bigSet: unknown[];
+    };
+    assertEquals(cappedCollections.bigMap['[Truncated]'], true);
+    assertEquals(Object.keys(cappedCollections.bigMap).length, 1_001);
+    assertEquals(cappedCollections.bigMixedMap.length, 1_001);
+    assertEquals(cappedCollections.bigMixedMap[1_000], '[Truncated]');
+    assertEquals(cappedCollections.bigSet.length, 1_001);
+    assertEquals(cappedCollections.bigSet[1_000], '[Truncated]');
+
+    // Incompatible receivers and Proxies must not throw
+    const fakeMap = Object.create(Map.prototype);
+    const fakeSet = Object.create(Set.prototype);
+    const fakeHeaders = Object.create(Headers.prototype);
+    const proxiedMap = new Proxy(new Map([['k', 'v']]), {});
+    const throwingItem: Record<string, unknown> = { ok: 'kept' };
+    Object.defineProperty(throwingItem, 'boom', {
+      enumerable: true,
+      get() {
+        throw new Error('boom');
+      },
+    });
+
+    const safe = sanitizeLogMeta({
+      fakeMap,
+      fakeSet,
+      fakeHeaders,
+      proxiedMap,
+      setWithThrowingItem: new Set([throwingItem]),
+      mapWithThrowingItem: new Map([['item', throwingItem]]),
+    }) as Record<string, unknown>;
+    assertEquals(safe.fakeMap, '[Unserializable]');
+    assertEquals(safe.fakeSet, '[Unserializable]');
+    assertEquals(safe.fakeHeaders, '[Unserializable]');
+    assertEquals(safe.proxiedMap, '[Unserializable]');
+    assertEquals(safe.setWithThrowingItem, [{ ok: 'kept', boom: '[Unserializable]' }]);
+    assertEquals(safe.mapWithThrowingItem, { item: { ok: 'kept', boom: '[Unserializable]' } });
+  }
+);
+
+Deno.test('Logger writes sanitized Map, Set, and Headers metadata to the log file', async () => {
+  const dir = await Deno.makeTempDir({ prefix: 'praxrr-logger-containers-' });
+  const originalLog = console.log;
+  console.log = () => {};
+  try {
+    const logger = new Logger({ logsDir: dir, minLevel: 'DEBUG' });
+    await logger.info('request context', {
+      source: 'test',
+      meta: {
+        counts: new Map<string, unknown>([
+          ['synced', 3],
+          ['apiKey', 'secret-map-key'],
+        ]),
+        tags: new Set(['radarr', 'sk-ABCDEFGHIJKLMNOPQRSTUVWX']),
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer log-secret-bearer',
+          'X-Api-Key': 'log-secret-apikey',
+          Cookie: 'session=log-secret-cookie',
+        }),
+      },
+    });
+
+    const files = [...Deno.readDirSync(dir)].filter((entry) => entry.name.endsWith('.log'));
+    assertEquals(files.length, 1);
+    const written = await Deno.readTextFile(`${dir}/${files[0].name}`);
+    for (const leaked of [
+      'secret-map-key',
+      'sk-ABCDEFGHIJKLMNOPQRSTUVWX',
+      'log-secret-bearer',
+      'log-secret-apikey',
+      'log-secret-cookie',
+    ]) {
+      assert(!written.includes(leaked), `${leaked} must not be written to log file`);
+    }
+    const parsed = JSON.parse(written.trim()) as {
+      meta: {
+        counts: Record<string, unknown>;
+        tags: unknown[];
+        headers: Record<string, unknown>;
+      };
+    };
+    assertEquals(parsed.meta.counts, { synced: 3, apiKey: '[REDACTED]' });
+    assertEquals(parsed.meta.tags, ['radarr', '[REDACTED]']);
+    assertEquals(parsed.meta.headers, {
+      'content-type': 'application/json',
+      authorization: '[REDACTED]',
+      'x-api-key': '[REDACTED]',
+      cookie: '[REDACTED]',
+    });
+  } finally {
+    console.log = originalLog;
+    await Deno.remove(dir, { recursive: true });
+  }
+});
