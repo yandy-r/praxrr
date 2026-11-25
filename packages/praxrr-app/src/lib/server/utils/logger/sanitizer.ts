@@ -4,6 +4,7 @@ const UNSERIALIZABLE_VALUE = '[Unserializable]';
 const TRUNCATED_VALUE = '[Truncated]';
 const MAX_DEPTH = 32;
 const MAX_STRING_LENGTH = 8192;
+const MAX_COLLECTION_ENTRIES = 1000;
 const TRUNCATED_SUFFIX = '…[Truncated]';
 
 const SENSITIVE_KEY_PATTERNS = [
@@ -15,6 +16,7 @@ const SENSITIVE_KEY_PATTERNS = [
   /credential/i,
   /x[-_]api[-_]key/i,
   /client[-_]secret/i,
+  /cookie/i,
 ];
 
 // Identifier-style suffixes need a word boundary (snake/kebab separator, or camelCase after a
@@ -133,12 +135,8 @@ function truncateString(value: string): string {
   return value.slice(0, end) + TRUNCATED_SUFFIX;
 }
 
-function sanitizeStringValue(input: string): string {
-  const value = truncateString(input);
-  if (SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(value))) {
-    return REDACTED_VALUE;
-  }
-
+/** Redact embedded JSON fields, URL userinfo, known token shapes, and credential query params. */
+function sanitizeEmbeddedSecrets(value: string): string {
   // JSON fields first: later token patterns must not disturb the quoting this pass relies on.
   let sanitized = redactJsonFields(value);
   sanitized = sanitized.replace(URL_USERINFO_PATTERN, `$1${REDACTED_VALUE}@`);
@@ -147,6 +145,39 @@ function sanitizeStringValue(input: string): string {
   }
 
   return sanitized.replace(CREDENTIAL_QUERY_PATTERN, `$1${REDACTED_VALUE}`);
+}
+
+/** Truncate and redact a string log value. */
+function sanitizeStringValue(input: string): string {
+  const value = truncateString(input);
+  if (SENSITIVE_VALUE_PATTERNS.some((pattern) => pattern.test(value))) {
+    return REDACTED_VALUE;
+  }
+
+  return sanitizeEmbeddedSecrets(value);
+}
+
+/** Truncate and redact secrets inside a record key while keeping dotted identifiers intact. */
+function sanitizeKeyString(input: string): string {
+  return sanitizeEmbeddedSecrets(truncateString(input));
+}
+
+/** Define an own enumerable data property safely, avoiding `__proto__` prototype mutation. */
+function defineField(out: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(out, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
+/** Assign a sanitized record field without downgrading an already-redacted value on key collision. */
+function setRecordFieldSafely(out: Record<string, unknown>, key: string, value: unknown): void {
+  if (Object.prototype.hasOwnProperty.call(out, key) && out[key] === REDACTED_VALUE) {
+    return;
+  }
+  defineField(out, key, value);
 }
 
 function sanitizeNested(value: unknown, ancestors: Set<object>, depth: number): unknown {
@@ -169,17 +200,166 @@ function setSanitizedField(
   try {
     nestedValue = read();
   } catch {
-    out[key] = UNSERIALIZABLE_VALUE;
+    defineField(out, key, UNSERIALIZABLE_VALUE);
     return;
   }
   if (skipUndefined && nestedValue === undefined) {
     return;
   }
   if (isSensitiveKey(key)) {
-    out[key] = nestedValue === '' ? '' : REDACTED_VALUE;
+    defineField(out, key, nestedValue === '' ? '' : REDACTED_VALUE);
   } else {
-    out[key] = sanitizeNested(nestedValue, ancestors, depth + 1);
+    defineField(out, key, sanitizeNested(nestedValue, ancestors, depth + 1));
   }
+}
+
+/** Serialize a `Map` as a sanitized record (when all keys are strings) or a sanitized entry array. */
+function sanitizeMap(
+  map: Map<unknown, unknown>,
+  ancestors: Set<object>,
+  depth: number
+): Record<string, unknown> | unknown[] | string {
+  let iterator: IterableIterator<[unknown, unknown]>;
+  try {
+    iterator = Map.prototype.entries.call(map);
+  } catch {
+    return UNSERIALIZABLE_VALUE;
+  }
+
+  const entries: Array<[unknown, unknown]> = [];
+  let allStringKeys = true;
+  let truncated = false;
+  try {
+    for (const entry of iterator) {
+      if (typeof entry[0] !== 'string') {
+        allStringKeys = false;
+      }
+      if (entries.length < MAX_COLLECTION_ENTRIES) {
+        entries.push(entry);
+      } else {
+        truncated = true;
+        if (!allStringKeys) {
+          break;
+        }
+      }
+    }
+  } catch {
+    return UNSERIALIZABLE_VALUE;
+  }
+
+  if (allStringKeys) {
+    const out: Record<string, unknown> = {};
+    for (const [rawKey, rawValue] of entries) {
+      const key = rawKey as string;
+      const sanitizedKey = sanitizeKeyString(key);
+      const sanitizedValue = isSensitiveKey(key)
+        ? rawValue === ''
+          ? ''
+          : REDACTED_VALUE
+        : sanitizeNested(rawValue, ancestors, depth + 1);
+      setRecordFieldSafely(out, sanitizedKey, sanitizedValue);
+    }
+    if (truncated) {
+      defineField(out, TRUNCATED_VALUE, true);
+    }
+    return out;
+  }
+
+  const out: unknown[] = [];
+  for (const [rawKey, rawValue] of entries) {
+    const sanitizedKey =
+      typeof rawKey === 'string'
+        ? depth + 1 > MAX_DEPTH
+          ? TRUNCATED_VALUE
+          : sanitizeKeyString(rawKey)
+        : sanitizeNested(rawKey, ancestors, depth + 1);
+    const sanitizedValue =
+      typeof rawKey === 'string' && isSensitiveKey(rawKey)
+        ? rawValue === ''
+          ? ''
+          : REDACTED_VALUE
+        : sanitizeNested(rawValue, ancestors, depth + 1);
+    out.push([sanitizedKey, sanitizedValue]);
+  }
+  if (truncated) {
+    out.push(TRUNCATED_VALUE);
+  }
+  return out;
+}
+
+/** Serialize a `Set` as a bounded array of sanitized values. */
+function sanitizeSet(set: Set<unknown>, ancestors: Set<object>, depth: number): unknown[] | string {
+  let iterator: IterableIterator<unknown>;
+  try {
+    iterator = Set.prototype.values.call(set);
+  } catch {
+    return UNSERIALIZABLE_VALUE;
+  }
+
+  const out: unknown[] = [];
+  try {
+    for (const item of iterator) {
+      if (out.length >= MAX_COLLECTION_ENTRIES) {
+        out.push(TRUNCATED_VALUE);
+        break;
+      }
+      out.push(sanitizeNested(item, ancestors, depth + 1));
+    }
+  } catch {
+    return UNSERIALIZABLE_VALUE;
+  }
+  return out;
+}
+
+/** Serialize a `Headers` instance as a sanitized record with sensitive headers redacted. */
+function sanitizeHeaders(headers: Headers, ancestors: Set<object>, depth: number): Record<string, unknown> | string {
+  const entriesFn = (
+    Headers.prototype as Headers & {
+      entries?: (this: Headers) => IterableIterator<[string, string]>;
+    }
+  ).entries;
+
+  const out: Record<string, unknown> = {};
+  let count = 0;
+
+  const recordHeader = (name: string, headerValue: string): boolean => {
+    if (count >= MAX_COLLECTION_ENTRIES) {
+      defineField(out, TRUNCATED_VALUE, true);
+      return false;
+    }
+    count++;
+    const sanitizedName = sanitizeKeyString(name);
+    const sanitizedValue = isSensitiveKey(name)
+      ? headerValue === ''
+        ? ''
+        : REDACTED_VALUE
+      : sanitizeNested(headerValue, ancestors, depth + 1);
+    setRecordFieldSafely(out, sanitizedName, sanitizedValue);
+    return true;
+  };
+
+  try {
+    if (typeof entriesFn === 'function') {
+      for (const [name, headerValue] of entriesFn.call(headers)) {
+        if (!recordHeader(name, headerValue)) {
+          break;
+        }
+      }
+    } else {
+      let truncated = false;
+      Headers.prototype.forEach.call(headers, (headerValue: string, name: string) => {
+        if (truncated) {
+          return;
+        }
+        if (!recordHeader(name, headerValue)) {
+          truncated = true;
+        }
+      });
+    }
+  } catch {
+    return UNSERIALIZABLE_VALUE;
+  }
+  return out;
 }
 
 function sanitizeRecord(value: object, ancestors: Set<object>, depth: number): Record<string, unknown> {
@@ -311,7 +491,19 @@ function sanitizeLogMetaInternal(value: unknown, ancestors: Set<object>, depth: 
       if (jsonValue !== value) {
         return sanitizeNested(jsonValue, ancestors, depth + 1);
       }
-      // toJSON returned itself: fall through to entry sanitization.
+      // toJSON returned itself: fall through to container or entry sanitization.
+    }
+
+    if (value instanceof Map) {
+      return sanitizeMap(value, ancestors, depth);
+    }
+
+    if (value instanceof Set) {
+      return sanitizeSet(value, ancestors, depth);
+    }
+
+    if (typeof Headers === 'function' && value instanceof Headers) {
+      return sanitizeHeaders(value, ancestors, depth);
     }
 
     return sanitizeRecord(value, ancestors, depth);
