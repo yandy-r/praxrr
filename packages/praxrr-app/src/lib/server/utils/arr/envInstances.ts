@@ -302,6 +302,32 @@ export async function isEnvInstanceDeclared(instance: {
   }
 }
 
+/** Evaluate declarations once for a list load, without retaining them across requests. */
+export async function buildEnvInstanceDeclarationMatcher(): Promise<
+  (instance: Pick<ArrInstance, 'name' | 'api_key_fingerprint'>) => boolean
+> {
+  try {
+    const names = new Set<string>();
+    const fingerprints = new Set<string>();
+    const seenApiKeyFingerprints = new Set<string>();
+    for (const descriptor of parseArrInstanceEnvVars()) {
+      const selection = await selectEnvDescriptor(descriptor, seenApiKeyFingerprints);
+      if (selection.status === 'fingerprintError') {
+        return () => true;
+      }
+      if (selection.status === 'selected') {
+        names.add(descriptor.name);
+        fingerprints.add(selection.apiKeyFingerprint);
+      }
+    }
+    return ({ name, api_key_fingerprint }) =>
+      names.has(name) || (api_key_fingerprint !== null && fingerprints.has(api_key_fingerprint));
+  } catch {
+    // An incomplete evaluation must not present env instances as deletable.
+    return () => true;
+  }
+}
+
 type ArrInstanceEnvKeys = {
   all: string[];
   unsupported: string[];
