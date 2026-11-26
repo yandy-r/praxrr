@@ -5,7 +5,8 @@
 import type { PCDCache } from '$pcd/index.ts';
 import { writeOperation, type OperationLayer } from '$pcd/index.ts';
 import { logger } from '$logger/logger.ts';
-import type { OrderedItem } from '$shared/pcd/display.ts';
+import type { ArrAppType } from '$shared/arr/capabilities.ts';
+import { buildSeedItems, resolveSeedTarget } from './createSeed.ts';
 
 // ============================================================================
 // Input types
@@ -16,6 +17,11 @@ interface CreateQualityProfileInput {
   description: string | null;
   tags: string[];
   language: string | null;
+  /**
+   * Target Arr app for the seeded quality ladder. Only qualities this app supports are seeded
+   * (Lidarr gets the audio ladder). When omitted, the video apps (Radarr + Sonarr) are inferred.
+   */
+  arrType?: ArrAppType;
 }
 
 interface CreateQualityProfileOptions {
@@ -97,140 +103,14 @@ export async function create(options: CreateQualityProfileOptions) {
     queries.push(linkTag);
   }
 
-  // 3. Get all qualities and add them to the profile as individual items
+  // 3. Seed the ladder with only the qualities the target Arr app(s) support
   const allQualities = await db.selectFrom('qualities').select(['id', 'name']).orderBy('id').execute();
+  const { ladder, supportedQualityNames } = await resolveSeedTarget(cache, input.arrType);
+  const orderedItems = buildSeedItems(ladder, allQualities, supportedQualityNames);
 
-  const allQualityNames = new Set(allQualities.map((quality) => quality.name));
-  const enabledQualities = new Set(['Remux-1080p', 'Bluray-1080p']);
-  const upgradeUntilName = 'Bluray-1080p';
-
-  type OrderEntry = { type: 'quality'; name: string } | { type: 'group'; name: string; members: string[] };
-
-  const groupDefinitions = [
-    {
-      name: 'WEB 1080p',
-      members: ['WEBDL-1080p', 'WEBRip-1080p'],
-      enabled: false,
-    },
-    {
-      name: 'Pre-releases',
-      members: ['REGIONAL', 'DVDSCR', 'TELECINE', 'TELESYNC', 'CAM', 'WORKPRINT'],
-      enabled: false,
-    },
-    {
-      name: 'Unwanted',
-      members: ['Unknown', 'Raw-HD', 'BR-DISK'],
-      enabled: false,
-    },
-  ];
-  const groupMap = new Map(groupDefinitions.map((group) => [group.name, group]));
-  const groupAvailability = new Map(
-    groupDefinitions.map((group) => [group.name, group.members.every((member) => allQualityNames.has(member))])
-  );
-
-  const desiredOrder: OrderEntry[] = [
-    { type: 'quality', name: 'Remux-2160p' },
-    { type: 'quality', name: 'Bluray-2160p' },
-    { type: 'quality', name: 'WEBDL-2160p' },
-    { type: 'quality', name: 'WEBRip-2160p' },
-    { type: 'quality', name: 'HDTV-2160p' },
-    { type: 'quality', name: 'Remux-1080p' },
-    { type: 'quality', name: 'Bluray-1080p' },
-    { type: 'group', name: 'WEB 1080p', members: ['WEBDL-1080p', 'WEBRip-1080p'] },
-    { type: 'quality', name: 'HDTV-1080p' },
-    { type: 'quality', name: 'Bluray-720p' },
-    { type: 'quality', name: 'WEBDL-720p' },
-    { type: 'quality', name: 'WEBRip-720p' },
-    { type: 'quality', name: 'HDTV-720p' },
-    { type: 'quality', name: 'Bluray-576p' },
-    { type: 'quality', name: 'Bluray-480p' },
-    { type: 'quality', name: 'WEBDL-480p' },
-    { type: 'quality', name: 'WEBRip-480p' },
-    { type: 'quality', name: 'HDTV-480p' },
-    { type: 'quality', name: 'DVD-R' },
-    { type: 'quality', name: 'DVD' },
-    { type: 'quality', name: 'SDTV' },
-    {
-      type: 'group',
-      name: 'Pre-releases',
-      members: ['REGIONAL', 'DVDSCR', 'TELECINE', 'TELESYNC', 'CAM', 'WORKPRINT'],
-    },
-    { type: 'group', name: 'Unwanted', members: ['Unknown', 'Raw-HD', 'BR-DISK'] },
-  ];
-
-  const orderedItems: OrderedItem[] = [];
-  const usedNames = new Set<string>();
-  let position = 1;
-
-  for (const entry of desiredOrder) {
-    if (entry.type === 'group') {
-      const group = groupMap.get(entry.name);
-      const canGroup = groupAvailability.get(entry.name) ?? false;
-      const members = group?.members ?? entry.members;
-
-      if (!canGroup) {
-        for (const member of members) {
-          if (!allQualityNames.has(member) || usedNames.has(member)) continue;
-          orderedItems.push({
-            type: 'quality',
-            name: member,
-            position,
-            enabled: false,
-            upgradeUntil: false,
-            members: [],
-          });
-          usedNames.add(member);
-          position += 1;
-        }
-        continue;
-      }
-
-      orderedItems.push({
-        type: 'group',
-        name: entry.name,
-        position,
-        enabled: group?.enabled ?? false,
-        upgradeUntil: false,
-        members: members.map((member) => ({ name: member })),
-      });
-      for (const member of members) {
-        usedNames.add(member);
-      }
-      position += 1;
-      continue;
-    }
-
-    if (!allQualityNames.has(entry.name) || usedNames.has(entry.name)) continue;
-    orderedItems.push({
-      type: 'quality',
-      name: entry.name,
-      position,
-      enabled: enabledQualities.has(entry.name),
-      upgradeUntil: entry.name === upgradeUntilName,
-      members: [],
-    });
-    usedNames.add(entry.name);
-    position += 1;
-  }
-
-  for (const quality of allQualities) {
-    if (usedNames.has(quality.name)) continue;
-    orderedItems.push({
-      type: 'quality',
-      name: quality.name,
-      position,
-      enabled: false,
-      upgradeUntil: false,
-      members: [],
-    });
-    position += 1;
-  }
-
-  const groupNames = orderedItems.filter((item) => item.type === 'group').map((item) => item.name);
-
-  for (const groupName of groupNames) {
-    const group = groupMap.get(groupName);
-    if (!group) continue;
+  for (const group of orderedItems) {
+    if (group.type !== 'group') continue;
+    const groupName = group.name;
     const insertGroup = {
       sql: `INSERT INTO quality_groups (quality_profile_name, name) VALUES ('${esc(input.name)}', '${esc(groupName)}')`,
       parameters: [],
@@ -238,7 +118,7 @@ export async function create(options: CreateQualityProfileOptions) {
     };
     queries.push(insertGroup);
 
-    for (const memberName of group.members) {
+    for (const { name: memberName } of group.members ?? []) {
       const insertMember = {
         sql: `INSERT INTO quality_group_members (quality_profile_name, quality_group_name, quality_name) VALUES ('${esc(input.name)}', '${esc(groupName)}', '${esc(memberName)}')`,
         parameters: [],
