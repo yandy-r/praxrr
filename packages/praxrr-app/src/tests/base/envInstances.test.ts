@@ -94,7 +94,7 @@ async function withEnvVarsAsync(variables: Record<string, string>, test: () => P
   try {
     await test();
   } finally {
-    for (const key of Object.keys(restoredKeys)) {
+    for (const key of Object.keys(variables)) {
       Deno.env.delete(key);
     }
 
@@ -123,7 +123,7 @@ function withEnvVars(variables: Record<string, string>, test: () => void): void 
   try {
     test();
   } finally {
-    for (const key of Object.keys(restoredKeys)) {
+    for (const key of Object.keys(variables)) {
       Deno.env.delete(key);
     }
 
@@ -201,7 +201,7 @@ Deno.test('parseTagsFromEnv: normalizes comma-separated tag strings', () => {
   assertEquals(parseTagsFromEnv(undefined), []);
 });
 
-Deno.test('reconcileEnvInstances skips env updates when a UI-owned name already exists', async () => {
+Deno.test('reconciliation and declaration skip a UI-owned name and later duplicates of its key', async () => {
   await withArrCredentialConfig(async () => {
     const restoreTargets: Restore[] = [];
     let updateAttempted = false;
@@ -212,8 +212,8 @@ Deno.test('reconcileEnvInstances skips env updates when a UI-owned name already 
     patchTarget(
       arrInstancesQueries,
       'getBySourceAndName',
-      (_source: string, _name: string) => {
-        if (_source === 'ui') {
+      (source, name) => {
+        if (source === 'ui' && name === 'UI-Managed Radarr') {
           return {
             id: 19,
             name: 'UI-Managed Radarr',
@@ -282,13 +282,26 @@ Deno.test('reconcileEnvInstances skips env updates when a UI-owned name already 
           RADARR_INSTANCE_URL_1: 'http://radarr.local:7878',
           RADARR_INSTANCE_API_KEY_1: 'radarr-ui-scope-key',
           RADARR_INSTANCE_NAME_1: 'UI-Managed Radarr',
+          SONARR_INSTANCE_URL_1: 'http://sonarr.local:8989',
+          SONARR_INSTANCE_API_KEY_1: 'radarr-ui-scope-key',
+          SONARR_INSTANCE_NAME_1: 'Duplicate Sonarr',
         },
         async () => {
           const result = await reconcileEnvInstances();
 
           assertEquals(result.skippedConflictUi, 1);
+          assertEquals(result.skippedDuplicateEnvKey, 1);
           assertEquals(updateAttempted, false);
           assertEquals(createAttempted, false);
+
+          const fingerprint = (await arrCredentialEncryption.deriveArrInstanceApiKeyFingerprint('radarr-ui-scope-key'))
+            .value;
+          assertEquals(await isEnvInstanceDeclared({ name: 'UI-Managed Radarr', api_key_fingerprint: null }), false);
+          assertEquals(
+            await isEnvInstanceDeclared({ name: 'Old Env Radarr', api_key_fingerprint: fingerprint }),
+            false
+          );
+          assertEquals(await isEnvInstanceDeclared({ name: 'Duplicate Sonarr', api_key_fingerprint: null }), false);
         }
       );
     } finally {
@@ -568,21 +581,55 @@ const DECLARED_ENV = {
   RADARR_INSTANCE_NAME_1: 'Declared Radarr',
 };
 
+Deno.test('isEnvInstanceDeclared: a duplicate does not declare a second name', async () => {
+  await withArrCredentialConfig(async () => {
+    await withNoExistingInstances(() =>
+      withEnvVarsAsync(
+        {
+          ...DECLARED_ENV,
+          RADARR_INSTANCE_URL_2: 'http://radarr-2.local:7878',
+          RADARR_INSTANCE_API_KEY_2: DECLARED_ENV.RADARR_INSTANCE_API_KEY_1,
+          RADARR_INSTANCE_NAME_2: 'Duplicate Radarr',
+        },
+        async () => {
+          assertEquals(await isEnvInstanceDeclared({ name: 'Declared Radarr', api_key_fingerprint: null }), true);
+          assertEquals(await isEnvInstanceDeclared({ name: 'Duplicate Radarr', api_key_fingerprint: null }), false);
+        }
+      )
+    );
+  });
+});
+
+async function withNoExistingInstances(test: () => Promise<void>): Promise<void> {
+  const restores: Restore[] = [];
+  patchTarget(arrInstancesQueries, 'getBySourceAndName', () => undefined, restores);
+  patchTarget(arrInstancesQueries, 'getByApiKey', () => undefined, restores);
+  try {
+    await test();
+  } finally {
+    for (const restore of restores.reverse()) restore();
+  }
+}
+
 Deno.test('isEnvInstanceDeclared: matches by API-key fingerprint when the name changed', async () => {
   await withArrCredentialConfig(async () => {
     const fingerprint = (await arrCredentialEncryption.deriveArrInstanceApiKeyFingerprint('declared-key')).value;
-    await withEnvVarsAsync(DECLARED_ENV, async () => {
-      assertEquals(await isEnvInstanceDeclared({ name: 'Renamed Radarr', api_key_fingerprint: fingerprint }), true);
-    });
+    await withNoExistingInstances(() =>
+      withEnvVarsAsync(DECLARED_ENV, async () => {
+        assertEquals(await isEnvInstanceDeclared({ name: 'Renamed Radarr', api_key_fingerprint: fingerprint }), true);
+      })
+    );
   });
 });
 
 Deno.test('isEnvInstanceDeclared: undeclared when neither name nor key matches', async () => {
   await withArrCredentialConfig(async () => {
     const fingerprint = (await arrCredentialEncryption.deriveArrInstanceApiKeyFingerprint('other-key')).value;
-    await withEnvVarsAsync(DECLARED_ENV, async () => {
-      assertEquals(await isEnvInstanceDeclared({ name: 'Gone Radarr', api_key_fingerprint: fingerprint }), false);
-    });
+    await withNoExistingInstances(() =>
+      withEnvVarsAsync(DECLARED_ENV, async () => {
+        assertEquals(await isEnvInstanceDeclared({ name: 'Gone Radarr', api_key_fingerprint: fingerprint }), false);
+      })
+    );
   });
 });
 
