@@ -12,7 +12,7 @@
   import PageTitle from '$ui/meta/PageTitle.svelte';
   import { alertStore } from '$alerts/store';
   import { getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
-  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
+  import { FIELD_META, formatFieldChangeValue } from '$ui/resolved/fieldChangeDisplay.ts';
   import { parseUTC } from '$shared/utils/dates';
   import type { components } from '$api/v1.d.ts';
   import type { Column } from '$ui/table/types';
@@ -401,13 +401,17 @@
                         </td>
                         <td class="px-4 py-2 align-top">
                           <pre
-                            class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                            class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldChangeValue(
+                              fieldChange.type,
+                              'current',
                               fieldChange.current
                             )}</pre>
                         </td>
                         <td class="px-4 py-2 align-top">
                           <pre
-                            class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                            class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldChangeValue(
+                              fieldChange.type,
+                              'desired',
                               fieldChange.desired
                             )}</pre>
                         </td>

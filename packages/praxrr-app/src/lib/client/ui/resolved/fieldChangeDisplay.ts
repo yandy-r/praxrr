@@ -26,6 +26,32 @@ export function formatFieldValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** Placeholder rendered for the side of an `added`/`removed` field change that has no value. */
+export const MISSING_FIELD_VALUE = '—';
+
+/** Which side of a `FieldChange` a value belongs to. */
+export type FieldChangeSide = 'current' | 'desired';
+
+/**
+ * True when `value` is the absent side of an `added` (no `current`) or `removed` (no
+ * `desired`) field change. Newer rows carry an explicit `null` there (per the OpenAPI
+ * contract); older stored sync-history/canary rows omit the key entirely (`undefined`).
+ * `changed` rows never have a missing side -- a `null` there is a real value.
+ */
+export function isMissingFieldChangeSide(type: FieldChangeType, side: FieldChangeSide, value: unknown): boolean {
+  if (value !== null && value !== undefined) return false;
+  return (type === 'added' && side === 'current') || (type === 'removed' && side === 'desired');
+}
+
+/**
+ * Renders one side of a `FieldChange` for diff tables: the missing side of an
+ * `added`/`removed` change becomes {@link MISSING_FIELD_VALUE}; everything else (including a
+ * real `null` on a `changed` row) is rendered by {@link formatFieldValue}.
+ */
+export function formatFieldChangeValue(type: FieldChangeType, side: FieldChangeSide, value: unknown): string {
+  return isMissingFieldChangeSide(type, side, value) ? MISSING_FIELD_VALUE : formatFieldValue(value);
+}
+
 type FieldLineage = components['schemas']['FieldLineage'];
 type LineageSourceKind = FieldLineage['sourceKind'];
 type BadgeVariant = 'neutral' | 'info' | 'warning' | 'accent';
