@@ -11,6 +11,7 @@ import type { PCDCache } from '$pcd/index.ts';
 import * as qualityProfiles from '$pcd/entities/qualityProfiles/index.ts';
 import { getSupportedQualityNames } from '$pcd/entities/qualityProfiles/compatibility.ts';
 import { buildSeedItems, VIDEO_SEED_LADDER } from '$pcd/entities/qualityProfiles/createSeed.ts';
+import { actions as newProfileActions } from '../../routes/quality-profiles/[databaseId]/new/+page.server.ts';
 import { overridesTest, type PcdFixture } from './overrides/overridesTestHelpers.ts';
 
 const LIDARR_ONLY = ['MP3-320', 'FLAC', 'ALAC 24bit', 'WAV', 'OGG Vorbis Q10'];
@@ -228,6 +229,49 @@ overridesTest('create seed: unknown arrType fails fast and writes nothing', asyn
   );
   const profiles = await qualityProfiles.list(fixture.cache());
   assert(!profiles.some((profile) => profile.name === 'Bad QP'));
+});
+
+/** Invoke the "new quality profile" form action like SvelteKit would; returns the fail() payload or redirect. */
+async function submitNewProfileForm(fixture: PcdFixture, name: string, query: string): Promise<unknown> {
+  const form = new FormData();
+  form.set('name', name);
+  form.set('tags', '[]');
+  form.set('language', '');
+  form.set('layer', 'user');
+  const url = new URL(`http://localhost/quality-profiles/${fixture.databaseId}/new${query}`);
+  const event = {
+    request: new Request(url, { method: 'POST', body: form }),
+    params: { databaseId: String(fixture.databaseId) },
+    url,
+  } as unknown as Parameters<NonNullable<typeof newProfileActions.default>>[0];
+  try {
+    return await newProfileActions.default!(event);
+  } catch (thrown) {
+    return thrown; // redirect(303, ...) on success
+  }
+}
+
+overridesTest('create seed: new-profile form action passes ?arrType=lidarr through to seeding', async (fixture) => {
+  const outcome = (await submitNewProfileForm(fixture, 'Form Lidarr QP', '?arrType=lidarr')) as { status?: number };
+  assertEquals(outcome.status, 303, 'successful create redirects');
+
+  const ladder = await qualityProfiles.qualities(fixture.cache(), fixture.databaseId, 'Form Lidarr QP');
+  const names = ladder.orderedItems.flatMap((item) =>
+    item.type === 'group' ? (item.members ?? []).map((member) => member.name) : [item.name]
+  );
+  assert(names.includes('FLAC'), 'lidarr form create seeds audio qualities');
+  for (const name of VIDEO_ONLY) assert(!names.includes(name), `lidarr form create seeded ${name}`);
+});
+
+overridesTest('create seed: new-profile form action rejects an unknown arrType', async (fixture) => {
+  const outcome = (await submitNewProfileForm(fixture, 'Form Bad QP', '?arrType=readarr')) as {
+    status?: number;
+    data?: { error?: string };
+  };
+  assertEquals(outcome.status, 400);
+  assertEquals(outcome.data?.error, 'Invalid target Arr app');
+  const profiles = await qualityProfiles.list(fixture.cache());
+  assert(!profiles.some((profile) => profile.name === 'Form Bad QP'));
 });
 
 Deno.test('buildSeedItems: collapses single-member groups, drops empty groups, appends extras', () => {
