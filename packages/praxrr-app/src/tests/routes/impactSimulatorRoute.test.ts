@@ -9,10 +9,9 @@
  * `PCDCache.prototype.buildReadOnly` patch). The registered "current" cache and the
  * sandbox are seeded from the SAME SQL so a proposed edit is the only difference.
  *
- * PARSER_PORT is 57130 (the score route test squats 57129 at module top-level; both
- * stubs are alive simultaneously in a full-suite run, so distinct ports avoid EADDRINUSE).
- * Because `deno test` gives each test file its own module graph, this file's `config`
- * singleton reads 57130 independently.
+ * The parser stub binds an OS-assigned port (port 0) and this worker's `config.parserUrl` is
+ * pinned to it before the dynamic imports, so this file never contends with other parser-stub
+ * test files for a port or for the process-global PARSER_* env under `deno test --parallel`.
  */
 
 import { assert, assertEquals, assertRejects } from '@std/assert';
@@ -25,9 +24,14 @@ import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { components } from '$api/v1.d.ts';
 
-Deno.env.set('PARSER_HOST', '127.0.0.1');
-const PARSER_PORT = 57130;
-Deno.env.set('PARSER_PORT', PARSER_PORT.toString());
+// Bind the parser stub to an OS-assigned port (port 0) so parallel test files never contend
+// for a fixed port. `deno test --parallel` runs files as workers in ONE process, so Deno.env is
+// shared and racy across files; pin this worker's own `config.parserUrl` instead of writing
+// PARSER_HOST/PARSER_PORT. Must run before the parser client singleton is first used.
+const parserState = await createParserStub(0);
+const { config } = await import('$config');
+const parserStubUrl = `http://127.0.0.1:${parserState.port}`;
+Object.defineProperty(config, 'parserUrl', { get: () => parserStubUrl, configurable: true });
 
 type SimulateImpactResponse = components['schemas']['SimulateImpactResponse'];
 type ProposedChange = components['schemas']['ProposedChange'];
@@ -35,7 +39,7 @@ type ProposedChange = components['schemas']['ProposedChange'];
 const PCD_SCHEMA_SQL_PATH = new URL('../../../../praxrr-schema/ops/0.schema.sql', import.meta.url);
 const PCD_SCHEMA_SQL = Deno.readTextFileSync(PCD_SCHEMA_SQL_PATH);
 
-// --- dynamic imports (after env is set, so this file's config sees PARSER_PORT=57130) ---
+// --- dynamic imports (after config.parserUrl is pinned to this file's parser stub) ---
 const impactRouteModule = await import('../../routes/api/v1/simulate/impact/+server.ts');
 const parserClientModule = await import('$lib/server/utils/arr/parser/client.ts');
 const { setCache, deleteCache } = await import('$pcd/database/registry.ts');
@@ -97,6 +101,7 @@ async function createParserStub(port: number): Promise<{
   setMatchResponse: (text: string, matches: Record<string, boolean>) => void;
   clearResponses: () => void;
   setForwardBaseUrl: (baseUrl: string | null) => void;
+  port: number;
   close: () => Promise<void>;
 }> {
   const parseResponses = new Map<string, ParseStubResponse>();
@@ -196,6 +201,7 @@ async function createParserStub(port: number): Promise<{
     setForwardBaseUrl: (baseUrl) => {
       forwardBaseUrl = baseUrl;
     },
+    port: server.addr.port,
     close: async () => {
       await server.shutdown();
     },
@@ -329,8 +335,6 @@ function installParserCacheStubs(): RestoreFunction {
     },
   };
 }
-
-const parserState = await createParserStub(PARSER_PORT);
 
 // ============================================================================
 // FIXTURE (registered current cache + sandbox via prototype patch)
