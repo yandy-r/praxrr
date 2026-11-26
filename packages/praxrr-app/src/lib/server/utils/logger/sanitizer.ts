@@ -362,6 +362,64 @@ function sanitizeHeaders(headers: Headers, ancestors: Set<object>, depth: number
   return out;
 }
 
+/** Work on a complete bounded URL so a cut through its authority or query cannot expose a partial value. */
+function sanitizeFetchUrl(input: string): string {
+  if (input === '') return '';
+  if (input.length > MAX_STRING_LENGTH) return TRUNCATED_VALUE;
+
+  const url = URL.parse(input);
+  if (!url) return UNSERIALIZABLE_VALUE;
+  // Opaque URLs (e.g. data:) can contain payloads rather than a network address.
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return REDACTED_VALUE;
+  url.username = '';
+  url.password = '';
+  url.hash = '';
+
+  // Match decoded query names, but preserve the spelling/order of the remaining URL.
+  const query = url.search
+    .slice(1)
+    .split('&')
+    .map((part) => {
+      const equals = part.indexOf('=');
+      if (equals === -1) return part;
+      const name = part.slice(0, equals);
+      const [decodedName] = new URLSearchParams(`${name}=`).keys();
+      return isSensitiveKey(decodedName ?? '') ? `${name}=${REDACTED_VALUE}` : part;
+    });
+  url.search = query.join('&');
+  const href = url.href;
+  return href.length > MAX_STRING_LENGTH ? TRUNCATED_VALUE : sanitizeStringValue(href);
+}
+
+/** Read only standard Fetch metadata; never invoke instance getters, toJSON, or body APIs. */
+function sanitizeFetchMessage(
+  message: Request | Response,
+  prototype: object,
+  fields: readonly string[],
+  ancestors: Set<object>,
+  depth: number
+): Record<string, unknown> {
+  const summary: Record<string, unknown> = {};
+  for (const key of fields) {
+    if (depth + 1 > MAX_DEPTH) {
+      summary[key] = TRUNCATED_VALUE;
+      continue;
+    }
+    const getter = Object.getOwnPropertyDescriptor(prototype, key)?.get;
+    if (!getter) throw new TypeError('Missing Fetch metadata getter');
+    const value = getter.call(message);
+    if (key === 'url') {
+      summary[key] = sanitizeFetchUrl(value as string);
+    } else if (key === 'headers') {
+      // Reuse the Headers sanitizer directly so a custom Headers.toJSON cannot run either.
+      summary[key] = sanitizeHeaders(value as Headers, ancestors, depth + 1);
+    } else {
+      summary[key] = sanitizeNested(value, ancestors, depth + 1);
+    }
+  }
+  return summary;
+}
+
 function sanitizeRecord(value: object, ancestors: Set<object>, depth: number): Record<string, unknown> {
   const sanitizedMeta: Record<string, unknown> = {};
   const record = value as Record<string, unknown>;
@@ -473,6 +531,20 @@ function sanitizeLogMetaInternal(value: unknown, ancestors: Set<object>, depth: 
 
     if (value instanceof Error) {
       return sanitizeError(value, ancestors, depth);
+    }
+
+    if (typeof Request === 'function' && value instanceof Request) {
+      return sanitizeFetchMessage(value, Request.prototype, ['method', 'url', 'headers', 'bodyUsed'], ancestors, depth);
+    }
+
+    if (typeof Response === 'function' && value instanceof Response) {
+      return sanitizeFetchMessage(
+        value,
+        Response.prototype,
+        ['status', 'statusText', 'ok', 'redirected', 'url', 'headers', 'bodyUsed'],
+        ancestors,
+        depth
+      );
     }
 
     let toJSON: unknown;
