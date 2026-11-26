@@ -83,11 +83,15 @@ export:
             schema:
               $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
       '500':
-        description: Database cache not available
+        description: >-
+          Database cache not available, or an unexpected export failure. Unexpected failures return a
+          fixed message with code `export_failed`; raw detail is logged server-side only.
         content:
           application/json:
             schema:
-              $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+              anyOf:
+                - $ref: '../schemas/pcd.yaml#/PcdErrorResponse'
+                - $ref: '../schemas/common.yaml#/InternalErrorResponse'
 
 import:
   post:

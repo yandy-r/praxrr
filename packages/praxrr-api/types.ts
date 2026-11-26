@@ -2578,6 +2578,7 @@ export interface components {
         | 'metadata_profile_request_failed'
         | 'import_failed'
         | 'bundle_import_failed'
+        | 'export_failed'
         | 'trash_guide_request_failed'
         | 'trash_guide_upstream_failed';
     };
@@ -9103,13 +9104,14 @@ export interface operations {
           'application/json': components['schemas']['PcdErrorResponse'];
         };
       };
-      /** @description Database cache not available */
+      /** @description Database cache not available, or an unexpected export failure. Unexpected failures return a fixed message with code `export_failed`; raw detail is logged server-side only. */
       500: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['PcdErrorResponse'];
+          'application/json':
+            components['schemas']['PcdErrorResponse'] | components['schemas']['InternalErrorResponse'];
         };
       };
     };
