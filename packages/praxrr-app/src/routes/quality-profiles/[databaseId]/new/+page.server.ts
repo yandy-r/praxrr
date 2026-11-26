@@ -5,6 +5,7 @@ import { canWriteToBase } from '$pcd/index.ts';
 import * as qualityProfileQueries from '$pcd/entities/qualityProfiles/index.ts';
 import { getRadarrLanguages } from '$lib/server/sync/mappings.ts';
 import { parseOperationLayer } from '$pcd/index.ts';
+import { ARR_APP_TYPES, type ArrAppType } from '$shared/arr/capabilities.ts';
 
 export const load: ServerLoad = ({ params }) => {
   const { databaseId } = params;
@@ -34,7 +35,7 @@ export const load: ServerLoad = ({ params }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, params }) => {
+  default: async ({ request, params, url }) => {
     const { databaseId } = params;
 
     if (!databaseId) {
@@ -64,6 +65,14 @@ export const actions: Actions = {
       return fail(400, { error: layerResult.error });
     }
     const layer = layerResult.value;
+
+    // Target Arr app for the seeded quality ladder (`?arrType=` on the action URL, set by the page's
+    // selector); empty infers Radarr + Sonarr (video).
+    const arrTypeRaw = (url.searchParams.get('arrType') ?? '').trim();
+    if (arrTypeRaw && !(ARR_APP_TYPES as readonly string[]).includes(arrTypeRaw)) {
+      return fail(400, { error: 'Invalid target Arr app' });
+    }
+    const arrType = arrTypeRaw ? (arrTypeRaw as ArrAppType) : undefined;
 
     // Validate
     if (!name?.trim()) {
@@ -96,6 +105,7 @@ export const actions: Actions = {
           description: description?.trim() || null,
           tags,
           language,
+          arrType,
         },
       });
     } catch (err) {
