@@ -54,6 +54,7 @@ InternalErrorResponse:
         - metadata_profile_request_failed
         - import_failed
         - bundle_import_failed
+        - export_failed
         - trash_guide_request_failed
         - trash_guide_upstream_failed
       description: Stable machine-readable code for the server-side failure.
