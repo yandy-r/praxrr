@@ -2,7 +2,7 @@ import { config } from '$config';
 import { createArrClient } from '$arr/factory.ts';
 import { logger } from '$logger/logger.ts';
 import { parseOptionalAbsoluteHttpUrl } from '$utils/validation/url.ts';
-import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
+import { arrInstancesQueries, type ArrInstance } from '$db/queries/arrInstances.ts';
 import { ARR_APP_TYPES, type ArrAppType } from '$shared/pcd/types.ts';
 import {
   deriveArrInstanceApiKeyFingerprint,
@@ -240,23 +240,59 @@ function defaultName(type: ArrAppType, index: number): string {
   return index === 1 ? APP_LABELS[type] : `${APP_LABELS[type]} ${index}`;
 }
 
+type EnvDescriptorSelection =
+  | { status: 'selected'; apiKeyFingerprint: string; existing: ArrInstance | undefined }
+  | { status: 'duplicate' | 'uiConflict' | 'fingerprintError' };
+
+async function selectEnvDescriptor(
+  descriptor: ParsedEnvInstanceDescriptor,
+  seenApiKeyFingerprints: Set<string>
+): Promise<EnvDescriptorSelection> {
+  let apiKeyFingerprint: string;
+  try {
+    apiKeyFingerprint = (await deriveArrInstanceApiKeyFingerprint(descriptor.apiKey)).value;
+  } catch {
+    return { status: 'fingerprintError' };
+  }
+
+  if (seenApiKeyFingerprints.has(apiKeyFingerprint)) {
+    return { status: 'duplicate' };
+  }
+  // The first descriptor reserves the fingerprint even if it conflicts with a UI instance.
+  seenApiKeyFingerprints.add(apiKeyFingerprint);
+
+  if (arrInstancesQueries.getBySourceAndName('ui', descriptor.name) !== undefined) {
+    return { status: 'uiConflict' };
+  }
+
+  const existing = arrInstancesQueries.getByApiKey(apiKeyFingerprint);
+  if (existing && existing.source !== 'env') {
+    return { status: 'uiConflict' };
+  }
+
+  return { status: 'selected', apiKeyFingerprint, existing };
+}
+
 /**
- * Whether an env-sourced instance is still declared by the current `*_INSTANCE_*` variables,
- * matched the same way reconciliation does (API-key fingerprint, then name). A declared instance
- * would be re-created on restart, so it must not be deleted. Fails closed: any parse or
- * fingerprint error reports the instance as declared.
+ * Whether an env-sourced instance still matches a declaration selected by reconciliation.
+ * Selected descriptors can match by fingerprint or name. If declarations cannot be evaluated,
+ * report the instance as declared to avoid deleting a row that may still be managed by env.
  */
 export async function isEnvInstanceDeclared(instance: {
   name: string;
   api_key_fingerprint: string | null;
 }): Promise<boolean> {
   try {
+    const seenApiKeyFingerprints = new Set<string>();
     for (const descriptor of parseArrInstanceEnvVars()) {
-      if (descriptor.name === instance.name) {
+      const selection = await selectEnvDescriptor(descriptor, seenApiKeyFingerprints);
+      if (selection.status === 'fingerprintError') {
         return true;
       }
-      const fingerprint = (await deriveArrInstanceApiKeyFingerprint(descriptor.apiKey)).value;
-      if (fingerprint === instance.api_key_fingerprint) {
+      if (
+        selection.status === 'selected' &&
+        (selection.apiKeyFingerprint === instance.api_key_fingerprint || descriptor.name === instance.name)
+      ) {
         return true;
       }
     }
@@ -351,19 +387,18 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
   const activeApiKeyFingerprints = new Set<string>();
 
   for (const descriptor of parsed) {
-    let apiKeyFingerprint: string;
-    try {
-      apiKeyFingerprint = (await deriveArrInstanceApiKeyFingerprint(descriptor.apiKey)).value;
-    } catch {
-      metrics.errors += 1;
+    const selection = await selectEnvDescriptor(descriptor, seenApiKeyFingerprints);
+    if (selection.status !== 'selected') {
+      if (selection.status === 'duplicate') {
+        metrics.skippedDuplicateEnvKey += 1;
+      } else if (selection.status === 'uiConflict') {
+        metrics.skippedConflictUi += 1;
+      } else {
+        metrics.errors += 1;
+      }
       continue;
     }
-
-    if (seenApiKeyFingerprints.has(apiKeyFingerprint)) {
-      metrics.skippedDuplicateEnvKey += 1;
-      continue;
-    }
-    seenApiKeyFingerprints.add(apiKeyFingerprint);
+    const { apiKeyFingerprint, existing } = selection;
 
     const encryptedApiKey = await encryptArrInstanceApiKey(descriptor.apiKey);
     const encryptedApiKeyPayload = {
@@ -372,18 +407,6 @@ export async function reconcileEnvInstances(): Promise<ReconcileEnvInstancesResu
       keyVersion: encryptedApiKey.credential.keyVersion,
       fingerprint: encryptedApiKey.fingerprint.value,
     };
-
-    const sourceConflict = arrInstancesQueries.getBySourceAndName('ui', descriptor.name) !== undefined;
-    if (sourceConflict) {
-      metrics.skippedConflictUi += 1;
-      continue;
-    }
-
-    const existing = arrInstancesQueries.getByApiKey(apiKeyFingerprint);
-    if (existing && existing.source !== 'env') {
-      metrics.skippedConflictUi += 1;
-      continue;
-    }
 
     const existingByName = !existing ? arrInstancesQueries.getBySourceAndName('env', descriptor.name) : undefined;
 
