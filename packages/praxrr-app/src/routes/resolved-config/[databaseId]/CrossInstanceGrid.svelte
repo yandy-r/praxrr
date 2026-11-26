@@ -4,7 +4,7 @@
   import Badge from '$ui/badge/Badge.svelte';
   import Table from '$ui/table/Table.svelte';
   import type { Column } from '$ui/table/types';
-  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
+  import { FIELD_META, formatFieldChangeValue } from '$ui/resolved/fieldChangeDisplay.ts';
   import { COMPARE_MAX_INSTANCES } from '$shared/resolvedConfig.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
@@ -39,7 +39,7 @@
   }
 
   type GridCell =
-    | { kind: 'match'; value: unknown }
+    | { kind: 'match'; baselineType: FieldChangeType; value: unknown }
     | { kind: 'diff'; type: FieldChangeType; value: unknown }
     | { kind: 'unavailable'; reason: string };
 
@@ -158,15 +158,15 @@
 
   function buildRows(data: CrossInstanceComparisonResponse): GridRow[] {
     const fieldOrder: string[] = [];
-    const baselineValueByField = new Map<string, unknown>();
+    const baselineByField = new Map<string, { type: FieldChangeType; value: unknown }>();
     const fieldChangesByInstance = new Map<number, Map<string, FieldChange>>();
 
     for (const diffRow of data.diffs) {
       const change = diffRow.changes[0];
       const fieldsMap = new Map<string, FieldChange>();
       for (const fieldChange of change?.fields ?? []) {
-        if (!baselineValueByField.has(fieldChange.field)) {
-          baselineValueByField.set(fieldChange.field, fieldChange.current);
+        if (!baselineByField.has(fieldChange.field)) {
+          baselineByField.set(fieldChange.field, { type: fieldChange.type, value: fieldChange.current });
         }
         if (!fieldOrder.includes(fieldChange.field)) {
           fieldOrder.push(fieldChange.field);
@@ -184,10 +184,11 @@
           cells[instance.instanceId] = { kind: 'unavailable', reason: reasonLabel(instance.error) };
           continue;
         }
+        const baseline = baselineByField.get(field);
         const fieldChange = instanceFields.get(field);
         cells[instance.instanceId] = fieldChange
           ? { kind: 'diff', type: fieldChange.type, value: fieldChange.desired }
-          : { kind: 'match', value: baselineValueByField.get(field) };
+          : { kind: 'match', baselineType: baseline?.type ?? 'changed', value: baseline?.value };
       }
       return { field, cells };
     });
@@ -406,7 +407,7 @@
                 <div
                   class="max-w-xs overflow-x-auto font-mono text-xs whitespace-pre-wrap text-neutral-700 dark:text-neutral-200"
                 >
-                  {formatFieldValue(cell.value)}
+                  {formatFieldChangeValue(cell.type, 'desired', cell.value)}
                 </div>
               </div>
             {:else if cell.kind === 'match'}
@@ -420,7 +421,7 @@
                 <div
                   class="max-w-xs overflow-x-auto font-mono text-xs whitespace-pre-wrap text-neutral-700 dark:text-neutral-200"
                 >
-                  {formatFieldValue(cell.value)}
+                  {formatFieldChangeValue(cell.baselineType, 'current', cell.value)}
                 </div>
               </div>
             {:else}

@@ -5,6 +5,11 @@
   import Badge from '$ui/badge/Badge.svelte';
   import Modal from '$ui/modal/Modal.svelte';
   import { SYNC_HISTORY_STATUS_LABEL, syncHistoryStatusVariant } from '$ui/sync-history/syncHistoryStatus.ts';
+  import {
+    MISSING_FIELD_VALUE,
+    isMissingFieldChangeSide,
+    type FieldChangeSide,
+  } from '$ui/resolved/fieldChangeDisplay.ts';
   import type { GeneratePreviewResult } from '$sync/preview/orchestrator.ts';
   import type { EntityChange, SyncPreviewSummary } from '$sync/preview/types.ts';
   import type { CanaryRolloutStatus } from '$sync/canary/types.ts';
@@ -161,8 +166,16 @@
     return 'neutral';
   }
 
+  // The missing side of an added/removed field (explicit `null` or an absent key on older
+  // stored rows) renders as the shared placeholder; a real `null` on a changed row stays `null`.
+  function formatSide(field: EntityChange['fields'][number], side: FieldChangeSide): string {
+    const value = field[side];
+    return isMissingFieldChangeSide(field.type, side, value) ? MISSING_FIELD_VALUE : formatValue(value);
+  }
+
   function formatValue(value: unknown): string {
-    if (value === undefined || value === null) return '—';
+    if (value === undefined) return MISSING_FIELD_VALUE;
+    if (value === null) return 'null';
     if (typeof value === 'string') return value;
     try {
       return JSON.stringify(value);
@@ -400,7 +413,7 @@
                                 <div>
                                   <dt class="font-medium">{field.field}</dt>
                                   <dd class="mt-0.5 break-all text-neutral-600 dark:text-neutral-400">
-                                    {formatValue(field.current)} → {formatValue(field.desired)}
+                                    {formatSide(field, 'current')} → {formatSide(field, 'desired')}
                                   </dd>
                                 </div>
                               {/each}

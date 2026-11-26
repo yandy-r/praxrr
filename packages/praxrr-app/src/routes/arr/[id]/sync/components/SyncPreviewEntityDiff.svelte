@@ -1,5 +1,6 @@
 <script lang="ts">
   import NarrationBlock from '$ui/narration/NarrationBlock.svelte';
+  import { formatFieldChangeValue } from '$ui/resolved/fieldChangeDisplay.ts';
   import { narrateEntityChange } from '$shared/narration/index.ts';
   import type { NarrationLevel } from '$shared/narration/index.ts';
   import type {
@@ -95,19 +96,6 @@
   $: entityMeta = `${entity.entityType}${entity.remoteId ? ` (id: ${entity.remoteId})` : ''}`;
   $: summaryText = entity.fields.length === 1 ? '1 field change' : `${entity.fields.length} field changes`;
 
-  function formatValue(value: unknown): string {
-    if (value === undefined) {
-      return 'undefined';
-    }
-    if (value === null) {
-      return 'null';
-    }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-    return JSON.stringify(value, null, 2);
-  }
-
   function toggle() {
     expanded = !expanded;
   }
@@ -184,12 +172,12 @@
                   <td class="py-2 align-top">
                     <pre
                       class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
-{formatValue(fieldChange.current)}</pre>
+{formatFieldChangeValue(fieldChange.type, 'current', fieldChange.current)}</pre>
                   </td>
                   <td class="py-2 align-top">
                     <pre
                       class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
-{formatValue(fieldChange.desired)}</pre>
+{formatFieldChangeValue(fieldChange.type, 'desired', fieldChange.desired)}</pre>
                   </td>
                 </tr>
               {/each}
