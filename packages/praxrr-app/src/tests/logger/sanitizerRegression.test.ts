@@ -793,3 +793,171 @@ Deno.test('Logger writes sanitized Map, Set, and Headers metadata to the log fil
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test('sanitizeLogMeta summarizes Request without accessing its body or custom hooks', async () => {
+  let pulls = 0;
+  const payload = 'request body fixture';
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode(payload));
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 }
+  );
+  const request = new Request('https://example.test/items?token=fixture-one&%74oken=fixture-two&page=2#omit', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer fixture-auth',
+      'X-Api-Key': 'fixture-key',
+      Cookie: 'sid=fixture-cookie',
+      'X-Request-Id': 'req-123',
+    },
+    body: stream,
+  });
+  const accessed: string[] = [];
+  const shadowed = ['body', 'clone', 'text', 'json', 'toJSON', 'headers', 'url', 'bodyUsed'];
+  for (const key of shadowed) {
+    Object.defineProperty(request, key, {
+      configurable: true,
+      enumerable: true,
+      get() {
+        accessed.push(key);
+        throw new Error('custom property must not run');
+      },
+    });
+  }
+
+  const summary = {
+    method: 'POST',
+    url: 'https://example.test/items?token=[REDACTED]&%74oken=[REDACTED]&page=2',
+    headers: {
+      authorization: '[REDACTED]',
+      'x-api-key': '[REDACTED]',
+      cookie: '[REDACTED]',
+      'x-request-id': 'req-123',
+    },
+    bodyUsed: false,
+  };
+  assertEquals(sanitizeLogMeta({ request, shared: request }), { request: summary, shared: summary });
+  await Promise.resolve();
+  assertEquals(accessed, []);
+  assertEquals(pulls, 0);
+  assertEquals(stream.locked, false);
+  // Remove the shadowed getters before normal application code consumes the original body.
+  for (const key of shadowed) Reflect.deleteProperty(request, key);
+  assertEquals(await request.text(), payload);
+  assertEquals(sanitizeLogMeta(request), { ...summary, bodyUsed: true });
+});
+
+Deno.test('sanitizeLogMeta summarizes Response with its original stream intact', async () => {
+  let pulls = 0;
+  const payload = 'response body fixture';
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls++;
+        controller.enqueue(new TextEncoder().encode(payload));
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 }
+  );
+  const response = new Response(stream, {
+    status: 202,
+    statusText: 'Accepted',
+    headers: [
+      ['Set-Cookie', 'sid=fixture-cookie'],
+      ['Set-Cookie', ''],
+      ['Content-Type', 'text/plain'],
+    ],
+  });
+  const summary = {
+    status: 202,
+    statusText: 'Accepted',
+    ok: true,
+    redirected: false,
+    url: '',
+    headers: { 'set-cookie': '[REDACTED]', 'content-type': 'text/plain' },
+    bodyUsed: false,
+  };
+  assertEquals(sanitizeLogMeta(response), summary);
+  await Promise.resolve();
+  assertEquals(pulls, 0);
+  assertEquals(stream.locked, false);
+  assertEquals(await response.text(), payload);
+  assertEquals(sanitizeLogMeta(response), { ...summary, bodyUsed: true });
+});
+
+Deno.test('sanitizeLogMeta removes userinfo from Fetch URLs and sanitizes redirected Response URLs', async () => {
+  // Some Fetch implementations refuse URLs with userinfo at construction time; Deno accepts them.
+  const request = new Request('https://:fixture-userinfo@example.test/path?access_token=fixture-value');
+  assertEquals((sanitizeLogMeta(request) as { url: string }).url, 'https://example.test/path?access_token=[REDACTED]');
+
+  const server = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen() {} }, (request) => {
+    if (new URL(request.url).pathname === '/start') {
+      return Response.redirect(new URL('/end?token=fixture-value&page=2', request.url));
+    }
+    return new Response('fixture');
+  });
+  try {
+    const base = `http://127.0.0.1:${server.addr.port}`;
+    const response = await fetch(`${base}/start`);
+    assertEquals(sanitizeLogMeta(response), {
+      status: 200,
+      statusText: 'OK',
+      ok: true,
+      redirected: true,
+      url: `${base}/end?token=[REDACTED]&page=2`,
+      headers: sanitizeLogMeta(response.headers),
+      bodyUsed: false,
+    });
+    assertEquals(await response.text(), 'fixture');
+  } finally {
+    await server.shutdown();
+  }
+});
+
+Deno.test('sanitizeLogMeta keeps Fetch summaries bounded and non-throwing', () => {
+  const headers = new Headers({ 'x-0000': 'x '.repeat(5000) });
+  for (let i = 1; i <= 1000; i++) headers.set(`x-${String(i).padStart(4, '0')}`, 'ok');
+  const response = new Response(null, { headers });
+  const request = new Request(`https://example.test/${'x'.repeat(9000)}`);
+  const opaque = new Request('data:text/plain,fixture');
+  assertEquals((sanitizeLogMeta(opaque) as { url: string }).url, '[REDACTED]');
+  const sanitized = sanitizeLogMeta({ request, response }) as {
+    request: { url: string };
+    response: { headers: Record<string, string | boolean> };
+  };
+  assertEquals(sanitized.request.url, '[Truncated]');
+  const capped = sanitized.response.headers;
+  assertEquals(Object.keys(capped).length, 1001);
+  assertEquals(capped['[Truncated]'], true);
+  assertEquals(capped['x-1000'], undefined);
+  const longHeader = capped['x-0000'];
+  assert(typeof longHeader === 'string' && longHeader.endsWith('…[Truncated]'));
+  assert(longHeader.length < 9000);
+
+  let deep: unknown = { request, response };
+  for (let i = 0; i < 31; i++) deep = { next: deep };
+  const unwrap = (value: unknown, levels: number) => {
+    for (let i = 0; i < levels; i++) value = (value as { next: unknown }).next;
+    return value;
+  };
+  assertEquals((unwrap(sanitizeLogMeta(deep), 31) as { request: unknown }).request, {
+    method: '[Truncated]',
+    url: '[Truncated]',
+    headers: '[Truncated]',
+    bodyUsed: '[Truncated]',
+  });
+  assertEquals(unwrap(sanitizeLogMeta({ next: deep }), 32), { request: '[Truncated]', response: '[Truncated]' });
+
+  const revoked = Proxy.revocable(response, {});
+  revoked.revoke();
+  assertEquals(
+    sanitizeLogMeta({ request: Object.create(Request.prototype), response: revoked.proxy, sibling: 'kept' }),
+    { request: '[Unserializable]', response: '[Unserializable]', sibling: 'kept' }
+  );
+});
