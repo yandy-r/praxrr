@@ -24,11 +24,26 @@ import type { PCDDatabase } from '$shared/pcd/types.ts';
 import type { DatabaseInstance } from '$db/queries/databaseInstances.ts';
 import type { components } from '$api/v1.d.ts';
 
+// Fixed ports that parser tests bind concurrently under `--parallel`: the Go parsers in the
+// route tests (58129-58131), plus the fixed-port stubs in simulateScoreRoute (57129) and the
+// server parser tests (57241, 57263). An OS-assigned stub port must never squat on one, or a Go
+// parser's /health probe could reach a stub and the stub would forward to itself.
+const RESERVED_PARSER_PORTS = new Set([57129, 57241, 57263, 58129, 58130, 58131]);
+
+async function createUnreservedParserStub(): ReturnType<typeof createParserStub> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const stub = await createParserStub(0);
+    if (!RESERVED_PARSER_PORTS.has(stub.port)) return stub;
+    await stub.close();
+  }
+  throw new Error('Could not bind the parser stub to an unreserved port');
+}
+
 // Bind the parser stub to an OS-assigned port (port 0) so parallel test files never contend
 // for a fixed port. `deno test --parallel` runs files as workers in ONE process, so Deno.env is
 // shared and racy across files; pin this worker's own `config.parserUrl` instead of writing
 // PARSER_HOST/PARSER_PORT. Must run before the parser client singleton is first used.
-const parserState = await createParserStub(0);
+const parserState = await createUnreservedParserStub();
 const { config } = await import('$config');
 const parserStubUrl = `http://127.0.0.1:${parserState.port}`;
 Object.defineProperty(config, 'parserUrl', { get: () => parserStubUrl, configurable: true });
