@@ -558,6 +558,14 @@ GoalApplyFailure:
   properties:
     message:
       type: string
+      description: >-
+        Human-readable failure text. For internal (5xx) failures this is a fixed, user-safe message and
+        `code` is set; raw detail is logged server-side only.
+    code:
+      type: string
+      enum:
+        - goal_apply_failed
+      description: Stable machine-readable code present on internal (5xx) failures.
     applyStatus:
       $ref: '#/GoalApplyStatus'
 

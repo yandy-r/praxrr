@@ -92,3 +92,5 @@ tasks/todo.md
 
 # graphify knowledge-graph output (large, machine-local, regenerated via `graphify update .`)
 graphify-out/
+.playwright-mcp
+opencode.json

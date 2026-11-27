@@ -1,6 +1,7 @@
 import { db } from '$db/db.ts';
 import { userInterfacePreferencesQueries } from '$db/queries/user_interface_preferences.ts';
 import { json } from '@sveltejs/kit';
+import { internalErrorResponse } from '$http/internalError.ts';
 import type { RequestHandler } from '@sveltejs/kit';
 import type { UserInterfacePreference } from '$db/queries/user_interface_preferences.ts';
 import { type SectionKey, type UiPreferenceMode } from '$shared/disclosure/sectionKeys.ts';
@@ -14,6 +15,10 @@ import {
 type ErrorResponse = {
   error: string;
 };
+
+const LOG_SOURCE = 'ui-preferences';
+const READ_FAILED_MESSAGE = 'Failed to read preference. Check the server logs for details.';
+const SAVE_FAILED_MESSAGE = 'Unable to save preference. Check the server logs for details.';
 
 type UiMode = UiPreferenceMode;
 
@@ -50,7 +55,13 @@ export const GET: RequestHandler = async ({ locals, url }) => {
   try {
     preference = userInterfacePreferencesQueries.getByUserIdAndSectionKey(locals.user.id, sectionKey);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : 'Failed to read preference' }, { status: 500 });
+    return await internalErrorResponse(error, {
+      message: READ_FAILED_MESSAGE,
+      code: 'preference_read_failed',
+      source: LOG_SOURCE,
+      logMessage: 'Failed to read UI preference',
+      meta: { userId: locals.user.id, sectionKey },
+    });
   }
 
   if (!preference) {
@@ -101,10 +112,13 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
   try {
     existing = userInterfacePreferencesQueries.getByUserIdAndSectionKey(locals.user.id, sectionKey);
   } catch (error) {
-    return json(
-      { error: error instanceof Error ? error.message : 'Failed to load current preference' },
-      { status: 500 }
-    );
+    return await internalErrorResponse(error, {
+      message: READ_FAILED_MESSAGE,
+      code: 'preference_read_failed',
+      source: LOG_SOURCE,
+      logMessage: 'Failed to load current UI preference',
+      meta: { userId: locals.user.id, sectionKey },
+    });
   }
 
   try {
@@ -140,10 +154,16 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
       return json({ error: 'Preference updated concurrently' }, { status: 409 });
     }
 
-    return json({ error: error instanceof Error ? error.message : 'Unable to save preference' }, { status: 500 });
+    return await internalErrorResponse(error, {
+      message: SAVE_FAILED_MESSAGE,
+      code: 'preference_save_failed',
+      source: LOG_SOURCE,
+      logMessage: 'Unable to save UI preference',
+      meta: { userId: locals.user.id, sectionKey, mode },
+    });
   }
 
-  return json({ error: 'Preference update failed' }, { status: 500 });
+  return json({ error: 'Preference update failed', code: 'preference_save_failed' }, { status: 500 });
 };
 
 function parseMode(raw: unknown): UiMode {

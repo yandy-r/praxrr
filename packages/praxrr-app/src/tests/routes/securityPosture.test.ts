@@ -480,7 +480,7 @@ migratedTest('buildPostureInputs accepts https and loopback http OIDC endpoints'
 
 migratedTest('buildPostureInputs discovers insecure endpoints without a prior sign-in', async () => {
   const discoveryUrl = 'https://idp.example.com/.well-known/openid-configuration';
-  const cases: Array<[string, Record<string, unknown>, OidcEndpointKind[]]> = [
+  const cases: Array<[string, Record<string, unknown>, readonly OidcEndpointKind[]]> = [
     ['token', { token_endpoint: 'http://idp.example.com/token' }, ['token']],
     ['jwks', { jwks_uri: 'http://idp.example.com/jwks' }, ['jwks']],
     ['authorization', { authorization_endpoint: 'http://idp.example.com/authorize' }, ['authorization']],

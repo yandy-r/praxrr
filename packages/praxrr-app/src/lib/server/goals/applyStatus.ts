@@ -9,6 +9,7 @@
 
 import type { components } from '$api/v1.d.ts';
 import type { QualityGoalApplyJournalRow } from '$db/queries/qualityGoalApplyJournal.ts';
+import { logger } from '$logger/logger.ts';
 
 type GoalApplyStatus = components['schemas']['GoalApplyStatus'];
 type GoalApplyFailure = components['schemas']['GoalApplyFailure'];
@@ -58,9 +59,30 @@ export function buildApplyStatus(fields: ApplyStatusFields): GoalApplyStatus {
   };
 }
 
+/**
+ * Fixed, user-safe text for an internal (5xx) apply/reconcile failure. Raw exception text can embed
+ * SQL or file paths, so it is logged server-side only and never returned or journaled.
+ */
+export const GOAL_APPLY_FAILED_MESSAGE = 'Goal apply failed. Check the server logs for details.';
+export const GOAL_APPLY_FAILED_CODE = 'goal_apply_failed' as const;
+
+/** Log an internal apply/reconcile failure through the sanitizing logger and return the fixed message. */
+export async function logGoalApplyInternalFailure(
+  rawError: unknown,
+  context: { origin: 'apply' | 'reconcile'; applyId: number; failureStage: 'scoring' | 'binding' }
+): Promise<string> {
+  await logger.error('Quality goal apply failed', {
+    source: 'QualityGoals',
+    meta: { ...context, error: rawError },
+  });
+  return GOAL_APPLY_FAILED_MESSAGE;
+}
+
 export interface ApplyFailureFields {
   applyId: number;
   message: string;
+  /** Stable code; set for internal (5xx) failures whose message is the fixed {@link GOAL_APPLY_FAILED_MESSAGE}. */
+  code?: typeof GOAL_APPLY_FAILED_CODE;
   /** Whether scoring reached (or may have reached) its intended terminal state before the failure. */
   scoringChanged: boolean;
   failureStage: 'scoring' | 'binding';
@@ -72,6 +94,7 @@ export interface ApplyFailureFields {
 export function buildApplyFailure(fields: ApplyFailureFields): GoalApplyFailure {
   return {
     message: fields.message,
+    ...(fields.code ? { code: fields.code } : {}),
     applyStatus: buildApplyStatus({
       applyId: fields.applyId,
       status: 'failed',

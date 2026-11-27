@@ -12,7 +12,7 @@ import { TrashGuideTransformError } from '$lib/server/trashguide/transformer.ts'
 import {
   logTrashGuideRouteError,
   parseOptionalNonEmptyString,
-  toErrorMessage,
+  toErrorBody,
   validateRepositoryUrl,
 } from './_helpers.ts';
 
@@ -70,7 +70,7 @@ export const POST: RequestHandler = async ({ request }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, 'Failed to create TRaSH source');
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 };
 

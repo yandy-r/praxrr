@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { importEntityWithRollback } from '$pcd/bundles/index.ts';
+import { importEntityWithRollback, type BundleImportReport } from '$pcd/bundles/index.ts';
 import {
   BundleImportFailedError,
   BundleInvalidError,
@@ -71,6 +71,30 @@ export const _importDependencies = {
 };
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
+
+// Fixed 5xx messages: raw import errors can embed SQL, file paths or compile output, so detail
+// stays in the server log and the client gets a stable `code` instead.
+const IMPORT_FAILED_MESSAGE = 'Import failed. Check the server logs for details.';
+const BUNDLE_IMPORT_FAILED_MESSAGE = 'Bundle import failed. Check the server logs for details.';
+const BUNDLE_IMPORT_ROLLED_BACK_MESSAGE =
+  'Bundle import failed and was rolled back; nothing was written. Check the server logs for details.';
+const BUNDLE_IMPORT_INCOMPLETE_MESSAGE =
+  'Bundle import failed and the rollback did not complete. Check the server logs for details.';
+const BUNDLE_ENTITY_FAILED_REASON = 'Import failed for this entity. Check the server logs for details.';
+
+/**
+ * A mid-apply failure report carries the raw exception text as each failed entity's reason; keep
+ * which entities failed but replace the reason with a fixed one (the raw cause is already logged).
+ */
+function redactFailedBundleReport(report: BundleImportReport): BundleImportReport {
+  return {
+    ...report,
+    errors: report.errors.map((entry) => ({ ...entry, error: BUNDLE_ENTITY_FAILED_REASON })),
+    outcomes: report.outcomes.map((outcome) =>
+      outcome.error === undefined ? outcome : { ...outcome, error: BUNDLE_ENTITY_FAILED_REASON }
+    ),
+  };
+}
 
 /** Concatenate streamed body chunks into one Uint8Array of exactly `length` bytes. */
 function concatChunks(chunks: readonly Uint8Array[], length: number): Uint8Array {
@@ -181,7 +205,7 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   if (!pcdManager.getCache(databaseId as number)) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
+    return json({ error: 'Database cache not available', code: 'import_failed' }, { status: 500 });
   }
 
   try {
@@ -210,8 +234,10 @@ export const POST: RequestHandler = async ({ request }) => {
           error: errorMessage,
         },
       });
-      const status = isValidationError(errorMessage) ? 400 : 500;
-      return json({ error: errorMessage }, { status });
+      if (isValidationError(errorMessage)) {
+        return json({ error: errorMessage }, { status: 400 });
+      }
+      return json({ error: IMPORT_FAILED_MESSAGE, code: 'import_failed' }, { status: 500 });
     }
 
     return json({ success: true });
@@ -226,8 +252,10 @@ export const POST: RequestHandler = async ({ request }) => {
         error: message,
       },
     });
-    const status = isValidationError(err) ? 400 : 500;
-    return json({ error: message }, { status });
+    if (isValidationError(err)) {
+      return json({ error: message }, { status: 400 });
+    }
+    return json({ error: IMPORT_FAILED_MESSAGE, code: 'import_failed' }, { status: 500 });
   }
 };
 
@@ -276,7 +304,7 @@ async function handleBundleImport(body: Record<string, unknown>): Promise<Respon
   }
 
   if (!pcdManager.getCache(databaseId)) {
-    return json({ error: 'Database cache not available' }, { status: 500 });
+    return json({ error: 'Database cache not available', code: 'import_failed' }, { status: 500 });
   }
 
   const isDryRun = dryRun === true;
@@ -306,7 +334,12 @@ async function handleBundleImport(body: Record<string, unknown>): Promise<Respon
         meta: { databaseId, layer: parsedLayer, error: err.message },
       });
       return json(
-        { error: err.message, report: err.report, rolledBack: err.report.rolledBack === true },
+        {
+          error: err.report.rolledBack === true ? BUNDLE_IMPORT_ROLLED_BACK_MESSAGE : BUNDLE_IMPORT_INCOMPLETE_MESSAGE,
+          code: 'bundle_import_failed',
+          report: redactFailedBundleReport(err.report),
+          rolledBack: err.report.rolledBack === true,
+        },
         { status: 500 }
       );
     }
@@ -321,7 +354,10 @@ async function handleBundleImport(body: Record<string, unknown>): Promise<Respon
       source: 'PCDImport',
       meta: { databaseId, layer: parsedLayer, error: message },
     });
-    return json({ error: message }, { status: isValidationError(err) ? 400 : 500 });
+    if (isValidationError(err)) {
+      return json({ error: message }, { status: 400 });
+    }
+    return json({ error: BUNDLE_IMPORT_FAILED_MESSAGE, code: 'bundle_import_failed' }, { status: 500 });
   }
 }
 

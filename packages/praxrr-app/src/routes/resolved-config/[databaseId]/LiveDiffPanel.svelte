@@ -2,7 +2,7 @@
   import { CheckCircle2, RefreshCw, XCircle } from 'lucide-svelte';
   import type { components } from '$api/v1.d.ts';
   import Badge from '$ui/badge/Badge.svelte';
-  import { FIELD_META, formatFieldValue } from '$ui/resolved/fieldChangeDisplay.ts';
+  import { FIELD_META, formatFieldChangeValue } from '$ui/resolved/fieldChangeDisplay.ts';
 
   type ResolvedEntityType = components['schemas']['ResolvedEntityState']['entityType'];
   type ArrAppType = components['schemas']['ResolvedInstanceState']['arrType'];
@@ -265,13 +265,17 @@
                 </td>
                 <td class="px-4 py-2 align-top">
                   <pre
-                    class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                    class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldChangeValue(
+                      fieldChange.type,
+                      'current',
                       fieldChange.current
                     )}</pre>
                 </td>
                 <td class="px-4 py-2 align-top">
                   <pre
-                    class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldValue(
+                    class="max-w-xs overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-2 text-xs whitespace-pre-wrap text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{formatFieldChangeValue(
+                      fieldChange.type,
+                      'desired',
                       fieldChange.desired
                     )}</pre>
                 </td>

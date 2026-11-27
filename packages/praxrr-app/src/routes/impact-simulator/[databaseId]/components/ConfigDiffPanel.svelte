@@ -2,6 +2,11 @@
   import { ArrowRight, GitCompare } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import type { components } from '$api/v1.d.ts';
+  import {
+    MISSING_FIELD_VALUE,
+    isMissingFieldChangeSide,
+    type FieldChangeSide,
+  } from '$ui/resolved/fieldChangeDisplay.ts';
 
   type EntityConfigDiff = components['schemas']['EntityConfigDiff'];
   type FieldChange = components['schemas']['FieldChange'];
@@ -10,10 +15,13 @@
 
   $: entriesWithChanges = configDiff.filter((entry) => entry.changes.length > 0);
 
-  function formatValue(value: FieldChange['current']): string {
-    if (value === null || value === undefined) {
-      return '—';
-    }
+  // The missing side of an added/removed field renders as the shared placeholder; a real `null`
+  // on a changed row stays `null`.
+  function formatSide(change: FieldChange, side: FieldChangeSide): string {
+    const value: unknown = change[side];
+    if (isMissingFieldChangeSide(change.type, side, value)) return MISSING_FIELD_VALUE;
+    if (value === undefined) return MISSING_FIELD_VALUE;
+    if (value === null) return 'null';
 
     if (typeof value === 'object') {
       return JSON.stringify(value);
@@ -46,9 +54,9 @@
                   {change.field}
                 </span>
                 <span class="flex items-center gap-1.5 justify-self-center text-neutral-500 dark:text-neutral-400">
-                  <span class="font-mono text-red-600 dark:text-red-400">{formatValue(change.current)}</span>
+                  <span class="font-mono text-red-600 dark:text-red-400">{formatSide(change, 'current')}</span>
                   <ArrowRight size={12} />
-                  <span class="font-mono text-emerald-600 dark:text-emerald-400">{formatValue(change.desired)}</span>
+                  <span class="font-mono text-emerald-600 dark:text-emerald-400">{formatSide(change, 'desired')}</span>
                 </span>
                 <span></span>
               </div>

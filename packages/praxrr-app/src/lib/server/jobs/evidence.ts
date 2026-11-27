@@ -9,7 +9,7 @@
  */
 
 import { HttpError } from '$http/types.ts';
-import { NotGitRepositoryError } from '$utils/git/errors.ts';
+import { GitFetchError, NotGitRepositoryError } from '$utils/git/errors.ts';
 import { arrInstancesQueries } from '$db/queries/arrInstances.ts';
 import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { trashGuideSourcesQueries } from '$db/queries/trashGuideSources.ts';
@@ -104,6 +104,7 @@ function classifyHttpStatus(status: number): JobFailureCode {
  */
 export function classifyJobFailure(error: unknown): JobFailureCode {
   if (error instanceof HttpError) return classifyHttpStatus(error.status);
+  if (error instanceof GitFetchError) return error.kind === 'auth' ? 'credential' : 'gitNetwork';
   if (error instanceof NotGitRepositoryError) return 'gitNetwork';
   if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) return 'timeout';
   return 'internalError';

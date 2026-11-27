@@ -32,3 +32,30 @@ ScopeForbiddenResponse:
         - admin
       description: The API token scope this request requires.
   description: An authenticated API token lacks the scope the requested route requires.
+
+InternalErrorResponse:
+  type: object
+  required:
+    - error
+    - code
+  properties:
+    error:
+      type: string
+      description: Fixed, user-safe message. Never contains raw exception text; detail is logged server-side only.
+    code:
+      type: string
+      enum:
+        - preference_read_failed
+        - preference_save_failed
+        - rollback_failed
+        - rollback_post_verify_failed
+        - preview_read_failed
+        - preview_delete_failed
+        - metadata_profile_request_failed
+        - import_failed
+        - bundle_import_failed
+        - export_failed
+        - trash_guide_request_failed
+        - trash_guide_upstream_failed
+      description: Stable machine-readable code for the server-side failure.
+  description: A 5xx failure body with a fixed message and a stable code.

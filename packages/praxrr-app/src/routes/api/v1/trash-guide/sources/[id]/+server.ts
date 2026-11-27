@@ -14,7 +14,7 @@ import {
   logTrashGuideRouteError,
   parseOptionalNonEmptyString,
   parseSourceId,
-  toErrorMessage,
+  toErrorBody,
   validateRepositoryUrl,
 } from '../_helpers.ts';
 
@@ -52,7 +52,7 @@ export const GET: RequestHandler = async ({ params }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, `Failed to fetch TRaSH source id=${idResult.value}`);
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 };
 
@@ -92,7 +92,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, `Failed to update TRaSH source id=${idResult.value}`);
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 };
 
@@ -119,7 +119,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
     if (status >= 500) {
       await logTrashGuideRouteError(error, `Failed to delete TRaSH source id=${idResult.value}`);
     }
-    return json({ error: toErrorMessage(error) }, { status });
+    return json(toErrorBody(error, status), { status });
   }
 };
 

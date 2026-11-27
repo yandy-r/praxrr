@@ -101,7 +101,7 @@ previewById:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
   delete:
     operationId: deleteSyncPreview
     summary: Discard a sync preview
@@ -133,7 +133,7 @@ previewById:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
 
 previewApply:
   post:

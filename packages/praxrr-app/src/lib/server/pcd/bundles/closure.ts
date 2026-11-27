@@ -11,6 +11,7 @@ import type { PCDCache } from '$pcd/database/cache.ts';
 import { getOutgoingEdges } from '$pcd/graph/edges.ts';
 import type { NodeKind, NodeRef } from '$pcd/graph/types.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
+import { isReaderNotFoundMessage } from '$pcd/resolved/readers.ts';
 import type { PcdBundleEntry, PcdBundleMissingRef } from '$shared/pcd/bundle.ts';
 import { BUNDLE_MAX_ENTITIES, bundleEntityKey } from '$shared/pcd/bundle.ts';
 import type { EntityType, PortableEntityData } from '$shared/pcd/portable.ts';
@@ -104,9 +105,11 @@ function nodeKindOf(entityType: EntityType): NodeKind | null {
 }
 
 /**
- * Collect the dependency closure of `roots`. Roots missing from `cache` throw
- * `Error('<entityType> "<name>" not found')` (route maps to 404). A missing dependency is
- * reported in `missing` instead of throwing.
+ * Collect the dependency closure of `roots`. Roots missing from `cache` throw the serializer's
+ * own `<Label> "<name>" not found` error (route maps to 404). A dependency whose serializer
+ * reports that same by-name miss is recorded in `missing` instead of throwing. Any other failure
+ * -- including cache-level errors that merely mention "not found", such as a SQL helper's
+ * `Tag not found: X` -- rethrows unchanged so the route returns its sanitized 500.
  */
 export async function collectBundleClosure(cache: PCDCache, roots: ReadonlyArray<BundleRoot>): Promise<BundleClosure> {
   const entries = new Map<string, PcdBundleEntry>();
@@ -140,13 +143,12 @@ export async function collectBundleClosure(cache: PCDCache, roots: ReadonlyArray
     try {
       data = await serializeEntityByType(cache, item.entityType, item.name);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // Only absence is treated specially: a missing root is a 404 and a missing dependency
-      // becomes a missing reference. Any other failure (e.g. a corrupt row) rethrows unchanged.
-      if (!message.includes('not found')) throw error;
-      if (item.isRoot) {
-        throw new Error(message);
-      }
+      // Only the serializer's own by-name miss on this item is absence: a missing root rethrows
+      // (the route maps it to 404) and a missing dependency becomes a missing reference. Any
+      // other failure (a corrupt row, a cache helper miss like `Tag not found: X`) rethrows
+      // unchanged.
+      const isByNameMiss = error instanceof Error && isReaderNotFoundMessage(error.message, item.name);
+      if (!isByNameMiss || item.isRoot) throw error;
       if (item.from) {
         missing.push({
           fromType: item.from.entityType,

@@ -2,7 +2,8 @@
  * Git repository commands
  */
 
-import { buildGitEnv, execGit, execGitSafe, type GitExecOptions } from './exec.ts';
+import { buildGitEnv, execGit, execGitSafe, redactGitOutput, type GitExecOptions } from './exec.ts';
+import { GitFetchError, classifyGitFetchFailure, isNotGitRepositoryError } from './errors.ts';
 import type { RepoInfo } from './types.ts';
 import { getCachedRepoInfo } from '../github/cache.ts';
 import { logger } from '$logger/logger.ts';
@@ -410,25 +411,44 @@ export async function clone(
 
   const { code, stderr } = await command.output();
   if (code !== 0) {
-    throw new Error(`Git clone failed: ${new TextDecoder().decode(stderr)}`);
+    throw new Error(`Git clone failed: ${redactGitOutput(new TextDecoder().decode(stderr), { personalAccessToken })}`);
   }
 
   return isPrivate;
 }
 
 /**
- * Fetch from remote (silent)
+ * Run a remote fetch and surface failures as a {@link GitFetchError} (credential-free message,
+ * redacted detail). A missing repository still throws `NotGitRepositoryError`.
  */
-export async function fetch(repoPath: string, options: GitExecOptions = {}): Promise<void> {
-  await execGitSafe(['fetch', '--quiet'], repoPath, options);
+async function execFetch(args: string[], repoPath: string, options: GitExecOptions): Promise<void> {
+  try {
+    await execGit(args, repoPath, options);
+  } catch (error) {
+    if (isNotGitRepositoryError(error)) {
+      throw error;
+    }
+    // execGit already redacts credentials from its message; redact again in case the error came
+    // from elsewhere (e.g. buildGitEnv rejecting a malformed token).
+    const detail = redactGitOutput(error instanceof Error ? error.message : String(error), options);
+    throw new GitFetchError(classifyGitFetchFailure(detail), detail);
+  }
 }
 
 /**
- * Fetch tags from remote
+ * Fetch from remote. Throws {@link GitFetchError} when the fetch fails (for example a revoked or
+ * expired personal access token), so callers never mistake a failed fetch for "no updates".
+ */
+export async function fetch(repoPath: string, options: GitExecOptions = {}): Promise<void> {
+  await execFetch(['fetch', '--quiet'], repoPath, options);
+}
+
+/**
+ * Fetch tags from remote. Throws {@link GitFetchError} on failure.
  */
 export async function fetchTags(repoPath: string, options: GitExecOptions = {}): Promise<void> {
   // --no-prune: with fetch.prune=true, `--tags` would delete local tags missing upstream.
-  await execGitSafe(['fetch', '--tags', '--no-prune', '--quiet'], repoPath, options);
+  await execFetch(['fetch', '--tags', '--no-prune', '--quiet'], repoPath, options);
 }
 
 /**

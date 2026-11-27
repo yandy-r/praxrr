@@ -9,9 +9,29 @@ import { DenoSqlite3Dialect } from '@soapbox/kysely-deno-sqlite';
 import type { PCDCache } from '$pcd/index.ts';
 import type { PCDDatabase } from '$shared/pcd/types.ts';
 
-Deno.env.set('PARSER_HOST', '127.0.0.1');
-const PARSER_PORT = 57130;
-Deno.env.set('PARSER_PORT', PARSER_PORT.toString());
+// Fixed ports that parser tests bind concurrently under `--parallel`: the Go parsers in the
+// route tests (58129-58131), plus the fixed-port stubs in simulateScoreRoute (57129) and the
+// server parser tests (57241, 57263). An OS-assigned stub port must never squat on one, or a Go
+// parser's /health probe could reach a stub and the stub would forward to itself.
+const RESERVED_PARSER_PORTS = new Set([57129, 57241, 57263, 58129, 58130, 58131]);
+
+async function createUnreservedParserStub(): ReturnType<typeof createParserStub> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const stub = await createParserStub(0);
+    if (!RESERVED_PARSER_PORTS.has(stub.port)) return stub;
+    await stub.close();
+  }
+  throw new Error('Could not bind the parser stub to an unreserved port');
+}
+
+// Bind the parser stub to an OS-assigned port (port 0) so parallel test files never contend
+// for a fixed port. `deno test --parallel` runs files as workers in ONE process, so Deno.env is
+// shared and racy across files; pin this worker's own `config.parserUrl` instead of writing
+// PARSER_HOST/PARSER_PORT. Must run before the parser client singleton is first used.
+const parserState = await createUnreservedParserStub();
+const { config } = await import('$config');
+const parserStubUrl = `http://127.0.0.1:${parserState.port}`;
+Object.defineProperty(config, 'parserUrl', { get: () => parserStubUrl, configurable: true });
 
 const PCD_SCHEMA_SQL_PATH = new URL('../../../../praxrr-schema/ops/0.schema.sql', import.meta.url);
 const PCD_SCHEMA_SQL = Deno.readTextFileSync(PCD_SCHEMA_SQL_PATH);
@@ -63,6 +83,7 @@ async function createParserStub(port: number): Promise<{
   setMatchResponse: (text: string, matches: Record<string, boolean>) => void;
   clearResponses: () => void;
   setForwardBaseUrl: (baseUrl: string | null) => void;
+  port: number;
   close: () => Promise<void>;
 }> {
   const parseResponses = new Map<string, ParseStubResponse>();
@@ -164,6 +185,7 @@ async function createParserStub(port: number): Promise<{
     setForwardBaseUrl: (baseUrl) => {
       forwardBaseUrl = baseUrl;
     },
+    port: server.addr.port,
     close: async () => {
       await server.shutdown();
     },
@@ -334,8 +356,6 @@ async function startGoParser(
   await process.status;
   throw new Error(`Go parser did not become healthy at ${baseUrl}`);
 }
-
-const parserState = await createParserStub(PARSER_PORT);
 
 Deno.test('entity-testing evaluate: parser-missing titles still match pattern-based conditions', async () => {
   const databaseId = 7001;

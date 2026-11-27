@@ -8,8 +8,9 @@ import {
   PORTABLE_MIGRATION_MIN_VERSION,
   PORTABLE_MIGRATION_SOURCE_EXPORT,
 } from '$shared/pcd/portable.ts';
-import { BundleExportLimitError, exportBundle, type PCDCache } from '$pcd/index.ts';
+import { BundleExportLimitError, exportBundle, isReaderNotFoundMessage, type PCDCache } from '$pcd/index.ts';
 import * as serialize from '$pcd/entities/serialize.ts';
+import { internalErrorResponse } from '$http/internalError.ts';
 
 /**
  * Mapping of portable entity serializers used during export.
@@ -37,6 +38,9 @@ export const _serializeDependencies = {
 } as const;
 
 const VALID_ENTITY_TYPES: ReadonlySet<string> = new Set(ENTITY_TYPES);
+
+/** Fixed, user-safe body text for an unexpected export failure; raw detail is logged only. */
+const EXPORT_FAILED_MESSAGE = 'Export failed';
 
 /**
  * GET /api/v1/pcd/export
@@ -119,14 +123,19 @@ export const GET: RequestHandler = async ({ url }) => {
       ...(exported.missing.length > 0 ? { missingReferences: exported.missing } : {}),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Export failed';
     if (err instanceof BundleExportLimitError) {
-      return json({ error: message }, { status: 400 });
+      return json({ error: err.message }, { status: 400 });
     }
-    if (message.includes('not found')) {
-      return json({ error: message }, { status: 404 });
+    if (err instanceof Error && names.some((name) => isReaderNotFoundMessage(err.message, name))) {
+      return json({ error: err.message }, { status: 404 });
     }
-    return json({ error: message }, { status: 400 });
+    return await internalErrorResponse(err, {
+      message: EXPORT_FAILED_MESSAGE,
+      code: 'export_failed',
+      source: 'PCDExport',
+      logMessage: 'PCD export failed',
+      meta: { databaseId, entityType, nameCount: names.length, includeDependencies, format },
+    });
   }
 };
 

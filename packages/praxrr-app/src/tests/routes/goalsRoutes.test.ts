@@ -32,6 +32,7 @@ import type { GoalApplyDependencies } from '../../routes/api/v1/goals/apply/+ser
 import type { GoalReconcileDependencies } from '$lib/server/goals/reconcileGoalApply.ts';
 import type { QualityGoalApplyJournalRow } from '$db/queries/qualityGoalApplyJournal.ts';
 import { qualityGoalApplyJournalQueries } from '$db/queries/qualityGoalApplyJournal.ts';
+import { GOAL_APPLY_FAILED_MESSAGE } from '$lib/server/goals/applyStatus.ts';
 import type { components } from '$api/v1.d.ts';
 
 const { setCache, deleteCache } = await import('$pcd/database/registry.ts');
@@ -782,7 +783,8 @@ Deno.test('goals apply: scoring and binding failures return a structured failure
   const scoringResponse = await applyRoute._handleGoalApplyRequest(
     postEvent(requestPayload).request,
     buildApplyDependencies(scoringLogs, {
-      persistGoalApply: () => Promise.resolve({ success: false, error: 'Scoring write failed' }),
+      persistGoalApply: () =>
+        Promise.resolve({ success: false, error: 'Scoring write failed: apikey=sk_live_SECRET123' }),
       markJournalFailed: (_id, input) => {
         scoringFailed.push(input);
       },
@@ -793,8 +795,12 @@ Deno.test('goals apply: scoring and binding failures return a structured failure
     })
   );
   assertEquals(scoringResponse.status, 500);
-  const scoringBody = (await scoringResponse.json()) as GoalApplyFailure;
-  assertEquals(scoringBody.message, 'Scoring write failed');
+  const scoringText = await scoringResponse.text();
+  assert(!scoringText.includes('SECRET123'), 'internal failure must not echo raw error text');
+  const scoringBody = JSON.parse(scoringText) as GoalApplyFailure;
+  assertEquals(scoringBody.message, GOAL_APPLY_FAILED_MESSAGE);
+  assertEquals(scoringBody.code, 'goal_apply_failed');
+  assertEquals(scoringBody.applyStatus.failureReason, GOAL_APPLY_FAILED_MESSAGE);
   assertEquals(scoringBody.applyStatus.failureStage, 'scoring');
   assertEquals(scoringBody.applyStatus.scoringChanged, false);
   assertEquals(scoringBody.applyStatus.recovery.endpoint, '/api/v1/goals/reconcile');
@@ -815,13 +821,17 @@ Deno.test('goals apply: scoring and binding failures return a structured failure
         bindingFailed.push(input);
       },
       upsertBinding: () => {
-        throw new Error('Binding write failed');
+        throw new Error('Binding write failed: apikey=sk_live_SECRET123');
       },
     })
   );
   assertEquals(bindingResponse.status, 500);
-  const bindingBody = (await bindingResponse.json()) as GoalApplyFailure;
-  assertEquals(bindingBody.message, 'Binding write failed');
+  const bindingText = await bindingResponse.text();
+  assert(!bindingText.includes('SECRET123'), 'internal failure must not echo raw error text');
+  const bindingBody = JSON.parse(bindingText) as GoalApplyFailure;
+  assertEquals(bindingBody.message, GOAL_APPLY_FAILED_MESSAGE);
+  assertEquals(bindingBody.code, 'goal_apply_failed');
+  assert(bindingFailed.every((call) => call.failureReason === GOAL_APPLY_FAILED_MESSAGE));
   assertEquals(bindingBody.applyStatus.failureStage, 'binding');
   assertEquals(bindingBody.applyStatus.scoringChanged, true);
   assertEquals(bindingBody.applyStatus.bindingStatus, 'failed');

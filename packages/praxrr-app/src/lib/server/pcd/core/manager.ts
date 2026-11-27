@@ -8,6 +8,7 @@ import {
   clone,
   refreshLocalRepositoryClone,
   getStatus,
+  isGitFetchError,
   isLocalRepositorySource,
   type GitStatus,
   pull,
@@ -20,6 +21,7 @@ import { loadManifest, type Manifest } from '../manifest/manifest.ts';
 import { getPCDPath } from '../utils/operations.ts';
 import { processDependencies, syncDependencies, validateDependencies } from '../git/dependencies.ts';
 import { scrubStoredGitCredentials } from '../git/credentialScrub.ts';
+import { clearPostPullPending, hasPostPullPending, markPostPullPending } from '../git/postPullMarker.ts';
 import { compile, invalidate } from '../database/compiler.ts';
 import { getCache } from '../database/registry.ts';
 import { logger } from '$logger/logger.ts';
@@ -235,7 +237,11 @@ class PCDManager {
       // Check for updates first
       const updateInfo = await checkForUpdates(instance.local_path, { personalAccessToken });
 
-      if (!updateInfo.hasUpdates) {
+      // A previous sync pulled but failed before finishing (e.g. a dependency fetch failed); the
+      // clone now matches the remote, so finish that work instead of reporting "up to date".
+      const postPullPending = await hasPostPullPending(instance.local_path);
+
+      if (!updateInfo.hasUpdates && !postPullPending) {
         // Already up to date
         databaseInstancesQueries.updateSyncedAt(id);
         return {
@@ -244,15 +250,20 @@ class PCDManager {
         };
       }
 
-      // Pre-pull snapshot for remote sources (best-effort, non-blocking)
-      await snapshotService.createAutoSnapshot({
-        databaseId: id,
-        trigger: 'pull',
-        targetInstanceIds: null,
-      });
+      if (updateInfo.hasUpdates) {
+        // Pre-pull snapshot for remote sources (best-effort, non-blocking)
+        await snapshotService.createAutoSnapshot({
+          databaseId: id,
+          trigger: 'pull',
+          targetInstanceIds: null,
+        });
 
-      // Pull updates
-      await pull(instance.local_path, { personalAccessToken });
+        // Cleared only once every post-pull step below has completed.
+        await markPostPullPending(instance.local_path);
+
+        // Pull updates
+        await pull(instance.local_path, { personalAccessToken });
+      }
 
       // Sync dependencies (schema, etc.) if versions changed
       await syncDependencies(instance.local_path, personalAccessToken);
@@ -289,6 +300,8 @@ class PCDManager {
       // Trigger arr syncs for configs with on_pull trigger
       await this.triggerPullSync(id);
 
+      await clearPostPullPending(instance.local_path);
+
       return {
         success: true,
         commitsBehind: updateInfo.commitsBehind,
@@ -298,12 +311,25 @@ class PCDManager {
         success: false,
         commitsBehind: 0,
         error: error instanceof Error ? error.message : 'Unknown error',
+        ...(isGitFetchError(error) ? { fetchFailureKind: error.kind } : {}),
       };
     }
   }
 
   /**
-   * Check for available updates without pulling
+   * Whether a previous sync pulled but did not finish its post-pull work (dependency sync, base-op
+   * import, compilation). A sync run will complete it even when the remote has no new commits.
+   */
+  async hasPendingPostPullWork(id: number): Promise<boolean> {
+    const instance = databaseInstancesQueries.getById(id);
+    if (!instance || isLocalRepositorySource(instance.repository_url)) {
+      return false;
+    }
+    return await hasPostPullPending(instance.local_path);
+  }
+
+  /**
+   * Check for available updates without pulling. Throws GitFetchError when the remote fetch fails.
    */
   async checkForUpdates(id: number): Promise<UpdateInfo> {
     const instance = databaseInstancesQueries.getById(id);

@@ -47,7 +47,7 @@ sync:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
   get:
     operationId: getTrashGuideSyncStatus
     summary: Resolve current + latest terminal run for a TRaSH source
@@ -82,7 +82,7 @@ sync:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
 
 sources:
   get:
@@ -142,13 +142,13 @@ sources:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
       '502':
         description: Retryable repository fetch failure
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
 
 sourceById:
   parameters:
@@ -187,7 +187,7 @@ sourceById:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
   put:
     operationId: updateTrashGuideSource
     summary: Update a TRaSH source
@@ -238,13 +238,13 @@ sourceById:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
       '502':
         description: Retryable repository fetch failure
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
   delete:
     operationId: deleteTrashGuideSource
     summary: Delete a TRaSH source
@@ -270,7 +270,7 @@ sourceById:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'
 
 entities:
   get:
@@ -358,4 +358,4 @@ entities:
         content:
           application/json:
             schema:
-              $ref: '../schemas/arr.yaml#/ErrorResponse'
+              $ref: '../schemas/common.yaml#/InternalErrorResponse'

@@ -4,6 +4,29 @@ import { databaseInstancesQueries } from '$db/queries/databaseInstances.ts';
 import { pcdManager } from '$pcd/index.ts';
 import { calculateNextRunFromMinutes } from '../scheduleUtils.ts';
 import { logger } from '$logger/logger.ts';
+import { isGitFetchError, type GitFetchFailureKind } from '$utils/git/errors.ts';
+
+/** Pre-authored recovery for a fetch rejected by the remote (revoked/expired token). */
+export const PCD_TOKEN_RECOVERY =
+  'Update or clear the personal access token in this database’s settings, then re-run the sync.';
+
+/**
+ * Map a failed sync to its job failure code. A remote fetch rejected for credentials is a
+ * `credential` failure with a token hint; everything else stays `gitNetwork`.
+ */
+export function pcdSyncFailure(fetchFailureKind: GitFetchFailureKind | undefined): {
+  failureCode: 'credential' | 'gitNetwork';
+  recovery?: string;
+} {
+  if (fetchFailureKind === 'auth') {
+    return { failureCode: 'credential', recovery: PCD_TOKEN_RECOVERY };
+  }
+  return { failureCode: 'gitNetwork' };
+}
+
+function fetchFailureKindOf(error: unknown): GitFetchFailureKind | undefined {
+  return isGitFetchError(error) ? error.kind : undefined;
+}
 
 const dbSyncHandler: JobHandler = async (job) => {
   const databaseId = Number(job.payload.databaseId);
@@ -40,7 +63,7 @@ const dbSyncHandler: JobHandler = async (job) => {
         });
         return {
           status: 'failure',
-          failureCode: 'gitNetwork',
+          ...pcdSyncFailure(syncResult.fetchFailureKind),
           rescheduleAt: autoRescheduleAt,
           rescheduleSource: autoRescheduleSource,
         };
@@ -59,7 +82,7 @@ const dbSyncHandler: JobHandler = async (job) => {
       });
       return {
         status: 'failure',
-        failureCode: 'gitNetwork',
+        ...pcdSyncFailure(fetchFailureKindOf(error)),
         rescheduleAt: autoRescheduleAt,
         rescheduleSource: autoRescheduleSource,
       };
@@ -87,8 +110,10 @@ const dbSyncHandler: JobHandler = async (job) => {
 
   try {
     const updateInfo = await pcdManager.checkForUpdates(databaseId);
+    // A previous pull whose post-pull work failed must be finished even without new commits.
+    const postPullPending = !updateInfo.hasUpdates && (await pcdManager.hasPendingPostPullWork(databaseId));
 
-    if (!updateInfo.hasUpdates) {
+    if (!updateInfo.hasUpdates && !postPullPending) {
       databaseInstancesQueries.updateSyncedAt(databaseId);
       return {
         status: 'skipped',
@@ -97,19 +122,19 @@ const dbSyncHandler: JobHandler = async (job) => {
       };
     }
 
-    if (instance.auto_pull === 1) {
+    if (instance.auto_pull === 1 || postPullPending) {
       const syncResult = await pcdManager.sync(databaseId);
       if (!syncResult.success) {
         await logger.error('Database sync job failed', {
           source: 'DbSyncJob',
           meta: { jobId: job.id, databaseId, databaseName: instance.name, error: syncResult.error ?? 'Sync failed' },
         });
-        return { status: 'failure', failureCode: 'gitNetwork', rescheduleAt };
+        return { status: 'failure', ...pcdSyncFailure(syncResult.fetchFailureKind), rescheduleAt };
       }
 
       return {
         status: 'success',
-        output: `Pulled ${syncResult.commitsBehind} update(s)`,
+        output: postPullPending ? 'Completed an interrupted sync' : `Pulled ${syncResult.commitsBehind} update(s)`,
         rescheduleAt,
       };
     }
@@ -126,7 +151,7 @@ const dbSyncHandler: JobHandler = async (job) => {
       source: 'DbSyncJob',
       meta: { jobId: job.id, databaseId, databaseName: instance.name, error },
     });
-    return { status: 'failure', failureCode: 'gitNetwork', rescheduleAt };
+    return { status: 'failure', ...pcdSyncFailure(fetchFailureKindOf(error)), rescheduleAt };
   }
 };
 
