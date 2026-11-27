@@ -2,7 +2,7 @@
   import Table from '$ui/table/Table.svelte';
   import type { Column } from '$ui/table/types.ts';
   import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: entity = $page.data.entity;
   $: scoringRows = ($page.data.scoringItems ?? []) as ScoringTableRow[];

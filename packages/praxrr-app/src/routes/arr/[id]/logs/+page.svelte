@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { Copy, RefreshCw, Filter, ChevronLeft, ChevronRight, Rows3 } from 'lucide-svelte';
   import { alertStore } from '$alerts/store';
   import Table from '$ui/table/Table.svelte';
@@ -95,7 +95,7 @@
 
   // Navigate with updated params
   function updateParams(params: Record<string, string | number | undefined>) {
-    const url = new URL($page.url);
+    const url = new URL($page.url.href);
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined || value === 'ALL') {
         url.searchParams.delete(key);
@@ -169,8 +169,9 @@
             >
               <span
                 class="font-medium {level === 'ALL' ? 'text-neutral-600 dark:text-neutral-400' : levelColors[level]}"
-                >{level}</span
               >
+                {level}
+              </span>
             </button>
           {/each}
         </Dropdown>

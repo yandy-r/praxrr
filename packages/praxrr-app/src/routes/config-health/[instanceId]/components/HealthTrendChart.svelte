@@ -231,15 +231,15 @@
               class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-neutral-600 dark:text-neutral-300"
               aria-label="Chart legend"
             >
-              <span class="inline-flex items-center gap-1.5"
-                ><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Persisted band</span
-              >
-              <span class="inline-flex items-center gap-1.5"
-                ><span class="font-mono font-bold">×</span>Evidence gap</span
-              >
-              <span class="inline-flex items-center gap-1.5"
-                ><span class="w-5 border-t-2 border-dashed border-neutral-500"></span>Engine change</span
-              >
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>Persisted band
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="font-mono font-bold">×</span>Evidence gap
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-5 border-t-2 border-dashed border-neutral-500"></span>Engine change
+              </span>
             </div>
           </figcaption>
 
@@ -266,18 +266,22 @@
                 type="button"
                 class="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
                 disabled={selectedIndex === 0}
-                onclick={() => selectPoint(selectedIndex - 1)}>Previous point</button
+                onclick={() => selectPoint(selectedIndex - 1)}
               >
+                Previous point
+              </button>
               <button
                 type="button"
                 class="min-h-11 rounded-lg border border-neutral-300 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
                 disabled={selectedIndex >= result.points.length - 1}
-                onclick={() => selectPoint(selectedIndex + 1)}>Next point</button
+                onclick={() => selectPoint(selectedIndex + 1)}
               >
+                Next point
+              </button>
             </div>
-            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400"
-              >Point {selectedIndex + 1} of {result.points.length}</span
-            >
+            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              Point {selectedIndex + 1} of {result.points.length}
+            </span>
           </div>
 
           {#if selectedPoint}
@@ -366,16 +370,16 @@
               <Card padding="sm">
                 <figure aria-label={`${chart.definition.label} score and contribution history`}>
                   <figcaption class="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-                    <span class="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
-                      >{chart.definition.label}</span
-                    >
+                    <span class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                      {chart.definition.label}
+                    </span>
                     <span class="flex flex-wrap gap-3 text-[11px] text-neutral-500 dark:text-neutral-400">
-                      <span class="inline-flex items-center gap-1"
-                        ><span class="border-accent-600 h-2 w-2 rounded-full border"></span>Score</span
-                      >
-                      <span class="inline-flex items-center gap-1"
-                        ><span class="inline-block h-2 w-2 rotate-45 border border-violet-600"></span>Contribution</span
-                      >
+                      <span class="inline-flex items-center gap-1">
+                        <span class="border-accent-600 h-2 w-2 rounded-full border"></span>Score
+                      </span>
+                      <span class="inline-flex items-center gap-1">
+                        <span class="inline-block h-2 w-2 rotate-45 border border-violet-600"></span>Contribution
+                      </span>
                     </span>
                   </figcaption>
 

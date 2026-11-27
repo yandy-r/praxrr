@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { tick } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import NumberInput from '$ui/form/NumberInput.svelte';
   import FormInput from '$ui/form/FormInput.svelte';
   import Toggle from '$ui/toggle/Toggle.svelte';

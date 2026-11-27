@@ -84,7 +84,8 @@ custom-format and quality-profile testing; linking, editing, and syncing continu
 
 ## Module Map
 
-Server code is organized under path aliases in `deno.json` and `svelte.config.js`:
+Server code is organized under path aliases in `deno.json` and the `sveltekit({...})` `alias` option
+in `packages/praxrr-app/vite.config.ts`:
 
 | Alias             | Path                        | Responsibility                                      |
 | ----------------- | --------------------------- | --------------------------------------------------- |

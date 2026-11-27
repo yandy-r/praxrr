@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { enhance } from '$app/forms';
   import { Plus, AlertTriangle, Check, X, Pencil, Trash2 } from 'lucide-svelte';
   import ExpandableTable from '$ui/table/ExpandableTable.svelte';
@@ -175,19 +175,22 @@
             {#if row.should_match}
               <span
                 class="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-                >Should Match</span
               >
+                Should Match
+              </span>
             {:else}
               <span
                 class="inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200"
-                >Shouldn't Match</span
               >
+                Shouldn't Match
+              </span>
             {/if}
           {:else if column.key === 'type'}
             <span
               class="inline-flex items-center gap-1 rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-              >{row.type}</span
             >
+              {row.type}
+            </span>
           {:else if column.key === 'result'}
             {#if row.result === 'pass'}
               <div class="flex items-center justify-center">
@@ -241,40 +244,49 @@
                     <tr>
                       <th
                         class="px-3 py-2 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Type</th
                       >
+                        Type
+                      </th>
                       <th
                         class="px-3 py-2 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Condition</th
                       >
+                        Condition
+                      </th>
                       <th
                         class="px-3 py-2 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Expected</th
                       >
+                        Expected
+                      </th>
                       <th
                         class="px-3 py-2 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Actual</th
                       >
+                        Actual
+                      </th>
                       <th
                         class="px-3 py-2 text-center text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Pass</th
                       >
+                        Pass
+                      </th>
                       <th
                         class="px-3 py-2 text-center text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Type Pass</th
                       >
+                        Type Pass
+                      </th>
                       <th
                         class="px-3 py-2 text-center text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Expected</th
                       >
+                        Expected
+                      </th>
                       <th
                         class="px-3 py-2 text-center text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Actual</th
                       >
+                        Actual
+                      </th>
                       <th
                         class="px-3 py-2 text-center text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                        >Result</th
                       >
+                        Result
+                      </th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-neutral-200 bg-white dark:divide-neutral-800 dark:bg-neutral-900">
@@ -459,9 +471,9 @@
                     </div>
                     <div class="flex items-center gap-1.5">
                       <span class="text-xs text-neutral-500 dark:text-neutral-400">Languages:</span>
-                      <Badge variant="neutral" size="md"
-                        >{row.parsed.languages.length > 0 ? row.parsed.languages.join(', ') : 'None'}</Badge
-                      >
+                      <Badge variant="neutral" size="md">
+                        {row.parsed.languages.length > 0 ? row.parsed.languages.join(', ') : 'None'}
+                      </Badge>
                     </div>
                     {#if row.parsed.releaseGroup}
                       <div class="flex items-center gap-1.5">

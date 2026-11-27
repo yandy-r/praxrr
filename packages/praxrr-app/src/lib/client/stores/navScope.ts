@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { writable } from 'svelte/store';
 import { ARR_TARGET_ORDER } from '$shared/arr/capabilities.ts';
 import { isArrType, type ArrType } from '$shared/pcd/types.ts';

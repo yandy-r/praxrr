@@ -78,8 +78,8 @@ jobs:
 
       - name: Prepare monorepo TypeScript fallback
         run: |
-          mkdir -p dist/.svelte-kit
-          printf '{"compilerOptions":{}}\n' > dist/.svelte-kit/tsconfig.json
+          mkdir -p 'packages/praxrr-app/node_modules/$app'
+          printf '{"compilerOptions":{}}\n' > 'packages/praxrr-app/node_modules/$app/tsconfig.json'
 
       - name: Build docs site
         working-directory: docs/site

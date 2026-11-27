@@ -31,12 +31,22 @@ executable.
 
 ## Server and scheduling
 
-| Variable                  | Default                 | Description                  |
-| ------------------------- | ----------------------- | ---------------------------- |
-| `PORT`                    | `6868`                  | Web UI and API port          |
-| `HOST`                    | `0.0.0.0`               | Bind address                 |
-| `TZ`                      | `Etc/UTC`               | Timezone for cron and logs   |
-| `PUID` / `PGID` / `UMASK` | `1000` / `1000` / `022` | File ownership in containers |
+| Variable                  | Default                 | Description                                                                       |
+| ------------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| `PORT`                    | `6868`                  | Web UI and API port                                                               |
+| `HOST`                    | `0.0.0.0`               | Bind address                                                                      |
+| `TZ`                      | `Etc/UTC`               | Timezone for cron and logs                                                        |
+| `PUID` / `PGID` / `UMASK` | `1000` / `1000` / `022` | File ownership in containers                                                      |
+| `BODY_SIZE_LIMIT`         | `1100M`                 | Largest accepted request body (`K`/`M`/`G` suffixes); covers 1 GiB backup uploads |
+| `SHUTDOWN_TIMEOUT`        | `5`                     | Seconds to wait for open requests (such as live-event streams) after `SIGTERM`    |
+
+The web server is SvelteKit's Node adapter, compiled with `deno compile`. Its other environment
+variables (`SOCKET_PATH`, `KEEP_ALIVE_TIMEOUT`, `HEADERS_TIMEOUT`, `ORIGIN`, `PROTOCOL_HEADER`,
+`HOST_HEADER`, `PORT_HEADER`) are passed through unchanged. Leave `ORIGIN`, `PROTOCOL_HEADER` and
+`HOST_HEADER` unset behind a reverse proxy and use [`TRUSTED_PROXY`](#trusted-proxy) instead:
+`PROTOCOL_HEADER` and `HOST_HEADER` are trusted from any client, and `ORIGIN` pins Praxrr to a single
+URL. `ADDRESS_HEADER` and `XFF_DEPTH` are ignored with a startup warning, because client addresses
+must come from the socket for `AUTH=local` and `TRUSTED_PROXY` to be sound.
 
 ## Parser service
 

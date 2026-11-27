@@ -234,9 +234,9 @@
 
 <div class="space-y-6">
   <div>
-    <a href="/canary" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline"
-      >← Back to canary rollouts</a
-    >
+    <a href="/canary" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">
+      ← Back to canary rollouts
+    </a>
   </div>
 
   <div class="flex flex-wrap items-start justify-between gap-3">

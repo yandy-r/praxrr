@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { browser } from '$app/env';
+  import { page } from '$stores/page';
   import { uniqueId } from '$lib/client/utils/uniqueId';
   import { ChevronDown, Film, Link, RotateCcw, Shield, Tv } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
@@ -153,7 +153,7 @@
   onMount(() => {
     if (!browser) return;
 
-    const urlState = parseUrlState($page.url.searchParams);
+    const urlState = parseUrlState(new URLSearchParams($page.url.search));
     let hasAnyUrlState = false;
     let hasTitleFromUrl = false;
     let hasProfileFromUrl = false;

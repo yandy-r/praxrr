@@ -13,7 +13,7 @@
   import { getPersistentSearchStore, type SearchStore } from '$stores/search';
   import { alertStore } from '$alerts/store';
   import type { TestEntity } from '$shared/pcd/display.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   export let open = false;
   export let entity: TestEntity | null = null;
@@ -608,14 +608,14 @@
                       {release.title}
                     </p>
                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span class="font-mono text-xs text-neutral-500 dark:text-neutral-400"
-                        >{formatSize(release.size)}</span
-                      >
+                      <span class="font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                        {formatSize(release.size)}
+                      </span>
                       {#if release.languages.length > 0}
                         <span class="text-xs text-neutral-400">•</span>
-                        <span class="text-xs text-neutral-500 dark:text-neutral-400"
-                          >{release.languages.join(', ')}</span
-                        >
+                        <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                          {release.languages.join(', ')}
+                        </span>
                       {/if}
                       {#each release.indexers as indexer}
                         <Badge variant="neutral">{indexer}</Badge>

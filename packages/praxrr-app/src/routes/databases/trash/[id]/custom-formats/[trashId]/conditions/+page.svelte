@@ -4,7 +4,7 @@
   import CodeBlock from '$ui/display/CodeBlock.svelte';
   import type { Column } from '$ui/table/types.ts';
   import type { TrashGuideCustomFormatSpecification } from '$lib/server/trashguide/types.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: entity = $page.data.entity;
   $: specifications = entity?.specifications

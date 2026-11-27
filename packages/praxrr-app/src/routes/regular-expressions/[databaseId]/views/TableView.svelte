@@ -8,7 +8,7 @@
   import { Tag, Code, FileText, Link, Copy, Download } from 'lucide-svelte';
   import { parseMarkdownInline } from '$shared/markdown/markdown.ts';
   import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   export let expressions: RegularExpressionWithTags[];
 

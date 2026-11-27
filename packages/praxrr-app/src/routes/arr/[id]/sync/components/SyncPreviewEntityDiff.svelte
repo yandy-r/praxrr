@@ -165,9 +165,9 @@
                     {fieldChange.field}
                   </td>
                   <td class="py-2 align-top">
-                    <span class={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${fieldMeta.textClass}`}
-                      >{fieldMeta.label}</span
-                    >
+                    <span class={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${fieldMeta.textClass}`}>
+                      {fieldMeta.label}
+                    </span>
                   </td>
                   <td class="py-2 align-top">
                     <pre

@@ -3,7 +3,7 @@
   import type { UpgradeJobLog } from '$lib/server/upgrades/types.ts';
   import { createSearchStore, getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import type { Readable } from 'svelte/store';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
@@ -333,14 +333,14 @@
           <span class="text-sm text-neutral-900 dark:text-neutral-100">
             {#if row.config.dryRun}
               <span class="font-mono">{row.results.searchesTriggered}</span> previewed,
-              <span class="{row.results.successful > 0 ? 'text-green-600 dark:text-green-400' : ''} font-mono"
-                >{row.results.successful}</span
-              > upgrades found
+              <span class="{row.results.successful > 0 ? 'text-green-600 dark:text-green-400' : ''} font-mono">
+                {row.results.successful}
+              </span> upgrades found
             {:else}
               <span class="font-mono">{row.results.searchesTriggered}</span> searches triggered,
-              <span class="{row.results.successful > 0 ? 'text-green-600 dark:text-green-400' : ''} font-mono"
-                >{row.results.successful}</span
-              > grabbed
+              <span class="{row.results.successful > 0 ? 'text-green-600 dark:text-green-400' : ''} font-mono">
+                {row.results.successful}
+              </span> grabbed
             {/if}
             {#if row.results.failed > 0}
               <span class="font-mono text-red-600 dark:text-red-400">, {row.results.failed} failed</span>
@@ -405,9 +405,9 @@
               <svelte:fragment slot="expanded" let:row={item}>
                 <div class="space-y-2 py-2 pl-2">
                   <div class="flex gap-2">
-                    <span class="w-16 shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400"
-                      >Current:</span
-                    >
+                    <span class="w-16 shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                      Current:
+                    </span>
                     <span
                       class="truncate font-mono text-xs text-neutral-700 dark:text-neutral-300"
                       title={item.original.fileName}
@@ -417,9 +417,9 @@
                   </div>
                   {#if item.upgrade}
                     <div class="flex gap-2">
-                      <span class="w-16 shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400"
-                        >Upgrade:</span
-                      >
+                      <span class="w-16 shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        Upgrade:
+                      </span>
                       <span
                         class="truncate font-mono text-xs text-neutral-700 dark:text-neutral-300"
                         title={item.upgrade.release}

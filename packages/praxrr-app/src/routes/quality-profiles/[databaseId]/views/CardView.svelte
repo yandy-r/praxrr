@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
   import type { SourceRef } from '$shared/sources/types.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { BookOpenText, Gauge, Earth, Copy, Download, DatabaseZap, ClipboardCopy } from 'lucide-svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
   import Card from '$ui/card/Card.svelte';
@@ -181,9 +181,9 @@
             {#if idx > 0}
               <span class="text-xs text-neutral-400">›</span>
             {/if}
-            <Label variant={quality.is_upgrade_until ? 'success' : 'secondary'} size="sm" rounded="md" mono
-              >{quality.name}</Label
-            >
+            <Label variant={quality.is_upgrade_until ? 'success' : 'secondary'} size="sm" rounded="md" mono>
+              {quality.name}
+            </Label>
           {/each}
           {#if profile.qualities.length > 3}
             <span class="text-[10px] text-neutral-500 dark:text-neutral-400">

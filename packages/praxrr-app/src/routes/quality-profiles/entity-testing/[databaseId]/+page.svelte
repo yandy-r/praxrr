@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { Info, Clapperboard, Film, Tv, Plus, AlertTriangle, Sliders, Check } from 'lucide-svelte';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
@@ -419,8 +419,10 @@
             <p class="text-neutral-600 dark:text-neutral-400">
               TMDB API key not configured. <a
                 href="/settings/general"
-                class="text-accent-600 dark:text-accent-400 hover:underline">Configure in Settings</a
+                class="text-accent-600 dark:text-accent-400 hover:underline"
               >
+                Configure in Settings
+              </a>
             </p>
           </div>
         {:else}

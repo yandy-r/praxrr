@@ -19,9 +19,9 @@
 </script>
 
 <div class="mb-4 space-y-1.5">
-  <label for="nav-scope-select" class="block text-xs font-medium tracking-wide text-neutral-500 dark:text-neutral-400"
-    >Apps Scope</label
-  >
+  <label for="nav-scope-select" class="block text-xs font-medium tracking-wide text-neutral-500 dark:text-neutral-400">
+    Apps Scope
+  </label>
   <select
     id="nav-scope-select"
     value={$navScope}

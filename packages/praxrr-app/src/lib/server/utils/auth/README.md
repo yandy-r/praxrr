@@ -121,8 +121,9 @@ every proxied request bypasses. Set `TRUSTED_PROXY` so the real forwarded client
 is graded instead.
 
 Because the gate keys on the socket peer, it depends on
-`event.getClientAddress()` returning the real peer. `sveltekit-adapter-deno` does
-so today; enabling an adapter XFF/address override would defeat it.
+`event.getClientAddress()` returning the real peer. `@sveltejs/adapter-node` does
+so while `ADDRESS_HEADER`/`XFF_DEPTH` are unset (`server-entry.js` strips both at
+startup); enabling an adapter address override would defeat it.
 
 > Deferred to a follow-up (recorded on issue #228): `X-Forwarded-Host` /
 > `X-Forwarded-Proto` used for WebAuthn RP-id/origin derivation (`webauthn/rp.ts`)

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import type { ComponentType, SvelteComponent } from 'svelte';
   import { goto } from '$app/navigation';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import type { components } from '$api/v1.d.ts';
   import ResolvedStatePanel from './ResolvedStatePanel.svelte';
   import LiveDiffPanel from './LiveDiffPanel.svelte';

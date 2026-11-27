@@ -18,7 +18,7 @@
     loadLocalOnly,
     saveLocalOnly,
   } from '$lib/client/utils/locallyModified.ts';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { alertStore } from '$alerts/store';

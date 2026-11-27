@@ -9,7 +9,7 @@
   import type { SourceRef } from '$shared/sources/types.ts';
   import { ARR_APP_TYPES, getArrAppMetadata } from '$shared/arr/capabilities.ts';
   import { Tag, FileText, Layers, BookOpenText, Gauge, Earth, Database, Copy, Download } from 'lucide-svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
   import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
   import { sanitizeHtml } from '$shared/markdown/markdown.ts';

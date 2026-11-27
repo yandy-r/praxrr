@@ -3,7 +3,7 @@
   import type { RenameJobLog } from '$lib/server/rename/types.ts';
   import { createSearchStore, getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import type { Readable } from 'svelte/store';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
@@ -279,9 +279,9 @@
             {#if row.config.dryRun}
               <span class="font-mono">{row.results.filesNeedingRename}</span> files would be renamed
             {:else}
-              <span class="font-mono">{row.results.filesRenamed}</span>/<span class="font-mono"
-                >{row.results.filesNeedingRename}</span
-              >
+              <span class="font-mono">{row.results.filesRenamed}</span>/<span class="font-mono">
+                {row.results.filesNeedingRename}
+              </span>
               files renamed
               {#if row.results.foldersRenamed > 0}
                 , <span class="font-mono">{row.results.foldersRenamed}</span> folders
@@ -325,16 +325,17 @@
                   {#each item.files as file}
                     <div class="space-y-1">
                       <div class="flex gap-2">
-                        <span class="w-12 shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400"
-                          >From:</span
-                        >
+                        <span class="w-12 shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                          From:
+                        </span>
                         <span class="font-mono text-xs break-all text-neutral-700 dark:text-neutral-300">
                           {getFileName(file.existingPath)}
                         </span>
                       </div>
                       <div class="flex gap-2">
-                        <span class="w-12 shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">To:</span
-                        >
+                        <span class="w-12 shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          To:
+                        </span>
                         <span class="font-mono text-xs break-all text-neutral-700 dark:text-neutral-300">
                           {getFileName(file.newPath)}
                         </span>

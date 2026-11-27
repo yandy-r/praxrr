@@ -1,7 +1,7 @@
 // Auto-spawn parser binary for standalone builds (must run before config import)
 await import('$lib/server/utils/parser/spawn.ts');
 
-import type { Handle } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { csrfGuard } from '$server/security/csrf.ts';

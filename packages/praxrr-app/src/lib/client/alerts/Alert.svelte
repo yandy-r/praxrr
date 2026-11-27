@@ -52,8 +52,9 @@
   >
     <Icon size={18} aria-hidden="true" class="flex-shrink-0 {iconColors[type]}" />
     <p aria-hidden="true" class="text-sm font-medium">{message}</p>
-    <a href={action.href} onclick={dismiss} class="text-sm font-semibold underline underline-offset-2">{action.label}</a
-    >
+    <a href={action.href} onclick={dismiss} class="text-sm font-semibold underline underline-offset-2">
+      {action.label}
+    </a>
     <button
       type="button"
       aria-label="Dismiss notification"

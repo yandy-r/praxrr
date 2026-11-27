@@ -5,7 +5,8 @@ Praxrr manages quality profiles, custom formats, and release profiles for Radarr
 ## Tech Stack
 
 - **Runtime:** Deno 2.x
-- **Web framework:** SvelteKit (Vite + sveltekit-adapter-deno), Svelte 5
+- **Web framework:** SvelteKit 3 (Vite + `@sveltejs/adapter-node`, compiled into one binary with
+  `deno compile`), Svelte 5
 - **Database:** SQLite (app DB via Kysely) + in-memory SQLite (PCD cache)
 - **UI:** Tailwind CSS v4
 - **Parser:** Go microservice (Go 1.26.11 toolchain, optional for CF/profile testing)
@@ -84,7 +85,8 @@ Praxrr runs as a monorepo workspace with the app runtime in `packages/praxrr-app
 
 ### Path Aliases
 
-Defined in `packages/praxrr-app/svelte.config.js` and mirrored in `deno.json`:
+Defined in the `alias` option of `sveltekit({...})` in `packages/praxrr-app/vite.config.ts`
+(SvelteKit 3 does not read `svelte.config.js`) and mirrored in `deno.json`:
 
 | Alias             | Path                                                        |
 | ----------------- | ----------------------------------------------------------- |

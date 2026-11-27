@@ -21,7 +21,7 @@
     saveLocalOnly,
   } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { Info, Plus, FileText, Users } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { alertStore } from '$alerts/store';
@@ -286,14 +286,18 @@
           href="https://regex101.com"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-accent-600 dark:text-accent-400 hover:underline">regex101.com</a
+          class="text-accent-600 dark:text-accent-400 hover:underline"
         >
+          regex101.com
+        </a>
         to test your patterns. Make sure to select the <strong>.NET</strong> flavor from the dropdown for accurate results.
       </p>
       <p class="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
         Tip: When saving a regex101 link, include the version number (e.g., <code
-          class="rounded bg-neutral-100 px-1 dark:bg-neutral-800">ABC123/1</code
-        >) to ensure it always points to your specific version.
+          class="rounded bg-neutral-100 px-1 dark:bg-neutral-800"
+        >
+          ABC123/1
+        </code>) to ensure it always points to your specific version.
       </p>
     </section>
   </div>

@@ -218,9 +218,9 @@
                 </div>
                 <div class="flex items-center gap-3">
                   <ShieldFixControl fix={action.fix} />
-                  <span class="text-xs font-semibold text-neutral-500 dark:text-neutral-400"
-                    >+{action.recoverablePoints} pts</span
-                  >
+                  <span class="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                    +{action.recoverablePoints} pts
+                  </span>
                 </div>
               </div>
             </Card>
@@ -297,14 +297,14 @@
                           <Badge variant={row.scheme === 'https' ? 'success' : 'danger'}>{row.scheme}</Badge>
                         </td>
                         <td class="py-1.5 pr-3 font-mono text-neutral-600 dark:text-neutral-400">{row.host}</td>
-                        <td class="py-1.5 pr-3"
-                          ><Badge variant={tierVariant(row.tier)}>{TRANSPORT_TIER_LABEL[row.tier]}</Badge></td
-                        >
+                        <td class="py-1.5 pr-3">
+                          <Badge variant={tierVariant(row.tier)}>{TRANSPORT_TIER_LABEL[row.tier]}</Badge>
+                        </td>
                         <td class="min-w-72 py-2 pr-3 align-top">
                           <div class="flex flex-wrap items-center gap-1.5">
-                            <Badge variant={dnsOutcomeVariant(row.dns.outcome)}
-                              >{DNS_OUTCOME_LABEL[row.dns.outcome]}</Badge
-                            >
+                            <Badge variant={dnsOutcomeVariant(row.dns.outcome)}>
+                              {DNS_OUTCOME_LABEL[row.dns.outcome]}
+                            </Badge>
                             {#if row.dns.incomplete}
                               <Badge variant="warning">Incomplete</Badge>
                             {/if}
@@ -346,9 +346,9 @@
             {#if check.id === 'arr_transport' && summary.transport.length === 0}
               <p class="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
                 No enabled Radarr, Sonarr, or Lidarr instances to grade for transport.
-                <a href="/arr" class="text-accent-600 dark:text-accent-500 font-medium hover:underline"
-                  >Add an Arr instance →</a
-                >
+                <a href="/arr" class="text-accent-600 dark:text-accent-500 font-medium hover:underline">
+                  Add an Arr instance →
+                </a>
               </p>
             {/if}
 

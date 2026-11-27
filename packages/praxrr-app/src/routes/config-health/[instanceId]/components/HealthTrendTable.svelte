@@ -223,9 +223,9 @@
                 >
                   {POINT_STATE_LABEL[point.state]}
                 </span>
-                <span class="mt-1 block font-mono text-[0.7rem] text-neutral-500 dark:text-neutral-400"
-                  >{point.state}</span
-                >
+                <span class="mt-1 block font-mono text-[0.7rem] text-neutral-500 dark:text-neutral-400">
+                  {point.state}
+                </span>
               </td>
               <td class="px-4 py-4 text-neutral-800 dark:text-neutral-200">
                 <span class="block font-semibold">Score: {formatPointScore(point)}</span>

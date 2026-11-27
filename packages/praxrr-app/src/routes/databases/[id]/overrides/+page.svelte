@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { Undo2, RotateCcw, AlertTriangle } from 'lucide-svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';

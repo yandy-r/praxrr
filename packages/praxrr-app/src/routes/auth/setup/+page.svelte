@@ -43,8 +43,10 @@
       >
         <p class="text-xs font-medium text-neutral-700 dark:text-neutral-300">
           Configure authentication via the <code
-            class="rounded bg-neutral-200 px-1 py-0.5 text-[11px] dark:bg-neutral-700">AUTH</code
-          > environment variable:
+            class="rounded bg-neutral-200 px-1 py-0.5 text-[11px] dark:bg-neutral-700"
+          >
+            AUTH
+          </code> environment variable:
         </p>
         <ul class="mt-3 space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
           <li class="flex items-center gap-2">

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { AlertTriangle } from 'lucide-svelte';
   import type { components } from '$api/v1.d.ts';
   import JsonView from '$ui/meta/JsonView.svelte';

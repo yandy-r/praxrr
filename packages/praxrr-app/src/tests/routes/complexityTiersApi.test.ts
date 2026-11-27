@@ -13,8 +13,10 @@ import { API_TOKEN_SCOPES } from '$shared/auth/apiTokenScopes.ts';
 import type { SectionKey } from '$shared/disclosure/sectionKeys.ts';
 
 type Restore = () => void;
-type PatchEvent = Parameters<typeof PATCH>[0];
-type GetEvent = Parameters<typeof GET>[0];
+// Kit 3 marks RequestEvent fields readonly; these tests build and adjust fake events.
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+type PatchEvent = Writable<Parameters<typeof PATCH>[0]>;
+type GetEvent = Writable<Parameters<typeof GET>[0]>;
 
 function restoreAll(restores: Restore[]): void {
   for (const restore of restores.reverse()) {

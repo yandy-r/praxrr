@@ -4,7 +4,7 @@
   import DetailField from '../../../components/DetailField.svelte';
   import Markdown from '$ui/display/Markdown.svelte';
   import { ExternalLink } from 'lucide-svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: source = $page.data.source;
   $: entity = $page.data.entity;

@@ -3,7 +3,7 @@
   import DetailCard from '../../components/DetailCard.svelte';
   import DetailField from '../../components/DetailField.svelte';
   import CodeBlock from '$ui/display/CodeBlock.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: source = $page.data.source;
   $: entity = $page.data.entity;

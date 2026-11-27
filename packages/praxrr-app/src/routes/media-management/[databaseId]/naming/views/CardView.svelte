@@ -161,9 +161,9 @@
             {/if}
           </div>
           <div class="min-w-0">
-            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100"
-              >{getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}</span
-            >
+            <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              {getMediaManagementDisplayName(config.name, config.arr_type, config.sourceType)}
+            </span>
             <div class="mt-1 flex flex-wrap items-center gap-1.5">
               {#if showSourceBadges}
                 {@const source = resolveSource(config)}

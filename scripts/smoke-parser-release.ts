@@ -193,12 +193,10 @@ async function validateLayout(options: Options): Promise<{ app: string; parser: 
   const directory = await Deno.realPath(options.directory);
   const app = join(directory, expectedFiles.app);
   const parser = join(directory, expectedFiles.parser);
-  for (const path of [app, parser, join(directory, 'server.js')]) {
+  // The adapter-node build embeds its client assets in the app binary.
+  for (const path of [app, parser]) {
     const info = await Deno.stat(path);
     if (!info.isFile) fail(`${path} must be a regular file`);
-  }
-  if (!(await Deno.stat(join(directory, 'static'))).isDirectory) {
-    fail('archive static entry must be a directory');
   }
   await validateMagic(app, expectedFiles.magic);
   await validateMagic(parser, expectedFiles.magic);

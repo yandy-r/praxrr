@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import type { LocallyModifiable } from '$shared/pcd/display/common.ts';
 
 export function filterLocallyModified<T extends LocallyModifiable>(rows: T[], onlyLocal: boolean): T[] {

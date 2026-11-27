@@ -1,5 +1,5 @@
 {
-  "extends": "./dist/.svelte-kit/tsconfig.json",
+  "extends": "./packages/praxrr-app/node_modules/$app/tsconfig.json",
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
@@ -11,14 +11,21 @@
     "strict": true,
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM"],
-    "types": ["deno"],
+    "types": ["deno", "./packages/praxrr-app/node_modules/$app/types"],
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    // Kit 3's generated config forces module detection; src/types/*.ts hold ambient
+    // `declare module` shims that must stay global scripts.
+    "moduleDetection": "auto"
   },
+  // Kit 3's generated tsconfig no longer lists the app's files, so scope type checking to them here.
+  "include": [
+    "packages/praxrr-app/vite.config.ts",
+    "packages/praxrr-app/src/**/*.js",
+    "packages/praxrr-app/src/**/*.ts",
+    "packages/praxrr-app/src/**/*.svelte"
+  ],
   "exclude": ["packages/praxrr-app/src/tests/**"]
-  // Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
-  // except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
-  //
-  // To make changes to top-level options such as include and exclude, we recommend extending
-  // the generated config; see https://svelte.dev/docs/kit/configuration#typescript
+  // Path aliases (including $lib) come from the `alias` option in packages/praxrr-app/vite.config.ts;
+  // SvelteKit writes them to packages/praxrr-app/node_modules/$app/tsconfig.json, extended above.
 }

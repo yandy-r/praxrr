@@ -3,7 +3,7 @@
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';
   import { alertStore } from '$alerts/store';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   // Minimal client-safe mirror of the server `TrashGuideSyncStatusView` / evidence contract (#238).
   interface RunCounts {

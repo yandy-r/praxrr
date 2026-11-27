@@ -3,8 +3,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { get } from 'svelte/store';
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { browser } from '$app/env';
+  import { page } from '$stores/page';
   import { Film, Tv, Link, Shield, Play, Eraser, AlertTriangle } from 'lucide-svelte';
   import Button from '$ui/button/Button.svelte';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
@@ -59,7 +59,7 @@
 
     localStorage.setItem(DATABASE_STORAGE_KEY, String(data.currentDatabase.id));
 
-    const urlState = parseUrlState($page.url.searchParams);
+    const urlState = parseUrlState(new URLSearchParams($page.url.search));
 
     if (urlState.arrType) {
       arrType = urlState.arrType;
@@ -336,9 +336,9 @@
       class="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
     >
       <AlertTriangle size={16} />
-      <span
-        >Parser service unavailable — release scoring is disabled. Config diff and cascade results are still shown.</span
-      >
+      <span>
+        Parser service unavailable — release scoring is disabled. Config diff and cascade results are still shown.
+      </span>
     </div>
   {/if}
 

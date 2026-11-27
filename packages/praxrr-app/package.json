@@ -1,0 +1,6 @@
+{
+  "name": "@yandy-r/praxrr-app-build",
+  "private": true,
+  "description": "Build-time manifest only: @sveltejs/adapter-node reads package.json from the Vite root and externalizes its dependencies. Keep dependencies empty so the server is fully bundled for deno compile. Real dependencies live in the repo-root package.json.",
+  "type": "module"
+}
