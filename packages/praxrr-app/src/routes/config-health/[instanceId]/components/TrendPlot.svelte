@@ -125,9 +125,9 @@
         stroke-width="1"
         vector-effect="non-scaling-stroke"
       />
-      <text x={geometry.padding.left - 8} y={tick.y + 4} text-anchor="end" class="fill-current text-[11px]"
-        >{tick.score}</text
-      >
+      <text x={geometry.padding.left - 8} y={tick.y + 4} text-anchor="end" class="fill-current text-[11px]">
+        {tick.score}
+      </text>
     {/each}
 
     {#if currentPolicyReference !== null}
@@ -146,8 +146,9 @@
         y={policyY(currentPolicyReference.healthyThreshold) - 4}
         text-anchor="end"
         class="fill-emerald-800 text-[10px] font-medium dark:fill-emerald-300"
-        >v{currentPolicyReference.engineVersion} current healthy {currentPolicyReference.healthyThreshold}+</text
       >
+        v{currentPolicyReference.engineVersion} current healthy {currentPolicyReference.healthyThreshold}+
+      </text>
       <line
         x1={geometry.padding.left}
         x2={geometry.width - geometry.padding.right}
@@ -163,8 +164,9 @@
         y={policyY(currentPolicyReference.attentionThreshold) - 4}
         text-anchor="end"
         class="fill-amber-800 text-[10px] font-medium dark:fill-amber-300"
-        >v{currentPolicyReference.engineVersion} current attention {currentPolicyReference.attentionThreshold}+</text
       >
+        v{currentPolicyReference.engineVersion} current attention {currentPolicyReference.attentionThreshold}+
+      </text>
     {/if}
 
     {#each visibleEngineRules as boundary (`${boundary.pointIndex}-${boundary.engineVersion}`)}
@@ -178,9 +180,9 @@
         stroke-dasharray="6 4"
         vector-effect="non-scaling-stroke"
       />
-      <text x={boundary.x + 4} y={geometry.padding.top + 11} class="fill-current text-[10px] font-semibold"
-        >v{boundary.engineVersion}</text
-      >
+      <text x={boundary.x + 4} y={geometry.padding.top + 11} class="fill-current text-[10px] font-semibold">
+        v{boundary.engineVersion}
+      </text>
     {/each}
 
     {#if primaryPath !== null}
@@ -274,8 +276,10 @@
         x={tick.x}
         y={geometry.height - 10}
         text-anchor={tickAnchor(index, geometry.timeTicks.length)}
-        class="fill-current text-[11px]">{formatTick(tick.timestamp, geometry.domain)}</text
+        class="fill-current text-[11px]"
       >
+        {formatTick(tick.timestamp, geometry.domain)}
+      </text>
     {/each}
   </svg>
 </div>

@@ -181,9 +181,9 @@
             {#if idx > 0}
               <span class="text-xs text-neutral-400">›</span>
             {/if}
-            <Label variant={quality.is_upgrade_until ? 'success' : 'secondary'} size="sm" rounded="md" mono
-              >{quality.name}</Label
-            >
+            <Label variant={quality.is_upgrade_until ? 'success' : 'secondary'} size="sm" rounded="md" mono>
+              {quality.name}
+            </Label>
           {/each}
           {#if profile.qualities.length > 3}
             <span class="text-[10px] text-neutral-500 dark:text-neutral-400">

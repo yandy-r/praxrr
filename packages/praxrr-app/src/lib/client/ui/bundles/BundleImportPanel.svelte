@@ -147,8 +147,7 @@
         disabled={busy}
         rows="8"
         class="w-full rounded-md border border-neutral-300 bg-white p-3 font-mono text-xs dark:border-neutral-700 dark:bg-neutral-950"
-        placeholder={'{"version": 1, "entities": [...]}'}
-      ></textarea>
+        placeholder={'{"version": 1, "entities": [...]}'}></textarea>
       <label for={id + '-file'} class="block text-sm font-medium">Or upload a JSON file (up to 5 MiB)</label>
       <input
         id={id + '-file'}
@@ -186,8 +185,10 @@
         class="rounded-md border border-neutral-300 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-950"
       >
         <option value="skip">Skip existing</option><option value="rename">Rename incoming</option><option
-          value="overwrite">Overwrite existing</option
+          value="overwrite"
         >
+          Overwrite existing
+        </option>
       </select>
     </label>
   </fieldset>
@@ -210,26 +211,29 @@
         </p>{/if}
       <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-neutral-800">
         <table class="w-full text-left text-sm">
-          <thead class="bg-neutral-100 dark:bg-neutral-800"
-            ><tr
-              ><th class="p-2">Entity type</th><th class="p-2">Name → final name</th><th class="p-2">Action</th><th
-                class="p-2">Collision policy</th
-              ></tr
-            ></thead
-          >
+          <thead class="bg-neutral-100 dark:bg-neutral-800">
+            <tr>
+              <th class="p-2">Entity type</th><th class="p-2">Name → final name</th><th class="p-2">Action</th><th
+                class="p-2"
+              >
+                Collision policy
+              </th>
+            </tr>
+          </thead>
           <tbody>
             {#each report.outcomes as outcome}
               <tr class="border-t border-neutral-200 dark:border-neutral-800">
-                <td class="p-2">{outcome.entityType}</td><td class="p-2"
-                  >{outcome.name}{#if outcome.finalName && outcome.finalName !== outcome.name}
-                    → {outcome.finalName}{/if}</td
-                >
-                <td class="p-2"
-                  ><span class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800">{outcome.action}</span
-                  >{#if outcome.error}<p class="text-red-600 dark:text-red-400">{outcome.error}</p>{/if}</td
-                >
-                <td class="p-2"
-                  ><select
+                <td class="p-2">{outcome.entityType}</td><td class="p-2">
+                  {outcome.name}{#if outcome.finalName && outcome.finalName !== outcome.name}
+                    → {outcome.finalName}{/if}
+                </td>
+                <td class="p-2">
+                  <span class="rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800">
+                    {outcome.action}
+                  </span>{#if outcome.error}<p class="text-red-600 dark:text-red-400">{outcome.error}</p>{/if}
+                </td>
+                <td class="p-2">
+                  <select
                     aria-label={`Collision policy for ${outcome.entityType}: ${outcome.name}`}
                     disabled={busy || report.applied}
                     value={overrides[`${outcome.entityType}:${outcome.name}`] ?? ''}
@@ -244,11 +248,11 @@
                     }}
                     class="rounded border border-neutral-300 bg-white p-1 dark:border-neutral-700 dark:bg-neutral-950"
                   >
-                    <option value="">Use default</option><option value="skip">Skip</option><option value="rename"
-                      >Rename</option
-                    ><option value="overwrite">Overwrite</option>
-                  </select></td
-                >
+                    <option value="">Use default</option><option value="skip">Skip</option><option value="rename">
+                      Rename
+                    </option><option value="overwrite">Overwrite</option>
+                  </select>
+                </td>
               </tr>
             {/each}
           </tbody>

@@ -383,8 +383,9 @@
           />
           <kbd
             class="hidden shrink-0 rounded border border-neutral-200 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500 sm:inline dark:border-neutral-700 dark:text-neutral-400"
-            >Esc</kbd
           >
+            Esc
+          </kbd>
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto p-2" bind:this={listboxEl}>
@@ -418,13 +419,13 @@
                     >
                       <span class="min-w-0 flex-1 truncate">{item.label}</span>
                       {#if item.description}
-                        <span class="shrink-0 truncate text-xs text-neutral-500 dark:text-neutral-400"
-                          >{item.description}</span
-                        >
+                        <span class="shrink-0 truncate text-xs text-neutral-500 dark:text-neutral-400">
+                          {item.description}
+                        </span>
                       {:else if item.group === 'recent' && recentKindLabel(item.kind)}
-                        <span class="shrink-0 text-xs text-neutral-500 dark:text-neutral-400"
-                          >{recentKindLabel(item.kind)}</span
-                        >
+                        <span class="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">
+                          {recentKindLabel(item.kind)}
+                        </span>
                       {/if}
                       {#if item.source}
                         <SourceBadge

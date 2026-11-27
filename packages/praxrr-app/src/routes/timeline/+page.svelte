@@ -407,9 +407,9 @@
                 <p class="break-words">{note.body}</p>
                 <div class="mt-1 flex items-center justify-between text-xs text-neutral-400">
                   <span>{note.authorName ?? 'Unknown'} · {formatWhen(note.createdAt)}</span>
-                  <button type="button" class="text-red-500 hover:underline" on:click={() => deleteNote(note.id)}
-                    >Delete</button
-                  >
+                  <button type="button" class="text-red-500 hover:underline" on:click={() => deleteNote(note.id)}>
+                    Delete
+                  </button>
                 </div>
               </li>
             {/each}

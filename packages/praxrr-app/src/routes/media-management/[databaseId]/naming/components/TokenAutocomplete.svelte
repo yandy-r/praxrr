@@ -171,8 +171,10 @@
             <span
               class="font-mono text-sm {highlightedIndex === index
                 ? 'text-neutral-900 dark:text-neutral-50'
-                : 'text-neutral-700 dark:text-neutral-200'}">{token.token}</span
+                : 'text-neutral-700 dark:text-neutral-200'}"
             >
+              {token.token}
+            </span>
             <span class="text-xs text-neutral-400 dark:text-neutral-500">{token.category}</span>
           </div>
           <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{token.description}</p>

@@ -177,12 +177,12 @@
               class="mt-0.5 h-4 w-4 rounded border-neutral-300 dark:border-neutral-700"
             />
             <span>
-              <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-50"
-                >{API_TOKEN_SCOPE_INFO[scope].label}</span
-              >
-              <span class="block text-xs text-neutral-500 dark:text-neutral-400"
-                >{API_TOKEN_SCOPE_INFO[scope].description}</span
-              >
+              <span class="block text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                {API_TOKEN_SCOPE_INFO[scope].label}
+              </span>
+              <span class="block text-xs text-neutral-500 dark:text-neutral-400">
+                {API_TOKEN_SCOPE_INFO[scope].description}
+              </span>
             </span>
           </label>
         {/each}

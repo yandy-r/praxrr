@@ -169,8 +169,9 @@
             >
               <span
                 class="font-medium {level === 'ALL' ? 'text-neutral-600 dark:text-neutral-400' : levelColors[level]}"
-                >{level}</span
               >
+                {level}
+              </span>
             </button>
           {/each}
         </Dropdown>

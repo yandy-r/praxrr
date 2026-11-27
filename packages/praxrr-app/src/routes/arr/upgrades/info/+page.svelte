@@ -130,8 +130,10 @@
       <p>
         Radarr and Sonarr don't search for the best release. They monitor RSS feeds and grab the first thing that
         qualifies as an upgrade. To get optimal releases, you need manual searches. This module automates that: <span
-          class="font-medium text-neutral-700 dark:text-neutral-300">Filter</span
+          class="font-medium text-neutral-700 dark:text-neutral-300"
         >
+          Filter
+        </span>
         your library,
         <span class="font-medium text-neutral-700 dark:text-neutral-300">Select</span> items to search, then
         <span class="font-medium text-neutral-700 dark:text-neutral-300">Search</span> for better releases.

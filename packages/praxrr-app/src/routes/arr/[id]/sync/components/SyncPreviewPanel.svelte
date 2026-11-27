@@ -965,9 +965,9 @@
           <div class="space-y-2 rounded-md border border-neutral-200 px-3 py-3 dark:border-neutral-700">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                Confirmed apply outcomes <span class="text-neutral-500 dark:text-neutral-400"
-                  >({applyOutcomes.length})</span
-                >
+                Confirmed apply outcomes <span class="text-neutral-500 dark:text-neutral-400">
+                  ({applyOutcomes.length})
+                </span>
               </p>
               {#if applySyncHistoryId !== null}
                 <a

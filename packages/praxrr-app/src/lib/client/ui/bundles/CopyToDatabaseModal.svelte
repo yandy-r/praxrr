@@ -73,8 +73,8 @@
     {#if loading}
       <p role="status">Loading bundle and databases…</p>
     {:else if bundle && targets.length}
-      <label class="block space-y-1 text-sm"
-        ><span class="block font-medium">Target database</span>
+      <label class="block space-y-1 text-sm">
+        <span class="block font-medium">Target database</span>
         <select
           bind:value={targetId}
           disabled={importing}

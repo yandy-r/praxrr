@@ -198,8 +198,10 @@
             href="https://www.themoviedb.org/settings/api"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-accent-600 dark:text-accent-400 hover:underline">themoviedb.org</a
+            class="text-accent-600 dark:text-accent-400 hover:underline"
           >
+            themoviedb.org
+          </a>
         </p>
         {#if settings.has_api_key}
           <button
