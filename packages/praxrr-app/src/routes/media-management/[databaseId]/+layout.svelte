@@ -1,7 +1,7 @@
 <script lang="ts">
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
-  import { page } from '$app/stores';
-  import { browser } from '$app/environment';
+  import { page } from '$stores/page';
+  import { browser } from '$app/env';
   import type { LayoutData } from './$types';
 
   export let data: LayoutData;

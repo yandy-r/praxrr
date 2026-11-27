@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { alertStore } from '$alerts/store';
 import { get, writable, type Readable, type Writable } from 'svelte/store';
 import {

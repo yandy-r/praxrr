@@ -8,7 +8,7 @@
   import { escapeHtml } from '$lib/client/utils/escapeHtml.ts';
   import { locallyModifiedBadgeHtml } from '$ui/badge/locallyModified.ts';
   import { Tag, Clock, Zap, Shield, Copy, Download } from 'lucide-svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   export let profiles: DelayProfileListItem[];
 

@@ -94,7 +94,7 @@ Variants and notes:
   auth pages it renders without those offsets.
 - Uses a `pointer-events-none` wrapper with `pointer-events-auto` per alert so clicks pass
   through empty areas. Keyed `each` block over `$alertStore` by `alert.id`. `AlertPosition`
-  is imported from `./settings`; `$app/stores` `page` is used to detect `/auth/` pathnames.
+  is imported from `./settings`; `page` from `$stores/page` is used to detect `/auth/` pathnames.
 
 ## MobileNavAlert
 

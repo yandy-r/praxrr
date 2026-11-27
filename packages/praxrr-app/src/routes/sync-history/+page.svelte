@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { History, Download, ChevronLeft, ChevronRight, X } from 'lucide-svelte';
   import Card from '$ui/card/Card.svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';
@@ -183,7 +183,7 @@
   let toValue = (data.filters.to ?? '').slice(0, 10);
 
   function updateParams(next: Record<string, string | number | undefined | null>) {
-    const url = new URL($page.url);
+    const url = new URL($page.url.href);
     for (const [key, value] of Object.entries(next)) {
       if (value === undefined || value === null || value === '') {
         url.searchParams.delete(key);
@@ -234,7 +234,7 @@
 
   // Export shares the active filters (minus pagination) and appends a format param.
   $: exportQuery = (() => {
-    const params = new URLSearchParams($page.url.searchParams);
+    const params = new URLSearchParams($page.url.search);
     params.delete('page');
     params.delete('pageSize');
     return params.toString();

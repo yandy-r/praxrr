@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { get, writable, type Readable, type Writable } from 'svelte/store';
 import { COMPLEXITY_TIERS, type ComplexityTier, type SectionKey } from '$shared/complexity/tiers.ts';
 import { createDebouncedSectionSync, type BaseSectionSyncState } from './sectionDebouncedSync.ts';

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { Camera, Plus, Trash2 } from 'lucide-svelte';
   import Card from '$ui/card/Card.svelte';
   import CardGrid from '$ui/card/CardGrid.svelte';

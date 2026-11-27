@@ -16,8 +16,10 @@ interface StorePreference {
   updatedAt: string;
 }
 
-type PatchEvent = Parameters<typeof PATCH>[0];
-type GetEvent = Parameters<typeof GET>[0];
+// Kit 3 marks RequestEvent fields readonly; these tests build and adjust fake events.
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+type PatchEvent = Writable<Parameters<typeof PATCH>[0]>;
+type GetEvent = Writable<Parameters<typeof GET>[0]>;
 
 interface RestorableRequest {
   restores: Restore[];

@@ -9,8 +9,8 @@
   import SetupChecklist from '$ui/setup/SetupChecklist.svelte';
   import CommandPalette from '$ui/command-palette/CommandPalette.svelte';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { browser } from '$app/env';
+  import { page } from '$stores/page';
   import { eventsStore } from '$stores/events';
   import { startJobToasts } from '$lib/client/events/jobToasts';
 

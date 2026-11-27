@@ -116,7 +116,7 @@ services:
             - .eslintignore
             - ./**/*.md
         - action: rebuild
-          path: ./packages/praxrr-app/svelte.config.js
+          path: ./packages/praxrr-app/server-entry.js
         - action: rebuild
           path: ./packages/praxrr-app/vite.config.ts
         - action: rebuild

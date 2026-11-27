@@ -1,4 +1,13 @@
-import type { ActionResult } from '@sveltejs/kit';
+/**
+ * The parts of SvelteKit's form `ActionResult` this module reads. Kit 3 only exports the type from
+ * the virtual `$app/forms` module, which `deno test` cannot resolve; kit's `deserialize()` result is
+ * assignable to this shape.
+ */
+export type ActionResult =
+  | { type: 'success'; status: number; data?: Record<string, unknown> }
+  | { type: 'failure'; status: number; data?: Record<string, unknown> }
+  | { type: 'redirect'; status: number; location: string }
+  | { type: 'error'; status?: number; error: unknown };
 
 export type FormActionResult =
   | { ok: true; data: Record<string, unknown> }

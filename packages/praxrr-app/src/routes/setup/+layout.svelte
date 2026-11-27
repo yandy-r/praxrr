@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LayoutData } from './$types';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { goto, afterNavigate } from '$app/navigation';
   import { alertStore } from '$alerts/store';
   import Button from '$ui/button/Button.svelte';

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page as pageStore } from '$app/stores';
+  import { page as pageStore } from '$stores/page';
   import { AlertTriangle, Film, ExternalLink, CircleAlert, Check, ChevronLeft, ChevronRight } from 'lucide-svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import ExpandableTable from '$ui/table/ExpandableTable.svelte';
   import type { Column, SortState } from '$ui/table/types';
   import Badge from '$ui/badge/Badge.svelte';
@@ -167,7 +167,7 @@
       return;
     }
 
-    const currentUrl = new URL($pageStore.url);
+    const currentUrl = new URL($pageStore.url.href);
     const url = new URL(currentUrl);
     if (updates.page === undefined) {
       url.searchParams.delete('page');
@@ -187,8 +187,8 @@
 
     goto(url.toString(), {
       replaceState: true,
-      noScroll: true,
-      keepFocus: true,
+      // Kit 3 replaced noScroll/keepFocus with `reset`.
+      reset: false,
       invalidateAll: true,
     });
   };
@@ -434,7 +434,7 @@
   let currentInstanceId: number | null = null;
 
   $: if (browser) {
-    syncPaginationFromUrl($pageStore.url);
+    syncPaginationFromUrl(new URL($pageStore.url.href));
   }
 
   $: {

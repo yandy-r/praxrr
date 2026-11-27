@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { resolveNavIcon } from '$lib/client/navigation/iconMap';
   import NavBadgePill from '../NavBadgePill.svelte';
   import { navIconStore } from '$stores/navIcons';

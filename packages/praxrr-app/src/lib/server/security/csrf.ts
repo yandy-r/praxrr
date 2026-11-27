@@ -2,13 +2,14 @@
  * Runtime, proxy-aware CSRF origin gate (YAN-433 / #276).
  *
  * SvelteKit's built-in `csrf.trustedOrigins` is a build-time constant baked into the generated
- * server bundle, so it cannot read runtime env vars. The previous `trustedOrigins: ['*']` wildcard
- * disabled the origin check app-wide, in dev AND in production builds, letting cross-site
- * form/`text/plain` requests (including `text/plain` bodies containing JSON) reach every form
- * action and `+server.ts` handler.
+ * server bundle, so it cannot read runtime env vars. Before YAN-433, `trustedOrigins: ['*']`
+ * disabled SvelteKit's check with nothing in its place, letting cross-site form/`text/plain`
+ * requests (including `text/plain` bodies containing JSON) reach every form action and
+ * `+server.ts` handler.
  *
- * This module replaces that check at runtime in `hooks.server.ts` (`checkOrigin` stays disabled in
- * `svelte.config.js` so this hook is the single source of truth):
+ * This module replaces that check at runtime in `hooks.server.ts` (SvelteKit's own check stays
+ * compiled out via `csrf.trustedOrigins: ['*']` in `vite.config.ts`, so this hook is the single
+ * source of truth):
  *
  * - EVERY mutating request (POST/PUT/PATCH/DELETE) is rejected with 403 when the `Origin` header
  *   is present and does not match an expected origin, regardless of `Content-Type`. Handlers call
@@ -27,7 +28,7 @@
  * `X-Forwarded-Host`; the first token is used, so an appended client-supplied value would win.
  */
 
-import type { Handle } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { config } from '$config';
 import { logger } from '$logger/logger.ts';
 import { firstForwardedValue } from '$http/forwardedHeader.ts';

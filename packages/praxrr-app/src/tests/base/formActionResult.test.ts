@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert';
-import type { ActionResult } from '@sveltejs/kit';
 import { parse, stringify } from 'npm:devalue';
 import {
+  type ActionResult,
   failedActionResponse,
   interpretActionResult,
   submitFormActionVia,

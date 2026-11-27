@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import type { components } from '$api/v1.d.ts';
   import { alertStore } from '$alerts/store';
   import { NODE_META } from '$ui/graph/nodeStyles.ts';

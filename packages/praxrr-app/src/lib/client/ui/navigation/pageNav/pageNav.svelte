@@ -12,7 +12,7 @@
   import { navScope } from '$stores/navScope.ts';
   import { ARR_CONDITION_TARGET_OPTIONS, supportsFeature, type ArrFeature } from '$shared/arr/capabilities.ts';
   import { NAV_GROUP_ID } from '$shared/navigation/constants.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { type ArrType } from '$shared/pcd/types.ts';
   import type { NavGroupId, NavShell, ResolvedNavItem } from '$shared/navigation/types.ts';
   import SectionHeader from './sectionHeader.svelte';

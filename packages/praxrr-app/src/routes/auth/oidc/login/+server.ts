@@ -80,5 +80,6 @@ export const GET: RequestHandler = async (event) => {
     codeChallenge,
   });
 
-  throw redirect(302, authUrl);
+  // Kit 3 rejects external redirects unless they are allowed; only the IdP's own origin is.
+  throw redirect(302, authUrl, { external: [discovery.authorization_endpoint] });
 };

@@ -143,9 +143,10 @@ function rightmostForwarded(headerValue: string): string | null {
  * the rightmost hop wins; a proxy that sets only `X-Real-IP` while forwarding the client's raw
  * `X-Forwarded-For` reopens the AUTH=local bypass (the forged XFF is returned before X-Real-IP is read).
  *
- * NOTE: this also relies on `event.getClientAddress()` returning the real socket peer. `sveltekit-adapter-deno`
- * does so today; enabling any adapter XFF/address override — or fronting Praxrr with a PROXY-protocol
- * terminator that rewrites the peer — would silently defeat `TRUSTED_PROXY`.
+ * NOTE: this also relies on `event.getClientAddress()` returning the real socket peer. `@sveltejs/adapter-node`
+ * does so while its `ADDRESS_HEADER`/`XFF_DEPTH` overrides are unset, and `server-entry.js` strips both
+ * at startup; enabling an address override — or fronting Praxrr with a PROXY-protocol terminator that
+ * rewrites the peer — would silently defeat `TRUSTED_PROXY`.
  */
 export function getClientIp(
   event: { getClientAddress: () => string; request: Request },

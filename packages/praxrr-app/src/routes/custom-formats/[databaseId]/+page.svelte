@@ -14,7 +14,7 @@
   import CardView from './views/CardView.svelte';
   import SearchFilterAction from './components/SearchFilterAction.svelte';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { Info, Plus } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { alertStore } from '$alerts/store';

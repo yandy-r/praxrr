@@ -6,7 +6,7 @@
   import Table from '$ui/table/Table.svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import type { Column } from '$ui/table/types.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: source = $page.data.source;
   $: entity = $page.data.entity;

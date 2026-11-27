@@ -146,16 +146,18 @@ jobs:
       - name: Compile application binary
         shell: bash
         run: |
-          mkdir -p dist/staging
+          mkdir -p dist/staging dist/build/prerendered
+          # adapter-node output; static assets are embedded with --include
+          cp packages/praxrr-app/server-entry.js dist/build/server-entry.js
           deno compile \
             --no-check \
             --allow-net --allow-read --allow-write \
             --allow-env --allow-ffi --allow-run --allow-sys \
             --target "${{ matrix.deno_target }}" \
+            --include dist/build/client \
+            --include dist/build/prerendered \
             --output "dist/staging/praxrr${{ matrix.binary_ext }}" \
-            dist/build/mod.ts
-          cp dist/build/server.js dist/staging/server.js
-          cp -R dist/build/static dist/staging/static
+            dist/build/server-entry.js
 
       - name: Build pinned static Go parser
         shell: bash

@@ -3,7 +3,7 @@
   import type { UpgradeJobLog } from '$lib/server/upgrades/types.ts';
   import { createSearchStore, getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import type { Readable } from 'svelte/store';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import SearchAction from '$ui/actions/SearchAction.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';

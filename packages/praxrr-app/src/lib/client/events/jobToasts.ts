@@ -2,7 +2,7 @@
  * Bridges `job.finished` live events to `alertStore` toasts with a "View details" link. Correlates
  * the run with its `sync.recorded` history row (when one arrived first) and dedupes replays.
  */
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 import { alertStore } from '$alerts/store';
 import { eventsStore } from '$stores/events';
 import {
@@ -13,6 +13,9 @@ import {
   ToastCoalescer,
 } from '$lib/client/events/toastPolicy.ts';
 import type { SyncOperationStatus } from '$sync/syncHistory/types.ts';
+
+// Kit 3 removed `base` from $app/paths; resolve('/') is the base path plus a trailing slash.
+const base = resolve('/').slice(0, -1);
 
 interface CorrelatedHistory {
   id: number;
