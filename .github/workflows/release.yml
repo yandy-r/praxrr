@@ -253,7 +253,7 @@ jobs:
               "Expand-Archive -LiteralPath 'dist/${{ steps.archive.outputs.name }}' -DestinationPath 'dist/smoke' -Force"
           fi
 
-      - name: Smoke archive layout and native runtime
+      - name: Smoke archive layout, native runtime and app HTTP
         shell: bash
         run: |
           deno run -A scripts/smoke-parser-release.ts \
