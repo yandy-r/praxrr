@@ -23,8 +23,10 @@ COPY . .
 RUN deno install --node-modules-dir
 
 # Build the application
-# 1. Vite builds SvelteKit to dist/build/
-# 2. Deno compiles to standalone binary
+# 1. Vite builds SvelteKit with @sveltejs/adapter-node to dist/build/
+#    (index.js, handler.js, server/, client/)
+# 2. Deno compiles server-entry.js into a standalone binary that embeds the
+#    client/ and prerendered/ assets
 
 # Build-time variables for version card
 # TARGETARCH is automatically set by Docker buildx (amd64 or arm64)
@@ -35,6 +37,8 @@ ENV VITE_CHANNEL=${VITE_CHANNEL}
 
 ENV APP_BASE_PATH=/build/dist/build
 RUN cd packages/praxrr-app && deno run -A npm:vite build
+RUN cp packages/praxrr-app/server-entry.js dist/build/server-entry.js \
+  && mkdir -p dist/build/prerendered
 RUN for i in 1 2 3; do \
     deno compile \
       --no-check \
@@ -46,8 +50,10 @@ RUN for i in 1 2 3; do \
       --allow-run \
       --allow-sys \
       --target x86_64-unknown-linux-gnu \
+      --include dist/build/client \
+      --include dist/build/prerendered \
       --output dist/build/praxrr \
-      dist/build/mod.ts && break; \
+      dist/build/server-entry.js && break; \
     status=$?; \
     if [ "$i" = "3" ]; then \
       exit "$status"; \
@@ -85,10 +91,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create application directory
 WORKDIR /app
 
-# Copy built application from builder stage
+# Copy built application from builder stage (static assets are embedded in the binary)
 COPY --from=builder /build/dist/build/praxrr /app/praxrr
-COPY --from=builder /build/dist/build/server.js /app/server.js
-COPY --from=builder /build/dist/build/static /app/static
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh

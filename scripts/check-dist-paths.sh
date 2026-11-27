@@ -35,7 +35,7 @@ check_patterns() {
 }
 
 check_patterns deno.json
-check_patterns packages/praxrr-app/svelte.config.js
+check_patterns packages/praxrr-app/vite.config.ts
 check_patterns .github/workflows/release.yml
 
 # Ensure runtime paths are always rooted at repo root.
