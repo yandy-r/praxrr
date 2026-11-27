@@ -1013,20 +1013,21 @@
                           {@const outcome = getConflictOutcome(conflict)}
                           <tr class="border-t border-neutral-200 align-top dark:border-neutral-800">
                             <td class="px-4 py-2">
-                              <span class="text-neutral-900 dark:text-neutral-100"
-                                >{conflict.entityName ?? 'Unknown'}</span
-                              >
+                              <span class="text-neutral-900 dark:text-neutral-100">
+                                {conflict.entityName ?? 'Unknown'}
+                              </span>
                               {#if conflict.entityType}
                                 <span class="ml-1 font-mono text-xs text-neutral-400 dark:text-neutral-500">
                                   {conflict.entityType}
                                 </span>
                               {/if}
                             </td>
-                            <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400"
-                              >#{conflict.opId}</td
-                            >
-                            <td class="px-4 py-2 text-neutral-700 dark:text-neutral-300">{conflict.operation ?? '—'}</td
-                            >
+                            <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                              #{conflict.opId}
+                            </td>
+                            <td class="px-4 py-2 text-neutral-700 dark:text-neutral-300">
+                              {conflict.operation ?? '—'}
+                            </td>
                             <td class="px-4 py-2 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                               {conflict.conflictReason}
                             </td>
@@ -1071,8 +1072,9 @@
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          ><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg
         >
+          <line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
         Outgoing Changes
       </h2>
 
@@ -1158,20 +1160,24 @@
                 <th class="w-12 px-4 py-3"></th>
                 <th
                   class="px-4 py-3 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                  >Operation</th
                 >
+                  Operation
+                </th>
                 <th
                   class="px-4 py-3 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                  >Entity</th
                 >
+                  Entity
+                </th>
                 <th
                   class="px-4 py-3 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                  >Name</th
                 >
+                  Name
+                </th>
                 <th
                   class="px-4 py-3 text-left text-xs font-medium tracking-wider text-neutral-700 uppercase dark:text-neutral-300"
-                  >File</th
                 >
+                  File
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-neutral-200 bg-white dark:divide-neutral-800 dark:bg-neutral-900">

@@ -419,8 +419,10 @@
             <p class="text-neutral-600 dark:text-neutral-400">
               TMDB API key not configured. <a
                 href="/settings/general"
-                class="text-accent-600 dark:text-accent-400 hover:underline">Configure in Settings</a
+                class="text-accent-600 dark:text-accent-400 hover:underline"
               >
+                Configure in Settings
+              </a>
             </p>
           </div>
         {:else}

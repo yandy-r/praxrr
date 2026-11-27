@@ -328,8 +328,9 @@
             {/each}
           </select>
           {#if compatibleProfiles.length === 0}
-            <span class="text-xs text-amber-600 dark:text-amber-400">No profiles are compatible with this Arr app.</span
-            >
+            <span class="text-xs text-amber-600 dark:text-amber-400">
+              No profiles are compatible with this Arr app.
+            </span>
           {/if}
         </label>
         <label class="flex flex-col gap-1 text-sm text-neutral-600 dark:text-neutral-400">

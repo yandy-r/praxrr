@@ -493,8 +493,9 @@
 
 <div class="space-y-6">
   <div>
-    <a href="/drift" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">← Back to drift</a
-    >
+    <a href="/drift" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">
+      ← Back to drift
+    </a>
   </div>
 
   {#if data.instanceId === null || data.error}

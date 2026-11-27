@@ -238,9 +238,9 @@
                   >
                     <Layers size={12} class="text-indigo-500" />
                     <span class="text-neutral-500 dark:text-neutral-400">Resolution</span>
-                    <span class="font-medium text-neutral-800 dark:text-neutral-100"
-                      >{evaluation.parsed.resolution}</span
-                    >
+                    <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                      {evaluation.parsed.resolution}
+                    </span>
                   </span>
                   {#if evaluation.parsed.modifier !== 'None'}
                     <span
@@ -248,9 +248,9 @@
                     >
                       <Tag size={12} class="text-amber-500" />
                       <span class="text-neutral-500 dark:text-neutral-400">Modifier</span>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-100"
-                        >{evaluation.parsed.modifier}</span
-                      >
+                      <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                        {evaluation.parsed.modifier}
+                      </span>
                     </span>
                   {/if}
                   {#if evaluation.parsed.releaseGroup}
@@ -259,9 +259,9 @@
                     >
                       <Users size={12} class="text-teal-500" />
                       <span class="text-neutral-500 dark:text-neutral-400">Group</span>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-100"
-                        >{evaluation.parsed.releaseGroup}</span
-                      >
+                      <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                        {evaluation.parsed.releaseGroup}
+                      </span>
                     </span>
                   {/if}
                   {#if evaluation.parsed.edition}
@@ -270,8 +270,9 @@
                     >
                       <Bookmark size={12} class="text-orange-500" />
                       <span class="text-neutral-500 dark:text-neutral-400">Edition</span>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-100">{evaluation.parsed.edition}</span
-                      >
+                      <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                        {evaluation.parsed.edition}
+                      </span>
                     </span>
                   {/if}
                   {#if evaluation.parsed.languages.length > 0}
@@ -280,9 +281,9 @@
                     >
                       <Earth size={12} class="text-emerald-500" />
                       <span class="text-neutral-500 dark:text-neutral-400">Languages</span>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-100"
-                        >{evaluation.parsed.languages.join(', ')}</span
-                      >
+                      <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                        {evaluation.parsed.languages.join(', ')}
+                      </span>
                     </span>
                   {/if}
                 </div>

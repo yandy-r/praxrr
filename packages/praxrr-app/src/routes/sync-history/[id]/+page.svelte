@@ -83,9 +83,9 @@
 
 <div class="space-y-6">
   <div>
-    <a href="/sync-history" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline"
-      >← Back to sync history</a
-    >
+    <a href="/sync-history" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">
+      ← Back to sync history
+    </a>
   </div>
 
   {#if data.id === null || data.error}
@@ -229,8 +229,9 @@
               class="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 px-4 py-2 text-sm dark:border-neutral-800"
             >
               <span class="font-medium text-neutral-900 dark:text-neutral-100">{formatSection(result.section)}</span>
-              <Badge variant={syncHistoryStatusVariant(result.status)}>{SYNC_HISTORY_STATUS_LABEL[result.status]}</Badge
-              >
+              <Badge variant={syncHistoryStatusVariant(result.status)}>
+                {SYNC_HISTORY_STATUS_LABEL[result.status]}
+              </Badge>
               <span class="text-xs text-neutral-500 dark:text-neutral-400">{result.itemsSynced} items</span>
               {#if result.failedProfiles && result.failedProfiles.length > 0}
                 <span class="text-xs text-amber-700 dark:text-amber-300">
@@ -249,8 +250,9 @@
     <section class="space-y-3">
       <div class="space-y-1">
         <h2 class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-          Confirmed outcomes <span class="text-neutral-500 dark:text-neutral-400">({detail.entityOutcomes.length})</span
-          >
+          Confirmed outcomes <span class="text-neutral-500 dark:text-neutral-400">
+            ({detail.entityOutcomes.length})
+          </span>
         </h2>
         <p class="text-xs text-neutral-500 dark:text-neutral-400">
           Per-entity results captured from the actual Arr writes — distinct from the planned changes below.

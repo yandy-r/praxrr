@@ -149,9 +149,9 @@
 
 <div class="space-y-6 pt-4">
   <div>
-    <a href={listHref} class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline"
-      >← Back to snapshots</a
-    >
+    <a href={listHref} class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">
+      ← Back to snapshots
+    </a>
   </div>
 
   {#if data.snapshotId === null || data.error}
@@ -189,14 +189,15 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Snapshot #{detail.id}</h1>
-        <Badge variant={detail.type === 'manual' ? 'accent' : 'neutral'}>{TYPE_LABEL[detail.type] ?? detail.type}</Badge
-        >
-        <Badge variant={detail.trigger === 'rollback' ? 'info' : 'neutral'}
-          >{TRIGGER_LABEL[detail.trigger] ?? detail.trigger}</Badge
-        >
-        <Badge variant={detail.isRestorable ? 'success' : 'danger'}
-          >{detail.isRestorable ? 'Restorable' : 'Not restorable'}</Badge
-        >
+        <Badge variant={detail.type === 'manual' ? 'accent' : 'neutral'}>
+          {TYPE_LABEL[detail.type] ?? detail.type}
+        </Badge>
+        <Badge variant={detail.trigger === 'rollback' ? 'info' : 'neutral'}>
+          {TRIGGER_LABEL[detail.trigger] ?? detail.trigger}
+        </Badge>
+        <Badge variant={detail.isRestorable ? 'success' : 'danger'}>
+          {detail.isRestorable ? 'Restorable' : 'Not restorable'}
+        </Badge>
       </div>
       <Button
         text="Restore to this snapshot"

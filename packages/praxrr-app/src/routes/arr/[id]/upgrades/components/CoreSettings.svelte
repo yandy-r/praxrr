@@ -150,26 +150,30 @@
       {#if !enabled}
         <span
           class="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-400"
-          >Paused</span
         >
+          Paused
+        </span>
       {:else if timeUntilNext !== null && timeUntilNext <= 0}
         <span
           class="rounded bg-green-100 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-900/50 dark:text-green-400"
-          >Ready</span
         >
+          Ready
+        </span>
       {:else if timeUntilNext !== null}
         <span>
           Next Run: <span
             class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-            >{formatTimeRemaining(timeUntilNext)}</span
           >
+            {formatTimeRemaining(timeUntilNext)}
+          </span>
         </span>
       {/if}
       <span>
         Last Run: <span
           class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-          >{formatLastRun(lastRunAt)}</span
         >
+          {formatLastRun(lastRunAt)}
+        </span>
       </span>
     </div>
   {/if}

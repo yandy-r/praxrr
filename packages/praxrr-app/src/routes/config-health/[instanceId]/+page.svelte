@@ -316,9 +316,9 @@
 
 <div class="space-y-6">
   <div>
-    <a href="/config-health" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline"
-      >← Back to config health</a
-    >
+    <a href="/config-health" class="text-accent-600 dark:text-accent-500 text-sm font-medium hover:underline">
+      ← Back to config health
+    </a>
   </div>
 
   {#if data.instanceId === null || data.error}
@@ -389,9 +389,9 @@
       <div class="flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
         <span>
           Overall score
-          <span class="ml-1 text-base font-bold {HEALTH_BAND_TEXT_CLASS[detail.overall.band]}"
-            >{detail.overall.band === 'unknown' ? '—' : detail.overall.score}</span
-          >
+          <span class="ml-1 text-base font-bold {HEALTH_BAND_TEXT_CLASS[detail.overall.band]}">
+            {detail.overall.band === 'unknown' ? '—' : detail.overall.score}
+          </span>
         </span>
         <span>Engine v{detail.engineVersion}</span>
         <span>Scored {formatWhen(detail.generatedAt)}</span>

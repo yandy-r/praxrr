@@ -174,9 +174,9 @@
               <span class="w-24 shrink-0 text-sm font-medium text-red-600 dark:text-red-400">Failure</span>
               <span class="text-sm break-words text-neutral-900 dark:text-neutral-100">
                 {row.evidence.failure.message}
-                <span class="ml-1 font-mono text-xs text-neutral-500 dark:text-neutral-400"
-                  >({row.evidence.failure.code})</span
-                >
+                <span class="ml-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                  ({row.evidence.failure.code})
+                </span>
               </span>
             </div>
           {/if}

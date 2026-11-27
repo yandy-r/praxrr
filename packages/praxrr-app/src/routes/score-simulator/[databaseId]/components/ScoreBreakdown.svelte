@@ -111,11 +111,11 @@
           </div>
         </div>
         {#if activeThresholdState}
-          <Badge variant={activeThresholdState === 'below' ? 'danger' : 'success'} size="md"
-            ><span class={activeThresholdState === 'upgrade-reached' ? 'opacity-70' : ''}>
+          <Badge variant={activeThresholdState === 'below' ? 'danger' : 'success'} size="md">
+            <span class={activeThresholdState === 'upgrade-reached' ? 'opacity-70' : ''}>
               {thresholdLabel(activeThresholdState)}
-            </span></Badge
-          >
+            </span>
+          </Badge>
         {/if}
       </div>
 
