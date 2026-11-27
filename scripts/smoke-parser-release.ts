@@ -596,6 +596,8 @@ async function smokeAdjacentApp(
     cwd: directory,
     clearEnv: true,
     env: appEnvironment(dataDirectory, appPort),
+    // POSIX: its own process group, so cleanup can kill the adjacent parser with it.
+    detached: Deno.build.os !== 'windows',
     stdout: 'piped',
     stderr: 'piped',
   }).spawn();
@@ -649,9 +651,11 @@ async function smokeAdjacentApp(
       await waitForExit(child, APP_SHUTDOWN_DEADLINE_MS).catch(() => undefined);
     }
     try {
-      child.kill('SIGKILL');
+      // POSIX: the whole group, so a parser whose app never handled SIGTERM does not survive.
+      if (Deno.build.os === 'windows') child.kill('SIGKILL');
+      else Deno.kill(-child.pid, 'SIGKILL');
     } catch {
-      // The parent has already exited.
+      // The app and its parser have already exited.
     }
     await child.status.catch(() => undefined);
     if (discoveredParserPort) {
