@@ -602,6 +602,12 @@ async function smokeAdjacentApp(
   const pumps = [pump(child.stdout.getReader(), output), pump(child.stderr.getReader(), output)];
   const withOutput = (message: string): never => fail(`${message}; app output: ${output.join('').slice(-4_000)}`);
   const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+  let exited = false;
+  child.status.then(
+    () => (exited = true),
+    () => (exited = true)
+  );
+  let discoveredParserPort = 0;
   try {
     // Any exit before SIGTERM is a failure; surface it at once instead of at the next deadline.
     const earlyExit = child.status.then((status) => {
@@ -612,6 +618,7 @@ async function smokeAdjacentApp(
       (async () => {
         // The app emits Ready only after its own parser health probe succeeds.
         const port = await waitForAdjacentParser(output, timeoutMs);
+        discoveredParserPort = port;
         const setupHTML = await waitForAppListener(baseURL, timeoutMs);
         const asset = await verifyImmutableAsset(baseURL, setupHTML, timeoutMs);
         await createSmokeUser(baseURL, timeoutMs);
@@ -635,12 +642,23 @@ async function smokeAdjacentApp(
     await waitForParserStop(parserPort, timeoutMs);
     return { appPort, immutableAsset, parserPort, shutdownMs };
   } finally {
+    // A failed check skips the graceful stop above. SIGKILL alone would bypass the app's own
+    // handlers that stop its adjacent parser, so try a bounded SIGTERM first.
+    if (!exited) {
+      await terminateProcess(child, true).catch(() => undefined);
+      await waitForExit(child, APP_SHUTDOWN_DEADLINE_MS).catch(() => undefined);
+    }
     try {
       child.kill('SIGKILL');
     } catch {
       // The parent has already exited.
     }
     await child.status.catch(() => undefined);
+    if (discoveredParserPort) {
+      await waitForParserStop(discoveredParserPort, Math.min(timeoutMs, 5_000)).catch((error: unknown) =>
+        console.error(`warning: ${messageOf(error)}; stop it by its listener on 127.0.0.1:${discoveredParserPort}`)
+      );
+    }
     await Promise.race([
       Promise.allSettled(pumps),
       new Promise<void>((resolve) => setTimeout(resolve, Math.min(timeoutMs, 2_000))),
