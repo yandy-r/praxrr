@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { Info, Clapperboard, Film, Tv, Plus, AlertTriangle, Sliders, Check } from 'lucide-svelte';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';

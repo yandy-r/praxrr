@@ -5,8 +5,8 @@
   import Table from '$ui/table/Table.svelte';
   import { createSearchStore } from '$lib/client/stores/search.ts';
   import type { Column, SortState } from '$ui/table/types.ts';
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { browser } from '$app/env';
+  import { page } from '$stores/page';
   import type { PageData } from './$types';
   import type { CustomFormatTableRow } from '$shared/pcd/display.ts';
   import {

@@ -7,7 +7,7 @@
   import { isDirty, initEdit, update, current, clear } from '$lib/client/stores/dirty';
   import { isValidExternalUrl } from '$lib/client/validation/arrUrls.ts';
   import type { ArrInstance } from '$db/queries/arrInstances.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import FormInput from '$ui/form/FormInput.svelte';
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';
   import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';

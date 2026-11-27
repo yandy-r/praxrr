@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import type { SourceRef, SourceKind } from '$shared/sources/types.ts';
 
 export type SourceFilterKey = `${SourceRef['type']}:${number}`;

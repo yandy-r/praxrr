@@ -14,7 +14,7 @@
   import TableView from './views/TableView.svelte';
   import CardView from './views/CardView.svelte';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { alertStore } from '$alerts/store';
   import type { QualityProfileTableRow } from '$shared/pcd/display.ts';
   import type { PageData } from './$types';

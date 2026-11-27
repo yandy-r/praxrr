@@ -19,7 +19,7 @@
 </script>
 
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { Eye, Loader2 } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import Button from '$ui/button/Button.svelte';

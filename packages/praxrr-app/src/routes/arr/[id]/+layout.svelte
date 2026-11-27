@@ -2,7 +2,7 @@
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import VersionSupportBadge from '$ui/arr/VersionSupportBadge.svelte';
   import CompatibilityBanner from '$ui/arr/CompatibilityBanner.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { Library, RefreshCw, ArrowUpCircle, FileEdit, ScrollText, Settings } from 'lucide-svelte';
   import type { LayoutData } from './$types';
 

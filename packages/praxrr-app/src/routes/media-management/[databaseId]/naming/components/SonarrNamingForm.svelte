@@ -1,6 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { tick } from 'svelte';
   import { get } from 'svelte/store';
   import StickyCard from '$ui/card/StickyCard.svelte';

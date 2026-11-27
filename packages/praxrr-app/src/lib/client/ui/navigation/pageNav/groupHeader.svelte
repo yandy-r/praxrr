@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import type { ComponentType } from 'svelte';
   import NavBadgePill from '../NavBadgePill.svelte';
   import type { NavBadge } from '$shared/navigation/types.ts';

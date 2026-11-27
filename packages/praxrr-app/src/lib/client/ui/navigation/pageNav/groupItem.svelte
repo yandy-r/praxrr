@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { goto } from '$app/navigation';
   import { userInterfacePreferencesStore } from '$stores/userInterfacePreferences.ts';
   import { clearLocalRecents } from '$ui/command-palette/recents.ts';

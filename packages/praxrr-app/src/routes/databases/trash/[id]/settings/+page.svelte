@@ -1,7 +1,7 @@
 <script lang="ts">
   import TrashGuideForm from '../../../components/TrashGuideForm.svelte';
   import type { ActionData } from './$types';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   export let form: ActionData;
 

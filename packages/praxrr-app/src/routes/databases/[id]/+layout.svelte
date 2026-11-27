@@ -11,7 +11,7 @@
     PencilLine,
     PackagePlus,
   } from 'lucide-svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: database = $page.data.database;
   $: currentPath = $page.url.pathname;

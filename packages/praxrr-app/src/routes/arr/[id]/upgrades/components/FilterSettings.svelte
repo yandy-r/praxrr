@@ -5,7 +5,7 @@
   import { selectors } from '$shared/upgrades/selectors';
   import { createSearchStore, getPersistentSearchStore, type SearchStore } from '$lib/client/stores/search';
   import type { Readable } from 'svelte/store';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import FilterGroupComponent from './FilterGroup.svelte';
   import NumberInput from '$ui/form/NumberInput.svelte';
   import DropdownSelect from '$ui/dropdown/DropdownSelect.svelte';

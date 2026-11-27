@@ -1,7 +1,7 @@
 <script lang="ts">
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import { LayoutDashboard, FileText, Layers, Ruler, Type, Settings } from 'lucide-svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: source = $page.data.source;
   $: currentPath = $page.url.pathname;

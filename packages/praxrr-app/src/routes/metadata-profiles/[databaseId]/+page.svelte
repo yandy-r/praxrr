@@ -2,7 +2,7 @@
   import CopyToDatabaseModal from '$ui/bundles/CopyToDatabaseModal.svelte';
   import { downloadBundle } from '$lib/client/bundles/api.ts';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import Tabs from '$ui/navigation/tabs/Tabs.svelte';
   import ActionsBar from '$ui/actions/ActionsBar.svelte';
   import ActionButton from '$ui/actions/ActionButton.svelte';
@@ -16,7 +16,7 @@
     saveLocalOnly,
   } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import Table from '$ui/table/Table.svelte';
   import type { Column } from '$ui/table/types';
   import type { LidarrMetadataProfileListItem } from '$shared/pcd/display.ts';

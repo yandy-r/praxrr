@@ -3,7 +3,7 @@
  */
 
 import { writable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 export type AccentColor = 'blue' | 'yellow' | 'green' | 'orange' | 'teal' | 'purple' | 'rose';
 

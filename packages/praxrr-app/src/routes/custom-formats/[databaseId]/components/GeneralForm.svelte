@@ -1,6 +1,6 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { tick } from 'svelte';
   import { Save, Loader2, Trash2 } from 'lucide-svelte';
   import DisclosureSection from '$ui/form/DisclosureSection.svelte';

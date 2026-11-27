@@ -4,7 +4,7 @@
   import { fade, scale } from 'svelte/transition';
   import { Loader2, Search } from 'lucide-svelte';
   import { afterNavigate, goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import Badge from '$ui/badge/Badge.svelte';
   import SourceBadge from '$ui/badge/SourceBadge.svelte';
   import { focusTrap, wrapIndex } from '$lib/client/utils/focusTrap';

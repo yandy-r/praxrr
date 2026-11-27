@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
   import { RotateCcw } from 'lucide-svelte';
   import Badge from '$ui/badge/Badge.svelte';
   import Button from '$ui/button/Button.svelte';

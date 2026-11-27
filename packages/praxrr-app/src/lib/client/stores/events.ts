@@ -2,8 +2,8 @@
  * One `EventSource` per tab for `GET /api/v1/events`, with its own backoff, replay cursor and
  * auth-aware stop. The browser authenticates through the session cookie; tokens never go in the URL.
  */
-import { browser } from '$app/environment';
-import { base } from '$app/paths';
+import { browser } from '$app/env';
+import { resolve } from '$app/paths';
 import { writable } from 'svelte/store';
 import {
   classifyProbeStatus,
@@ -44,7 +44,7 @@ function createEventsStore() {
   /** Bumped on every connect/stop so stale `onerror` probes cannot schedule a reconnect. */
   let generation = 0;
 
-  const streamUrl = `${base}${LIVE_EVENTS_PATH}`;
+  const streamUrl = resolve(LIVE_EVENTS_PATH);
 
   function setStatus(next: LiveStatus): void {
     currentStatus = next;

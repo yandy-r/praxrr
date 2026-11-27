@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { alertStore } from '$alerts/store';
 import { get, writable, type Writable } from 'svelte/store';
 import { SECTION_KEY_MAX_LENGTH, SECTION_KEY_PATTERN, type SectionKey } from '$shared/disclosure/sectionKeys.ts';

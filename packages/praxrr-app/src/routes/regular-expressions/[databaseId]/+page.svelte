@@ -21,7 +21,7 @@
     saveLocalOnly,
   } from '$lib/client/utils/locallyModified.ts';
   import { createDataPageStore } from '$lib/client/stores/dataPage';
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { Info, Plus, FileText, Users } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { alertStore } from '$alerts/store';

@@ -5,7 +5,7 @@
   import Table from '$ui/table/Table.svelte';
   import type { Column } from '$ui/table/types.ts';
   import type { TrashGuideQualitySizeEntry } from '$lib/server/trashguide/types.ts';
-  import { page } from '$app/stores';
+  import { page } from '$stores/page';
 
   $: source = $page.data.source;
   $: entity = $page.data.entity;
