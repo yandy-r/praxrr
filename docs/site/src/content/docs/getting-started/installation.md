@@ -65,8 +65,8 @@ details.
 
 ## Standalone archive
 
-Release archives contain the `praxrr` application, its `server.js` and `static/`
-assets, and an adjacent `praxrr-parser` binary (`.exe` on Windows). Run `praxrr`
+Release archives contain the `praxrr` application (web assets are embedded in the
+binary) and an adjacent `praxrr-parser` binary (`.exe` on Windows). Run `praxrr`
 from the extracted archive; when no explicit `PARSER_HOST` is set, it starts the
 adjacent parser on loopback, waits for parser health, and stops the child process
 with the app. If the parser is absent or unhealthy, Praxrr still starts and only
