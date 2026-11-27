@@ -39,7 +39,7 @@ Options:
   --platform VALUE         linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64
   --expected-version VALUE Parser behavior version (default: ${DEFAULT_VERSION})
   --native VALUE           Run binaries on this host: true or false (default: true)
-  --adjacent VALUE         Run the full adjacent app lifecycle: true or false (default: true)
+  --adjacent VALUE         Run the adjacent app lifecycle and HTTP smoke: true or false (default: true)
   --timeout-ms VALUE       Per-phase deadline (default: ${DEFAULT_TIMEOUT_MS})
   --help                   Show this help
 `;
@@ -314,12 +314,17 @@ async function verifyParserAPI(baseURL: string, timeoutMs: number): Promise<void
 }
 
 async function waitForExit(child: Deno.ChildProcess, timeoutMs: number): Promise<Deno.CommandStatus> {
-  return await Promise.race([
-    child.status,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`process ${child.pid} did not exit`)), timeoutMs)
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      child.status,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`process ${child.pid} did not exit`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function terminateProcess(child: Deno.ChildProcess, includeTree: boolean): Promise<void> {
@@ -447,33 +452,188 @@ async function waitForParserStop(port: number, timeoutMs: number): Promise<void>
   fail(`adjacent parser on port ${port} survived parent termination`);
 }
 
-async function smokeAdjacentDiscovery(app: string, directory: string, timeoutMs: number): Promise<number> {
+// Variables passed through to the app. Everything else is dropped so a runner's TRUSTED_PROXY,
+// ORIGIN, *_HEADER or AUTH settings cannot change what the HTTP smoke proves.
+const PASSTHROUGH_ENV = ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'SystemRoot', 'windir', 'USERPROFILE', 'LANG'];
+const APP_SHUTDOWN_DEADLINE_MS = 10_000;
+// A documentation-range (TEST-NET-3) address: never local, never routable.
+const SPOOFED_FORWARDED_FOR = '203.0.113.7';
+// Protected by the auth middleware (not a public path, not a prerendered page) and answers 200
+// for a request the middleware lets through, so 200 vs 401 shows how the request was classified.
+const PROTECTED_API_PATH = '/api/v1/security-posture/summary';
+
+interface AppHTTPSmoke {
+  appPort: number;
+  immutableAsset: string;
+  shutdownMs: number;
+}
+
+function appEnvironment(dataDirectory: string, appPort: number): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const name of PASSTHROUGH_ENV) {
+    const value = Deno.env.get(name);
+    if (value !== undefined) env[name] = value;
+  }
+  return {
+    ...env,
+    APP_BASE_PATH: dataDirectory,
+    AUTH: 'local',
+    HOST: '127.0.0.1',
+    PORT: String(appPort),
+    PARSER_HOST: '',
+    PARSER_PORT: '',
+    // No first-run auto-link: the smoke must not clone anything from the network.
+    PRAXRR_DEFAULT_DB_URL: '',
+    // Startup requires a credential key; a fresh random one per run, discarded with the data dir.
+    ARR_CREDENTIAL_MASTER_KEY: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))),
+    ARR_CREDENTIAL_MASTER_KEY_VERSION: 'v1',
+  };
+}
+
+async function appRequest(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  return await fetch(url, {
+    redirect: 'manual',
+    ...init,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
+async function expectStatus(response: Response, expected: number, label: string): Promise<string> {
+  const body = await response.text();
+  if (response.status !== expected) {
+    const location = response.headers.get('location');
+    fail(
+      `${label} returned HTTP ${response.status}${location ? ` (location ${location})` : ''}, ` +
+        `expected ${expected}: ${body.slice(0, 500)}`
+    );
+  }
+  return body;
+}
+
+async function waitForAppListener(baseURL: string, timeoutMs: number): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = 'listener did not respond';
+  while (Date.now() < deadline) {
+    try {
+      const response = await appRequest(`${baseURL}/auth/setup`, {}, Math.min(2_000, timeoutMs));
+      if (response.status === 200) return await response.text();
+      await response.body?.cancel();
+      lastError = `HTTP ${response.status}`;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  fail(`app did not serve /auth/setup: ${lastError}`);
+}
+
+async function verifyImmutableAsset(baseURL: string, html: string, timeoutMs: number): Promise<string> {
+  const match = html.match(/\/_app\/immutable\/[A-Za-z0-9._\-/]+\.(?:js|css)/);
+  if (!match) fail('/auth/setup does not reference a hashed /_app/immutable asset');
+  const asset = match[0];
+  const response = await appRequest(`${baseURL}${asset}`, {}, timeoutMs);
+  const body = await expectStatus(response, 200, asset);
+  if (body.length === 0) fail(`${asset} returned an empty body`);
+  return asset;
+}
+
+async function createSmokeUser(baseURL: string, timeoutMs: number): Promise<void> {
+  // A throwaway account in a temporary data directory, so the local-bypass check below runs
+  // against a configured instance instead of the first-run setup redirect.
+  const password = Array.from(crypto.getRandomValues(new Uint8Array(18)), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+  const response = await appRequest(
+    `${baseURL}/auth/setup`,
+    {
+      method: 'POST',
+      // A browser form post: without Accept: text/html, SvelteKit answers with a JSON redirect.
+      headers: { accept: 'text/html', origin: baseURL },
+      body: new URLSearchParams({ username: 'release-smoke', password, confirmPassword: password }),
+    },
+    timeoutMs
+  );
+  await expectStatus(response, 303, 'POST /auth/setup');
+}
+
+async function verifyAppHealth(baseURL: string, timeoutMs: number): Promise<void> {
+  const response = await appRequest(`${baseURL}/api/v1/health`, {}, timeoutMs);
+  const body = await expectStatus(response, 200, '/api/v1/health');
+  const health = JSON.parse(body) as { status?: unknown };
+  if (health.status !== 'healthy' && health.status !== 'degraded') {
+    fail(`/api/v1/health reported status ${JSON.stringify(health.status)}`);
+  }
+}
+
+async function verifyLocalBypassUsesSocketPeer(baseURL: string, timeoutMs: number): Promise<void> {
+  // ITC-1952: under AUTH=local the client address must come from the socket, not from headers.
+  const plain = await appRequest(`${baseURL}${PROTECTED_API_PATH}`, {}, timeoutMs);
+  await expectStatus(plain, 200, `${PROTECTED_API_PATH} from loopback`);
+  const spoofed = await appRequest(
+    `${baseURL}${PROTECTED_API_PATH}`,
+    { headers: { 'x-forwarded-for': SPOOFED_FORWARDED_FOR } },
+    timeoutMs
+  );
+  await expectStatus(spoofed, 200, `${PROTECTED_API_PATH} from loopback with X-Forwarded-For`);
+}
+
+async function smokeAdjacentApp(
+  app: string,
+  directory: string,
+  timeoutMs: number
+): Promise<
+  AppHTTPSmoke & {
+    parserPort: number;
+  }
+> {
   const output: string[] = [];
   const dataDirectory = await Deno.makeTempDir({
     prefix: 'praxrr-release-smoke-',
   });
+  const appPort = reserveLoopbackPort();
+  const baseURL = `http://127.0.0.1:${appPort}`;
   const child = new Deno.Command(app, {
     cwd: directory,
-    env: {
-      APP_BASE_PATH: dataDirectory,
-      AUTH: 'off',
-      HOST: '127.0.0.1',
-      PORT: String(reserveLoopbackPort()),
-      PARSER_HOST: '',
-      PARSER_PORT: '',
-    },
+    clearEnv: true,
+    env: appEnvironment(dataDirectory, appPort),
     stdout: 'piped',
     stderr: 'piped',
   }).spawn();
   const pumps = [pump(child.stdout.getReader(), output), pump(child.stderr.getReader(), output)];
-  let parserPort = 0;
+  const withOutput = (message: string): never => fail(`${message}; app output: ${output.join('').slice(-4_000)}`);
+  const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
   try {
-    parserPort = await waitForAdjacentParser(output, timeoutMs);
-    // The app emits Ready only after its own parser health probe succeeds.
+    // Any exit before SIGTERM is a failure; surface it at once instead of at the next deadline.
+    const earlyExit = child.status.then((status) => {
+      throw new Error(`app exited before SIGTERM with code ${status.code} (signal ${status.signal})`);
+    });
+    earlyExit.catch(() => undefined);
+    const { parserPort, immutableAsset } = await Promise.race([
+      (async () => {
+        // The app emits Ready only after its own parser health probe succeeds.
+        const port = await waitForAdjacentParser(output, timeoutMs);
+        const setupHTML = await waitForAppListener(baseURL, timeoutMs);
+        const asset = await verifyImmutableAsset(baseURL, setupHTML, timeoutMs);
+        await createSmokeUser(baseURL, timeoutMs);
+        await verifyAppHealth(baseURL, timeoutMs);
+        await verifyLocalBypassUsesSocketPeer(baseURL, timeoutMs);
+        return { parserPort: port, immutableAsset: asset };
+      })(),
+      earlyExit,
+    ]).catch((error: unknown) => withOutput(messageOf(error)));
+
+    const stopStarted = performance.now();
     await terminateProcess(child, true);
-    await waitForExit(child, timeoutMs);
+    const status = await waitForExit(child, APP_SHUTDOWN_DEADLINE_MS).catch(() =>
+      withOutput(`app did not exit within ${APP_SHUTDOWN_DEADLINE_MS}ms of SIGTERM`)
+    );
+    // Windows has no SIGTERM: terminateProcess force-kills the tree, so the exit code is not graceful.
+    if (Deno.build.os !== 'windows' && (!status.success || status.signal !== null)) {
+      withOutput(`app exited after SIGTERM with code ${status.code} (signal ${status.signal})`);
+    }
+    const shutdownMs = Math.round(performance.now() - stopStarted);
     await waitForParserStop(parserPort, timeoutMs);
-    return parserPort;
+    return { appPort, immutableAsset, parserPort, shutdownMs };
   } finally {
     try {
       child.kill('SIGKILL');
@@ -492,16 +652,12 @@ async function smokeAdjacentDiscovery(app: string, directory: string, timeoutMs:
 async function main(): Promise<void> {
   const options = parseOptions(Deno.args);
   const layout = await validateLayout(options);
-  let adjacentParserPort: number | undefined;
+  let adjacent: (AppHTTPSmoke & { parserPort: number }) | undefined;
   if (options.native) {
     await smokeParser(layout.parser, options.expectedVersion, options.timeoutMs);
   }
   if (options.adjacent) {
-    adjacentParserPort = await smokeAdjacentDiscovery(
-      layout.app,
-      await Deno.realPath(options.directory),
-      options.timeoutMs
-    );
+    adjacent = await smokeAdjacentApp(layout.app, await Deno.realPath(options.directory), options.timeoutMs);
   }
   console.log(
     JSON.stringify({
@@ -513,8 +669,17 @@ async function main(): Promise<void> {
       nativeSmoke: options.native,
       adjacentSmoke: options.adjacent,
       version: options.expectedVersion,
-      adjacentParserPort,
+      adjacentParserPort: adjacent?.parserPort,
       parentChildTermination: options.adjacent,
+      appHTTPSmoke: adjacent
+        ? {
+            health: 200,
+            immutableAsset: adjacent.immutableAsset,
+            localBypassIgnoresForwardedFor: true,
+            sigtermExit: 0,
+            shutdownMs: adjacent.shutdownMs,
+          }
+        : undefined,
     })
   );
 }
