@@ -104,9 +104,9 @@
     >
       <span>Inspect plugin details</span>
       <span class="text-xs text-neutral-500 group-open:hidden dark:text-neutral-400" aria-hidden="true">Expand</span>
-      <span class="hidden text-xs text-neutral-500 group-open:inline dark:text-neutral-400" aria-hidden="true"
-        >Collapse</span
-      >
+      <span class="hidden text-xs text-neutral-500 group-open:inline dark:text-neutral-400" aria-hidden="true">
+        Collapse
+      </span>
     </summary>
 
     <div class="space-y-6 border-t border-neutral-200 p-4 sm:p-5 dark:border-neutral-800">

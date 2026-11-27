@@ -129,8 +129,9 @@
                 <span
                   id={qualityHeaderId}
                   class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
-                  >Quality</span
                 >
+                  Quality
+                </span>
               </div>
               {#each uniqueQualities as quality}
                 <button
@@ -164,8 +165,9 @@
               <span
                 id={profileHeaderId}
                 class="text-xs font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400"
-                >Profile</span
               >
+                Profile
+              </span>
             </div>
             {#each uniqueProfiles as profile}
               <button

@@ -222,9 +222,9 @@
       <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800">
         <p class="text-sm text-neutral-600 dark:text-neutral-300">
           TMDB API key not configured. Please add your API key in
-          <a href="/settings/general" class="text-accent-600 dark:text-accent-400 font-medium hover:underline"
-            >Settings</a
-          >
+          <a href="/settings/general" class="text-accent-600 dark:text-accent-400 font-medium hover:underline">
+            Settings
+          </a>
           to search for movies and TV series.
         </p>
       </div>

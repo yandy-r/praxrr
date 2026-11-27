@@ -452,8 +452,9 @@
         Format strings control how {appLabel.toLowerCase()} names episode files and folders. Use tokens like
         <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs dark:bg-neutral-800">{'{Series Title}'}</code>
         and
-        <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs dark:bg-neutral-800">{'{Episode Title}'}</code
-        >
+        <code class="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs dark:bg-neutral-800">
+          {'{Episode Title}'}
+        </code>
         to build your naming pattern. {appLabel} has separate formats for standard, daily, and anime episodes.
       </p>
     </div>

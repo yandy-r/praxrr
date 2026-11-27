@@ -76,8 +76,10 @@
           <Search size={18} aria-hidden="true" />
           <kbd
             class="hidden rounded border border-neutral-300 px-1 font-mono text-[10px] leading-4 text-neutral-500 md:inline dark:border-neutral-700 dark:text-neutral-400"
-            aria-hidden="true">{shortcutHint}</kbd
+            aria-hidden="true"
           >
+            {shortcutHint}
+          </kbd>
         </button>
       {/if}
       <AccentPicker />

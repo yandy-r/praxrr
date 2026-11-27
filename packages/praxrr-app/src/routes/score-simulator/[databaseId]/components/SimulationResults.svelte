@@ -301,9 +301,9 @@
                       <tr class="border-b border-neutral-100 dark:border-neutral-800">
                         <td class="px-2 py-2 align-top">
                           <div class="flex flex-wrap items-center gap-1.5">
-                            <span class="font-medium text-neutral-800 dark:text-neutral-100"
-                              >{condition.conditionName}</span
-                            >
+                            <span class="font-medium text-neutral-800 dark:text-neutral-100">
+                              {condition.conditionName}
+                            </span>
                             {#if condition.required}
                               <Badge variant="warning" size="sm">Required</Badge>
                             {/if}

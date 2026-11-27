@@ -596,8 +596,9 @@
       <p class="mb-3">
         Schedule uses standard cron syntax: <code
           class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs dark:bg-neutral-800"
-          >minute hour day month weekday</code
         >
+          minute hour day month weekday
+        </code>
       </p>
       <div class="space-y-1.5 font-mono text-xs">
         <div class="flex gap-3">

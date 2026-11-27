@@ -22,8 +22,8 @@
   <span class="sr-only">{badge.label}</span>
 {:else}
   <span class="ml-auto shrink-0">
-    <Badge variant={badge.tone} size="sm"
-      ><span aria-hidden="true">{text}</span><span class="sr-only">{badge.label}</span></Badge
-    >
+    <Badge variant={badge.tone} size="sm">
+      <span aria-hidden="true">{text}</span><span class="sr-only">{badge.label}</span>
+    </Badge>
   </span>
 {/if}

@@ -274,9 +274,9 @@
             <svelte:fragment slot="header">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex min-w-0 items-center gap-1.5">
-                  <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100"
-                    >{profile.name}</span
-                  >
+                  <span class="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {profile.name}
+                  </span>
                   {#if profile.locallyModified}
                     <LocallyModifiedBadge />
                   {/if}

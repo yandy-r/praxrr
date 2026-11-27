@@ -336,9 +336,9 @@
       class="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
     >
       <AlertTriangle size={16} />
-      <span
-        >Parser service unavailable — release scoring is disabled. Config diff and cascade results are still shown.</span
-      >
+      <span>
+        Parser service unavailable — release scoring is disabled. Config diff and cascade results are still shown.
+      </span>
     </div>
   {/if}
 
